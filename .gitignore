@@ -1,0 +1,15 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Environment / secrets
+.env
+*.local.json
+
+# Data artifacts
+data/raw/
+data/interim/
+*.duckdb
+*.duckdb.wal

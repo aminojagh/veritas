@@ -1,0 +1,187 @@
+# Target State
+
+**Where Veritas is going.** Written in Glossary terms only. This document changes
+rarely and only by explicit agreement — it is the fixed point every Step is
+measured against.
+
+**Status:** proposed, updated 2026-07-23. The Domain Language it uses is now
+`agreed`. The Target State itself stays `proposed` until the data-availability
+check confirms every source it assumes can actually be obtained — see
+[Step 001, Sub-step 1.2](../plan/step-001-target-state-design.md).
+
+---
+
+## Why this project exists
+
+Veritas serves two audiences, and the design must satisfy both without
+compromise:
+
+1. **DataTalks.Club LLM Zoomcamp capstone** — must score full marks against the
+   published rubric (see the [Zoomcamp criteria map](#zoomcamp-criteria-map)
+   section).
+2. **A credible minimal slice of the [full system](product-brief.md)** — a Senior
+   Data Scientist role building AI-over-data-warehouse systems. It must extend
+   into a full MVP for that role without reworking its core.
+
+Where the two pull apart, the tension is recorded as an ADR, not resolved
+silently.
+
+---
+
+## The problem
+
+Ask an LLM a business question over a data warehouse and it will write plausible
+SQL. Plausible is the problem. "What was our revenue last quarter?" has no single
+correct answer at a brokerage: **Gross Revenue** and **Net Revenue** differ by
+every Rebate paid to introducing partners, and a model that picks one silently
+has produced a **correct program computing the wrong number**.
+
+That failure is worse than an error, because it is confident, well-formatted, and
+indistinguishable from a right answer. Repeated across a business, it is how a
+**Shadow Metric** layer forms: every question invents its own definition of
+revenue, and no two dashboards agree.
+
+The failure is not a model capability problem. It is a **grounding** problem. The
+definitions exist — they live in analysts' heads, in dbt models, in BI tools —
+they are simply not available to the model at the moment it writes SQL.
+
+## The system
+
+Veritas is a natural-language analytics copilot over a brokerage warehouse whose
+governing rule is:
+
+> **The model never defines a metric. It may only select one from a certified
+> Semantic Layer, and everything it generates is checked by code before it runs.**
+
+Two consequences follow, and they are the whole design:
+
+- **Retrieval is not a nicety, it is the correctness mechanism.** Retrieving the
+  wrong Metric Definition *is* the wrong answer. This is why retrieval quality
+  can be measured objectively here rather than by an LLM's opinion.
+- **Governance is deterministic.** The Validation Gate is ordinary code, not a
+  prompt asking the model to behave. Governance you can prove beats governance
+  you request politely.
+
+### Components
+
+| Component | Responsibility | Built with |
+|---|---|---|
+| **Warehouse** | Brokerage star schema — Trades, Cash Movements, Positions, balances, plus Client/Account/Instrument/date/FX dimensions. | DuckDB |
+| **Semantic Layer** | Metric Definitions, Dimension Definitions, Join Paths, Ambiguous Terms. One YAML file per Semantic Entry, versioned. | YAML |
+| **Ingestion** | Real FX Rates and market data from public APIs; synthetic Trade/Cash/Position activity from a seeded simulator. | dlt |
+| **Retrieval** | Question → the Semantic Entries needed to answer it. Hybrid text + vector, re-ranked. | minsearch + embeddings |
+| **Copilot** | Rewrite → retrieve → ground → generate SQL → validate → execute → explain. | tool-calling LLM |
+| **Validation Gate** | Deterministic pre-execution checks on the generated SQL's parse tree. | sqlglot |
+| **Interface** | Ask questions, see the Grounded Answer with its SQL and Lineage, leave feedback. | Streamlit |
+| **Observability** | Every question, Grounded Answer, Validation Gate outcome, cost, latency, and feedback. | Postgres + Grafana |
+| **Evaluation** | Gold Question Set; retrieval measures; Execution Accuracy; LLM-as-judge. | notebooks + scripts |
+
+> **Metrics vs. measures.** The Semantic Layer holds **metrics** — Certified
+> Metrics like Gross Revenue, always about the brokerage. Evaluation and
+> Observability produce **measures** of Veritas itself: Evaluation Measures (hit
+> rate, MRR, Execution Accuracy) and Operational Measures (cost, latency,
+> feedback). The two words are never used interchangeably. See the
+> [System measures](../glossary.md#e-system-measures) section of the Glossary.
+
+### Flow
+
+```
+question
+   │
+   ├─ 1. REWRITE ──────── resolve Ambiguous Terms against the Semantic Layer.
+   │                      "revenue" is not answerable — ask which, or use the
+   │                      one the question actually names.
+   │
+   ├─ 2. RETRIEVE ─────── hybrid search over Semantic Entries, re-ranked.
+   │                      Returns Metric Definitions, Dimension Definitions,
+   │                      and Join Paths — never raw table dumps.
+   │
+   ├─ 3. GROUND ───────── build the prompt from retrieved entries only.
+   │                      Metrics not retrieved are not available.
+   │
+   ├─ 4. GENERATE ─────── SQL, composed from certified metric expressions.
+   │
+   ├─ 5. VALIDATE ─────── deterministic, on the parse tree:
+   │                      · every metric expression traces to a Certified Metric
+   │                      · no restricted column in the projection
+   │                      · Access Profile predicate present
+   │                      · scan bounded, statement read-only
+   │                      fail → explain the violation, do not execute
+   │
+   ├─ 6. EXECUTE ──────── against the Warehouse
+   │
+   └─ 7. ANSWER ───────── Grounded Answer: result, SQL, Lineage (which entries,
+                          which metric versions), Validation Gate outcome.
+                          Logged, and open to feedback.
+```
+
+Steps 1, 2 and 5 are where the correctness lives. Step 4 is the part everyone
+else builds.
+
+---
+
+## Non-goals
+
+As load-bearing as the goals. Veritas deliberately does **not**:
+
+- **Answer questions it cannot ground.** No Certified Metric, no answer. Refusing
+  is a feature; a helpful guess is the exact failure being prevented.
+- **Let the model define metrics.** Even correctly. A right answer by an
+  uncertified route is still a Shadow Metric.
+- **Validate with an LLM.** The Validation Gate is code. An LLM asked to check
+  its own SQL shares its own blind spots.
+- **Run on real client data.** Client activity is synthetic by construction —
+  which is also what makes the access-control story demonstrable without risk.
+- **Be a general text-to-SQL system.** Veritas is narrow on purpose: one
+  warehouse, one certified vocabulary.
+- **Chase conversational polish.** Multi-turn memory, charting, and export are
+  outside the slice.
+
+---
+
+## Zoomcamp criteria map
+
+Each row is **one line item on the Zoomcamp grader's scorecard** — not a section
+of this design. The rubric awards up to the **Max** points shown per criterion;
+the right column is how Veritas earns them. Scoring is a design constraint here,
+not an afterthought.
+
+| Criterion | Max | How Veritas earns it |
+|---|---|---|
+| Problem description | 2 | The grader's first checkbox — *does the project explain what problem it solves and why it matters?* Veritas frames it as **silent metric ambiguity**: answering "revenue" with Gross when the business meant Net is a confident, well-formatted wrong number. The [`The problem`](#the-problem) section is that narrative, carried by the Gross-vs-Net worked example. |
+| Retrieval flow | 2 | Semantic Layer knowledge base + LLM, both load-bearing in the flow. |
+| Retrieval evaluation | 2 | Hit rate and MRR across ≥3 approaches — text, vector, hybrid, re-ranked. Ground truth is *derived*: the Semantic Entries a gold SQL touches are its relevant set. |
+| LLM evaluation | 2 | Execution Accuracy across ≥2 prompts and ≥2 models, plus LLM-as-judge as a second lens. Objective primary signal. |
+| Interface | 2 | Streamlit app showing answer, SQL, Lineage, and Validation Gate outcome. |
+| Ingestion pipeline | 2 | dlt pipelines for FX, market data, and the Semantic Layer index. |
+| Monitoring | 2 | Feedback capture + Grafana dashboard, ≥5 charts — including Validation-Gate rejections by reason and metric-usage frequency. |
+| Containerization | 2 | docker-compose: app, Postgres, Grafana. |
+| Reproducibility | 2 | `uv.lock`, pinned Python, key-free public data sources, seeded simulator, one-command bring-up. |
+| Hybrid search | 1 | Text + vector, evaluated against each alone. |
+| Document re-ranking | 1 | Re-ranker over hybrid candidates, evaluated. |
+| Query rewriting | 1 | Ambiguous Term resolution — the core disambiguation step, not a bolt-on. |
+| Cloud deployment | 2 | Out of the 2–3 week slice. Debt Ledger. |
+| Extra credit | 3 | Deterministic Validation Gate, Access Profile enforcement, derived retrieval ground truth. |
+
+**Rubric constraints:** the DataTalks.Club FAQ corpus may not be used (Veritas
+does not touch it); reusing course-module code is explicitly allowed (`LLMZC`).
+
+---
+
+## Extension path to the full proposal
+
+The slice is shaped so the MVP for `final_proposal_target.md` is addition, not
+rewrite. Each of these lands against an existing seam:
+
+| Full-MVP capability | Seam it plugs into |
+|---|---|
+| BigQuery instead of DuckDB | Warehouse is behind one adapter; SQL is generated via sqlglot, which retargets dialects. |
+| dbt semantic layer as the source of Metric Definitions | Semantic Entries are already YAML with the same shape. |
+| Real row/column-level security | Access Profile already threads through the Validation Gate; swap enforcement to warehouse-native policy tags. |
+| Query-cost governance | Cost check already exists; swap DuckDB's estimate for BigQuery dry-run bytes-billed. |
+| Multi-agent reconciliation and anomaly detection | Grounded Answer + Lineage is the interface a reconciliation agent consumes. |
+| Entity resolution across sources | Client/Account distinction is already modelled as the place duplicates would surface. |
+
+The deliberate bet: **the Semantic Layer and the Validation Gate are the durable
+parts.** Warehouse engine, model, and UI are all replaceable; those two are the
+thing worth having built.
