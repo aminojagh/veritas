@@ -4,10 +4,11 @@
 rarely and only by explicit agreement — it is the fixed point every Step is
 measured against.
 
-**Status:** proposed, updated 2026-07-23. The Domain Language it uses is now
-`agreed`. The Target State itself stays `proposed` until the data-availability
-check confirms every source it assumes can actually be obtained — see
-[Step 001, Sub-step 1.2](../plan/step-001-target-state-design.md).
+**Status:** **`agreed`** — 2026-08-03. The Domain Language it uses is `agreed`,
+and the [data-availability check](data-availability.md) confirmed every source
+this design assumes can actually be obtained key-free. Two consequences of that
+check are folded in below: single bonds and options are out of scope, and market
+prices are snapshotted into the repository rather than fetched live.
 
 ---
 
@@ -66,9 +67,9 @@ Two consequences follow, and they are the whole design:
 
 | Component | Responsibility | Built with |
 |---|---|---|
-| **Warehouse** | Brokerage star schema — Trades, Cash Movements, Positions, balances, plus Client/Account/Instrument/date/FX dimensions. | DuckDB |
+| **Warehouse** | Brokerage star schema — Trades, Cash Movements, Positions and balances, plus Client/Account/Instrument/date dimensions and the dated `fct_fx_rate` and `fct_instrument_price` series. | DuckDB |
 | **Semantic Layer** | Metric Definitions, Dimension Definitions, Join Paths, Ambiguous Terms. One YAML file per Semantic Entry, versioned. | YAML |
-| **Ingestion** | Real FX Rates and market data from public APIs; synthetic Trade/Cash/Position activity from a seeded simulator. | dlt |
+| **Ingestion** | Real FX Rates and Market Prices from key-free public APIs, snapshotted into the repository so a clone reproduces exactly; synthetic Trade/Cash/Position activity from a seeded simulator. | dlt |
 | **Retrieval** | Question → the Semantic Entries needed to answer it. Hybrid text + vector, re-ranked. | minsearch + embeddings |
 | **Copilot** | Rewrite → retrieve → ground → generate SQL → validate → execute → explain. | tool-calling LLM |
 | **Validation Gate** | Deterministic pre-execution checks on the generated SQL's parse tree. | sqlglot |
@@ -156,7 +157,7 @@ not an afterthought.
 | Ingestion pipeline | 2 | dlt pipelines for FX, market data, and the Semantic Layer index. |
 | Monitoring | 2 | Feedback capture + Grafana dashboard, ≥5 charts — including Validation-Gate rejections by reason and metric-usage frequency. |
 | Containerization | 2 | docker-compose: app, Postgres, Grafana. |
-| Reproducibility | 2 | `uv.lock`, pinned Python, key-free public data sources, seeded simulator, one-command bring-up. |
+| Reproducibility | 2 | `uv.lock`, pinned Python, key-free public data sources **snapshotted into the repo** (so a clone reproduces even if a source disappears), seeded simulator, one-command bring-up. |
 | Hybrid search | 1 | Text + vector, evaluated against each alone. |
 | Document re-ranking | 1 | Re-ranker over hybrid candidates, evaluated. |
 | Query rewriting | 1 | Ambiguous Term resolution — the core disambiguation step, not a bolt-on. |

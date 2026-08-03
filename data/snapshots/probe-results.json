@@ -1,0 +1,159 @@
+{
+  "checked": "2026-08-03",
+  "probes": [
+    {
+      "name": "Frankfurter \u2014 FX Rates",
+      "url": "https://api.frankfurter.dev/v1/currencies",
+      "http": 200,
+      "bytes": 703,
+      "verdict": "ok",
+      "expected": "ok",
+      "head": "{\"AUD\":\"Australian Dollar\",\"BRL\":\"Brazilian Real\",\"CAD\":\"Canadian Dollar\",\"CHF\":\"Swiss Franc\",\"CNY\":\"Chinese Renminbi Yu"
+    },
+    {
+      "name": "NASDAQ Trader \u2014 symbol directory",
+      "url": "https://www.nasdaqtrader.com/dynamic/symdir/nasdaqlisted.txt",
+      "http": 200,
+      "bytes": 345359,
+      "verdict": "ok",
+      "expected": "ok",
+      "head": "Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares\r\nAAAP|Pacer Barings CLO M"
+    },
+    {
+      "name": "SEC \u2014 company_tickers",
+      "url": "https://www.sec.gov/files/company_tickers.json",
+      "http": 200,
+      "bytes": 798160,
+      "verdict": "ok",
+      "expected": "ok",
+      "head": "{\"0\":{\"cik_str\":1045810,\"ticker\":\"NVDA\",\"title\":\"NVIDIA CORP\"},\"1\":{\"cik_str\":320193,\"ticker\":\"AAPL\",\"title\":\"Apple Inc."
+    },
+    {
+      "name": "Stooq \u2014 daily CSV",
+      "url": "https://stooq.com/q/d/l/?s=aapl.us&d1=20250101&d2=20251231&i=d",
+      "http": 200,
+      "bytes": 796,
+      "verdict": "blocked",
+      "expected": "blocked",
+      "head": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"noindex,nofollow\"></head><body><noscript>T"
+    }
+  ],
+  "coverage": [
+    {
+      "symbol": "AAPL",
+      "http": 200,
+      "instrument_type": "EQUITY",
+      "quotation_currency": "USD",
+      "exchange": "NasdaqGS",
+      "bars": 22
+    },
+    {
+      "symbol": "SAP.DE",
+      "http": 200,
+      "instrument_type": "EQUITY",
+      "quotation_currency": "EUR",
+      "exchange": "XETRA",
+      "bars": 22
+    },
+    {
+      "symbol": "VOD.L",
+      "http": 200,
+      "instrument_type": "EQUITY",
+      "quotation_currency": "GBp",
+      "exchange": "LSE",
+      "bars": 22
+    },
+    {
+      "symbol": "7203.T",
+      "http": 200,
+      "instrument_type": "EQUITY",
+      "quotation_currency": "JPY",
+      "exchange": "Tokyo",
+      "bars": 21
+    },
+    {
+      "symbol": "SPY",
+      "http": 200,
+      "instrument_type": "ETF",
+      "quotation_currency": "USD",
+      "exchange": "NYSEArca",
+      "bars": 22
+    },
+    {
+      "symbol": "IWDA.AS",
+      "http": 200,
+      "instrument_type": "ETF",
+      "quotation_currency": "EUR",
+      "exchange": "Amsterdam",
+      "bars": 22
+    },
+    {
+      "symbol": "TLT",
+      "http": 200,
+      "instrument_type": "ETF",
+      "quotation_currency": "USD",
+      "exchange": "NasdaqGM",
+      "bars": 22
+    },
+    {
+      "symbol": "BNDX",
+      "http": 200,
+      "instrument_type": "ETF",
+      "quotation_currency": "USD",
+      "exchange": "NasdaqGM",
+      "bars": 22
+    },
+    {
+      "symbol": "ES=F",
+      "http": 200,
+      "instrument_type": "FUTURE",
+      "quotation_currency": "USD",
+      "exchange": "CME",
+      "bars": 21
+    },
+    {
+      "symbol": "GC=F",
+      "http": 200,
+      "instrument_type": "FUTURE",
+      "quotation_currency": "USD",
+      "exchange": "COMEX",
+      "bars": 21
+    },
+    {
+      "symbol": "EURUSD=X",
+      "http": 200,
+      "instrument_type": "CURRENCY",
+      "quotation_currency": "USD",
+      "exchange": "CCY",
+      "bars": 22
+    },
+    {
+      "symbol": "^GSPC",
+      "http": 200,
+      "instrument_type": "INDEX",
+      "quotation_currency": "USD",
+      "exchange": "SNP",
+      "bars": 22
+    }
+  ],
+  "excluded": [
+    {
+      "name": "option chain (AAPL)",
+      "url": "https://query1.finance.yahoo.com/v7/finance/options/AAPL",
+      "http": 401,
+      "obtainable": false
+    },
+    {
+      "name": "single bond by ISIN",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/US912810TW33?range=5d&interval=1d",
+      "http": 404,
+      "obtainable": false
+    },
+    {
+      "name": "single bond by CUSIP",
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/912810TW3?range=5d&interval=1d",
+      "http": 404,
+      "obtainable": false
+    }
+  ]
+}

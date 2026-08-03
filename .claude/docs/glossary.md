@@ -20,6 +20,18 @@ old name is recognisable in history, with a pointer to its replacement).
 > The Section C distinctions were ruled on explicitly, and both `Metric
 > Definition` and `Certified Metric` are kept as genuinely distinct terms
 > (artifact vs. status). Use freely, in prose and in code.
+>
+> **Three terms added and one narrowed on 2026-08-03** by Sub-step 1.2, all
+> approved the same day. `Market Price`, `Adjusted Close` and `Quotation
+> Currency` each name a way the real market data was found to produce a
+> *plausible wrong number*. `Instrument` was narrowed to exclude single bonds
+> and options, neither being obtainable from a key-free source
+> ([DEBT-003](debt-ledger.md)). Evidence:
+> [data-availability.md](design/data-availability.md).
+>
+> **`FX Rate` and `Market Price` live in `fct_` tables, not `dim_`.** Both are
+> dated observations that grow daily, which is a fact-table shape; only their
+> subjects (`dim_instrument`) are dimensions.
 
 ### A. The system
 
@@ -51,7 +63,7 @@ instruments, trades move cash and change positions.
 
 | Term | Definition | Lives in | Status |
 |---|---|---|---|
-| **Instrument** | A tradable asset — equity, ETF, bond, future, option, or currency pair. | `dim_instrument` | agreed |
+| **Instrument** | A tradable asset — equity, ETF, future, or currency pair. Single bonds and options are **out of scope**: neither has a key-free Market Price source, so holding them would mean fabricating prices while claiming market data is real. Bond exposure is represented through bond ETFs, which is how most brokerage clients hold bonds anyway. Narrowed 2026-08-03; see [DEBT-003](debt-ledger.md). | `dim_instrument` | agreed |
 | **Client** | The legal owner of one or more Accounts. The entity a region or segment attaches to. | `dim_client` | agreed |
 | **Account** | The container trades and cash sit in. Has exactly one Client and one or more currency balances. | `dim_account` | agreed |
 | **Trade** | One executed order: an Account buys or sells a quantity of an Instrument at a price, on a Trade Date, settling on a Settlement Date. | `fct_trade` | agreed |
@@ -70,7 +82,10 @@ instruments, trades move cash and change positions.
 | **Position Change** | Change in a Position between two points in time, from any cause — a Trade, a transfer, or a corporate action. | `semantic/metrics/` | agreed |
 | **Realised P&L** | Profit or loss locked in by closing a Position. | `semantic/metrics/` | agreed |
 | **Unrealised P&L** | Profit or loss on a Position still held, at current market price. Moves with the market; nothing has been banked. | `semantic/metrics/` | agreed |
-| **FX Rate** | Real ECB reference rate between two currencies on a date. Sourced from the public Frankfurter API. | `dim_fx_rate` | agreed |
+| **FX Rate** | Real ECB reference rate between two currencies on a date. Sourced from the public Frankfurter API. Published on working days only, so a rate for a non-publishing date is the most recent published rate at or before it. | `fct_fx_rate` | agreed |
+| **Market Price** | The unadjusted closing price at which an Instrument traded on a date, in its Quotation Currency. The only price a Position may be marked at. | `fct_instrument_price` | agreed |
+| **Adjusted Close** | A price series back-adjusted for splits and dividends, which rewrites historical prices as later corporate actions occur. Correct for computing returns; **forbidden** for marking Positions or computing P&L. | — (an anti-pattern) | agreed |
+| **Quotation Currency** | The currency *and minor unit* an Instrument's Market Price is quoted in — LSE quotes in pence (`GBp`), not pounds. Normalising to major units is a required ingestion step. Distinct from Reporting Currency. | `dim_instrument` | agreed |
 
 ### C. Distinctions we must not blur
 
@@ -89,6 +104,8 @@ trust. Every pair here is drawn from the job specification's own list.
 | **Realised P&L** | **Unrealised P&L** | One is banked, one is a market opinion. Summing them without saying so mixes fact with mark-to-market. |
 | **Traded Notional** | **Trade Count** | "Volume" means either. One large trade and a thousand small ones are opposite answers to "was this a busy month". |
 | **Client** | **Account** | One Client may hold many Accounts. Counting Accounts and calling it clients inflates every per-client figure. |
+| **Adjusted Close** | **Market Price** | Measured on real data: the two differ on **95.5%** of AAPL's last 1,255 daily bars. Adjusted Close rewrites history every time a dividend is paid, so a Position marked at it yields an Account Value that is both wrong and *irreproducible* — the same query returns a different number next quarter. |
+| **Quotation Currency** | **Reporting Currency** | A Market Price is quoted in the Instrument's own currency and minor unit; a Grounded Answer is expressed in one Reporting Currency. Skipping the conversion is an FX-sized error; missing the minor unit is a **100×** error — LSE quotes pence, and £4.20 booked as £420 looks entirely plausible. |
 
 ### D. Ambiguous Terms
 
