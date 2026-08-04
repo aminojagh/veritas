@@ -52,6 +52,47 @@ option, this is not an ADR — put it in `current-state.md`.
 consequences are all upside is marketing. This section is why the document
 exists: it is what a future reader checks when the decision starts to hurt.
 
+**Every cost gets classified, in the same Sub-step.** A cost written and left
+dangling is a fact nobody acts on — the ADR records it, and then no one re-reads
+the ADR until the cost bites. Naming a cost is the moment to decide which of
+three things it is, and to say so inline:
+
+| Classification | Meaning | Goes where |
+|---|---|---|
+| **Accepted** | We are living with this permanently. Say why. | Stays in the ADR, marked *accepted* |
+| **Debt** | The slice does the cheap thing; it should be fixed here. | [`debt-ledger.md`](../../docs/debt-ledger.md), with a Trigger |
+| **Extension** | Correct for the slice; the full MVP needs more. | [`extension-register.md`](../../docs/extension-register.md), with the seam it lands against |
+
+The test that settles debt-versus-extension: **does the trigger fire inside this
+project's life?** If it can only fire after Veritas becomes something else, it is
+an extension, and calling it debt puts a wish on the Ledger.
+
+**A cost may be both**, and forcing a single label loses information. Access
+control was one: warehouse-native enforcement is an extension, while *overstating
+what the current enforcement guarantees* is debt that fires as soon as a README
+exists. Split it and link both.
+
+**The failure mode to watch for is ritual.** A rule that feels like paperwork
+gets performed rather than thought about, and the cheapest way to perform this
+one is to stamp *accepted* on everything. Two guards:
+
+- **Accepted must carry a reason**, not just the word. "Accepted" with no
+  argument is a dangling cost wearing a label.
+- **An ADR where every cost is accepted deserves re-reading.** It is possible —
+  some decisions really are all-upside-with-known-limits — but it is more often a
+  sign the costs were written to be survivable rather than to be true.
+
+An ADR whose Consequences list a cost that is none of the three is unfinished.
+This is the forcing function that keeps future work discoverable from the
+decision that created it, instead of depending on someone remembering.
+
+**Citations quote.** Any claim about what another document says must include the
+words it relies on. Do not write "named as out of scope in the product brief"
+and link — quote the line. Without the quote there is nothing stopping an
+adjacent, plausible-looking sentence from being pressed into service as support
+for a claim it does not make, and the link makes the unsupported claim look
+sourced.
+
 **Commitments** are the assumptions that must hold. Name the signal that would
 tell you they had stopped holding — that turns an ADR into something with a
 falsifiable shelf life rather than a permanent justification.
@@ -74,3 +115,5 @@ Decisions get overturned; that is healthy. When it happens:
 | Straw-man alternatives | Steel-man them, or admit there was only one option |
 | ADR for a reversible choice | Debt Ledger entry, or just code |
 | Deleting a superseded ADR | Mark it and keep it |
+| Citing a document from memory of its gist | Open it, find the line, quote it — or drop the citation |
+| A cost named and left dangling | Classify it: accepted, Debt Ledger, or Extension Register |

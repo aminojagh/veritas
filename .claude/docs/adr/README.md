@@ -15,7 +15,14 @@ Debt Ledger entries or just code.
 
 | ADR | Title | Status |
 |---|---|---|
-| _(none yet)_ | | |
+| [0001](0001-semantic-layer-as-the-retrieval-corpus.md) | The Semantic Layer is the retrieval corpus | accepted |
+| [0002](0002-duckdb-as-the-warehouse-behind-an-adapter.md) | DuckDB is the Warehouse, reached only through an adapter | accepted |
+| [0003](0003-validation-gate-is-deterministic-code.md) | The Validation Gate is deterministic code, not an Large Language Model (LLM) self-check | accepted |
+
+All three accepted by Amino on 2026-08-03, conditional on the corrections applied
+the same day (see the Step 001 review, Sub-step 1.3). Each ADR's **Consequences**
+classify every cost as *accepted*, *debt*, or *extension* — the ones that became
+debt are [DEBT-005](../debt-ledger.md) through [DEBT-008](../debt-ledger.md).
 
 Statuses: `proposed` · `accepted` · `superseded by ADR-NNNN` · `rejected`
 (rejected ADRs are kept — they record an option we considered and declined).

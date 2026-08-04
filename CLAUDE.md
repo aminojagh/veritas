@@ -101,6 +101,15 @@ the Step Review. See `recording-debt`.
 Every entry carries a **Trigger**: the condition that forces repayment. Debt
 without a trigger is a wish.
 
+**Debt is not the same as an extension.** Debt means the current code is *wrong,
+cheaply*, and belongs in the Ledger. An extension means the current code is
+*right for this scope* and the full MVP needs more — that belongs in
+[`.claude/docs/extension-register.md`](.claude/docs/extension-register.md), with
+the **seam** it lands against and a **Readiness** condition instead of a Trigger.
+The test: *does the trigger fire inside this project's life?* If it can only fire
+after Veritas becomes something else, it is an extension, and filing it as debt
+puts a wish on the Ledger and blunts the open-debt count.
+
 ### 3. Both state documents are always true
 
 - [`.claude/docs/design/target-state.md`](.claude/docs/design/target-state.md) — where we are
@@ -121,6 +130,21 @@ verification command *in that same message* and read its output. "Should work",
 If verification fails and you cannot fix it within the Sub-step, say so plainly
 in the Step Review and record it as debt. A failed Sub-step honestly reported is
 worth more than a green one that lies.
+
+**Evidence in a document comes from a committed script.** If a check is worth
+putting in a Step Review, it is worth committing to `.claude/scripts/`. Never
+paste the output of a throwaway inline script into a permanent document: the
+reader cannot re-run it, the transcription can be wrong, and a summary count
+(*"checked 37 links, 0 broken"*) hides what was actually covered. **Before
+writing any new check, look in `.claude/scripts/` for one that already does it** —
+`verify_framework.py` already validates document links, skills, and the
+interpreter. A review shows the command a reader can run and the output that
+command produced, nothing else.
+
+**Citations quote.** Any claim about what another document says must include the
+words it relies on. A bare link is not evidence — it is an invitation to assume
+the target says what the sentence needs it to say, which is how a real line gets
+stretched into support for a claim it never made. Quote it, or do not cite it.
 
 ---
 
@@ -147,12 +171,24 @@ cold session must be able to resume from the files alone. The contract:
 | [`.claude/docs/design/current-state.md`](.claude/docs/design/current-state.md) | What is built, honestly | Every Sub-step |
 | [`.claude/docs/design/product-brief.md`](.claude/docs/design/product-brief.md) | The full system Veritas is a slice of | Rare |
 | [`.claude/docs/debt-ledger.md`](.claude/docs/debt-ledger.md) | Known shortcuts, with repayment triggers | Every shortcut |
+| [`.claude/docs/extension-register.md`](.claude/docs/extension-register.md) | What the full MVP needs that the slice deliberately lacks, each with the seam it lands against | Every ADR cost classified *extension* |
 | [`.claude/docs/adr/`](.claude/docs/adr/) | Decisions that are expensive to reverse | As decided |
 | `.claude/docs/plan/step-NNN-*.md` | The one active Step | Once per Step |
 | `.claude/docs/reviews/step-NNN-*.md` | Handoff notes for Amino's review | Every Sub-step |
 
 `README.md` is the public face for Zoomcamp reviewers. The `.claude/docs/` tree is the
 working record. Keep them separate — do not turn the README into a changelog.
+
+### Writing conventions
+
+- **Expand every abbreviation on first use in each document**, then use the short
+  form freely: "Data Definition Language (DDL)", "Mean Reciprocal Rank (MRR)".
+  This applies to domain and technical shorthand alike. The reader of these
+  documents is reading them to learn what was decided, and an unexpanded
+  abbreviation silently assumes they already know. Terms registered in the
+  Glossary are exempt only if the Glossary itself expands them.
+- **No unexplained bare numbers.** A figure in a document says where it came
+  from, or names the script that produces it.
 
 Check the framework is wired up correctly at any time:
 

@@ -29,6 +29,10 @@ Do these in order. Later items depend on earlier ones being honest.
 
 1. **Verify.** Run the Sub-step's verification command from the plan, in full.
    Read the whole output and the exit code. Not a subset, not a previous run.
+   Evidence must come from a **committed script** — check `.claude/scripts/` for
+   one that already covers the check before writing anything new. Never
+   transcribe the output of a throwaway inline script into the review; the
+   reader cannot re-run it.
 2. **If verification failed** and you cannot fix it inside this Sub-step: stop.
    Say so plainly, record it, and hand over anyway. Do not quietly reduce the
    claim to something that passes.
@@ -70,7 +74,9 @@ too small to need a review.
 
 | Excuse | Reality |
 |---|---|
-| "It's a docs-only change, no need to verify" | Then verify the docs render and their links resolve |
+| "It's a docs-only change, no need to verify" | Run `verify_framework.py` — it already checks links, skills, and paths. Do not hand-roll a second link checker |
+| "I'll write a quick inline script to check this" | If it is worth showing Amino, it is worth committing to `.claude/scripts/`. Check what is already there first |
+| "The output is long, I'll summarise the count" | A count hides what was covered. Show the command and its real output |
 | "I ran it a few messages ago" | Run it again; the code changed since |
 | "The debt is obvious from the code" | It is obvious to you today and to nobody in a month |
 | "I'll record the debt at the end of the Step" | The Step ends and the memory is gone. Now |

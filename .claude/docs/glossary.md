@@ -32,6 +32,15 @@ old name is recognisable in history, with a pointer to its replacement).
 > **`FX Rate` and `Market Price` live in `fct_` tables, not `dim_`.** Both are
 > dated observations that grow daily, which is a fact-table shape; only their
 > subjects (`dim_instrument`) are dimensions.
+>
+> **Eight component terms added on 2026-08-04** by Sub-step 1.3, all approved the
+> same day: `Warehouse`, `Warehouse Adapter`, `Ingestion`, `Retrieval`,
+> `Orchestrator`, `App`, `Observability`, `Evaluation`. Seven of the nine Target
+> State components had been used as names since Sub-step 1.1 without ever being
+> registered — a gap `.claude/scripts/check_language.py` now makes impossible to
+> reintroduce. Two were renamed on registration: `Copilot` → `Orchestrator` and
+> `Interface` → `App`. See [Component terms](#component-terms--agreed-2026-08-04)
+> and [Retired terms](#retired-terms).
 
 ### A. The system
 
@@ -55,6 +64,90 @@ What Veritas is made of.
 | **Gold Question Set** | The evaluation corpus: question, gold SQL, gold result, and the Semantic Entries the gold SQL touches. | `data/gold/` | agreed |
 | **Execution Accuracy** | Share of generated queries whose result set matches the gold result. The primary correctness measure — objective, unlike a judge's opinion. | `veritas/evaluation/` | agreed |
 | **Reporting Currency** | The single currency a Grounded Answer is expressed in. Every monetary metric must state one. | `semantic/metrics/` | agreed |
+| **Warehouse** | The analytical store holding the brokerage star schema — the `fct_` and `dim_` tables of Section B. DuckDB for the slice. Reached **only** through the Warehouse Adapter; no component queries it directly. | `veritas/warehouse/` | agreed |
+| **Warehouse Adapter** | The single boundary through which all Warehouse access passes. Holds the connection and the engine's dialect; nothing DuckDB-specific exists outside it. The seam an engine swap lands on. | `veritas/warehouse/` | agreed |
+| **Ingestion** | The pipeline that fills the Warehouse: real FX Rates, Market Prices and instrument reference data from key-free public sources, snapshotted into the repository and replayed by default; synthetic Trades, Cash Movements and Positions from a seeded simulator. **Market data real, client activity synthetic — never the reverse.** | `veritas/ingestion/` | agreed |
+| **Retrieval** | The step that turns a question into the Semantic Entries needed to answer it. Searches the Semantic Layer **only** — never Warehouse schema, never free text. Hybrid text + vector, re-ranked. | `veritas/retrieval/` | agreed |
+| **Orchestrator** | The component that runs a question through the seven-step flow: rewrite, retrieve, ground, generate, validate, execute, answer. Owns the sequence and the failure paths; owns none of the steps' logic. Renamed from `Copilot` on 2026-08-04 — Veritas *is* a copilot, so the word could not also name one component inside it. | `veritas/orchestrator/` | agreed |
+| **App** | Where a person asks a question and reads a Grounded Answer — with its SQL, its Lineage and its Validation Gate outcome. **Never renders a bare number.** Renamed from `Interface` on 2026-08-04, so the name matches the directory and does not collide with the rubric's own "Interface" criterion. | `veritas/app/` | agreed |
+| **Observability** | Records what happened at runtime: every question, Grounded Answer, Validation Gate outcome, cost, latency and feedback. Produces Operational Measures. **Records; never judges.** Live traffic, no ground truth. | `veritas/observability/` | agreed |
+| **Evaluation** | Computes Evaluation Measures over the Gold Question Set: hit rate and MRR for Retrieval, Execution Accuracy and LLM-as-judge for generation. **Offline, against known-correct answers** — the opposite pole from Observability. | `veritas/evaluation/` | agreed |
+
+#### Component terms — `agreed` 2026-08-04
+
+The eight component rows above were proposed and decided the same day. Seven had
+been used as capitalised names since Sub-step 1.1 — in `target-state.md`, in
+`current-state.md`, in the ADRs — without ever being registered.
+`.claude/scripts/check_language.py` fails on any Target State component name with
+no Glossary row, which is what surfaced them.
+
+**Why it mattered.** In prose an unregistered component name is a formatting
+inconsistency. In Step 002 these become **directories and modules**, and
+Non-Negotiable #1 requires a domain noun to be registered *before* it names a
+code identifier. Registering them first was the cheap order; renaming a directory
+after it exists is not.
+
+**Why Section A.** Section A is headed *"What Veritas is made of"* and already
+held `Semantic Layer` and `Validation Gate` — two of the nine components. Putting
+the rest anywhere else would have raised "why is Validation Gate in A but App in
+F?". Splitting Section A into components versus artifacts-and-concepts was
+considered and **declined for now** (2026-08-04): the combined table is readable
+enough, and restructuring an `agreed` section costs more than it returns today.
+
+##### Two renames
+
+- **`Copilot` → `Orchestrator`.** `Copilot` named two different things at two
+  different scopes: Veritas *is* a natural-language analytics copilot, and Veritas
+  *contained* a Copilot. One word for a whole and one of its parts is the synonym
+  disease inverted. `Orchestrator` names the job — it owns the sequence and the
+  failure paths, and none of the steps' logic. `Answer Pipeline` was the other
+  candidate and was **rejected**: "pipeline" implies a straight line, and this
+  flow branches — a failed Validation Gate stops, an unresolved Ambiguous Term
+  returns to the user.
+  **"copilot" survives in lowercase prose**, which is the point of the rename:
+  *"Veritas is a natural-language analytics copilot"* and *"a metrics copilot,
+  not a database browser"* both still read correctly, and both keep the thread
+  back to the [product brief](design/product-brief.md), which lists "Analytical
+  copilots" among the full system's capabilities.
+- **`Interface` → `App`**, matching `veritas/app/`. A second reason emerged
+  beyond the directory name: the Zoomcamp rubric has its own criterion called
+  *Interface*, so the word was carrying both our component and the grader's
+  scorecard line. The criteria map still says "Interface" because that is the
+  grader's vocabulary, not ours.
+
+##### What each term buys, strongest first
+
+- **`Warehouse` and `Warehouse Adapter`** — the pair matters most. ADR-0002 had
+  been leaning on three different readings of "Warehouse" (the DuckDB database,
+  the star schema, the adapter boundary), exactly the ambiguity a Glossary exists
+  to kill. Split, the constraint becomes sayable: the Warehouse is *the store*,
+  the Adapter is *the only way in*. Unsplit, "no component touches the Warehouse
+  directly" is a sentence that contradicts itself.
+- **`Retrieval`** — carries a hard constraint rather than a generic meaning. Here
+  it means retrieval *over Semantic Entries, never over schema* (ADR-0001), which
+  is the central bet of the project. The word must not drift back to its ordinary
+  sense.
+- **`Ingestion`** — likewise specific: snapshot-and-replay for real market data,
+  a seeded simulator for client activity. *"Market real, client synthetic — never
+  the reverse"* is a rule someone could otherwise break without noticing.
+- **`Observability` and `Evaluation`** — weak individually, strong as a pair. One
+  is live traffic with no ground truth; the other is offline against known
+  answers. Blurring them produces the disease Section E exists to prevent —
+  reporting user feedback as accuracy, or expecting hit rate from production.
+  Section E registers the *measures*; these register the components that produce
+  them.
+- **`Orchestrator`** — thin by design. It owns sequence and failure paths only,
+  so its definition is mostly a list of what it does *not* own.
+- **`App`** — one real constraint, *"never renders a bare number"*, echoing
+  `Grounded Answer`. Beyond that it is a plain name for a plain thing.
+
+##### Documents swept on agreement
+
+`target-state.md`, `current-state.md`, the ADRs, the Debt Ledger and the
+Extension Register were all revisited in the same Sub-step so no document uses an
+old name. The Step Reviews were **not** rewritten: they are point-in-time records
+of what was true when written, and editing them would destroy the history that
+makes the renames traceable.
 
 ### B. The warehouse
 
@@ -162,6 +255,56 @@ Vocabulary of how we work. Settled — this is the framework described in
 
 ---
 
+## Abbreviations
+
+Every abbreviation used anywhere in the project, expanded once. `CLAUDE.md`
+requires abbreviations to be expanded on first use in each document; an entry
+here satisfies that requirement project-wide, so this table is the one place to
+look when a document uses a short form you do not recognise.
+
+These are **not** Domain Language terms — they are shorthand. A word that carries
+domain meaning belongs in a section above, with a definition and a status.
+
+| Short | Expanded | Note |
+|---|---|---|
+| **ADR** | Architecture Decision Record | Also a Process Language term |
+| **BI** | Business Intelligence | The dashboard layer metric logic is being moved *out* of |
+| **CIK** | Central Index Key | Securities and Exchange Commission's issuer identifier |
+| **CUSIP** | Committee on Uniform Securities Identification Procedures | North American security identifier |
+| **DDD** | Domain-Driven Design | Where the ubiquitous-language discipline comes from |
+| **DDL** | Data Definition Language | The `CREATE TABLE` subset of Structured Query Language |
+| **ECB** | European Central Bank | Publishes the reference rates behind `FX Rate` |
+| **EODHD** | End Of Day Historical Data | A market-data vendor, rejected for requiring a key |
+| **ETF** | Exchange-Traded Fund | An `Instrument` type |
+| **FX** | Foreign Exchange | As in `FX Rate` |
+| **ICE** | Intercontinental Exchange | A market-data vendor, rejected as paid-only |
+| **ISIN** | International Securities Identification Number | Global security identifier |
+| **LLM** | Large Language Model | |
+| **LLMZC** | Large Language Model Zoomcamp | The course; `aminojagh/LLMZC` holds reusable coursework |
+| **LSE** | London Stock Exchange | Quotes in pence — see `Quotation Currency` |
+| **ML** | Machine Learning | |
+| **MRR** | Mean Reciprocal Rank | An `Evaluation Measure` for Retrieval |
+| **MVP** | Minimum Viable Product | The full system in `product-brief.md` |
+| **OHLCV** | Open, High, Low, Close, Volume | The daily price bar fields |
+| **RAG** | Retrieval-Augmented Generation | |
+| **SEC** | Securities and Exchange Commission | Source of issuer reference data |
+| **UI** / **UX** | User Interface / User Experience | |
+
+Left unexpanded on purpose, being more recognisable than their expansions:
+`SQL`, `API`, `HTTP`, `JSON`, `CSV`, `YAML`, `URL`, `ID`, `CLI`, `AI`. The list
+lives in `.claude/scripts/check_language.py` and is enforced by it.
+
+---
+
 ## Retired terms
 
-_(none yet)_
+Kept so the old name stays recognisable in history, with a pointer to its
+replacement.
+
+| Retired | Replaced by | When | Why |
+|---|---|---|---|
+| **Copilot** | [`Orchestrator`](#a-the-system) | 2026-08-04 | Named both the product and one component inside it. "copilot" remains valid in lowercase prose for the product as a whole. |
+| **Interface** | [`App`](#a-the-system) | 2026-08-04 | Renamed to match `veritas/app/`, and to stop colliding with the Zoomcamp rubric's own *Interface* criterion. |
+
+Neither term ever reached code — both were renamed while still `proposed`, which
+is the order the Glossary rule exists to produce.

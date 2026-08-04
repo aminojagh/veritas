@@ -248,7 +248,15 @@ any source, official or not.
 
 The check script already works this way, so the pattern is proven rather than
 planned; what remains is applying it to the real ingestion pipeline, which is
-DEBT-002's trigger. It should also become an ADR in Sub-step 1.3.
+DEBT-002's trigger.
+
+**Update, Sub-step 1.3:** this was considered as a fourth founding ADR and
+**deferred to the ingestion Step**, where the decision actually binds. Snapshot
+-and-replay applies specifically to sources that are *undocumented and
+unversioned* — Yahoo — not to every external source; Frankfurter and the SEC are
+documented and stable, and snapshotting them is a reproducibility convenience
+rather than a hedge against disappearance. DEBT-002's trigger already forces the
+decision to surface with the pipeline, so nothing is lost by writing it there.
 
 ---
 
