@@ -4,19 +4,20 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-04 — Sub-step 1.3 revised a third time. Component terms `agreed` and swept through every document; Extension Register created; three ADRs `accepted`. Step 001 is complete and has nothing outstanding.
-**Steps completed:** Step 000 (framework) and Step 001 Sub-step 1.1, both committed in `6281e6b`. Sub-step 1.2 committed in `4b48a46`. Sub-step 1.3 done and staged, awaiting Amino's commit.
+**Last updated:** 2026-08-05 — Sub-step 1.3 committed. Step 001 is closed with nothing outstanding.
+**Steps completed:** Step 000 (framework) and Step 001, fully committed. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`.
 
 ---
 
 ## Resume here
 
-- **Active Step:** 001 — Design the Target State
-  ([plan](../plan/step-001-target-state-design.md)). **All three Sub-steps done.**
-  Step 001 closes once Amino commits 1.3.
-- **Next Sub-step:** none in Step 001. The next move is to **plan Step 002** —
-  the first Step that builds something — with `planning-a-step`. Do not plan it
-  before 1.3 is committed.
+- **Active Step:** none. Step 001 — Design the Target State
+  ([plan](../plan/step-001-target-state-design.md)) — is **done**, all three
+  Sub-steps committed, the last in `9c5b060`.
+- **Next Sub-step:** none exists yet. Step 001 has no Sub-steps left, and Step
+  002 is unplanned. The next move is to **plan Step 002** — the first Step that
+  builds something — with `planning-a-step`; its Sub-step 2.1 is then the next
+  Sub-step.
 - **Awaiting Amino: nothing.** Every question raised in Sub-step 1.3 has been
   ruled on. The eight component terms are `agreed`
   ([Glossary Section A](../glossary.md#a-the-system)), including two renames —
@@ -98,7 +99,7 @@ veritas/
 
 All implementation. The design gate is fully open: the data-availability check
 passed, rulings R1–R3 are applied, and the founding ADRs are written. Nothing
-blocks Step 002 but Amino's commit.
+blocks Step 002.
 
 The component-name gap found in Sub-step 1.3 is **closed**: all nine Target State
 components are now registered Glossary terms, two of them renamed in the process

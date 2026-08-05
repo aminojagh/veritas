@@ -1,6 +1,6 @@
 # Step 001 — Design the Target State
 
-- **Status:** in review
+- **Status:** done — all three Sub-steps committed, the last in `9c5b060` (2026-08-05)
 - **Goal:** Decide what Veritas is, in language we both agree on, so that every
   later Step has a fixed point to be measured against.
 - **Moves Current State by:** replacing an empty Target State and an empty Domain
