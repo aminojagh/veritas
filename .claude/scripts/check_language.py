@@ -73,6 +73,7 @@ KNOWN_NON_ABBREVIATIONS = {
     # SQL keywords and code-ish tokens quoted in prose.
     "SELECT", "CREATE", "TABLE", "WHERE", "DECIMAL", "NULL", "OWL", "RDF",
     "SPARQL", "DAG", "CTE", "LIMIT", "JOIN", "GROUP", "ORDER",
+    "INSERT", "INTO", "FROM",
     # Document and tooling shorthand.
     "PY", "OK", "GO", "PASS", "FAIL", "NOTE", "TODO", "KB", "MB", "GB",
     "CET", "FAQ", "BIRD", "MD", "README", "CI", "R1", "R2", "R3",
@@ -199,6 +200,19 @@ def glossary_abbreviations() -> dict[str, str]:
     return found
 
 
+def prose_only(text: str) -> str:
+    """Drop fenced code blocks, so the abbreviation scan reads prose only.
+
+    A fenced block is code, and code is full of shouted tokens that are not
+    abbreviations at all: SQL keywords, type names, environment variables. They
+    are not words a reader needs to look up, and enumerating them one at a time
+    in KNOWN_NON_ABBREVIATIONS is a list that grows for the life of the project.
+    Inline spans are deliberately *not* stripped: a short identifier inside a
+    sentence is still being read as part of that sentence.
+    """
+    return re.sub(r"^```.*?^```", "", text, flags=re.DOTALL | re.MULTILINE)
+
+
 def check_abbreviations() -> None:
     """An abbreviation is expanded on first use, or registered in the Glossary.
 
@@ -217,7 +231,7 @@ def check_abbreviations() -> None:
     docs = sorted(DOCS.rglob("*.md")) + [REPO_ROOT / "CLAUDE.md"]
     unknown: set[str] = set()
     for doc in docs:
-        for abbr in set(re.findall(r"\b([A-Z]{2,6})\b", doc.read_text())):
+        for abbr in set(re.findall(r"\b([A-Z]{2,6})\b", prose_only(doc.read_text()))):
             if abbr in EXEMPT or abbr in registered or abbr in KNOWN_NON_ABBREVIATIONS:
                 continue
             unknown.add(abbr)

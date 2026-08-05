@@ -10,6 +10,15 @@ this design assumes can actually be obtained key-free. Two consequences of that
 check are folded in below: single bonds and options are out of scope, and market
 prices are snapshotted into the repository rather than fetched live.
 
+**One correction, 2026-08-05**, agreed while planning Step 002. The Warehouse row
+below previously listed a **date** dimension alongside Client, Account and
+Instrument. It has been removed: the Glossary's `Dimension Definition` entry
+points the date axis at a column — *"**by date** (`trade_date`, daily)"* — and no
+Certified Metric or Section C distinction needs a calendar attribute that cannot
+be derived in SQL. A `dim_date` table was considered and rejected rather than
+registered, so the Data Definition Language (DDL) written in Step 002 has one
+design to follow instead of two.
+
 ---
 
 ## Why this project exists
@@ -67,7 +76,7 @@ Two consequences follow, and they are the whole design:
 
 | Component | Responsibility | Built with |
 |---|---|---|
-| **Warehouse** | Brokerage star schema — Trades, Cash Movements, Positions and balances, plus Client/Account/Instrument/date dimensions and the dated `fct_fx_rate` and `fct_instrument_price` series. | DuckDB |
+| **Warehouse** | Brokerage star schema — Trades, Cash Movements, Positions and balances, plus Client/Account/Instrument dimensions and the dated `fct_fx_rate` and `fct_instrument_price` series. | DuckDB |
 | **Semantic Layer** | Metric Definitions, Dimension Definitions, Join Paths, Ambiguous Terms. One YAML file per Semantic Entry, versioned. | YAML |
 | **Ingestion** | Real FX Rates and Market Prices from key-free public APIs, snapshotted into the repository so a clone reproduces exactly; synthetic Trade/Cash/Position activity from a seeded simulator. | dlt |
 | **Retrieval** | Question → the Semantic Entries needed to answer it. Hybrid text + vector, re-ranked. | minsearch + embeddings |

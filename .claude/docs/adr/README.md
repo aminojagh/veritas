@@ -20,7 +20,10 @@ Debt Ledger entries or just code.
 | [0003](0003-validation-gate-is-deterministic-code.md) | The Validation Gate is deterministic code, not an Large Language Model (LLM) self-check | accepted |
 
 All three accepted by Amino on 2026-08-03, conditional on the corrections applied
-the same day (see the Step 001 review, Sub-step 1.3). Each ADR's **Consequences**
+the same day (see the Step 001 review, Sub-step 1.3). ADR-0002 carries one dated
+**clarification** added 2026-08-05 — what its sqlglot commitment forbids, with
+worked examples. A clarification makes an accepted decision precise; it is not a
+supersede, and the status stays `accepted`. Each ADR's **Consequences**
 classify every cost as *accepted*, *debt*, or *extension* — the ones that became
 debt are [DEBT-005](../debt-ledger.md) through [DEBT-008](../debt-ledger.md).
 

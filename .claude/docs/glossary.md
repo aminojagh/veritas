@@ -33,6 +33,21 @@ old name is recognisable in history, with a pointer to its replacement).
 > dated observations that grow daily, which is a fact-table shape; only their
 > subjects (`dim_instrument`) are dimensions.
 >
+> **`Execution Price` added on 2026-08-05** during Step 002 planning, approved the
+> same day. The Glossary had been using the bare word "price" for the price a
+> Trade filled at — in the `Trade` row and inside `Traded Notional` — while
+> `Market Price` was registered for the day's close. Two different numbers under
+> one unregistered word, about to become a column name. Both rows now say
+> `Execution Price`, and the pair has a [Section C](#c-distinctions-we-must-not-blur)
+> row of its own.
+>
+> **A date dimension was rejected on 2026-08-05**, in the same conversation.
+> `target-state.md` had described the Warehouse as holding a *"date"* dimension
+> while the `Dimension Definition` row below points the date axis at a column
+> (*"**by date** (`trade_date`, daily)"*). No metric and no Section C distinction
+> needs a calendar attribute that is not derivable in SQL, so there is no
+> `dim_date` and the Target State's Warehouse row was corrected instead.
+>
 > **Eight component terms added on 2026-08-04** by Sub-step 1.3, all approved the
 > same day: `Warehouse`, `Warehouse Adapter`, `Ingestion`, `Retrieval`,
 > `Orchestrator`, `App`, `Observability`, `Evaluation`. Seven of the nine Target
@@ -159,8 +174,9 @@ instruments, trades move cash and change positions.
 | **Instrument** | A tradable asset — equity, ETF, future, or currency pair. Single bonds and options are **out of scope**: neither has a key-free Market Price source, so holding them would mean fabricating prices while claiming market data is real. Bond exposure is represented through bond ETFs, which is how most brokerage clients hold bonds anyway. Narrowed 2026-08-03; see [DEBT-003](debt-ledger.md). | `dim_instrument` | agreed |
 | **Client** | The legal owner of one or more Accounts. The entity a region or segment attaches to. | `dim_client` | agreed |
 | **Account** | The container trades and cash sit in. Has exactly one Client and one or more currency balances. | `dim_account` | agreed |
-| **Trade** | One executed order: an Account buys or sells a quantity of an Instrument at a price, on a Trade Date, settling on a Settlement Date. | `fct_trade` | agreed |
-| **Traded Notional** | Σ(quantity × price) converted to the Reporting Currency. The monetary size of trading activity. | `semantic/metrics/` | agreed |
+| **Trade** | One executed order: an Account buys or sells a quantity of an Instrument at an Execution Price, on a Trade Date, settling on a Settlement Date. | `fct_trade` | agreed |
+| **Execution Price** | The price a Trade actually filled at, in the Instrument's Quotation Currency. Distinct from Market Price, which is that day's close for the Instrument as a whole: a Trade fills at whatever the market gave it at that moment, which is not the close except by coincidence. Trades are valued at Execution Price; Positions are marked at Market Price. Registered 2026-08-05 — the Glossary had been calling this "price". | `fct_trade` | agreed |
+| **Traded Notional** | Σ(quantity × Execution Price) converted to the Reporting Currency. The monetary size of trading activity. | `semantic/metrics/` | agreed |
 | **Trade Count** | Number of Trades. Deliberately separate from Traded Notional — they answer different questions. | `semantic/metrics/` | agreed |
 | **Commission** | What the broker charges the Client for executing a Trade. Broker income. | `fct_trade` | agreed |
 | **Fee** | A third-party charge passed through to the Client — exchange, clearing, regulatory. Collected by the broker but not earned by it. | `fct_trade` | agreed |
@@ -197,6 +213,7 @@ trust. Every pair here is drawn from the job specification's own list.
 | **Realised P&L** | **Unrealised P&L** | One is banked, one is a market opinion. Summing them without saying so mixes fact with mark-to-market. |
 | **Traded Notional** | **Trade Count** | "Volume" means either. One large trade and a thousand small ones are opposite answers to "was this a busy month". |
 | **Client** | **Account** | One Client may hold many Accounts. Counting Accounts and calling it clients inflates every per-client figure. |
+| **Execution Price** | **Market Price** | Both are a price of the same Instrument on the same date, and neither is the wrong one — they answer different questions. Traded Notional at the close values trading that never happened at that price; a Position marked at whatever a Trade happened to fill at is a mark to one order rather than to the market. Registered 2026-08-05, because the two were about to become `fct_trade.price` and `fct_instrument_price.market_price` — the same word for two numbers, which is the disease Section C exists to catch. |
 | **Adjusted Close** | **Market Price** | Measured on real data: the two differ on **95.5%** of AAPL's last 1,255 daily bars. Adjusted Close rewrites history every time a dividend is paid, so a Position marked at it yields an Account Value that is both wrong and *irreproducible* — the same query returns a different number next quarter. |
 | **Quotation Currency** | **Reporting Currency** | A Market Price is quoted in the Instrument's own currency and minor unit; a Grounded Answer is expressed in one Reporting Currency. Skipping the conversion is an FX-sized error; missing the minor unit is a **100×** error — LSE quotes pence, and £4.20 booked as £420 looks entirely plausible. |
 

@@ -4,26 +4,39 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-05 — Sub-step 1.3 committed. Step 001 is closed with nothing outstanding.
+**Last updated:** 2026-08-05 — Step 001 closed and committed; Step 002 planned, approved, and awaiting its first commit. Still no implementation code.
 **Steps completed:** Step 000 (framework) and Step 001, fully committed. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`.
 
 ---
 
 ## Resume here
 
-- **Active Step:** none. Step 001 — Design the Target State
-  ([plan](../plan/step-001-target-state-design.md)) — is **done**, all three
+- **Active Step:** 002 — Build the Warehouse and fill it
+  ([plan](../plan/step-002-warehouse-and-ingestion.md)), **approved 2026-08-05**
+  along with all six rulings in it. Step 001
+  ([plan](../plan/step-001-target-state-design.md)) is **done**, all three
   Sub-steps committed, the last in `9c5b060`.
-- **Next Sub-step:** none exists yet. Step 001 has no Sub-steps left, and Step
-  002 is unplanned. The next move is to **plan Step 002** — the first Step that
-  builds something — with `planning-a-step`; its Sub-step 2.1 is then the next
-  Sub-step.
-- **Awaiting Amino: nothing.** Every question raised in Sub-step 1.3 has been
-  ruled on. The eight component terms are `agreed`
-  ([Glossary Section A](../glossary.md#a-the-system)), including two renames —
-  `Copilot` → `Orchestrator` and `Interface` → `App` — and every document has
-  been swept so no old name survives outside the Step Reviews, which are kept as
-  point-in-time records on purpose.
+- **Next Sub-step:** 2.1 — create the Warehouse behind its adapter:
+  `veritas/warehouse/` holding the Warehouse Adapter and the ten-table star
+  schema, empty, plus `.claude/scripts/check_warehouse.py`. `uv add duckdb` is
+  the first dependency this project takes. Start it once the planning documents
+  below are committed.
+- **Awaiting Amino: the commit** of the Step 002 planning changes. Nothing is
+  blocked on a decision — every question the plan raised was ruled on the same
+  day and recorded in
+  [Rulings](../plan/step-002-warehouse-and-ingestion.md#rulings):
+  1. **`Execution Price` is `agreed`** and required — Glossary Section B, with a
+     Section C row against `Market Price`. Column `fct_trade.execution_price`.
+  2. **No `dim_date`.** The date axis is `trade_date` / `settlement_date`;
+     `target-state.md`'s Warehouse row was corrected.
+  3. **Hand-authored DDL inside the adapter is allowed**, with the reasoning and
+     four worked examples now a dated clarification in
+     [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#clarification-2026-08-05--what-the-sqlglot-commitment-forbids).
+  4. **dlt lands raw; the adapter builds the star schema.** Second decision in
+     ADR-0004, due in Sub-step 2.2.
+  5. **Check scripts, no pytest** this Step.
+  6. **2.4 is a pre-agreed split point** — if 2.1–2.3 grow under review, it
+     becomes Step 003 rather than being squeezed.
 - **Obligations recorded for later Steps**, so they are not rediscovered:
   `README.md` must list every credential Veritas touches
   ([Target State](target-state.md#what-credential-free-means)), and two Ledger
@@ -54,12 +67,12 @@ Semantic Layer, no application.
 | Development framework | ✅ working | `CLAUDE.md`, `.claude/docs/` tree, five skills in `.claude/skills/`. |
 | Framework self-check | ✅ working | `.claude/scripts/verify_framework.py` — structure only (documents exist, links resolve, skills load, interpreter pinned), passes. |
 | Language check | ✅ working | `.claude/scripts/check_language.py` — content rules: component names registered, no `proposed` term in code, abbreviations resolvable. Passes. Parses code with `ast` so it checks identifiers, not prose. Partial payment of [DEBT-001](../debt-ledger.md). |
-| Glossary | ✅ working | Process Language + Domain Language Sections A–E, all `agreed`. Sub-step 1.2 added `Market Price`, `Adjusted Close`, `Quotation Currency`; narrowed `Instrument`; renamed `dim_fx_rate` → `fct_fx_rate` and registered `fct_instrument_price`. |
-| Target State | ✅ working | **`agreed`** 2026-08-03. Terms agreed, data sources verified, rulings R1–R3 applied. |
+| Glossary | ✅ working | Process Language + Domain Language Sections A–E, all `agreed`. Sub-step 1.2 added `Market Price`, `Adjusted Close`, `Quotation Currency`; narrowed `Instrument`; renamed `dim_fx_rate` → `fct_fx_rate` and registered `fct_instrument_price`. Step 002 planning added `Execution Price` and its Section C row against `Market Price`. |
+| Target State | ✅ working | **`agreed`** 2026-08-03. Terms agreed, data sources verified, rulings R1–R3 applied. One correction 2026-08-05: no date dimension in the Warehouse row. |
 | Product brief | ✅ working | `.claude/docs/design/product-brief.md` — the full system Veritas slices, captured so the job description can be removed. |
 | Data-availability check | ✅ working | `.claude/docs/design/data-availability.md` + `.claude/scripts/check_data_availability.py`. Verdict GO. Runs offline from `data/snapshots/` or live with `--refresh`; exits non-zero if a source dies, a wrong-number trap vanishes, or a distinction collapses. |
 | Data snapshots | ✅ working | `data/snapshots/` — 288 KB: real 2025 FX Rates and three real price series, plus the dated probe record. Committed on purpose: it is what makes the check reproduce without network access. |
-| Founding ADRs | ✅ working | Three ADRs in `.claude/docs/adr/`, all **`accepted`** 2026-08-03: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code. Every cost in each is classified *accepted* / *debt* / *extension*. A fourth — snapshot-and-replay — was deferred to the ingestion Step ([DEBT-002](../debt-ledger.md)). |
+| Founding ADRs | ✅ working | Three ADRs in `.claude/docs/adr/`, all **`accepted`** 2026-08-03: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code. Every cost in each is classified *accepted* / *debt* / *extension*. A fourth — snapshot-and-replay — was deferred to the ingestion Step ([DEBT-002](../debt-ledger.md)), and is now due as ADR-0004 in Sub-step 2.2. ADR-0002 carries a dated clarification (2026-08-05) on what its sqlglot commitment forbids; its status stays `accepted`. |
 | Warehouse | ✗ none | — |
 | Semantic Layer | ✗ none | — |
 | Ingestion | ✗ none | — |
