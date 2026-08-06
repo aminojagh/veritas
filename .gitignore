@@ -13,3 +13,4 @@ data/raw/
 data/interim/
 *.duckdb
 *.duckdb.wal
+.claude/worktrees/
