@@ -42,8 +42,10 @@ reason) · `superseded`.
 | [EXT-003](#ext-003--metric-authoring-at-scale) | Metric authoring at scale | `semantic/` file format · retrieval index build | L | open |
 | [EXT-004](#ext-004--coverage-miss-capture) | Coverage-miss capture | Observability question log · Grounded Answer refusal path | M | open |
 | [EXT-005](#ext-005--semantic-layer-coherence-checks) | Semantic Layer coherence checks | Metric Definition fields · the same sqlglot parse as EXT-002 | M | open |
+| [EXT-006](#ext-006--position-change-attribution) | Position Change attribution | `fct_position_snapshot` · the `Position Change` Metric Definition | M | open |
+| [EXT-007](#ext-007--corporate-actions) | Corporate actions | `fct_instrument_price` · `fct_position_snapshot` · the P&L Metric Definitions | M | open |
 
-**Open:** 5 · **Built:** 0 · **Dropped:** 0
+**Open:** 7 · **Built:** 0 · **Dropped:** 0
 
 ### Target State extension path, mapped
 
@@ -323,3 +325,131 @@ When the Semantic Layer has enough entries for a human to stop holding the whole
 set in their head — in practice the same threshold as
 [EXT-003](#ext-003--metric-authoring-at-scale), around 50 entries — or as soon as
 a second author can add entries. Build with EXT-002; they share the parse step.
+
+---
+
+### EXT-006 — Position Change attribution
+
+- **Status:** open
+- **Opened:** Sub-step 2.1, on Amino's review of the snapshot design (2026-08-06)
+- **Size:** M
+- **Seam:** `fct_position_snapshot`, and the `Position Change` Metric Definition
+- **Motivated by:** the [Section C](glossary.md#c-distinctions-we-must-not-blur)
+  pair *Position Change* versus *Trade* — *"Positions also change through
+  transfers and corporate actions"* — which the slice can **measure** but cannot
+  **explain**
+
+**What the full system needs**
+
+A fact table at event grain recording every cause of a Position moving — a Trade,
+a transfer in or out, a corporate action — so that the difference between a
+snapshot delta and the sum of Trades has a name instead of being a residual:
+
+```
+fct_position_movement(movement_date, account_id, instrument_id,
+                      quantity_delta, cost_basis_delta, movement_reason, trade_id)
+```
+
+The snapshot then becomes a materialisation of the fold rather than an
+independent truth, and reconciling the two is a check rather than an act of
+faith. `cost_basis_delta` is what carries a basis for quantity that arrives
+without a Trade to price it, which is the case a transfer creates and the one a
+fold over `fct_trade` can never recover.
+
+**What the slice does instead, and why that is correct here**
+
+The snapshot answers *what was held* and `fct_trade` answers *what was done*, and
+`Position Change` is a delta between two snapshot dates. That satisfies the
+metric exactly as registered — *"Change in a Position between two points in time,
+from any cause — a Trade, a transfer, or a corporate action"*. It promises the
+change; it does not promise the cause. No Certified Metric, no Dimension
+Definition and no Ambiguous Term in the slice asks which cause, so building the
+table now would be modelling for a question nobody has posed.
+
+**Why it matters in the full system**
+
+Attribution is the first thing a reconciliation agent needs — the Target State
+already names *"multi-agent reconciliation and anomaly detection"* as a full-MVP
+capability, and a reconciliation that can only say *"the numbers differ by 20
+shares"* has done the easy half. It is also what turns the Section C pair from a
+warning into a demonstrable trap: with causes recorded, a Gold Question can show
+the two numbers diverging and name why.
+
+**Readiness**
+
+A Certified Metric, Dimension Definition or Gold Question needs to attribute a
+Position Change to a cause — in practice, the first question of the form "how
+much of this move was trading?".
+
+**Not to be confused with** making the trap *real in the data*, which is a much
+smaller thing and belongs to Sub-step 2.3: the simulator emitting a few transfers
+so that a snapshot delta and a sum of Trades actually disagree somewhere. That
+needs no new table, and without it the Section C distinction is asserted rather
+than demonstrated.
+
+---
+
+### EXT-007 — Corporate actions
+
+- **Status:** open
+- **Opened:** Sub-step 2.1, when Amino approved simulating transfers but not
+  corporate actions and asked where the excluded half belongs (2026-08-06)
+- **Size:** M
+- **Seam:** `fct_instrument_price`, `fct_position_snapshot`, and the
+  `Realised P&L` / `Unrealised P&L` Metric Definitions
+- **Motivated by:** the [Section C](glossary.md#c-distinctions-we-must-not-blur)
+  pair *Adjusted Close vs Market Price*, which forbids the usual shortcut, and the
+  `Position Change` row naming corporate actions as a cause of a Position moving
+
+**Is this in the full Minimum Viable Product's scope? Yes — but as something the
+system must not break on, rather than something it builds.**
+
+That distinction is the whole entry. Veritas is a **reader of a warehouse, not a
+book of record**. It does not create corporate actions; a real brokerage warehouse
+already records them, and the full system reads that warehouse. So the extension
+is not "simulate splits" — it is "be correct over a book where splits happened",
+which is a Semantic Layer and pricing concern, not a generator concern.
+
+**What the full system needs**
+
+1. **A split-aware relationship between quantity and price.** A 4:1 split quarters
+   the unadjusted close overnight. Marking a Position at `Market Price` across that
+   date shows Account Value collapsing ~75% with no Trade behind it. The quantity
+   must move on the same date the price does.
+2. **Corporate actions as a `movement_reason`** in
+   [EXT-006](#ext-006--position-change-attribution)'s `fct_position_movement` —
+   the two extensions share that table, and EXT-006 should be built first or with
+   it.
+3. **Cost Basis carried through the action.** A split changes quantity without
+   changing what the holding cost, so `cost_basis` must survive unchanged while
+   quantity multiplies. A dividend does the opposite. Getting this wrong misstates
+   both P&L metrics, which is the failure `data-availability.md` already measured
+   for the adjusted-close route.
+4. **Never by reaching for `Adjusted Close`**, which is the tempting shortcut and
+   is registered as an anti-pattern precisely because it rewrites history and makes
+   an Account Value irreproducible.
+
+**What the slice does instead, and why that is correct here**
+
+Holds no corporate actions and, more importantly, **holds no data containing
+one** — the price window for held Instruments is kept split-free, and Sub-step
+2.2's `--sources` check is required to verify that rather than assume it. Client
+activity is synthetic and we choose the instruments, so this costs nothing. It is
+correct for the slice because a corporate action here would force the choice
+between building the machinery above and holding knowingly incoherent data, and
+the third option — quietly using `Adjusted Close` — is the exact wrong number the
+project exists to prevent.
+
+**Why this is not debt**
+
+The current code is right for its scope, and the trigger cannot fire inside this
+project's life: it fires when Veritas points at a warehouse it did not populate.
+It becomes debt only if the slice ever loads a price window containing a split,
+which is what the `--sources` guard exists to make impossible by accident.
+
+**Readiness**
+
+Either: the Warehouse is pointed at real (non-synthetic) client data, which will
+already contain corporate actions; or the loaded price window can no longer be
+kept split-free — for example a longer history, or a held Instrument chosen for a
+reason other than our convenience.

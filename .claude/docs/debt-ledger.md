@@ -36,8 +36,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently) | No ad-hoc exploration | — | — | **accepted** (permanent) |
 | [DEBT-007](#debt-007--moved-to-ext-003) | Metric authoring does not scale beyond a hand-written corpus | L | — | moved → [EXT-003](extension-register.md#ext-003--metric-authoring-at-scale) |
 | [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers) | The access-control story promises more than it delivers | S | Any access-control claim in `README.md` or the App | open |
+| [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL | open |
+| [DEBT-010](#debt-010--movement_type-has-no-registered-value-vocabulary) | `movement_type` has no registered value vocabulary | S | The first Cash Movement row is generated | **paid** (Sub-step 2.1) |
 
-**Open debt:** 5 · **Paid:** 0 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 6 · **Paid:** 1 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -470,3 +472,162 @@ the sharpest possible own goal.
 The first access-control claim made anywhere a reader will see it: `README.md`,
 the App, or a demo script. Whichever comes first — and it will come during the
 App Step, not at the end.
+
+---
+
+### DEBT-009 — The seam scan checks imports but not the dialect
+
+- **Status:** open
+- **Opened:** Sub-step 2.1 (`.claude/docs/reviews/step-002-warehouse-and-ingestion.md`)
+- **Size:** S
+- **Location:** `.claude/scripts/check_warehouse.py` — `duckdb_importers` and
+  `check_seam`
+
+**What we did**
+
+Implemented half of the signal ADR-0002 named. That ADR commits that all warehouse
+access goes through the adapter, and says the signal that it has stopped holding
+is *"a `duckdb` import **or a DuckDB-specific function name** anywhere outside the
+adapter module"*. `check_seam` scans imports only. A module that never imports
+`duckdb` but writes `list_aggregate(...)` or `strftime(...)` into a query string
+passes the check while breaking exactly the commitment the check exists to
+protect.
+
+The clarification added to ADR-0002 on 2026-08-05 says of this script that it
+"performs that scan, so the commitment is checked on every run rather than
+asserted in a review" — which is currently true of the import half and not of the
+function-name half.
+
+**What we should have done**
+
+Scan string literals in every module outside `veritas/warehouse/` for
+DuckDB-specific function names, with the list derived from something that can go
+stale honestly — sqlglot already knows which functions belong to which dialect,
+and Sub-step 2.4 adds sqlglot as a dependency for unrelated reasons.
+
+**Why we deferred**
+
+There is nothing to scan. No module outside the adapter emits SQL yet, because no
+Semantic Layer and no Orchestrator exist. Writing the scan now would mean writing
+a dialect list against zero examples and having it pass vacuously — the same
+failure mode `check_seam` already guards against for imports, where it fails the
+run if *nothing* imports duckdb.
+
+**Cost while unpaid**
+
+A reader of `check_warehouse.py`, or of ADR-0002's clarification, can reasonably
+conclude the adapter commitment is mechanically enforced. It is enforced against
+the coarse half of the signal. The finer half — the one that actually leaks a
+dialect assumption into generated SQL — is still discipline, which is precisely
+what [DEBT-001](#debt-001--framework-rules-rely-on-discipline-not-enforcement)
+records goes quiet under pressure.
+
+**Trigger**
+
+The first component outside `veritas/warehouse/` that emits SQL — the Semantic
+Layer's first Metric Definition expression, or the Orchestrator's first generated
+query, whichever lands first. The scan is written in the same Sub-step as the
+thing it has to scan, so it is written against real examples.
+
+---
+
+### DEBT-010 — `movement_type` has no registered value vocabulary
+
+- **Status:** **paid** — Sub-step 2.1, 2026-08-06, in the same Sub-step that opened
+  it and before a single row was written
+- **Opened:** Sub-step 2.1 (`.claude/docs/reviews/step-002-warehouse-and-ingestion.md`)
+- **Size:** S
+- **Location:** `veritas/warehouse/schema.sql` — `fct_cash_movement.movement_type`
+  and `fct_accounting_movement.movement_type`
+
+**What we did**
+
+Gave both movement tables a `movement_type` column with no `CHECK` constraint and
+no registered value set, while the schema's three other enumerated columns —
+`client_region`, `instrument_type`, `trade_side` — each carry a constraint listing
+values the Glossary agreed. The asymmetry is deliberate and it is a shortcut.
+
+The Glossary's `Cash Movement` row does enumerate them in prose — *"deposits,
+withdrawals, settlement, fee charges"* — so the words exist; what does not exist
+is agreement on their exact spelling as data, which is the thing a constraint
+would freeze.
+
+**What we should have done**
+
+Raised a Term Proposal for the movement-type value set alongside the three raised
+in this Sub-step, agreed the spellings, and constrained both columns the same way
+the other three are constrained.
+
+**Why we deferred**
+
+Nothing consumed the values at the time. No Certified Metric named then — Gross
+Revenue, Net Revenue, Traded Notional, Cash Balance, Account Value — sliced by
+movement type; the Section C pair these tables exist for is *Cash Movement versus
+Accounting Movement*, which is a table-level distinction, not a type-level one.
+Agreeing a value vocabulary against zero consumers means guessing at requirements
+that do not exist, which is the reasoning that kept the fourth Term Proposal off
+the list rather than an oversight.
+
+**That reasoning no longer holds. Amended 2026-08-06**, on Amino's review of the
+snapshot design. Walking every Certified Metric against the ten tables asked where
+`Realised P&L` — *"profit or loss locked in by closing a Position"* — is computed
+from, and the answer is this column. It is a value recognised on a date, which is
+what `Accounting Movement` is registered to hold: *"a ledger entry recognising
+economic value on the date it was earned, whether or not cash moved."* So a
+`movement_type` value **is** the home of a registered metric, and this entry is
+load-bearing rather than cosmetic. It stays open and stays `S` — the fix is still
+one Term Proposal and two `CHECK` constraints — but the vocabulary must now cover
+realised P&L explicitly, and a metric depends on getting the spelling right rather
+than only a tidy `GROUP BY`.
+
+**Cost while unpaid**
+
+The column is the one place in the star schema where a simulator can write
+`'Deposit'` on one row and `'deposit'` on the next and nothing objects. That is a
+small version of exactly the disease this project is about: two spellings of one
+concept, silently splitting a `GROUP BY` into two rows that each look plausible.
+Since the amendment above, the cost is larger than tidiness: a realised-P&L
+posting spelled two ways is a P&L metric that under-reports, with no error
+anywhere.
+
+**Trigger**
+
+Sub-step 2.3, when the simulator generates the first Cash Movement or Accounting
+Movement row. The values become real at that moment, so the proposal is raised
+before the generator is written, not after — otherwise the vocabulary is decided
+by whichever string got typed first.
+
+**How it was paid**
+
+Amino's instruction on 2026-08-06 was *"if that 'if' is a bad one, make sure it
+won't happen — don't leave these cases hanging hoping that they will get fixed."*
+The "if" was that Sub-step 2.3 might pay this debt without noticing that
+`Realised P&L` now depends on it. Recording the dependency in a third place would
+have been one more thing to hope someone reads, so the debt was paid instead:
+
+Both columns now carry a `CHECK`, and the two lists **differ**, which is the point:
+
+| Table | Permitted `movement_type` |
+|---|---|
+| `fct_cash_movement` | `deposit` · `withdrawal` · `trade settlement` · `commission` · `fee` · `rebate` |
+| `fct_accounting_movement` | `commission` · `fee` · `rebate` · `realised P&L` |
+
+`realised P&L` is accounting-only — no cash moves when a Position closes, the cash
+moved at settlement — and `deposit` is cash-only, because a deposit earns nothing.
+That asymmetry is the Section C pair *Cash Movement vs Accounting Movement* made
+structural instead of remembered, and three probes in `check_warehouse.py` hold it
+there: the two cross-table refusals, and `'Deposit'` refused for its capital D,
+which is the exact spelling failure this entry was opened for.
+
+The trigger above can no longer fire: 2.3's simulator cannot write a movement row
+at all without using an agreed spelling, and cannot give `Realised P&L` no home
+without the engine refusing the insert.
+
+**Term Proposal — the spellings, for Amino to amend if he disagrees.** These are
+data values rather than Glossary terms, and the words themselves were already
+agreed — the `Cash Movement` row enumerates *"deposits, withdrawals, settlement,
+fee charges"*. What is new is their spelling as data: lowercase with spaces,
+following `instrument_type`'s *"currency pair"* and `trade_side`'s *"buy"*, with
+`realised P&L` keeping its registered capitalisation the way `ETF` does. Changing
+any of them is a one-line edit in `schema.sql` while the tables are empty; it stops
+being free once 2.3 has loaded rows.

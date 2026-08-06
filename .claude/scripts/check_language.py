@@ -65,15 +65,32 @@ EXEMPT = {
 # Uppercase tokens that are not abbreviations at all, so the "can the reader look
 # this up?" scan should ignore them.
 KNOWN_NON_ABBREVIATIONS = {
-    # Currency codes — ISO 4217, and self-explanatory in context.
-    "USD", "EUR", "GBP", "JPY", "CHF", "AUD", "HKD", "SGD",
+    # Currency codes — ISO 4217, and self-explanatory in context. GBX is the
+    # minor-unit spelling of GBP that dim_instrument's constraint does *not*
+    # catch, so it is named in the documents on purpose.
+    "USD", "EUR", "GBP", "GBX", "JPY", "CHF", "AUD", "HKD", "SGD",
     # Ticker symbols and exchange suffixes appearing in the data-availability work.
     "AAPL", "SPY", "TLT", "BNDX", "IWDA", "SAP", "VOD", "GSPC", "TNX",
     "ES", "GC", "EURUSD", "DE", "AS", "NASDAQ",
     # SQL keywords and code-ish tokens quoted in prose.
+    #
+    # The Data Definition Language (DDL) half of this group is *derived*, not
+    # remembered. It had grown one failure at a time — "BY" and "CHECK" were added
+    # when a review quoted a constraint, "DATE", "NOT" and "OR" when the next one
+    # quoted a column — which is a list that is always one document behind. The
+    # whole keyword vocabulary of our own schema is now here, so writing about any
+    # part of it is already covered. To re-derive after a schema change:
+    #
+    #   uv run python -c "import re; print(sorted(set(re.findall(r'\b[A-Z]{2,6}\b',
+    #       open('veritas/warehouse/schema.sql').read()))))"
+    #
+    # Anything longer than six characters — VARCHAR, PRIMARY, REFERENCES,
+    # TIMESTAMP — never reaches this set, because the abbreviation candidate
+    # pattern in check_abbreviations() is `[A-Z]{2,6}`.
     "SELECT", "CREATE", "TABLE", "WHERE", "DECIMAL", "NULL", "OWL", "RDF",
     "SPARQL", "DAG", "CTE", "LIMIT", "JOIN", "GROUP", "ORDER",
-    "INSERT", "INTO", "FROM",
+    "INSERT", "INTO", "FROM", "BY", "CHECK",
+    "ABS", "BIGINT", "DATE", "IN", "KEY", "NOT", "OR", "UNIQUE",
     # Document and tooling shorthand.
     "PY", "OK", "GO", "PASS", "FAIL", "NOTE", "TODO", "KB", "MB", "GB",
     "CET", "FAQ", "BIRD", "MD", "README", "CI", "R1", "R2", "R3",

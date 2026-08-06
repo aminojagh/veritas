@@ -145,6 +145,37 @@ Committed check scripts, the pattern Non-Negotiable #4 asks for and the one
 component that has branching logic worth unit-testing, which is the Validation
 Gate rather than the warehouse.
 
+### R7–R10 — four rulings from writing the Data Definition Language (DDL), 2026-08-05
+
+Raised during Sub-step 2.1 and settled the same day, before any of the four
+reached a column name. Three are Term Proposals and one is a contradiction
+between two `agreed` Glossary rows. All four were found the same way: by writing
+the star schema and hitting a column with no word to name it — which is the order
+Non-Negotiable #1 exists to produce, and the reason 2.1 comes before 2.2.
+
+| | Question | Ruling |
+|---|---|---|
+| **R7** | The natural key `dim_instrument` needs, so Yahoo prices and NASDAQ/SEC reference rows have something to join on. No term named an Instrument's ticker. | **`Instrument Symbol`** → `dim_instrument.instrument_symbol`. It is what both reference sources call it — NASDAQ Trader's `Symbol` column and Yahoo's `symbol` field — so ingestion reads without a rename in it. |
+| **R8** | The currency a monetary amount in a fact row is held in. Neither `Quotation Currency` (the Instrument's) nor `Reporting Currency` (the answer's), and needed by four tables. | **`Denomination Currency`** → `denomination_currency`. One term covering Trades, Cash Movements, Accounting Movements and Cash Balances. `Cash Currency` was rejected: an Accounting Movement is explicitly the entry recognised *"whether or not cash moved"*, so that word is wrong on one of the four tables and would need a second name — which is the synonym disease. A bare `currency` was rejected as the same mistake R1 had just fixed. |
+| **R9** | How `fct_trade` records buy versus sell. The `Trade` row says an Account *"buys or sells"* but no term names which. | **`Trade Side`** → `fct_trade.trade_side`, values `buy`/`sell`, with `quantity` always positive. Chosen over a signed quantity, which adds no vocabulary but makes `Traded Notional`'s registered formula Σ(quantity × Execution Price) require an undocumented absolute value to stay correct. |
+| **R10** | Two `agreed` rows disagreed on the instrument-type values. `Dimension Definition` said *"equity · bond · future · option"*; `Instrument`, narrowed 2026-08-03 by R1, says *"equity, ETF, future, or currency pair"*. | **The `Instrument` row wins.** The parenthetical was missed when R1 narrowed the universe — single bonds and options have no key-free Market Price source ([DEBT-003](../debt-ledger.md)). The `Dimension Definition` row was swept to match, so this removes a contradiction rather than making a choice, exactly as R2 did. |
+
+### R11–R15 — five rulings from Amino's review of the snapshot design, 2026-08-06
+
+Raised by one question — *given that snapshot tables answer "what was held" and
+`fct_trade` answers "what was done", is any promised question unanswerable?* — and
+all settled before Sub-step 2.1 was committed. The argument for each is in the
+[Step Review](../reviews/step-002-warehouse-and-ingestion.md); this table is the
+ruling only.
+
+| | Question | Ruling |
+|---|---|---|
+| **R11** | `Unrealised P&L` is quantity × Market Price − Cost Basis, and no column held the third term. Store it, defer it as debt, or fold it out of `fct_trade`? | **Store it.** `Cost Basis` registered and added to `fct_position_snapshot`, signed, total rather than per unit, with `CHECK (quantity != 0 OR cost_basis = 0)`. The fold returns a plausible wrong number under a date filter, after a transfer, and after a round trip — three worked examples in the review. |
+| **R12** | Is a Snapshot **end-of-day**? | **Yes**, and it is part of the `Snapshot` term rather than a loading detail: a Position marked at that date's closing Market Price must be the Position held at the close. Registering `Snapshot` was the same ruling — the word named two tables and a column and had never been defined. |
+| **R13** | Are Snapshots **dense or sparse**, and on which calendar? | **Dense, over trading days only** — one row per subject per date on which the Warehouse holds a Market Price. Dense makes an "as of" question an equality join instead of a most-recent-row-at-or-before lookup, which is a Join Path the Orchestrator would have to get right every time. Trading days rather than calendar days, because a Saturday snapshot joins to no price. **Snapshot density and Market Price density are one decision, not two.** |
+| **R14** | Does the simulator emit **non-trade Position movements**? | **Transfers yes, corporate actions no.** A handful of transfers makes the Section C pair *Position Change vs Trade* real in the data rather than merely asserted, and is what puts `cost_basis` under load. Corporate actions are excluded because `Market Price` is real data: a split inside the loaded window forces either corporate-action machinery or knowingly incoherent data, and the third option is `Adjusted Close`, which is an anti-pattern. **Sub-step 2.2's `--sources` must verify the price window is split-free rather than assume it**, and the excluded half is [EXT-007](../extension-register.md#ext-007--corporate-actions). |
+| **R15** | `Realised P&L` had no home. Record the intention, or implement it? | **Implement it, by paying [DEBT-010](../debt-ledger.md) in the Sub-step that opened it.** Both `movement_type` columns now carry a `CHECK`, and the two lists differ: `realised P&L` is accounting-only, `deposit` is cash-only. The debt's own justification — *"nothing consumes the values yet"* — had been falsified by R11's walk, so annotating it would have left a dependency for 2.3 to notice or not. Three probes hold it. |
+
 ### R6 — 2.4 is a pre-agreed split point → **approved**
 
 If review-driven growth arrives in 2.1–2.3, **2.4 becomes Step 003** rather than

@@ -48,6 +48,41 @@ old name is recognisable in history, with a pointer to its replacement).
 > needs a calendar attribute that is not derivable in SQL, so there is no
 > `dim_date` and the Target State's Warehouse row was corrected instead.
 >
+> **Three terms added on 2026-08-05** by Sub-step 2.1, all approved the same day,
+> each one found by writing the star schema's Data Definition Language (DDL) and
+> discovering a column with no word to name it. `Instrument Symbol` is the natural
+> key both reference sources supply. `Trade Side` names the buy-or-sell the `Trade`
+> row described but never named, and keeps `Traded Notional` literally true as
+> written by letting `quantity` stay positive. `Denomination Currency` is the third
+> currency sense — what a monetary amount in a fact row is *held* in, as opposed to
+> what an Instrument is *quoted* in or what an answer is *expressed* in — and has a
+> [Section C](#c-distinctions-we-must-not-blur) row against the other two.
+>
+> **The instrument-type values were swept on 2026-08-05**, in the same Sub-step.
+> Two `agreed` rows disagreed: `Dimension Definition` listed *"equity · bond ·
+> future · option"* while `Instrument`, narrowed on 2026-08-03 by R1, reads
+> *"equity, ETF, future, or currency pair"*. The parenthetical was simply missed
+> when the universe narrowed — single bonds and options have no key-free Market
+> Price source ([DEBT-003](debt-ledger.md)) — so the `Dimension Definition` row now
+> matches the `Instrument` row, and `dim_instrument.instrument_type` carries a
+> constraint that refuses anything else.
+>
+> **`Cost Basis` added on 2026-08-06**, approved the same day, and found by asking
+> a question of the finished schema rather than of the DDL being written: *given
+> that snapshots answer "what was held" and `fct_trade` answers "what was done",
+> is any promised question unanswerable?* Walking all eight Certified Metrics
+> against the ten tables found exactly one. `Unrealised P&L` is quantity ×
+> `Market Price` − Cost Basis, and the second term existed in no column, while
+> Section D commits Veritas to resolving *"P&L"* to either P&L metric on demand.
+> Reconstructing it from Trades is possible only under conditions this schema
+> cannot promise, and yields an expression that a Dimension Definition filter
+> silently corrupts. It is now a column on `fct_position_snapshot`. `Realised P&L`
+> needed no schema change: it is a ledger posting, so it lands in
+> `fct_accounting_movement` as a `movement_type` — which is what makes
+> [DEBT-010](debt-ledger.md) load-bearing for a registered metric rather than
+> cosmetic. Attribution of a `Position Change` to its cause went to
+> [EXT-006](extension-register.md) in the same ruling.
+>
 > **Eight component terms added on 2026-08-04** by Sub-step 1.3, all approved the
 > same day: `Warehouse`, `Warehouse Adapter`, `Ingestion`, `Retrieval`,
 > `Orchestrator`, `App`, `Observability`, `Evaluation`. Seven of the nine Target
@@ -69,7 +104,7 @@ What Veritas is made of.
 | **Certified Metric** | A metric that exists in the Semantic Layer. The only kind Veritas is permitted to compute. | `semantic/metrics/` | agreed |
 | **Shadow Metric** | A metric computed inline in a query instead of drawn from the Semantic Layer. The failure mode Veritas exists to prevent. | — (an anti-pattern) | agreed |
 | **Ambiguous Term** | A word users say that maps to two or more Certified Metrics and therefore has no single correct answer. Not a metric — an instruction to disambiguate before generating SQL. | `semantic/ambiguous/` | agreed |
-| **Dimension Definition** | A certified axis for *slicing* a metric — the answer to "by what?". Names the column, its grain, and its allowed values, so "by region" always means the same column with the same buckets. Examples: **by date** (`trade_date`, daily), **by region** (`client_region` — EU · UK · APAC), **by instrument type** (equity · bond · future · option). "Net Revenue **by region** last quarter" applies the region Dimension Definition to the Net Revenue metric. | `semantic/dimensions/` | agreed |
+| **Dimension Definition** | A certified axis for *slicing* a metric — the answer to "by what?". Names the column, its grain, and its allowed values, so "by region" always means the same column with the same buckets. Examples: **by date** (`trade_date`, daily), **by region** (`client_region` — EU · UK · APAC), **by instrument type** (equity · ETF · future · currency pair — swept 2026-08-05 to match the narrowed `Instrument` term). "Net Revenue **by region** last quarter" applies the region Dimension Definition to the Net Revenue metric. | `semantic/dimensions/` | agreed |
 | **Join Path** | A certified route between two warehouse tables, so the model never invents a join. | `semantic/joins/` | agreed |
 | **Grounding** | The step where retrieved Semantic Entries constrain SQL generation. Ungrounded generation is forbidden, not merely discouraged. | `veritas/grounding/` | agreed |
 | **Validation Gate** | Deterministic, non-LLM checks a query must pass before execution: certified-metrics-only, no restricted columns, access policy applied, cost bounded, read-only. | `veritas/validation/` | agreed |
@@ -172,10 +207,12 @@ instruments, trades move cash and change positions.
 | Term | Definition | Lives in | Status |
 |---|---|---|---|
 | **Instrument** | A tradable asset — equity, ETF, future, or currency pair. Single bonds and options are **out of scope**: neither has a key-free Market Price source, so holding them would mean fabricating prices while claiming market data is real. Bond exposure is represented through bond ETFs, which is how most brokerage clients hold bonds anyway. Narrowed 2026-08-03; see [DEBT-003](debt-ledger.md). | `dim_instrument` | agreed |
+| **Instrument Symbol** | The ticker identifying an Instrument, and the natural key every source keys on — NASDAQ Trader's `Symbol` column, the SEC's ticker, and the symbol Yahoo's chart endpoint is queried by. Unique. Registered 2026-08-05: without it the price and reference feeds have nothing to join an Instrument on. | `dim_instrument` | agreed |
 | **Client** | The legal owner of one or more Accounts. The entity a region or segment attaches to. | `dim_client` | agreed |
 | **Account** | The container trades and cash sit in. Has exactly one Client and one or more currency balances. | `dim_account` | agreed |
 | **Trade** | One executed order: an Account buys or sells a quantity of an Instrument at an Execution Price, on a Trade Date, settling on a Settlement Date. | `fct_trade` | agreed |
 | **Execution Price** | The price a Trade actually filled at, in the Instrument's Quotation Currency. Distinct from Market Price, which is that day's close for the Instrument as a whole: a Trade fills at whatever the market gave it at that moment, which is not the close except by coincidence. Trades are valued at Execution Price; Positions are marked at Market Price. Registered 2026-08-05 — the Glossary had been calling this "price". | `fct_trade` | agreed |
+| **Trade Side** | Whether a Trade bought or sold: `buy` or `sell`. The direction the `Trade` row described — *"an Account buys or sells"* — without ever naming it. Registered 2026-08-05 in preference to a signed quantity, so `quantity` is always positive and `Traded Notional` stays literally true as it is written below, with no undocumented absolute value hidden in the metric. | `fct_trade` | agreed |
 | **Traded Notional** | Σ(quantity × Execution Price) converted to the Reporting Currency. The monetary size of trading activity. | `semantic/metrics/` | agreed |
 | **Trade Count** | Number of Trades. Deliberately separate from Traded Notional — they answer different questions. | `semantic/metrics/` | agreed |
 | **Commission** | What the broker charges the Client for executing a Trade. Broker income. | `fct_trade` | agreed |
@@ -187,14 +224,17 @@ instruments, trades move cash and change positions.
 | **Accounting Movement** | A ledger entry recognising economic value on the date it was *earned*, whether or not cash moved. | `fct_accounting_movement` | agreed |
 | **Cash Balance** | Money held in an Account in one currency at a point in time. Cash only. | `fct_balance_snapshot` | agreed |
 | **Account Value** | Cash Balance plus all Positions marked to market, in the Reporting Currency. | `semantic/metrics/` | agreed |
+| **Snapshot** | The state of a subject **as of the close of** a date, at a grain of one row per subject per date. Authoritative for *"what was held as of D"* and nothing else: a Snapshot cannot see between its own dates, so a Position opened and closed inside one day leaves the Snapshots either side of it identical. End-of-day is part of the definition, not a loading detail — a Position marked at that date's closing Market Price must be the Position held at the close. Written on every date the Warehouse holds a Market Price for, so an "as of" question is an equality join rather than a most-recent-row-at-or-before lookup. Registered 2026-08-06. | `fct_position_snapshot`, `fct_balance_snapshot` | agreed |
 | **Position** | Quantity of one Instrument held by one Account at a point in time. | `fct_position_snapshot` | agreed |
 | **Position Change** | Change in a Position between two points in time, from any cause — a Trade, a transfer, or a corporate action. | `semantic/metrics/` | agreed |
+| **Cost Basis** | What a held Position cost to acquire, in the Instrument's Quotation Currency — the total for the held quantity, accumulated across the Trades that built it. The quantity both Realised and Unrealised P&L are measured against: neither is computable without it, since a Market Price alone says what a holding is worth and not what it gained. Signed, tracking the Position's own sign, so a short's proceeds are negative and one expression covers both directions. Registered 2026-08-06. | `fct_position_snapshot` | agreed |
 | **Realised P&L** | Profit or loss locked in by closing a Position. | `semantic/metrics/` | agreed |
 | **Unrealised P&L** | Profit or loss on a Position still held, at current market price. Moves with the market; nothing has been banked. | `semantic/metrics/` | agreed |
 | **FX Rate** | Real ECB reference rate between two currencies on a date. Sourced from the public Frankfurter API. Published on working days only, so a rate for a non-publishing date is the most recent published rate at or before it. | `fct_fx_rate` | agreed |
 | **Market Price** | The unadjusted closing price at which an Instrument traded on a date, in its Quotation Currency. The only price a Position may be marked at. | `fct_instrument_price` | agreed |
 | **Adjusted Close** | A price series back-adjusted for splits and dividends, which rewrites historical prices as later corporate actions occur. Correct for computing returns; **forbidden** for marking Positions or computing P&L. | — (an anti-pattern) | agreed |
 | **Quotation Currency** | The currency *and minor unit* an Instrument's Market Price is quoted in — LSE quotes in pence (`GBp`), not pounds. Normalising to major units is a required ingestion step. Distinct from Reporting Currency. | `dim_instrument` | agreed |
+| **Denomination Currency** | The currency a monetary amount in a fact row is *held* in — a Cash Movement's amount, an Accounting Movement's amount, a Cash Balance, and a Trade's Commission, Fee and Rebate. The third currency sense, and the one with no Instrument and no answer attached to it: a broker does not necessarily charge in the currency an Instrument is quoted in, so Traded Notional and Gross Revenue take different routes through FX Rate to reach the Reporting Currency. Registered 2026-08-05. | `fct_trade`, `fct_cash_movement`, `fct_accounting_movement`, `fct_balance_snapshot` | agreed |
 
 ### C. Distinctions we must not blur
 
@@ -216,6 +256,8 @@ trust. Every pair here is drawn from the job specification's own list.
 | **Execution Price** | **Market Price** | Both are a price of the same Instrument on the same date, and neither is the wrong one — they answer different questions. Traded Notional at the close values trading that never happened at that price; a Position marked at whatever a Trade happened to fill at is a mark to one order rather than to the market. Registered 2026-08-05, because the two were about to become `fct_trade.price` and `fct_instrument_price.market_price` — the same word for two numbers, which is the disease Section C exists to catch. |
 | **Adjusted Close** | **Market Price** | Measured on real data: the two differ on **95.5%** of AAPL's last 1,255 daily bars. Adjusted Close rewrites history every time a dividend is paid, so a Position marked at it yields an Account Value that is both wrong and *irreproducible* — the same query returns a different number next quarter. |
 | **Quotation Currency** | **Reporting Currency** | A Market Price is quoted in the Instrument's own currency and minor unit; a Grounded Answer is expressed in one Reporting Currency. Skipping the conversion is an FX-sized error; missing the minor unit is a **100×** error — LSE quotes pence, and £4.20 booked as £420 looks entirely plausible. |
+| **Cost Basis** | **Execution Price** | An Execution Price is what *one* Trade filled at; a Cost Basis is what the *whole holding* cost, accumulated across every Trade that built it and carried on the Position rather than the Trade. Marking Unrealised P&L against the latest Execution Price prices the holding at the last thing that happened to it, which for a position built over six months is a number with no relationship to what it cost. The two are also different shapes — one is per unit, the other is a total — so substituting one for the other is off by a quantity as well as by a price. Registered 2026-08-06. |
+| **Denomination Currency** | **Quotation Currency** | Both sit on `fct_trade` and they are not the same column. `quantity × Execution Price` is in the Instrument's Quotation Currency; Commission, Fee and Rebate are in the Trade's Denomination Currency, because a broker charges in the currency it bills in rather than the one the exchange quotes in. Assuming they are equal converts Gross Revenue through the wrong FX Rate — a plausible number, off by a currency pair. Registered 2026-08-05, when both were about to become one word. |
 
 ### D. Ambiguous Terms
 
