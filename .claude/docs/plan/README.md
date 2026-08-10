@@ -13,7 +13,7 @@ attempted versus what shipped, which is where the Step Review gets its honesty.
 |---|---|---|---|
 | [000](step-000-framework-scaffolding.md) | Development framework scaffolding | 1 | done |
 | [001](step-001-target-state-design.md) | Design the Target State | 3 | done |
-| [002](step-002-warehouse-and-ingestion.md) | Build the Warehouse and fill it | 4 | active |
+| [002](step-002-warehouse-and-ingestion.md) | Build the Warehouse and fill it | 5 | active |
 
 Statuses: `active` · `in review` · `done` · `abandoned` (with a note on why —
 an abandoned Step usually means the Target State moved).

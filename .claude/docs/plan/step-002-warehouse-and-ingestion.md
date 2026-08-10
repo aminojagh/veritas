@@ -1,7 +1,11 @@
 # Step 002 — Build the Warehouse and fill it
 
 - **Status:** active — written and **approved by Amino on 2026-08-05**, together
-  with every ruling in [Rulings](#rulings). Sub-step 2.1 may begin.
+  with every ruling in [Rulings](#rulings). Sub-step 2.1 is **committed**
+  (`5a061a7`). **Amended 2026-08-10 — see [R16](#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10):**
+  the original Sub-step 2.2 splits into three, and [R6](#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+  fires, so the sqlglot spike leaves this Step. **The amendment was approved by
+  Amino on 2026-08-10, and Sub-step 2.2 may begin.**
 - **Goal:** Stand up the Warehouse — the star schema of
   [Glossary Section B](../glossary.md#b-the-warehouse), behind the Warehouse
   Adapter, holding real market data and seeded synthetic client activity — so
@@ -41,57 +45,76 @@ end.** The Step 001 review's own handoff says so:
 > have not built it. It is the single highest-risk assumption in the design, so
 > Step 002 should touch it early rather than leave it to the end.
 
-Sub-step 2.4 is that touch, and it is deliberately a **spike** in the same shape
+Sub-step 2.4 was that touch, and it is deliberately a **spike** in the same shape
 as Sub-step 1.2 — the least code that answers the question, plus a committed
 script so the answer can be re-run.
 
+**Amended 2026-08-10 — this reason no longer holds for Step 002, and saying so is
+the point of writing it down.** [R6](#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+fired and the spike became Step 003, so reason 3 is now a reason for *Step 003*
+and only reasons 1 and 2 justify this one. The handoff asked that Step 002 *"touch
+it early rather than leave it to the end"*; the honest position after R6 is that
+the touch slips by one Step, not to the end. **The cost of that slip is real** — if
+the spike returns a no-go, ADR-0003 needs revisiting after Step 002's ingestion
+work rather than during it. It is accepted rather than logged as debt because the
+spike is *cheaper and better* against 2.5's real data than against the empty
+Warehouse it would have had if run before ingestion, which is what R6's
+alternative — a squeezed six-Sub-step Step — actually offered. Step 003 is the
+next Step planned, so the slip is one Step and not an open-ended deferral.
+
 ---
 
-## How the four Sub-steps divide the work
+## How the five Sub-steps divide the work
 
-Two components, four commits. The division is not arbitrary and 2.2 versus 2.3 is
-the one worth stating plainly, because both are Ingestion.
+Two components, five commits — **one table per Sub-step across the real half**,
+which is what [R16](#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10)
+changed.
 
 ```
-veritas/warehouse/     ← 2.1   the adapter and the star schema (empty)
-veritas/ingestion/     ← 2.2   real sources:      FX Rates · Market Prices · instruments
-                       ← 2.3   synthetic sources: Trades · Cash · Positions · balances
-.claude/scripts/       ← 2.4   the sqlglot spike (no component; a probe)
+veritas/warehouse/     ← 2.1   the adapter and the star schema (empty)   ✅ committed 5a061a7
+veritas/ingestion/     ← 2.2   dim_instrument         NASDAQ Trader · SEC
+                       ← 2.3   fct_instrument_price   Yahoo, by snapshot-and-replay
+                       ← 2.4   fct_fx_rate            Frankfurter
+                       ← 2.5   synthetic sources:     Trades · Cash · Positions · balances
 ```
 
-**`veritas/ingestion/` and its entry point are created in 2.2 and extended in
-2.3.** After 2.2, `uv run python -m veritas.ingestion` already builds a Warehouse
-end-to-end from a clean clone — real market data in, no client activity yet.
-After 2.3 the same command additionally generates the activity. Neither Sub-step
-leaves a half-wired pipeline; 2.3 adds a second source to a pipeline that already
-runs.
+**`veritas/ingestion/` and its entry point are created in 2.2 and extended by each
+Sub-step after it.** After 2.2, `uv run python -m veritas.ingestion` already builds
+a Warehouse end-to-end from a clean clone — the traded Instrument universe in,
+nothing priced yet. 2.3 adds prices, 2.4 adds rates, 2.5 adds the activity. **No
+Sub-step leaves a half-wired pipeline**; each adds a source to a pipeline that
+already runs, and each is one more populated table in `check_warehouse.py`'s
+listing.
 
-**Why they are two Sub-steps and not one.** The Glossary's own definition of
-`Ingestion` splits at a semicolon: *"real FX Rates, Market Prices and instrument
-reference data from key-free public sources, snapshotted into the repository and
-replayed by default; **synthetic** Trades, Cash Movements and Positions from a
-seeded simulator."* The two halves share a destination and nothing else:
+**Why the real half and the synthetic half are separate Sub-steps at all.** The
+Glossary's own definition of `Ingestion` splits at a semicolon: *"real FX Rates,
+Market Prices and instrument reference data from key-free public sources,
+snapshotted into the repository and replayed by default; **synthetic** Trades,
+Cash Movements and Positions from a seeded simulator."* The two halves share a
+destination and nothing else:
 
-| | 2.2 — real | 2.3 — synthetic |
+| | 2.2–2.4 — real | 2.5 — synthetic |
 |---|---|---|
-| Data comes from | three external sources we do not control | a seeded generator we fully control |
+| Data comes from | external sources we do not control | a seeded generator we fully control |
 | The hard part | replay, minor units, fill-forward, unadjusted close | making every Section C distinction a different number |
 | Fails by | a wrong number arriving from outside | a right number that proves nothing |
-| Depends on | 2.1 | 2.1 **and 2.2** — Positions are marked at Market Price and converted through FX Rate |
+| Depends on | 2.1 | 2.1 **and 2.2–2.4** — Positions are marked at Market Price and converted through FX Rate |
 
-They also pass the sizing tests directly. Each has a commit subject with no
-conjunction — *"Load real market data into the Warehouse by snapshot-and-replay"*
-and *"Generate seeded synthetic client activity"* — and they meet
-`planning-a-step`'s test for splitting: **Amino could reasonably approve one and
-reject the other.** A minor-unit bug in 2.2 and a too-calm simulation window in
-2.3 are unrelated failures with unrelated fixes.
+Every one of the five passes the sizing test with a conjunction-free commit
+subject, and every adjacent pair passes `planning-a-step`'s test for splitting:
+**Amino could reasonably approve one and reject the next.** A wrong Instrument
+universe (2.2), a leaked Adjusted Close (2.3), a fill-forward that misses a
+European Central Bank (ECB) holiday (2.4) and a too-calm simulation window (2.5)
+are four unrelated failures with four unrelated fixes.
 
 ---
 
 ## Rulings
 
-All settled by Amino on 2026-08-05, before any code. Recorded here so the Step is
-implemented against decisions rather than assumptions.
+R1–R6 settled by Amino on 2026-08-05, before any code; R7–R10 on the same day,
+during Sub-step 2.1; R11–R15 on 2026-08-06, from his review of it; **R16 on
+2026-08-10**, with it. Recorded here so the Step is implemented against decisions
+rather than assumptions.
 
 ### R1 — `Execution Price` → **approved and required**
 
@@ -176,14 +199,68 @@ ruling only.
 | **R14** | Does the simulator emit **non-trade Position movements**? | **Transfers yes, corporate actions no.** A handful of transfers makes the Section C pair *Position Change vs Trade* real in the data rather than merely asserted, and is what puts `cost_basis` under load. Corporate actions are excluded because `Market Price` is real data: a split inside the loaded window forces either corporate-action machinery or knowingly incoherent data, and the third option is `Adjusted Close`, which is an anti-pattern. **Sub-step 2.2's `--sources` must verify the price window is split-free rather than assume it**, and the excluded half is [EXT-007](../extension-register.md#ext-007--corporate-actions). |
 | **R15** | `Realised P&L` had no home. Record the intention, or implement it? | **Implement it, by paying [DEBT-010](../debt-ledger.md) in the Sub-step that opened it.** Both `movement_type` columns now carry a `CHECK`, and the two lists differ: `realised P&L` is accounting-only, `deposit` is cash-only. The debt's own justification — *"nothing consumes the values yet"* — had been falsified by R11's walk, so annotating it would have left a dependency for 2.3 to notice or not. Three probes hold it. |
 
-### R6 — 2.4 is a pre-agreed split point → **approved**
+### R6 — the sqlglot spike (then numbered 2.4) is a pre-agreed split point → **approved**
 
 If review-driven growth arrives in 2.1–2.3, **2.4 becomes Step 003** rather than
-being squeezed into an over-full Step. Agreed in advance because the Step 001
+being squeezed into an over-full Step. *(The heading carries a clarifier added
+2026-08-10: R16 renumbered the Sub-steps, so the "2.4" this ruling names is the
+sqlglot spike, not the Frankfurter Sub-step that now holds that number. The ruling
+itself is unchanged.)* Agreed in advance because the Step 001
 closing note recorded that 1.3 was planned as three documents and shipped fifteen
 files, and that *"the natural split, in hindsight, was 1.3 (the ADRs) and a
 separate 1.4"* — an option that should have been offered at review and was not.
 Offering it before the Step starts is the lesson applied.
+
+**Fired 2026-08-10.** Growth arrived twice. Amino's 2026-08-06 review of Sub-step
+2.1 added a column, two Glossary terms and the payment of
+[DEBT-010](../debt-ledger.md), and grew the evidence script along the way — the
+[Step Review](../reviews/step-002-warehouse-and-ingestion.md) records one such
+increment as *"taking the constraint probe from eight rejections to ten and the
+positive control from three seed rows to five"*, and
+`uv run python .claude/scripts/check_warehouse.py` today prints fourteen refusals
+against a seven-row positive control. R16 then turns one Sub-step into three.
+Without R6, Step 002 would hold six Sub-steps, which
+`planning-a-step` reads as two Steps: *"Six or more Sub-steps | This is two Steps;
+ship the first."* So the spike leaves, exactly as pre-agreed. Its text is preserved
+under [Not in this Step](#not-in-this-step) so Step 003's plan starts from it
+rather than from memory — it is **not** planned here, because *"Never plan more
+than one Step ahead."*
+
+### R16 — the original Sub-step 2.2 splits into three → **approved by Amino 2026-08-10**
+
+The original 2.2 carried, in one commit: a new package, a new entry point, a new
+dependency, **three external sources**, three proven-necessary transforms, a
+founding-tier ADR, the payment of [DEBT-002](../debt-ledger.md), and four new
+assertions in `check_warehouse.py`. Its commit subject — *"Load real market data
+into the Warehouse by snapshot-and-replay"* — passes the no-conjunction test only
+because "real market data" hides three sources behind one noun phrase. That is the
+symptom `planning-a-step` names: *"Commit message needs 'and' | Split it."*
+
+**The split follows two lines the project had already drawn**, so it honours
+boundaries rather than inventing them.
+
+1. **The hedge boundary.** [`data-availability.md`](../design/data-availability.md)'s
+   R3 update already separates the sources: snapshot-and-replay *"applies
+   specifically to sources that are undocumented and unversioned — Yahoo — not to
+   every external source; Frankfurter and the SEC are documented and stable, and
+   snapshotting them is a reproducibility convenience rather than a hedge against
+   disappearance."* One source carries the hedge and two do not. Bundling all three
+   into one Sub-step made ADR-0004 argue a distinction that its own Sub-step
+   erased; splitting them means the ADR is written in 2.2 against the stable
+   sources and **cashed in 2.3** against the unstable one.
+2. **The engine.** Sub-step 2.1 declared and enforced foreign keys, so
+   `dim_instrument` must exist before `fct_instrument_price` accepts a row — the
+   constraint probe already demonstrates the rejection. The order of 2.2 before 2.3
+   is therefore not a preference; it is what the database permits.
+
+`fct_fx_rate` is third because nothing constrains where it goes — it has no foreign
+key to a dimension — and the Loop prefers *"the slice that removes the most
+uncertainty"* early. The Step's uncertainty is concentrated in Yahoo, not in
+Frankfurter.
+
+**What this does not change:** every ruling R1–R15 stands, no Sub-step's content is
+dropped, and the Step's Goal is untouched. Three commits now carry what one
+carried, in the order the foreign keys allow.
 
 ---
 
@@ -210,7 +287,7 @@ nothing on either side of it."*
   quietly wrong numbers is not a trade worth making"*) applies to our own column
   types too. No `dim_date` (R2); `fct_trade.execution_price` (R1).
 - `.claude/scripts/check_warehouse.py` — the committed evidence script for this
-  Step, growing across 2.1–2.3. At 2.1 it lists every table with its columns and
+  Step, growing across 2.1–2.5. At 2.1 it lists every table with its columns and
   row count, and runs ADR-0002's greppable signal: **a `duckdb` import anywhere
   outside `veritas/warehouse/` fails the check** (R3).
 - `uv add duckdb`.
@@ -227,31 +304,38 @@ second is the one that matters most here: it is the first time it scans real
 domain identifiers rather than three framework scripts, which is what makes this
 Sub-step's Glossary compliance evidence rather than a claim.
 
-### 2.2 — Load real market data into the Warehouse by snapshot-and-replay
+### 2.2 — Load `dim_instrument` from NASDAQ Trader and the Securities and Exchange Commission (SEC)
 
-The first half of `Ingestion`. Creates `veritas/ingestion/` and its entry point.
+The `Ingestion` seam, drawn against the sources that carry no hedge. Creates
+`veritas/ingestion/` and its entry point.
 
-- dlt pipelines for the three real sources named in
-  [`data-availability.md`](../design/data-availability.md): Frankfurter for FX
-  Rates, Yahoo's chart endpoint for Market Prices, NASDAQ Trader and the
-  Securities and Exchange Commission (SEC) for instrument reference data. They
-  land in the `raw` schema; the adapter builds `fct_fx_rate`,
-  `fct_instrument_price` and `dim_instrument` from it (R4).
-- **Default is replay.** `data/snapshots/` is the input. `--refresh` re-hits every
-  source and rewrites the snapshots — the only mode that needs a network.
-- The snapshots widen from the three probe series to the full traded universe, on
-  the same code path a reviewer would run.
-- The three transforms the sources demand, each already proven necessary:
-  **normalise minor units** (`GBp` → `GBP`, a factor of 100) before anything
-  reaches the star schema; **store unadjusted close only**, never Adjusted Close;
-  **fill FX Rates forward** across weekends and the six European Central Bank
-  (ECB) holidays.
+- dlt lands NASDAQ Trader's symbol directory and the SEC's `company_tickers.json`
+  in the `raw` schema; **the adapter executes the SQL that builds `dim_instrument`
+  from it** (R4). This is where R4 stops being a ruling and becomes code, and it
+  is why this Sub-step is first: the raw-versus-star boundary is easier to get
+  right against sources with no snapshot logic layered over them.
+- **Default is replay.** `data/snapshots/` is the input; `--refresh` re-hits the
+  source and rewrites the snapshot, the only mode that needs a network. For these
+  two sources that is a reproducibility convenience rather than a hedge — the
+  distinction ADR-0004 records, and the reason 2.3 exists separately.
+- **Normalise minor units** (`GBp` → `GBP`, a factor of 100) **before insert.**
+  Sub-step 2.1 made this non-optional at the engine level: `quotation_currency`
+  must equal its own upper case, so an unnormalised row is refused rather than
+  quietly stored. It does **not** catch the `GBX` spelling.
 - **ADR-0004 — snapshot-and-replay, and where dlt stops.** Deferred to this Step
   by name: *"this was considered as a fourth founding ADR and deferred to the
   ingestion Step, where the decision actually binds."* It carries both decisions:
   why snapshot-and-replay applies to Yahoo and not to Frankfurter or the SEC, and
-  R4's raw-versus-star boundary.
-- **[DEBT-002](../debt-ledger.md) → `paid`**, by this Sub-step.
+  R4's raw-versus-star boundary. Written here because R4 becomes code here; its
+  Yahoo half is what tells 2.3 what to build.
+- `uv add dlt`.
+- `check_warehouse.py --sources` — its first two assertions: no quotation currency
+  survives into `dim_instrument` that is not already upper case, and every
+  `Instrument Symbol` is present and unique.
+
+[DEBT-002](../debt-ledger.md) is **not** paid here. Its subject is the Yahoo
+endpoint and its first trigger is *"The market-price ingestion pipeline is
+written — the snapshot lands in the same Sub-step, not after it"*, which is 2.3.
 
 **Verification:**
 
@@ -260,17 +344,74 @@ uv run python -m veritas.ingestion
 uv run python .claude/scripts/check_warehouse.py --sources
 ```
 
-The first builds a Warehouse from a clean clone with no network. The second grows
-to assert what the two proven traps demand: no `GBp` survives into
-`dim_instrument`, every `fct_instrument_price` row matches the snapshot's
-unadjusted close rather than its adjusted close, and every calendar date in the
-loaded window resolves to an FX Rate after fill-forward. It fails the run if any
-of the three stops holding, in the same spirit as `check_data_availability.py`.
+The first builds a Warehouse from a clean clone with no network. The second shows
+`dim_instrument` populated with the other nine tables still at zero rows, and both
+assertions holding.
 
-### 2.3 — Generate seeded synthetic client activity
+### 2.3 — Load `fct_instrument_price` from Yahoo by snapshot-and-replay
+
+The Sub-step [DEBT-002](../debt-ledger.md) was opened for, and the one carrying
+this Step's real risk.
+
+- dlt fetches Yahoo's chart endpoint into `raw`; the adapter builds
+  `fct_instrument_price`. It loads **after** 2.2 because the foreign key to
+  `dim_instrument` is declared and enforced.
+- **Store the unadjusted close only**, never `Adjusted Close`. The trap is
+  measured rather than theoretical: `check_data_availability.py` found the two
+  differ on 95.5% of bars.
+- The snapshots widen from the three probe series now in `data/snapshots/`
+  (`yahoo-AAPL-5y.json`, `yahoo-SAP.DE-2y.json`, `yahoo-VOD.L-2y.json`) to the
+  full traded Instrument universe, on the same code path a reviewer would run.
+- **[DEBT-002](../debt-ledger.md) → `paid`**, by this Sub-step, under its first
+  trigger.
+- `--sources` grows by two: every `fct_instrument_price` row matches the
+  snapshot's unadjusted close rather than its adjusted close, and **the loaded
+  price window is split-free** for every held Instrument — a day-over-day ratio
+  large enough to be a corporate action rather than a market move. R14 excluded
+  corporate actions on the assumption that no loaded series contains one; this is
+  what turns that assumption into a check
+  ([EXT-007](../extension-register.md#ext-007--corporate-actions)).
+
+**Verification:**
+
+```bash
+uv run python -m veritas.ingestion
+uv run python .claude/scripts/check_warehouse.py --sources
+```
+
+Two populated tables, four assertions holding. It fails the run if any stops
+holding, in the same spirit as `check_data_availability.py`.
+
+### 2.4 — Load `fct_fx_rate` from Frankfurter
+
+The last real source. Nothing constrains its position — it has no foreign key to
+a dimension — so it comes after the Step's risk has been retired.
+
+- dlt fetches Frankfurter into `raw`; the adapter builds `fct_fx_rate`. **Never
+  Yahoo's `EURUSD=X`**, which would be a second source for one concept:
+  *"Frankfurter is the only FX Rate source."*
+- **Fill FX Rates forward** across weekends and the six European Central Bank
+  (ECB) holidays — *"the FX Rate for a non-publishing date is the most recent
+  published rate."*
+- Send a descriptive User-Agent. Frankfurter returns HTTP 403 to the default
+  `Python-urllib`, which reads as "blocked" when the fix is one header.
+- `--sources` grows by one: every calendar date in the loaded window resolves to
+  an FX Rate after fill-forward.
+
+**Verification:**
+
+```bash
+uv run python -m veritas.ingestion
+uv run python .claude/scripts/check_warehouse.py --sources
+```
+
+Three populated tables, five assertions holding — the whole real half of
+`Ingestion`, replayable from a clean clone with no network.
+
+### 2.5 — Generate seeded synthetic client activity
 
 The second half of `Ingestion` — *"market data real, client activity synthetic —
-never the reverse"* — added to the pipeline 2.2 built.
+never the reverse"* — added to the pipeline 2.2–2.4 built.
 
 - A seeded simulator producing Trades, Cash Movements, Accounting Movements,
   Position snapshots and Cash Balance snapshots, wired into the same
@@ -303,7 +444,16 @@ will make repayment possible or impossible later, so the Step Review must state
 what the Trade Date versus Settlement Date FX delta came out as on the generated
 data, and whether it cleared the 1% line the spike missed.
 
-### 2.4 — Prove the Validation Gate's parse-tree claim
+---
+
+## Not in this Step
+
+### Deferred to Step 003 — Prove the Validation Gate's parse-tree claim
+
+**Was Sub-step 2.4 until [R6](#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+fired on 2026-08-10.** The text below is the approved 2026-08-05 wording, kept
+verbatim so Step 003's plan starts from it rather than from memory. It is **not**
+planned here, and Step 003 is not written until Step 002 ships.
 
 A spike, not the Gate. The question is narrow and answerable: **can sqlglot
 decide, from a parse tree alone, that a generated query computes a Certified
@@ -315,7 +465,7 @@ Metric and nothing else?**
   shape as `data-availability.md`, ending in a go/no-go on
   [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md).
 
-What it must answer, using the real schema from 2.1 and the real data from 2.3:
+What it must answer, using the real schema from 2.1 and the real data from 2.5:
 
 1. **Tracing.** Does a certified expression stay recognisable in a generated
    query's parse tree under aliasing, a subquery, and a common table expression?
@@ -330,7 +480,7 @@ What it must answer, using the real schema from 2.1 and the real data from 2.3:
    `commission` instead of drawing on the certified expression — the failure
    named in the Target State's problem statement — is rejected, and the two
    queries return *different numbers* against the real warehouse. That last part
-   is what makes the spike worth running against 2.3's data rather than against
+   is what makes the spike worth running against 2.5's data rather than against
    fixtures.
 4. **Dialect retargeting.** A generated statement round-trips DuckDB → BigQuery
    through sqlglot without losing meaning. ADR-0002 calls transpilation *"good
@@ -349,13 +499,13 @@ go stale unnoticed — the pattern `check_data_availability.py` established for 
 data half.
 
 A **no-go on claim 1 or 3 is a real possible outcome**, and it would be the most
-valuable thing this Step produces. It would mean ADR-0003 needs revisiting before
+valuable thing that Step produces. It would mean ADR-0003 needs revisiting before
 any Gate code exists, which is enormously cheaper than discovering it in the Step
 that builds the Gate.
 
----
+*End of the preserved 2026-08-05 text.*
 
-## Not in this Step
+### Also not in this Step
 
 - **The Semantic Layer.** It is
   [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md)'s central bet
@@ -368,8 +518,8 @@ that builds the Gate.
   columns to quote.
 - **Retrieval, Orchestrator, Validation Gate, App, Observability, Evaluation,
   containerization.** Nothing here is blocked by leaving them out, and nothing
-  here half-builds them. 2.4 probes the Validation Gate's central assumption
-  without building the Gate.
+  here half-builds them. The deferred spike above probes the Validation Gate's
+  central assumption without building the Gate.
 - **The Gold Question Set**, and therefore [DEBT-004](../debt-ledger.md)'s
   repayment.
 - **`README.md`**, and therefore [DEBT-008](../debt-ledger.md)'s repayment. No

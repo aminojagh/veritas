@@ -503,7 +503,10 @@ function-name half.
 Scan string literals in every module outside `veritas/warehouse/` for
 DuckDB-specific function names, with the list derived from something that can go
 stale honestly — sqlglot already knows which functions belong to which dialect,
-and Sub-step 2.4 adds sqlglot as a dependency for unrelated reasons.
+and the sqlglot spike adds sqlglot as a dependency for unrelated reasons. That
+spike was Sub-step 2.4 when this entry was written; R16 moved it to a future
+Step 003 on 2026-08-10, which delays the cheap version of this scan but does not
+change what it should do.
 
 **Why we deferred**
 
@@ -592,7 +595,8 @@ anywhere.
 
 **Trigger**
 
-Sub-step 2.3, when the simulator generates the first Cash Movement or Accounting
+Sub-step 2.5 — numbered 2.3 when this entry was written, renumbered by R16 on
+2026-08-10 — when the simulator generates the first Cash Movement or Accounting
 Movement row. The values become real at that moment, so the proposal is raised
 before the generator is written, not after — otherwise the vocabulary is decided
 by whichever string got typed first.
@@ -601,7 +605,7 @@ by whichever string got typed first.
 
 Amino's instruction on 2026-08-06 was *"if that 'if' is a bad one, make sure it
 won't happen — don't leave these cases hanging hoping that they will get fixed."*
-The "if" was that Sub-step 2.3 might pay this debt without noticing that
+The "if" was that Sub-step 2.5 might pay this debt without noticing that
 `Realised P&L` now depends on it. Recording the dependency in a third place would
 have been one more thing to hope someone reads, so the debt was paid instead:
 
@@ -619,7 +623,7 @@ structural instead of remembered, and three probes in `check_warehouse.py` hold 
 there: the two cross-table refusals, and `'Deposit'` refused for its capital D,
 which is the exact spelling failure this entry was opened for.
 
-The trigger above can no longer fire: 2.3's simulator cannot write a movement row
+The trigger above can no longer fire: 2.5's simulator cannot write a movement row
 at all without using an agreed spelling, and cannot give `Realised P&L` no home
 without the engine refusing the insert.
 
@@ -630,4 +634,4 @@ fee charges"*. What is new is their spelling as data: lowercase with spaces,
 following `instrument_type`'s *"currency pair"* and `trade_side`'s *"buy"*, with
 `realised P&L` keeping its registered capitalisation the way `ETF` does. Changing
 any of them is a one-line edit in `schema.sql` while the tables are empty; it stops
-being free once 2.3 has loaded rows.
+being free once 2.5 has loaded rows.

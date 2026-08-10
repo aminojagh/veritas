@@ -382,7 +382,8 @@ Position Change to a cause — in practice, the first question of the form "how
 much of this move was trading?".
 
 **Not to be confused with** making the trap *real in the data*, which is a much
-smaller thing and belongs to Sub-step 2.3: the simulator emitting a few transfers
+smaller thing and belongs to Sub-step 2.5 — numbered 2.3 when this entry was
+written, renumbered by R16 on 2026-08-10: the simulator emitting a few transfers
 so that a snapshot delta and a sum of Trades actually disagree somewhere. That
 needs no new table, and without it the Section C distinction is asserted rather
 than demonstrated.
@@ -433,7 +434,9 @@ which is a Semantic Layer and pricing concern, not a generator concern.
 
 Holds no corporate actions and, more importantly, **holds no data containing
 one** — the price window for held Instruments is kept split-free, and Sub-step
-2.2's `--sources` check is required to verify that rather than assume it. Client
+**2.3**'s `--sources` check is required to verify that rather than assume it. It
+was Sub-step 2.2's until R16 split the price load into its own Sub-step on
+2026-08-10, which is where the check now naturally belongs. Client
 activity is synthetic and we choose the instruments, so this costs nothing. It is
 correct for the slice because a corporate action here would force the choice
 between building the machinery above and holding knowingly incoherent data, and

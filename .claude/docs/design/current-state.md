@@ -4,8 +4,8 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-06 — Sub-step 2.1 built and verified, awaiting Amino's review and commit. **The first implementation code exists.**
-**Steps completed:** Step 000 (framework) and Step 001, fully committed. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`.
+**Last updated:** 2026-08-10 — Sub-step 2.1 committed; Step 002's plan amended and approved the same day (R16). **The first implementation code exists.**
+**Steps completed:** Step 000 (framework) and Step 001, fully committed; Step 002 is in flight, **one of its five Sub-steps committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`.
 
 ---
 
@@ -13,10 +13,18 @@ wrong and gets fixed immediately.
 
 - **Active Step:** 002 — Build the Warehouse and fill it
   ([plan](../plan/step-002-warehouse-and-ingestion.md)), approved 2026-08-05.
-  **Sub-step 2.1 is built and verified**; both its verification commands pass and
-  their output is in the
+  **Sub-step 2.1 is committed** (`5a061a7`); both its verification commands pass
+  and their output is in the
   [review](../reviews/step-002-warehouse-and-ingestion.md).
-- **Awaiting Amino: the commit of Sub-step 2.1. No open questions.** Everything
+- **The plan was amended and approved on 2026-08-10
+  ([R16](../plan/step-002-warehouse-and-ingestion.md#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10)).**
+  The original Sub-step 2.2 split into three — one table per Sub-step — and
+  [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+  fired, moving the sqlglot spike out of Step 002 and into a future Step 003.
+  Step 002 now has five Sub-steps: 2.1 `schema` ✅, 2.2 `dim_instrument`,
+  2.3 `fct_instrument_price`, 2.4 `fct_fx_rate`, 2.5 synthetic activity.
+  **Awaiting Amino: the commit of this amendment. No open questions.**
+- Everything
   raised on 2026-08-05 and 2026-08-06 has been ruled on and applied — recorded as
   [R11–R15](../plan/step-002-warehouse-and-ingestion.md#r11r15--five-rulings-from-aminos-review-of-the-snapshot-design-2026-08-06)
   and argued in the [Step Review](../reviews/step-002-warehouse-and-ingestion.md).
@@ -28,16 +36,19 @@ wrong and gets fixed immediately.
   [EXT-007](../extension-register.md#ext-007--corporate-actions).
 - **One spelling set is open to amendment, not blocking:** the `movement_type`
   values frozen by the new `CHECK` constraints. Free to change while the tables are
-  empty, not free after 2.3 loads rows — see [DEBT-010](../debt-ledger.md).
+  empty, not free after **2.5** generates the Movements that fill them — see
+  [DEBT-010](../debt-ledger.md).
 - The four questions Sub-step 2.1 raised earlier were ruled on the same day and
   are recorded as
   [R7–R10](../plan/step-002-warehouse-and-ingestion.md#r7r10--four-rulings-from-writing-the-data-definition-language-ddl-2026-08-05):
   `Instrument Symbol`, `Denomination Currency` and `Trade Side` are registered
   and `agreed`; the instrument-type values were swept so the `Dimension
   Definition` row matches the narrowed `Instrument` row.
-- **Next Sub-step:** 2.2 — load real market data by snapshot-and-replay. Creates
-  `veritas/ingestion/` and its entry point, writes **ADR-0004**, and pays
-  [DEBT-002](../debt-ledger.md). Three things 2.1 leaves it:
+- **Next Sub-step:** 2.2 — load `dim_instrument` from NASDAQ
+  Trader and the SEC. Creates `veritas/ingestion/` and its entry point and writes
+  **ADR-0004**. [DEBT-002](../debt-ledger.md) is **no longer paid here** — it
+  moved to 2.3, the Yahoo Sub-step, which is what its subject actually is. Three
+  things 2.1 leaves the ingestion work:
   1. **Load dimensions before facts.** Foreign keys are declared and enforced, so
      `dim_instrument` must exist before `fct_instrument_price` accepts a row.
      The constraint probe in `check_warehouse.py` demonstrates the rejection.
@@ -52,8 +63,9 @@ wrong and gets fixed immediately.
      from the slice on the assumption that no loaded series contains one, and this
      is what turns that assumption into a check
      ([EXT-007](../extension-register.md#ext-007--corporate-actions)).
-- **What Sub-step 2.3 must now implement rather than decide** (all settled as
-  R12–R14): Snapshots are end-of-day; dense, one row per subject on every date the
+- **What Sub-step 2.5 must now implement rather than decide** (all settled as
+  R12–R14; this was Sub-step 2.3 before the R16 split): Snapshots are end-of-day;
+  dense, one row per subject on every date the
   Warehouse holds a Market Price for; and the simulator emits a handful of
   transfers so a Snapshot delta and a sum of Trades genuinely disagree somewhere.
   Two checks fall out of these and belong in `--distinctions`: every
@@ -101,7 +113,7 @@ above it is built: no Ingestion, no Semantic Layer, no application.
 | Founding ADRs | ✅ working | Three ADRs in `.claude/docs/adr/`, all **`accepted`** 2026-08-03: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code. Every cost in each is classified *accepted* / *debt* / *extension*. A fourth — snapshot-and-replay — was deferred to the ingestion Step ([DEBT-002](../debt-ledger.md)), and is now due as ADR-0004 in Sub-step 2.2. ADR-0002 carries a dated clarification (2026-08-05) on what its sqlglot commitment forbids; its status stays `accepted`. |
 | Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, empty. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is now checked rather than promised. `create_schema`, `tables`, `columns`, `row_count`, `execute`, `query`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. Hardcoded database path and no error handling, both licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
-| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, eleven constraint rejections fire against an in-memory Warehouse with a five-row positive control, and no `duckdb` import outside `veritas/warehouse/`. `--rebuild` recreates the database. Grows in 2.2 (`--sources`) and 2.3 (`--distinctions`). |
+| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and no `duckdb` import outside `veritas/warehouse/`. `--rebuild` recreates the database. Grows in 2.2 (`--sources`) and 2.3 (`--distinctions`). |
 | Semantic Layer | ✗ none | — |
 | Ingestion | ✗ none | — |
 | Retrieval | ✗ none | — |

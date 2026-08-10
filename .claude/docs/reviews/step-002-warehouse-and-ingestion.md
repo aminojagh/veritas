@@ -1,5 +1,25 @@
 # Step Review — Step 002: Build the Warehouse and fill it
 
+> **Note added 2026-08-10 — the Sub-steps below 2.1 were renumbered after this
+> review was written, and the body is left untouched because it is a dated
+> record.** Amino approved
+> [R16](../plan/step-002-warehouse-and-ingestion.md#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10),
+> which split the one real-market-data Sub-step into three. Read every forward
+> reference below through this map:
+>
+> | Written here as | Now |
+> |---|---|
+> | 2.2 — all real market data | **2.2** `dim_instrument` · **2.3** `fct_instrument_price` · **2.4** `fct_fx_rate` |
+> | 2.3 — synthetic client activity | **2.5** |
+> | 2.4 — the sqlglot spike | deferred to **Step 003** by [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved) |
+>
+> Two specific handoffs below land more precisely under the new numbering. The
+> `--sources` split-free check now belongs to **2.3**, the Sub-step that loads the
+> price window it inspects. The enforced-foreign-key constraint still binds
+> **2.2**, unchanged — it is why `dim_instrument` loads before
+> `fct_instrument_price`, which is now the 2.2-before-2.3 ordering rather than an
+> ordering inside one Sub-step.
+
 ## Sub-step 2.1 — Create the Warehouse behind its adapter
 
 **What changed**
