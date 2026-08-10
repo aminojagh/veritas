@@ -28,8 +28,14 @@ an ADR and two are promises made by comments in the schema.
      parsing the import statements rather than grepping the text — a `duckdb`
      mentioned in a docstring is prose, and this file is full of it.
 
-Exits non-zero if any check fails. This script grows across Step 002: Sub-step 2.2
-adds `--sources` and Sub-step 2.3 adds `--distinctions`.
+  5. `--sources` only — what ingestion loaded is what the sources said. Added by
+     Sub-step 2.2, and it grows with every source: no minor unit survives into
+     `dim_instrument`, and the loaded Instrument Symbols are exactly the universe
+     declared in `veritas/ingestion/universe.py`. Needs a filled Warehouse, so
+     run `uv run python -m veritas.ingestion` first.
+
+Exits non-zero if any check fails. This script grows across Step 002: Sub-steps
+2.3 and 2.4 add assertions to `--sources`, and Sub-step 2.5 adds `--distinctions`.
 """
 
 import argparse
@@ -265,6 +271,166 @@ def check_constraints() -> None:
                 )
 
 
+def check_sources(warehouse: WarehouseAdapter) -> None:
+    """What Sub-step 2.2 loaded is what the sources actually said.
+
+    Two assertions, both of them the plan's, and both aimed at a trap that has
+    already been measured rather than imagined:
+
+      1. **No minor unit survives into `dim_instrument`.** The engine's own CHECK
+         refuses a code that is not equal to its own upper case, so this cannot
+         fail while that constraint stands — which is the point of asserting it
+         anyway. The CHECK is a statement about *spelling*; this is a statement
+         about *the loaded data*, and it also names the specific codes
+         `universe.MINOR_UNIT_CURRENCIES` knows about, which is the half the
+         constraint provably cannot catch (`GBX` is already upper case).
+
+      2. **The loaded Instrument Symbols are exactly the declared universe.** A
+         symbol whose metadata failed to arrive would otherwise drop out of the
+         star build's driving join silently, leaving a smaller Warehouse that
+         looks entirely healthy.
+
+    The instrument_type and Quotation Currency distributions are printed but not
+    asserted. They are what a reviewer needs to see to judge whether the universe
+    is rich enough for Sub-step 2.5, and that judgement is Amino's rather than
+    this script's.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from veritas.ingestion.universe import MINOR_UNIT_CURRENCIES, TRADED_INSTRUMENTS
+
+    rows = warehouse.query(
+        "SELECT instrument_symbol, instrument_type, quotation_currency "
+        "FROM dim_instrument ORDER BY instrument_symbol"
+    )
+    print(f"  dim_instrument: {len(rows)} rows · "
+          f"{len(TRADED_INSTRUMENTS)} Instruments declared in universe.py")
+
+    if not rows:
+        problems.append(
+            "dim_instrument is empty — run `uv run python -m veritas.ingestion` "
+            "before checking sources, or this check passes vacuously"
+        )
+        return
+
+    # 1. minor units
+    minor_units = sorted(MINOR_UNIT_CURRENCIES)
+    offenders = [
+        (symbol, currency)
+        for symbol, _, currency in rows
+        if currency != currency.upper() or currency in MINOR_UNIT_CURRENCIES
+    ]
+    print(f"    minor units: none of {minor_units} survived normalisation"
+          if not offenders else f"    minor units: {offenders}")
+    for symbol, currency in offenders:
+        problems.append(
+            f"dim_instrument.{symbol} is quoted in {currency!r}, a minor unit — "
+            f"a Market Price in pence booked as pounds is the 100x error the "
+            f"Quotation Currency term exists to prevent"
+        )
+
+    # 2. the loaded universe is the declared universe
+    loaded = [symbol for symbol, _, _ in rows]
+    missing = sorted(set(TRADED_INSTRUMENTS) - set(loaded))
+    unexpected = sorted(set(loaded) - set(TRADED_INSTRUMENTS))
+    duplicated = sorted({s for s in loaded if loaded.count(s) > 1})
+
+    if missing:
+        problems.append(
+            f"declared in universe.py but absent from dim_instrument: {missing} — "
+            f"the metadata fetch dropped a symbol and the star build's driving "
+            f"join silently narrowed"
+        )
+    if unexpected:
+        problems.append(f"in dim_instrument but not declared in universe.py: {unexpected}")
+    if duplicated:
+        problems.append(f"dim_instrument holds a repeated Instrument Symbol: {duplicated}")
+    if not (missing or unexpected or duplicated):
+        print(f"    symbols: all {len(loaded)} declared Instruments present, none repeated")
+
+    # 3. every source dlt landed actually carries rows.
+    #
+    # Without this the check has a hole big enough to drive the whole Sub-step
+    # through: `instrument_name` falls back through three sources, so an empty
+    # `sec_registrant` table would silently produce a complete-looking
+    # dim_instrument built from one source instead of three, and every assertion
+    # above would still pass. This is the same failure `snapshots.py` refuses at
+    # read time, asserted again at the far end where it would actually show up.
+    for raw_table in ("nasdaq_symbol", "sec_registrant", "yahoo_instrument",
+                      "minor_unit_currency", "yahoo_instrument_type"):
+        landed = warehouse.row_count(f"raw.{raw_table}")
+        print(f"    raw.{raw_table:22} {landed:>6} rows")
+        if not landed:
+            problems.append(
+                f"raw.{raw_table} is empty — the source landed nothing, and "
+                f"dim_instrument was built without it rather than failing"
+            )
+
+    # 4. the universe is rich enough for the Sub-step that will query it.
+    #
+    # Sub-step 2.5 generates the client activity that makes every Section C
+    # distinction a different number, and it can only be as rich as the Instruments
+    # it has to trade. A universe that satisfies the Glossary on paper — one row of
+    # each kind — produces a Warehouse where slicing by instrument type is really
+    # slicing by one company, and no amount of simulator cleverness fixes that
+    # afterwards. Asserting it here means the gap is found while widening the
+    # universe is still one line in universe.py, rather than in 2.5 where it means
+    # regenerating everything downstream.
+    counts_by: dict[str, dict[str, int]] = {}
+    for label, index in (("instrument_type", 1), ("quotation_currency", 2)):
+        counted: dict[str, int] = {}
+        for row in rows:
+            counted[row[index]] = counted.get(row[index], 0) + 1
+        counts_by[label] = counted
+        spread = " · ".join(f"{value} {count}" for value, count in sorted(counted.items()))
+        print(f"    {label}: {spread}")
+
+    from veritas.ingestion.universe import YAHOO_INSTRUMENT_TYPES
+
+    types = counts_by["instrument_type"]
+    currencies = counts_by["quotation_currency"]
+
+    absent_types = sorted(set(YAHOO_INSTRUMENT_TYPES.values()) - set(types))
+    if absent_types:
+        problems.append(
+            f"no Instrument of type {absent_types} — the 'by instrument type' "
+            f"Dimension Definition names an axis the data cannot slice on"
+        )
+
+    # Two of each kind, not one. One is indistinguishable from a special case: a
+    # metric sliced to that type returns that single security's numbers, so the
+    # slice proves nothing about the type.
+    thin_types = sorted(value for value, count in types.items() if count < 2)
+    if thin_types:
+        problems.append(
+            f"only one Instrument of type {thin_types} — slicing a metric by that "
+            f"type would return one security's numbers, so Sub-step 2.5 cannot "
+            f"make it a distinction. Add a second in universe.py"
+        )
+
+    if len(currencies) < 3:
+        problems.append(
+            f"only {len(currencies)} Quotation Currencies "
+            f"({sorted(currencies)}) — FX conversion to the Reporting Currency "
+            f"needs several to be more than a formality"
+        )
+
+    normalised = {
+        mapping["major_unit_currency"] for mapping in MINOR_UNIT_CURRENCIES.values()
+    }
+    if not (normalised & set(currencies)):
+        problems.append(
+            f"no Instrument normalised from a minor unit — nothing carries the "
+            f"100x trap into the fact tables, so Sub-steps 2.3 and 2.5 exercise "
+            f"it nowhere"
+        )
+
+    if not any(
+        problem.startswith(("no Instrument", "only ")) for problem in problems
+    ):
+        print(f"    richness: {len(types)} types (min {min(types.values())} each) · "
+              f"{len(currencies)} currencies · minor unit normalised")
+
+
 def duckdb_importers() -> list[Path]:
     """Every Python file that imports `duckdb`, adapter or not.
 
@@ -328,7 +494,19 @@ def main() -> int:
         help="delete the Warehouse and recreate it from schema.sql "
              "(the file is gitignored; the snapshots are what make it reproducible)",
     )
+    parser.add_argument(
+        "--sources",
+        action="store_true",
+        help="also check what ingestion loaded against what the sources said — "
+             "run `uv run python -m veritas.ingestion` first",
+    )
     arguments = parser.parse_args()
+
+    if arguments.rebuild and arguments.sources:
+        parser.error(
+            "--rebuild empties the Warehouse and --sources checks what is in it, "
+            "so together they only ever prove that an empty table is empty"
+        )
 
     if arguments.rebuild and DATABASE_PATH.exists():
         DATABASE_PATH.unlink()
@@ -341,6 +519,10 @@ def main() -> int:
         print(f"  Warehouse: {DATABASE_PATH.relative_to(REPO_ROOT)} "
               f"({'created from schema.sql' if fresh else 'already existed'})")
         check_schema(warehouse)
+
+        if arguments.sources:
+            print()
+            check_sources(warehouse)
 
     check_constraints()
     print()

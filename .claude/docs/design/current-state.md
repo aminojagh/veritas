@@ -4,8 +4,8 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-10 — Sub-step 2.1 committed; Step 002's plan amended and approved the same day (R16). **The first implementation code exists.**
-**Steps completed:** Step 000 (framework) and Step 001, fully committed; Step 002 is in flight, **one of its five Sub-steps committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`.
+**Last updated:** 2026-08-10 — Sub-step 2.2 built and verified, awaiting Amino's review and commit. **The Warehouse now holds real data.**
+**Steps completed:** Step 000 (framework) and Step 001, fully committed; Step 002 is in flight, **one of its five Sub-steps committed and a second built**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`.
 
 ---
 
@@ -21,9 +21,19 @@ wrong and gets fixed immediately.
   The original Sub-step 2.2 split into three — one table per Sub-step — and
   [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
   fired, moving the sqlglot spike out of Step 002 and into a future Step 003.
-  Step 002 now has five Sub-steps: 2.1 `schema` ✅, 2.2 `dim_instrument`,
+  Step 002 now has five Sub-steps: 2.1 `schema` ✅, 2.2 `dim_instrument` ✅ built,
   2.3 `fct_instrument_price`, 2.4 `fct_fx_rate`, 2.5 synthetic activity.
-  **Awaiting Amino: the commit of this amendment. No open questions.**
+- **Awaiting Amino: the review and commit of Sub-step 2.2, and a ruling on
+  [ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md), which is
+  `proposed`.** One judgement call in it is the one to check first: **2.2 reads
+  Yahoo's `meta` block**, which the plan's shorthand did not list among its
+  sources. Neither NASDAQ Trader file carries a currency column and the SEC file
+  carries only a name and a key, so `quotation_currency` — and therefore the whole
+  `GBp` trap — has no other source. `data-availability.md` already said so:
+  *"Non-US Instruments (SAP.DE, VOD.L, 7203.T) come from the price source's own
+  metadata, which returns exchange, currency and instrument type per symbol."*
+  Sub-step 2.3 still loads the Market Price series; 2.2 reads only the metadata
+  half of the same snapshot.
 - Everything
   raised on 2026-08-05 and 2026-08-06 has been ruled on and applied — recorded as
   [R11–R15](../plan/step-002-warehouse-and-ingestion.md#r11r15--five-rulings-from-aminos-review-of-the-snapshot-design-2026-08-06)
@@ -44,25 +54,33 @@ wrong and gets fixed immediately.
   `Instrument Symbol`, `Denomination Currency` and `Trade Side` are registered
   and `agreed`; the instrument-type values were swept so the `Dimension
   Definition` row matches the narrowed `Instrument` row.
-- **Next Sub-step:** 2.2 — load `dim_instrument` from NASDAQ
-  Trader and the SEC. Creates `veritas/ingestion/` and its entry point and writes
-  **ADR-0004**. [DEBT-002](../debt-ledger.md) is **no longer paid here** — it
-  moved to 2.3, the Yahoo Sub-step, which is what its subject actually is. Three
-  things 2.1 leaves the ingestion work:
-  1. **Load dimensions before facts.** Foreign keys are declared and enforced, so
-     `dim_instrument` must exist before `fct_instrument_price` accepts a row.
-     The constraint probe in `check_warehouse.py` demonstrates the rejection.
-  2. **The `GBp` trap is now refused by the engine**, not merely checked after
-     the fact — `dim_instrument.quotation_currency` must equal its own upper
-     case. Ingestion must normalise minor units *before* insert or it will fail
-     loudly, which is the intent. It does not catch the `GBX` spelling.
-  3. `--sources` is the flag to add to `check_warehouse.py`, alongside the
-     existing `--rebuild`. **It must verify the loaded price window is split-free**
-     for every held Instrument — a day-over-day ratio large enough to be a
-     corporate action rather than a market move. R14 excluded corporate actions
-     from the slice on the assumption that no loaded series contains one, and this
-     is what turns that assumption into a check
-     ([EXT-007](../extension-register.md#ext-007--corporate-actions)).
+- **Next Sub-step:** 2.3 — load `fct_instrument_price` from Yahoo by
+  snapshot-and-replay, and **pay [DEBT-002](../debt-ledger.md)** under its first
+  trigger. Four things 2.2 leaves it:
+  1. **The snapshots it needs already exist.** `data/snapshots/ingestion/` holds a
+     full chart response per traded Instrument, fetched in 2.2 for the `meta`
+     block. 2.3 reads the `timestamp` and `indicators` halves of the same files
+     and needs no new fetch — one file, two halves, one Sub-step each.
+  2. **The minor-unit factor is already declared and landed.**
+     `MINOR_UNIT_CURRENCIES` in `veritas/ingestion/universe.py` carries
+     `minor_units_per_major: 100`, and it reaches the Warehouse as
+     `raw.minor_unit_currency`. 2.2 used only the code half; **2.3 must divide
+     every `GBp` price by that factor** or the 100x error lands in the fact table
+     rather than the dimension, where no constraint catches it.
+  3. **Adding a source is a resource plus a build script.** Append to
+     `FETCHED_TABLES` in `veritas/ingestion/__main__.py`, add
+     `veritas/warehouse/builds/fct_instrument_price.sql`, and add its name to
+     `BUILDS`. Nothing else changes — and the build SQL must stay inside
+     `veritas/warehouse/`, which is what keeps [DEBT-009](../debt-ledger.md)
+     unfired.
+  4. `--sources` **must verify the loaded price window is split-free** for every
+     held Instrument — a day-over-day ratio large enough to be a corporate action
+     rather than a market move. R14 excluded corporate actions from the slice on
+     the assumption that no loaded series contains one, and this is what turns
+     that assumption into a check
+     ([EXT-007](../extension-register.md#ext-007--corporate-actions)). **This is
+     the assertion most likely to fail on first run** and to force a symbol swap
+     in `TRADED_INSTRUMENTS`.
 - **What Sub-step 2.5 must now implement rather than decide** (all settled as
   R12–R14; this was Sub-step 2.3 before the R16 split): Snapshots are end-of-day;
   dense, one row per subject on every date the
@@ -85,23 +103,26 @@ wrong and gets fixed immediately.
 
 ## Summary
 
-A fully designed project with one component built. The framework is in place and
+A fully designed project with one component built and a second under way. The framework is in place and
 the Target State is `agreed`, so there is a fixed point to build toward: a
 natural-language analytics copilot over a brokerage warehouse, whose answers are
 grounded in a certified Semantic Layer and checked by a deterministic Validation
 Gate.
 
 Every data source that design assumes has been verified obtainable, key-free, and
-is snapshotted into the repository. **The Warehouse now exists**: the ten-table
-star schema of Glossary Section B, empty, behind the Warehouse Adapter — the only
-module in the repository that imports `duckdb`. Nothing fills it yet, and nothing
-above it is built: no Ingestion, no Semantic Layer, no application.
+is snapshotted into the repository. **The Warehouse exists and has begun to
+fill.** The ten-table star schema of Glossary Section B sits behind the Warehouse
+Adapter — the only module in the repository that imports `duckdb` — and one of its
+ten tables now holds real data: `dim_instrument`, nineteen Instruments across four
+types and four Quotation Currencies, loaded offline from committed snapshots.
+The other nine are empty. Nothing above Ingestion is built: no Semantic Layer, no
+Retrieval, no application.
 
 ## What is built
 
 | Component | State | Notes |
 |---|---|---|
-| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **One dependency**, taken in Sub-step 2.1: `duckdb==1.5.5`. The three framework check scripts remain stdlib-only. |
+| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **Two declared dependencies**: `duckdb==1.5.5` (2.1) and `dlt==1.29.1` (2.2). dlt brings roughly forty transitive packages, among them `sqlglot==30.15.0` — which is now installed a Step earlier than anything planned to use it, and makes [DEBT-009](../debt-ledger.md) cheaper to repay. The three framework check scripts remain stdlib-only. |
 | Development framework | ✅ working | `CLAUDE.md`, `.claude/docs/` tree, five skills in `.claude/skills/`. |
 | Framework self-check | ✅ working | `.claude/scripts/verify_framework.py` — structure only (documents exist, links resolve, skills load, interpreter pinned), passes. |
 | Language check | ✅ working | `.claude/scripts/check_language.py` — content rules: component names registered, no `proposed` term in code, abbreviations resolvable. Passes. Parses code with `ast` so it checks identifiers, not prose. Partial payment of [DEBT-001](../debt-ledger.md). |
@@ -113,9 +134,9 @@ above it is built: no Ingestion, no Semantic Layer, no application.
 | Founding ADRs | ✅ working | Three ADRs in `.claude/docs/adr/`, all **`accepted`** 2026-08-03: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code. Every cost in each is classified *accepted* / *debt* / *extension*. A fourth — snapshot-and-replay — was deferred to the ingestion Step ([DEBT-002](../debt-ledger.md)), and is now due as ADR-0004 in Sub-step 2.2. ADR-0002 carries a dated clarification (2026-08-05) on what its sqlglot commitment forbids; its status stays `accepted`. |
 | Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, empty. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is now checked rather than promised. `create_schema`, `tables`, `columns`, `row_count`, `execute`, `query`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. Hardcoded database path and no error handling, both licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
-| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and no `duckdb` import outside `veritas/warehouse/`. `--rebuild` recreates the database. Grows in 2.2 (`--sources`) and 2.3 (`--distinctions`). |
+| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and no `duckdb` import outside `veritas/warehouse/`. `--rebuild` recreates the database; `--sources` (added 2.2) checks the loaded data, including a **richness** assertion that the traded universe is thick enough for Sub-step 2.5 — every instrument type present, at least two Instruments of each, at least three Quotation Currencies, one normalised from a minor unit. The two are mutually exclusive — together they only prove an empty table is empty. Grows in 2.3, 2.4 (`--sources`) and 2.5 (`--distinctions`). |
 | Semantic Layer | ✗ none | — |
-| Ingestion | ✗ none | — |
+| Ingestion | ◐ partial | `veritas/ingestion/` — the pipeline and **one of its four sources**. `uv run python -m veritas.ingestion` builds the Warehouse end-to-end from a clean clone with **no network**; `--refresh` is the only mode that opens a socket, and a refresh that fails part-way names the snapshots it had already rewritten. dlt lands five `raw` tables, the adapter builds `dim_instrument` from them. Market Prices (2.3), FX Rates (2.4) and the synthetic half (2.5) are absent. |
 | Retrieval | ✗ none | — |
 | Orchestrator | ✗ none | — |
 | Validation Gate | ✗ none | — |
@@ -133,11 +154,19 @@ veritas/
 ├── pyproject.toml, uv.lock, .python-version, .gitignore
 ├── data/
 │   ├── snapshots/             # committed source data + dated probe record
-│   └── veritas.duckdb         # the Warehouse — gitignored, rebuilt from schema.sql
+│   │   └── ingestion/         # 2.6 MB, 22 files — ingestion's own snapshots (2.2)
+│   └── veritas.duckdb         # the Warehouse — gitignored, rebuilt by ingestion
 ├── veritas/
-│   └── warehouse/
-│       ├── adapter.py         # the Warehouse Adapter — the only duckdb importer
-│       └── schema.sql         # the ten-table star schema, hand-authored
+│   ├── warehouse/
+│   │   ├── adapter.py         # the Warehouse Adapter — the only duckdb importer
+│   │   ├── schema.sql         # the ten-table star schema, hand-authored
+│   │   └── builds/            # hand-authored raw→star SQL, one file per table
+│   │       └── dim_instrument.sql
+│   └── ingestion/
+│       ├── __main__.py        # the entry point: replay by default, --refresh
+│       ├── universe.py        # the 19 traded Instruments + two vocabulary maps
+│       ├── snapshots.py       # snapshot-and-replay — the only socket in the package
+│       └── sources.py         # NASDAQ Trader · SEC · Yahoo metadata, parsed for dlt
 └── .claude/
     ├── skills/                # 5 framework skills
     ├── scripts/
@@ -157,15 +186,24 @@ veritas/
 
 ## Known gaps
 
-**Everything above the Warehouse**, and the Warehouse itself is empty — ten tables
-at zero rows. Sub-step 2.2 fills the three real-data tables and 2.3 the six
-client-activity ones. Nothing blocks either.
+**Everything above Ingestion**, and nine of the Warehouse's ten tables are still
+at zero rows. Sub-step 2.3 fills `fct_instrument_price`, 2.4 fills `fct_fx_rate`
+and 2.5 the six client-activity tables. Nothing blocks any of them.
 
-Two things 2.1 chose not to settle, both on the Ledger rather than left implicit:
-`movement_type` has no agreed value vocabulary and no constraint, unlike the
-schema's three other enumerated columns ([DEBT-010](../debt-ledger.md)), and the
-adapter seam scan checks `duckdb` imports but not the DuckDB-specific function
-names ADR-0002 also named ([DEBT-009](../debt-ledger.md)).
+**No number in the Warehouse is aggregatable yet.** `dim_instrument` is a
+dimension: it names nineteen Instruments and says what currency each is quoted in.
+Not one Market Price, FX Rate or Trade exists, so every Certified Metric still
+returns nothing. That is the expected shape after 2.2 and it is worth stating
+plainly, because "the Warehouse holds real data" could otherwise be read as more
+than it is.
+
+One thing 2.1 chose not to settle remains on the Ledger:
+[DEBT-009](../debt-ledger.md) — the adapter seam scan checks `duckdb` imports but
+not the DuckDB-specific function names ADR-0002 also named. **Its trigger came
+close in 2.2 and did not fire**: the raw-to-star SQL lives in
+`veritas/warehouse/builds/` rather than in `veritas/ingestion/`, so there is still
+no component outside the adapter emitting SQL. [DEBT-010](../debt-ledger.md) was
+**paid in 2.1** and both `movement_type` columns now carry a `CHECK`.
 
 **The cost-basis gap is closed** (2026-08-06). This section previously read that
 Realised and Unrealised P&L *"can both be expressed as a weighted average of

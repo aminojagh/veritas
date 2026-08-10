@@ -227,6 +227,17 @@ Whichever comes first:
 2. Any reproducibility claim is made in `README.md`.
 3. The endpoint returns a non-200 for a symbol in the traded universe.
 
+**Status note, Sub-step 2.2 (2026-08-10) — still open, and the trigger has not
+fired.** Trigger 1 names the *market-price* pipeline, which is Sub-step 2.3.
+What 2.2 built is the mechanism and the snapshot: `veritas/ingestion/snapshots.py`
+replays by default, and `data/snapshots/ingestion/` now holds a Yahoo chart
+response for all sixteen traded Instruments. 2.2 reads only the `meta` block of
+those files — see [ADR-0004](adr/0004-snapshot-and-replay-and-where-dlt-stops.md)
+— so the price series is loaded, and this debt paid, one Sub-step later. The
+mitigation landing *before* the pipeline is the ordering the trigger wanted; the
+condition it guards against, a pipeline existing with no snapshot behind it,
+cannot now occur.
+
 ---
 
 ### DEBT-003 — No Market Price vendor, so single bonds and options are out of scope
@@ -531,6 +542,24 @@ The first component outside `veritas/warehouse/` that emits SQL — the Semantic
 Layer's first Metric Definition expression, or the Orchestrator's first generated
 query, whichever lands first. The scan is written in the same Sub-step as the
 thing it has to scan, so it is written against real examples.
+
+**Status note, Sub-step 2.2 (2026-08-10) — the trigger came close and did not
+fire, deliberately.** Ingestion needed SQL to build `dim_instrument` from `raw`,
+which would have made `veritas/ingestion/` the first component outside the adapter
+to emit it. It lives in `veritas/warehouse/builds/dim_instrument.sql` instead,
+hand-authored and run through `WarehouseAdapter.run_build`, which is where R4 puts
+it anyway: *"the adapter executes the SQL that builds the star schema from it."*
+One draft of `check_warehouse.py --sources` did interpolate a table name into a
+`count(*)` string; it was replaced with `WarehouseAdapter.row_count`, which reaches
+`raw` through the relational API and assembles no text. So after this Sub-step
+there is still no component outside `veritas/warehouse/` emitting SQL, and the
+scan would still pass vacuously.
+
+Repayment did get cheaper, for a reason worth recording: **`sqlglot` is now an
+installed dependency**, pulled in transitively by dlt (`sqlglot==30.15.0`). The
+repayment plan above assumed it would arrive with the Validation Gate spike, which
+[R6](plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+has since moved to Step 003. It is available now regardless.
 
 ---
 

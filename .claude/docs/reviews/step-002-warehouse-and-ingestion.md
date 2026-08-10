@@ -778,3 +778,213 @@ series above a threshold is either a split or a market event worth knowing about
 and it should fail `check_warehouse.py --sources` in Sub-step 2.2. Recording it as
 a check rather than an intention is the difference between this holding and this
 having held on the day someone widened the window.
+
+---
+
+## Sub-step 2.2 — Load `dim_instrument` from NASDAQ Trader and the Securities and Exchange Commission (SEC)
+
+**What changed**
+
+`Ingestion` exists. `uv run python -m veritas.ingestion` builds the Warehouse from
+nothing, offline, and fills one of its ten tables with sixteen real Instruments.
+
+- **`veritas/ingestion/`** — four modules with one job each. `universe.py` holds
+  the sixteen traded Instruments and two vocabulary maps; `snapshots.py` is the
+  only module in the package that opens a socket; `sources.py` parses each source
+  into records; `__main__.py` wires dlt to the adapter.
+- **Snapshot-and-replay, applied to every real source.** Replay is the default and
+  needs no network. `--refresh` re-hits the sources and rewrites
+  `data/snapshots/ingestion/` — 22 files, 2.6 MB.
+- **`veritas/warehouse/builds/dim_instrument.sql`** — the raw-to-star SQL,
+  hand-authored, run through the new `WarehouseAdapter.run_build`. It sits on the
+  adapter's side of the seam on purpose; see the DEBT-009 note below.
+- **[ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md)**, `proposed` —
+  snapshot-and-replay's scope, and where dlt stops.
+- **`check_warehouse.py --sources`** — three assertions, and `--rebuild` and
+  `--sources` are now mutually exclusive, since together they only ever prove an
+  empty table is empty.
+- `uv add dlt`.
+
+**Verification**
+
+```
+$ uv run python -m veritas.ingestion
+  mode: replay (offline)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+
+    dim_account                   0 rows
+    dim_client                    0 rows
+  · dim_instrument               19 rows
+    fct_accounting_movement       0 rows
+    fct_balance_snapshot          0 rows
+    fct_cash_movement             0 rows
+    fct_fx_rate                   0 rows
+    fct_instrument_price          0 rows
+    fct_position_snapshot         0 rows
+    fct_trade                     0 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments
+exit: 0
+```
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+  Warehouse: data/veritas.duckdb (already existed)
+  Glossary Section B names 10 tables · the Warehouse has 10
+
+  [the per-table column listing is unchanged from Sub-step 2.1 and elided here
+   for length — it is the same output that review already records, and the
+   command above reproduces all of it]
+
+  dim_instrument: 19 rows · 19 Instruments declared in universe.py
+    minor units: none of ['GBp'] survived normalisation
+    symbols: all 19 declared Instruments present, none repeated
+    raw.nasdaq_symbol           13117 rows
+    raw.sec_registrant          10398 rows
+    raw.yahoo_instrument           19 rows
+    raw.minor_unit_currency         1 rows
+    raw.yahoo_instrument_type       4 rows
+    instrument_type: ETF 4 · currency pair 3 · equity 9 · future 3
+    quotation_currency: EUR 3 · GBP 2 · JPY 3 · USD 11
+    richness: 4 types (min 3 each) · 4 currencies · minor unit normalised
+  constraint probe (in-memory Warehouse from the same schema.sql)
+    accepted  7 valid seed rows (positive control)
+    [fourteen refusals, unchanged from 2.1]
+
+  seam scan: 12 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit: 0
+```
+
+`check_language.py` and `verify_framework.py` both PASS; the former now scans 12
+Python files and 371 identifiers, against 7 and 268 at the end of 2.1.
+
+**Both checks were made to fail before being trusted.** Deleting `VOD.L` from
+`dim_instrument` produced *"declared in universe.py but absent from
+dim_instrument: ['VOD.L']"* and exit 1. Pointing the SEC source at a 404 produced
+the source-failure path and exit 1. The second of those found a real defect, which
+is why it is worth doing: dlt wraps a resource's exception in its own
+`PipelineStepFailed`, so the original `except SourceUnavailable` never fired and
+the operator got a dlt traceback instead of the sentence telling them what to do.
+`source_failure()` now walks the exception chain.
+
+**Deliberately left undone**
+
+- **No new Debt Ledger entry.** The one candidate was that `--refresh` is not
+  transactional — nineteen files rewritten one at a time, so a failure part-way
+  leaves a mix of fresh and stale snapshots. `recording-debt` says to fix rather
+  than document when the fix is smaller than the entry, so the failure path now
+  names every snapshot it had already rewritten and says not to commit until a
+  refresh succeeds. What remains is visible rather than silent.
+- **[DEBT-002](../debt-ledger.md) is not paid**, and its trigger has not fired —
+  trigger 1 names the *market-price* pipeline, which is 2.3. The snapshot half of
+  the mitigation landed here, one Sub-step early, so the pipeline can never exist
+  without a snapshot behind it.
+- **[DEBT-009](../debt-ledger.md)'s trigger came close and did not fire**,
+  deliberately. Ingestion needed SQL to build `dim_instrument`; putting it in
+  `veritas/ingestion/` would have made that package the first component outside the
+  adapter to emit SQL. It lives in `veritas/warehouse/builds/` instead, which is
+  where R4 puts it anyway. One draft of `--sources` did interpolate a table name
+  into a `count(*)` string — that is now `WarehouseAdapter.row_count`, which reaches
+  `raw` through the relational API and assembles no text.
+- **The split-free check is not here.** It belongs to 2.3, which loads the price
+  window it inspects.
+
+**Look at this sceptically**
+
+1. **2.2 reads Yahoo's `meta` block, and the plan did not list Yahoo among this
+   Sub-step's sources.** This is the judgement call to check first. Neither NASDAQ
+   Trader file has a currency column — the header is
+   `Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares`
+   — and the SEC file carries only a name and a key. Yahoo's `meta.currency` is the
+   only place any source states an Instrument's Quotation Currency, and it is where
+   the literal `GBp` comes from. Building from the two named sources alone would
+   mean guessing currency from a symbol suffix, and a guessed `GBP` would make both
+   the schema's CHECK and this Sub-step's own assertion pass **without ever meeting
+   the trap they exist to catch**. `data-availability.md` already said this: *"Non-US
+   Instruments (SAP.DE, VOD.L, 7203.T) come from the price source's own metadata,
+   which returns exchange, currency and instrument type per symbol."* I read the
+   plan's "NASDAQ Trader · SEC" as shorthand that the design document had already
+   qualified. **If you disagree, the alternative is a hand-authored suffix-to-currency
+   map, and it is worse for the reason above.**
+2. **The universe is nineteen symbols I chose.** Four types, four currencies, EU/UK/
+   APAC/US. Bond exposure is TLT and BNDX because DEBT-003 rules out single bonds.
+   Two GBp listings rather than one, so the 100x trap is a class of row and not a
+   special case.
+
+   **Richness is now asserted rather than printed** (added on Amino's review):
+   every `instrument_type` present, **at least two Instruments of each**, at least
+   three Quotation Currencies, and at least one normalised from a minor unit. The
+   two-of-each bar is the one that bites — a type with a single member turns a
+   metric sliced to that type into a report on one security, and no simulator
+   cleverness in 2.5 repairs that afterwards.
+
+   **It failed on the first run**, on the universe this review originally
+   described: `only one Instrument of type ['currency pair']`. The sources were
+   made richer rather than the bar lowered — `GBPUSD=X`, `USDJPY=X` and `CL=F`
+   were added, one currency pair per non-EUR currency the book is quoted in, and a
+   third future. The thinnest type is now three. That the check found a real gap
+   on its first execution is the argument for it existing.
+3. **`instrument_name` is visibly mixed-case** — `JOHNSON & JOHNSON` and
+   `MICROSOFT CORP` next to `SAP SE`. The `coalesce` takes the SEC's registered
+   name, then NASDAQ's security name, then Yahoo's long name. The shouting is the
+   SEC's own, not a transform this code applied.
+
+   **The criterion, stated properly** — the first version of this note gave the
+   choice without the rule behind it, which is a fair complaint. The question is
+   *what `instrument_name` is for*, and there are exactly two answers:
+
+   | If it is a **record** | If it is a **label** |
+   |---|---|
+   | The name exists so a row can be traced to the entity a registry recognises | The name exists so a person reading a Grounded Answer knows which company it is |
+   | Most authoritative source wins → SEC, NASDAQ, Yahoo | Most consistent source wins → Yahoo's `longName` throughout |
+   | Mixed case is the sources' truth, faithfully carried | Mixed case is a defect in a user-facing string |
+
+   **I chose *record*, and the reasoning is one step, not a preference:** this
+   project's subject is numbers being traceable to where they came from, and a
+   name is the only column in `dim_instrument` that a human uses to check a row is
+   the company they meant. A name taken from the most authoritative source is
+   checkable against a registry; a name taken from the tidiest source is not.
+
+   **What would change my mind, and what to weigh:** nothing downstream computes
+   on this column — no Certified Metric touches it — so the *record* argument buys
+   traceability that only a human ever exercises, while the *label* argument buys
+   readability in every answer the App will ever render. If you expect
+   `instrument_name` to appear in Grounded Answers, **label is the better rule and
+   I would switch**. The change is the `coalesce` order in
+   `veritas/warehouse/builds/dim_instrument.sql`, and nothing else moves. I left it
+   as *record* because the App does not exist yet and the reversible choice is the
+   one that keeps the more authoritative data in the column meanwhile.
+4. **Ingestion deletes and rebuilds the Warehouse on every run.** `schema.sql` uses
+   plain `CREATE TABLE`, so there is nothing to reconcile, and a pipeline whose
+   output depends on how many times it ran is not reproducible. But it does mean
+   the command is destructive, and it says so in one line of output rather than
+   asking.
+5. **2.6 MB of committed snapshots, of which ~1.5 MB is reference data for symbols
+   outside the universe.** Filtering would halve it and would break the property
+   that replay and `--refresh` exercise the same parser. Recorded as an accepted
+   cost in ADR-0004 rather than as debt.
+6. **dlt is a large dependency for five small tables** — roughly forty transitive
+   packages. R4 chose it before this Sub-step; I am flagging the size, not
+   reopening the ruling. One side effect is genuinely useful: `sqlglot` is now
+   installed, a Step before anything planned to use it.
+
+**Language**
+
+No new terms, and none proposed. Every domain identifier added resolves to a
+registered term: `Instrument`, `Instrument Symbol`, `Quotation Currency`,
+`Ingestion`, `Market Price`, `FX Rate`, `Snapshot`. `TRADED_INSTRUMENTS` is built
+from `Instrument` rather than coining "universe" as an identifier, though the
+prose uses *"the traded Instrument universe"* as `data-availability.md` already
+does.
+
+One checker change worth noting, because it is the kind that hides a rule rot:
+`check_language.py` flagged `ACT` — NASDAQ Trader's `ACT Symbol` column, quoted in
+ADR-0004. Rather than append two ticker symbols to a hand-maintained list, the
+traded universe's tokens are now **derived** from `TRADED_INSTRUMENTS`, the same
+way the schema-keyword group is derived from `schema.sql`. That file's own comment
+argued for this: a remembered list *"is always one document behind"*. `ACT` itself
+is listed as a source's column name, which is what it is.

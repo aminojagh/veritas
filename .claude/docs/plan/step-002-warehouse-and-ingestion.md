@@ -425,6 +425,18 @@ never the reverse"* — added to the pipeline 2.2–2.4 built.
   closed and Positions held, so Realised and Unrealised P&L both exist.
 - Trades priced at Execution Price; Positions marked at Market Price; both
   converted through FX Rate to the Reporting Currency (R1).
+- **The simulator can only be as rich as the Instruments it has to trade**, so the
+  universe is checked rather than hoped for. `check_warehouse.py --sources` gained
+  a richness assertion in Sub-step 2.2, and it is a **precondition of this
+  Sub-step**: every `instrument_type` present, **at least two Instruments of each**,
+  at least three Quotation Currencies, and at least one normalised from a minor
+  unit. The two-of-each bar is the one that matters here — a type with a single
+  member makes a metric sliced to that type a report on one security, which is a
+  distinction the simulator cannot rescue afterwards. It failed on first run
+  (one currency pair) and `TRADED_INSTRUMENTS` was widened from sixteen
+  Instruments to nineteen; if this Sub-step finds the universe still too thin,
+  widening it again is one line in `veritas/ingestion/universe.py` plus a
+  `--refresh`.
 
 **Verification:**
 

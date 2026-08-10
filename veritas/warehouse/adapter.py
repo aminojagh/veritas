@@ -32,6 +32,14 @@ REPO_ROOT = WAREHOUSE_DIR.parent.parent
 
 SCHEMA_PATH = WAREHOUSE_DIR / "schema.sql"
 
+# Hand-authored raw-to-star build scripts, one per table, added from Sub-step 2.2.
+# They live here rather than in veritas/ingestion/ because R4 puts them on this
+# side of the seam: "dlt lands raw source data in a `raw` schema; the adapter
+# executes the SQL that builds the star schema from it." Keeping them here is also
+# what stops DEBT-009's trigger — "the first component outside the adapter emits
+# SQL" — from firing on the ingestion pipeline.
+BUILDS_DIR = WAREHOUSE_DIR / "builds"
+
 # Hardcoded, and licensed as such by ADR-0002. `*.duckdb` is gitignored, so the
 # built Warehouse is never committed — the snapshots in data/snapshots/ are what
 # make it reproducible, not the database file.
@@ -102,6 +110,27 @@ class WarehouseAdapter:
         """
         self._connection.execute(SCHEMA_PATH.read_text())
 
+    def builds(self) -> list[str]:
+        """The raw-to-star build scripts available, by name, alphabetically."""
+        return sorted(path.stem for path in BUILDS_DIR.glob("*.sql"))
+
+    def run_build(self, build_name: str) -> None:
+        """Execute one hand-authored raw-to-star build script by name.
+
+        The name is resolved against the scripts actually present rather than
+        pasted into a path, so a caller cannot reach a file outside `builds/`, and
+        an unknown name fails here with the list of real ones instead of surfacing
+        as a confusing engine error. The SQL itself is human-authored text under
+        the same ADR-0002 licence as `create_schema`: nothing is assembled.
+        """
+        available = self.builds()
+        if build_name not in available:
+            raise FileNotFoundError(
+                f"no build script named {build_name!r} in "
+                f"{BUILDS_DIR.name}/ — have {available}"
+            )
+        self._connection.execute((BUILDS_DIR / f"{build_name}.sql").read_text())
+
     # -- introspection -----------------------------------------------------
 
     def tables(self) -> list[str]:
@@ -127,13 +156,19 @@ class WarehouseAdapter:
         ).fetchall()
 
     def row_count(self, table_name: str) -> int:
-        """Exact row count for one table.
+        """Exact row count for one table, star-schema or `raw.`-qualified.
 
         Goes through the relational API rather than `SELECT count(*) FROM <name>`
         precisely so that no SQL text is assembled from the argument — ADR-0002's
         case C, which is permitted inside the seam and still worth refusing. The
         alternative, `duckdb_tables().estimated_size`, is an estimate, and Sub-steps
-        2.2 and 2.3 assert against these numbers.
+        2.2 onward assert against these numbers.
+
+        A schema-qualified name works and is how `check_warehouse.py --sources`
+        counts what dlt landed in `raw`. Giving callers this rather than letting
+        them build one `count(*)` string is the whole point: the alternative put
+        an interpolated table name in a script outside the adapter, which is both
+        the construct ADR-0002 rejects and the event DEBT-009's trigger names.
         """
         (count,) = self._connection.table(table_name).aggregate(
             "count(*) AS row_count"

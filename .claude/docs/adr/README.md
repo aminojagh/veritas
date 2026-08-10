@@ -18,8 +18,14 @@ Debt Ledger entries or just code.
 | [0001](0001-semantic-layer-as-the-retrieval-corpus.md) | The Semantic Layer is the retrieval corpus | accepted |
 | [0002](0002-duckdb-as-the-warehouse-behind-an-adapter.md) | DuckDB is the Warehouse, reached only through an adapter | accepted |
 | [0003](0003-validation-gate-is-deterministic-code.md) | The Validation Gate is deterministic code, not an Large Language Model (LLM) self-check | accepted |
+| [0004](0004-snapshot-and-replay-and-where-dlt-stops.md) | Every real source is snapshot-and-replayed, and dlt stops at `raw` | proposed |
 
-All three accepted by Amino on 2026-08-03, conditional on the corrections applied
+ADR-0004 was written in Sub-step 2.2 and is **`proposed`** — it awaits Amino's
+review with the rest of that Sub-step. It was deferred to this Step by name in
+Sub-step 1.3: *"this was considered as a fourth founding ADR and deferred to the
+ingestion Step, where the decision actually binds."*
+
+The first three were accepted by Amino on 2026-08-03, conditional on the corrections applied
 the same day (see the Step 001 review, Sub-step 1.3). ADR-0002 carries one dated
 **clarification** added 2026-08-05 — what its sqlglot commitment forbids, with
 worked examples. A clarification makes an accepted decision precise; it is not a

@@ -69,9 +69,16 @@ KNOWN_NON_ABBREVIATIONS = {
     # minor-unit spelling of GBP that dim_instrument's constraint does *not*
     # catch, so it is named in the documents on purpose.
     "USD", "EUR", "GBP", "GBX", "JPY", "CHF", "AUD", "HKD", "SGD",
-    # Ticker symbols and exchange suffixes appearing in the data-availability work.
-    "AAPL", "SPY", "TLT", "BNDX", "IWDA", "SAP", "VOD", "GSPC", "TNX",
-    "ES", "GC", "EURUSD", "DE", "AS", "NASDAQ",
+    # Ticker symbols and exchange suffixes from the data-availability probes.
+    # The *traded* universe is not listed here — it is derived below, for the same
+    # reason the schema keywords are: a remembered list is always one document
+    # behind, and Sub-steps 2.3 to 2.5 will move the universe again.
+    "GSPC", "TNX", "NASDAQ",
+    # A NASDAQ Trader column name, not project vocabulary: `otherlisted.txt` keys
+    # its symbol column `ACT Symbol` where `nasdaqlisted.txt` says `Symbol`. It is
+    # quoted in ADR-0004 because resolving that disagreement is what the ingestion
+    # code does.
+    "ACT",
     # SQL keywords and code-ish tokens quoted in prose.
     #
     # The Data Definition Language (DDL) half of this group is *derived*, not
@@ -106,7 +113,39 @@ KNOWN_NON_ABBREVIATIONS = {
     "EU", "UK", "US", "APAC",
     # Proper nouns that are not abbreviations.
     "EXANTE", "DB",
+    # Legal-form suffixes inside registered company names. These arrive in the
+    # data — `dim_instrument.instrument_name` holds "SAP SE" and "MICROSOFT CORP"
+    # — and get quoted in reviews as evidence of what actually loaded. They are
+    # not abbreviations a reader looks up, they are part of a company's name. The
+    # list is stocked ahead of need rather than one failure at a time, because
+    # widening the traded universe is what produces the next one.
+    # (`ETF` and `ADR` belong here by category but are registered in the
+    # Glossary's Abbreviations table already, so listing them would be dead text.)
+    "SE", "CORP", "PLC", "LTD", "INC", "NV", "AG", "SA", "REIT",
+    # Module-level constant names quoted in prose, e.g. "add its name to BUILDS".
+    "BUILDS", "SEED",
 }
+
+
+def traded_universe_tokens() -> set[str]:
+    """Shouted tokens inside the traded Instrument universe's ticker symbols.
+
+    Derived rather than remembered, exactly as the schema-keyword group above is.
+    `SAP.DE` contributes SAP and DE, `EURUSD=X` contributes EURUSD; the one- and
+    two-character suffixes that the abbreviation pattern would not match anyway
+    fall out on their own. When Sub-step 2.3 or 2.5 changes the universe, this
+    follows without anyone remembering that it has to.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from veritas.ingestion.universe import TRADED_INSTRUMENTS
+
+    tokens: set[str] = set()
+    for symbol in TRADED_INSTRUMENTS:
+        tokens.update(re.findall(r"[A-Z]{2,6}", symbol))
+    return tokens
+
+
+KNOWN_NON_ABBREVIATIONS |= traded_universe_tokens()
 
 problems: list[str] = []
 
