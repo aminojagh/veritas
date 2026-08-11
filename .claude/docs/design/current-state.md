@@ -5,7 +5,7 @@ intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
 **Last updated:** 2026-08-11 — Sub-step 2.4 reviewed and **approved**; its one open question ruled on as [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11). **The real half of Ingestion is complete: every Market Price in the Warehouse can now be converted to a Reporting Currency.**
-**Steps completed:** Step 000 (framework) and Step 001, fully committed; Step 002 is in flight, **four of its five Sub-steps built and approved**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`. **Sub-step 2.4 is committed on the `worktree-substep-2-4-fx-rate` branch and not yet on `main`** — as `acee54d` (snapshots) and `8777f3f` (the implementation and its review), which Amino expects to squash when the branch lands and the worktree is cleaned up. The R19 edits are **uncommitted** and are what this session leaves for him.
+**Steps completed:** Step 000 (framework) and Step 001, fully committed; Step 002 is in flight, **four of its five Sub-steps built and approved**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, **Sub-step 2.4 in `13b99bb`** — squashed onto `main` from the `worktree-substep-2-4-fx-rate` branch, carrying the implementation, its review, and the R19/R20 edits together. The worktree is gone and the working tree is clean, so **nothing is uncommitted**.
 
 ---
 
@@ -13,9 +13,9 @@ wrong and gets fixed immediately.
 
 - **Active Step:** 002 — Build the Warehouse and fill it
   ([plan](../plan/step-002-warehouse-and-ingestion.md)), approved 2026-08-05.
-  **Sub-steps 2.1 (`5a061a7`), 2.2 (`0fc5a34`) and 2.3 (`a58ef91`) are committed
-  on `main`, and 2.4 is committed on the worktree branch only** (`acee54d`,
-  `8777f3f`); the verification commands of each pass and their output is in the
+  **All four built Sub-steps are committed on `main`** — 2.1 (`5a061a7`), 2.2
+  (`0fc5a34`), 2.3 (`a58ef91`), 2.4 (`13b99bb`); the verification commands of
+  each pass and their output is in the
   [review](../reviews/step-002-warehouse-and-ingestion.md).
 - **The plan was amended and approved on 2026-08-10
   ([R16](../plan/step-002-warehouse-and-ingestion.md#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10)).**
