@@ -118,7 +118,8 @@ across open/high/low/close/volume. 20 rapid sequential requests all returned
 200 — no rate limiting at the volume Veritas needs.
 
 **Do not use Yahoo for FX Rates.** `EURUSD=X` works, but the `FX Rate` Glossary
-term is registered as *the ECB reference rate from Frankfurter*. Two sources for
+term is registered as coming from the ECB reference rates *"sourced from the public
+Frankfurter API"*, and *"a rate of any other origin is not one"*. Two sources for
 one concept is precisely the synonym disease Non-Negotiable #1 exists to prevent.
 Frankfurter is the only FX Rate source.
 

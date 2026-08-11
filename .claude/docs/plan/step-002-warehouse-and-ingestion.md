@@ -293,6 +293,53 @@ and the Glossary row behind it on the second — both recorded in the Sub-step 2
 review under
 [Changes made on review](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11).
 
+### R19 — an FX Rate includes the derived cross-rate → **approved by Amino 2026-08-11**
+
+Sub-step 2.4 stored all sixteen ordered pairs of its four currencies and raised the
+consequence as a Glossary question rather than deciding it: twelve of those pairs
+are reference rates the European Central Bank (ECB) published, and the four between
+two non-euro currencies are a **ratio of two** published rates. `FX Rate` was
+registered as *"Real ECB reference rate between two currencies on a date"*, which
+covers the ratio or excludes it depending on how it is read.
+
+Amino ruled both ways closed: **the four derived pairs stay in the table, and the
+definition is amended to say so.** The Glossary row now separates the two cases in
+its own words — a euro-side pair *is* a published reference rate, a non-euro pair
+is the ratio of that date's two published rates — and keeps the source exclusivity
+that was always the point of naming the ECB: *"a rate of any other origin is not
+one"*. Nothing in `fct_fx_rate.sql` changed; the `WHERE` clause the review had
+costed was not needed.
+
+Worth recording as a ruling rather than a silent edit, because the amendment is to
+an `agreed` term. The reasoning for storing all pairs is unchanged and lives where
+it was argued, in the
+[Sub-step 2.4 review](../reviews/step-002-warehouse-and-ingestion.md#sub-step-24--load-fct_fx_rate-from-frankfurter);
+this ruling records that the ambiguity was resolved by widening the definition, not
+by narrowing the table.
+
+### R20 — `verify_framework.py` checks anchors, not just files → **approved by Amino 2026-08-11**
+
+Found while applying R19: `check_links` split every link on `#` and validated only
+the path, so a link could point at a heading that had been renamed or never written
+and still pass. The consequence is quieter than a dead link — the reader lands at
+the top of the *right* document and reads the citation as vague rather than broken,
+which is the failure the citations-quote rule exists to catch.
+
+Amino approved closing it. `check_links` now resolves both halves and reports a
+`dead anchor` distinct from a `dead link`, and it no longer skips same-document
+`#anchor` links, which were previously not checked at all. Two details in
+`heading_anchors` are load-bearing and both had already produced a wrong answer in
+the throwaway script that found the gap: underscores are kept, so `fct_fx_rate`
+slugs as itself rather than as `fctfxrate`; and a `#` line inside a fenced block is
+shell or SQL rather than a heading, so counting it would invent an anchor no
+renderer produces and let a genuinely dead link pass.
+
+**It was verified by making it fail**, with a temporary document carrying two dead
+anchors and two live ones — output in the
+[Sub-step 2.4 changes-on-review section](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11-sub-step-24).
+Scope is unchanged otherwise: `.claude/docs/**` plus `CLAUDE.md`, and `README.md`
+is still outside it.
+
 ---
 
 ## Sub-steps

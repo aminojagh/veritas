@@ -14,6 +14,7 @@ transforming a value, and the values are where wrong numbers come from. ADR-0004
 records this boundary.
 """
 
+import datetime as dt
 import json
 from collections.abc import Iterator
 
@@ -28,13 +29,25 @@ NASDAQ_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/symdir/nasdaqlisted.tx
 NASDAQ_OTHER_URL = "https://www.nasdaqtrader.com/dynamic/symdir/otherlisted.txt"
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+FRANKFURTER_URL = "https://api.frankfurter.dev/v1/{start}..{end}?base=EUR"
 
-# Two years of daily bars, which is the window `fct_instrument_price` ends up
-# holding — each Instrument on its own exchange calendar. Two years covers the
-# whole of the 2025 window `frankfurter-2025.json` holds, which is what lets a
-# Position be converted on the date it was held.
-YAHOO_RANGE = "2y"
+# How far back a refresh reaches. One number, used twice: Yahoo takes it as a
+# relative range and Frankfurter needs two explicit dates, so writing it once is
+# what keeps the two windows from drifting apart across refreshes. They must not:
+# a Market Price on a date with no FX Rate is a Position that cannot be converted
+# to the Reporting Currency, which is the failure `fct_fx_rate` exists to prevent.
+PRICE_WINDOW_YEARS = 2
+
+YAHOO_RANGE = f"{PRICE_WINDOW_YEARS}y"
 YAHOO_INTERVAL = "1d"
+
+# Extra days on the *front* of the FX window only. Two reasons, both about the
+# start: 365-day years drift against Yahoo's calendar-aware "2y", and the European
+# Central Bank (ECB) does not publish on the day a window happens to open. A rate
+# is filled forward from the most recent published one, so a window that starts
+# late leaves the earliest Market Prices with nothing at or before them to fill
+# from — while a window that starts early costs a few unused rows.
+FX_WINDOW_LEAD_DAYS = 10
 
 # Both NASDAQ Trader files end with a provenance line rather than a record:
 #   File Creation Time: <mmddyyyyhh:mm>|||||||
@@ -215,6 +228,56 @@ def yahoo_prices(*, refresh: bool) -> Iterator[dict[str, object]]:
                 "instrument_symbol": symbol_in_response,
                 "bar_timestamp": bar_timestamp,
                 "unadjusted_close": close,
+            }
+
+
+def frankfurter_rates(*, refresh: bool) -> Iterator[dict[str, object]]:
+    """Every European Central Bank (ECB) reference rate Frankfurter publishes.
+
+    **Frankfurter is the only FX Rate source**, which is a rule rather than a
+    convenience. Yahoo serves `EURUSD=X` and this pipeline already reads it — as a
+    traded Instrument, priced into `fct_instrument_price` like any other. Letting
+    it also become an FX Rate would put two numbers for one concept in the
+    Warehouse, differing by the spread and by the hour they were sampled, and
+    whichever one a metric happened to join to would look equally plausible.
+
+    Two things about the shape, both of which the build script relies on:
+
+      * **The response is EUR-based and the base is not in it.** `rates` holds one
+        entry per *other* currency — the number of that currency one euro buys —
+        so a row for EUR against itself has to be derived rather than read. That
+        derivation is a transform and lives in `fct_fx_rate.sql`.
+      * **Only publishing days appear.** The ECB publishes on working days, so
+        weekends and its own holidays are simply absent — not present-and-null.
+        The Glossary settles what a Warehouse row for such a date is: *"a rate for
+        a non-publishing date is the most recent published rate at or before
+        it"*, which is again the build script's job.
+
+    Every published currency is landed, not just the ones the Warehouse currently
+    needs. Which currencies matter is a question about the traded universe, and it
+    is answered in `fct_fx_rate.sql` against `dim_instrument`; landing the whole
+    response means adding an Instrument in a new currency does not also require a
+    refresh, which would need a network to load a source that is already on disk.
+    """
+    today = dt.date.today()
+    # 365-day years rather than a calendar shift, so that a window opening on
+    # 29 February is not an error case. FX_WINDOW_LEAD_DAYS absorbs the drift.
+    start = today - dt.timedelta(days=365 * PRICE_WINDOW_YEARS + FX_WINDOW_LEAD_DAYS)
+    url = FRANKFURTER_URL.format(start=start.isoformat(), end=today.isoformat())
+
+    # A fixed name rather than one built from the dates. The window moves with
+    # every refresh, and a dated filename would leave the previous window's file
+    # behind as a second snapshot of the same source that nothing reads and
+    # nothing updates.
+    response = json.loads(read_source("frankfurter-rates.json", url, refresh=refresh))
+    base_currency = response["base"]
+    for rate_date, rates in response["rates"].items():
+        for currency, rate in rates.items():
+            yield {
+                "rate_date": rate_date,
+                "from_currency": base_currency,
+                "to_currency": currency,
+                "fx_rate": rate,
             }
 
 

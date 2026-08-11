@@ -35,10 +35,14 @@ an ADR and two are promises made by comments in the schema.
      (Sub-step 2.3): every row equals the snapshot's *unadjusted* close on the
      exchange's own trading date, the adjusted series is shown to be a different
      number, and no day-over-day move is large enough to be a corporate action.
+     For `fct_fx_rate` (Sub-step 2.4): every rate is the one the European Central
+     Bank's (ECB) published quotes imply, the table is dense over calendar dates
+     rather than publishing days, every Market Price has a rate on its own date,
+     and a currency converted through another and back is unchanged.
      Needs a filled Warehouse, so run `uv run python -m veritas.ingestion` first.
 
-Exits non-zero if any check fails. This script grows across Step 002: Sub-step 2.4
-adds assertions to `--sources`, and Sub-step 2.5 adds `--distinctions`.
+Exits non-zero if any check fails. This script grows across Step 002: Sub-step 2.5
+adds `--distinctions`.
 """
 
 import argparse
@@ -75,6 +79,20 @@ FLOATING_POINT = ("DOUBLE", "FLOAT", "REAL")
 # 6) built from the source's close is correct exactly when it is within this of
 # it; anything further apart is a different number rather than a rounded one.
 PRICE_TOLERANCE = Decimal("0.0000005")
+
+# The same rule at `fct_fx_rate.fx_rate`'s two extra digits of scale.
+FX_RATE_TOLERANCE = Decimal("0.000000005")
+
+# How far a currency may drift from itself after a round trip through another one.
+#
+# Converting EUR to JPY and back cannot return exactly the euro it started with:
+# both legs are stored to eight decimal places, so the second undoes a *rounded*
+# version of the first. The residue is bounded by that rounding rather than by
+# anything about markets, and the bound is what makes it a check — a round trip
+# that loses real money means the two directions are not reciprocals, which is a
+# rate stored the wrong way up rather than a rounding artefact. Half a basis point
+# is orders of magnitude above the arithmetic and orders below an inversion.
+ROUND_TRIP_TOLERANCE = Decimal("0.00005")
 
 # The day-over-day price ratio above which a move stops being a market move and
 # starts being a corporate action. Its ceiling is not a guess: the smallest split
@@ -537,22 +555,29 @@ def expected_prices(wrong_reading: str | None = None) -> dict[tuple[str, dt.date
 
 
 def rows_changed(
-    stored: dict[tuple[str, dt.date], Decimal],
-    alternative: dict[tuple[str, dt.date], Decimal],
-) -> tuple[int, set[str]]:
-    """How many rows an alternative reading would change, and for which symbols.
+    stored: dict[tuple[object, ...], Decimal],
+    alternative: dict[tuple[object, ...], Decimal],
+    tolerance: Decimal,
+) -> tuple[int, set[object]]:
+    """How many rows an alternative reading would change, and for which subjects.
 
     A row counts as changed when the two disagree about its value *or* when only
     one of them has it at all — a date shifted by a time zone removes one row and
     adds another, and both are the Warehouse holding a price on a day the
-    Instrument did not close at it.
+    Instrument did not close at it. The same is true of a rate that was never
+    filled forward: the row is absent rather than wrong, which is the more
+    dangerous of the two because a join simply returns nothing.
+
+    Keyed by a tuple whose **first element is the subject** — the Instrument Symbol
+    for a price, the from-currency for a rate — because that is what the caller
+    reports the spread across. Everything after it is what makes the key unique.
     """
-    changed: set[tuple[str, dt.date]] = set()
+    changed: set[tuple[object, ...]] = set()
     for key in set(stored) | set(alternative):
         here, there = stored.get(key), alternative.get(key)
-        if here is None or there is None or abs(here - there) > PRICE_TOLERANCE:
+        if here is None or there is None or abs(here - there) > tolerance:
             changed.add(key)
-    return len(changed), {symbol for symbol, _ in changed}
+    return len(changed), {key[0] for key in changed}
 
 
 def check_prices(warehouse: WarehouseAdapter) -> None:
@@ -636,7 +661,9 @@ def check_prices(warehouse: WarehouseAdapter) -> None:
     #    probe series; this measures all three on everything actually loaded, so
     #    they are proven against the data the Warehouse holds rather than a sample.
     for reading, description in WRONG_READINGS.items():
-        changed, affected = rows_changed(stored, expected_prices(reading))
+        changed, affected = rows_changed(
+            stored, expected_prices(reading), PRICE_TOLERANCE
+        )
         share = 100 * changed / len(rows)
         print(f"    if it {description}:")
         print(f"      {changed}/{len(rows)} rows change ({share:.0f}%), "
@@ -686,6 +713,250 @@ def check_prices(warehouse: WarehouseAdapter) -> None:
     print(f"    calendars: {len(dates)} dates have a price for at least one "
           f"Instrument · {shared} have one for all "
           f"{len(by_symbol)} (Sub-step 2.5 chooses between them)")
+
+
+# The correct reading of the Frankfurter snapshot, and the two wrong ones
+# `fct_fx_rate.sql` is written to avoid. Same idea as WRONG_READINGS above: an
+# assertion that nothing violates proves nothing, so each wrong answer is shown to
+# be a *different* answer on the data actually loaded.
+WRONG_FX_READINGS = {
+    "left non-publishing dates empty": "stores only the dates the ECB published "
+                                       "on, instead of filling a rate forward "
+                                       "across weekends and ECB holidays",
+    "stored every rate upside down": "reads a published rate as euros per unit "
+                                     "of currency rather than currency per euro",
+}
+
+
+def expected_fx_rates(
+    wrong_reading: str | None = None,
+) -> dict[tuple[str, str, dt.date], Decimal]:
+    """Re-derive `fct_fx_rate` from the committed snapshots, in Python.
+
+    **A second implementation of `veritas/warehouse/builds/fct_fx_rate.sql`, not a
+    call into it**, for the same reason `expected_prices` is one: the build derives
+    a dense grid of ordered pairs from a sparse list of EUR quotes, and a check
+    that reused its SQL could only prove the SQL agrees with itself.
+
+    It reproduces all three of the build's transforms independently — the base
+    currency's row against itself, the fill-forward, and the pair arithmetic — and
+    it takes the window and the currency set from the same two places the build
+    does, without going near the Warehouse: the currencies from the Yahoo metadata
+    (normalised out of any minor unit) plus the base the source publishes against,
+    and the window end from `expected_prices`, which re-derives the price series
+    from the snapshots as well.
+
+    With no argument it returns what the Warehouse should hold. Passing one of
+    `WRONG_FX_READINGS` returns what it would hold if that mistake had been made.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from veritas.ingestion.snapshots import SNAPSHOT_DIR
+    from veritas.ingestion.universe import MINOR_UNIT_CURRENCIES, TRADED_INSTRUMENTS
+
+    if wrong_reading is not None and wrong_reading not in WRONG_FX_READINGS:
+        raise ValueError(
+            f"unknown reading {wrong_reading!r} — have {list(WRONG_FX_READINGS)}"
+        )
+
+    response = json.loads((SNAPSHOT_DIR / "frankfurter-rates.json").read_bytes())
+    base_currency = response["base"]
+
+    # The Quotation Currency of every traded Instrument, read from the same meta
+    # block dim_instrument was built from and normalised the same way — GBp is a
+    # minor unit of GBP, and no reference rate is published for pence.
+    quoted = {base_currency}
+    for symbol in TRADED_INSTRUMENTS:
+        currency = json.loads(
+            (SNAPSHOT_DIR / f"yahoo-chart-{symbol}.json").read_bytes()
+        )["chart"]["result"][0]["meta"]["currency"]
+        quoted.add(
+            MINOR_UNIT_CURRENCIES.get(currency, {}).get("major_unit_currency", currency)
+        )
+
+    published: dict[dt.date, dict[str, float]] = {}
+    for day, rates in response["rates"].items():
+        on_date = {
+            currency: rate for currency, rate in rates.items() if currency in quoted
+        }
+        on_date[base_currency] = 1.0
+        published[dt.date.fromisoformat(day)] = on_date
+
+    price_dates = {price_date for _, price_date in expected_prices()}
+    start = min(published)
+    end = max(max(published), max(price_dates))
+
+    rates_by_date: dict[tuple[str, str, dt.date], Decimal] = {}
+    in_force: dict[str, float] = {}
+    day = start
+    while day <= end:
+        if day in published:
+            in_force = published[day]
+        elif wrong_reading == "left non-publishing dates empty":
+            day += dt.timedelta(days=1)
+            continue
+        for from_currency, from_rate in in_force.items():
+            for to_currency, to_rate in in_force.items():
+                pair = (
+                    from_rate / to_rate
+                    if wrong_reading == "stored every rate upside down"
+                    else to_rate / from_rate
+                )
+                rates_by_date[(from_currency, to_currency, day)] = Decimal(repr(pair))
+        day += dt.timedelta(days=1)
+    return rates_by_date
+
+
+def check_fx_rates(warehouse: WarehouseAdapter) -> None:
+    """`fct_fx_rate` is the ECB's published rates, dense over calendar dates, in
+    both directions — and every Market Price the Warehouse holds can be converted.
+
+    Four assertions, all of them Sub-step 2.4's:
+
+      1. **Every row is derived from the snapshot's published rates**, re-derived
+         independently by `expected_fx_rates`. One assertion covering the whole
+         build: a missing fill-forward, an inverted quote, a currency dropped on
+         the way through, or a window that stops short all surface here.
+      2. **Each wrong reading would have produced different rows.**
+      3. **Every Market Price has a rate on its own date**, for the currency it is
+         quoted in. This is the one that matters to the Warehouse rather than to
+         this table: a price with no rate is a Position that can be marked and not
+         reported, and the two windows drift apart on their own, because Yahoo and
+         the ECB publish on different calendars and at different times of day.
+      4. **A currency converted through another and back is the currency it
+         started as**, within the rounding the stored scale forces. An inverted
+         pair passes assertion 1 nowhere, but this is what makes the *direction* of
+         every stored rate testable without a second FX source to compare against.
+    """
+    rows = warehouse.query(
+        "SELECT from_currency, to_currency, rate_date, fx_rate "
+        "FROM fct_fx_rate ORDER BY rate_date, from_currency, to_currency"
+    )
+    if not rows:
+        print("  fct_fx_rate: empty")
+        problems.append(
+            "fct_fx_rate is empty — run `uv run python -m veritas.ingestion` "
+            "before checking sources, or this check passes vacuously"
+        )
+        return
+
+    currencies = {from_currency for from_currency, _, _, _ in rows}
+    dates = {rate_date for _, _, rate_date, _ in rows}
+    print(f"  fct_fx_rate: {len(rows)} rows · {len(currencies)} currencies "
+          f"({' '.join(sorted(currencies))}) · {len(dates)} dates "
+          f"({min(dates)} to {max(dates)})")
+
+    # 1. every stored rate is the one the snapshot's published rates imply.
+    expected = expected_fx_rates()
+    stored = {
+        (from_currency, to_currency, rate_date): rate
+        for from_currency, to_currency, rate_date, rate in rows
+    }
+
+    missing = sorted(set(expected) - set(stored))
+    extra = sorted(set(stored) - set(expected))
+    wrong = [
+        (key, rate, expected[key])
+        for key, rate in sorted(stored.items())
+        if key in expected and abs(rate - expected[key]) > FX_RATE_TOLERANCE
+    ]
+
+    for from_currency, to_currency, rate_date in missing[:5]:
+        problems.append(
+            f"the snapshot implies a rate for {from_currency}->{to_currency} on "
+            f"{rate_date} that fct_fx_rate does not hold — a date the fill-forward "
+            f"skipped, or a currency dropped on the way through"
+        )
+    for from_currency, to_currency, rate_date in extra[:5]:
+        problems.append(
+            f"fct_fx_rate holds {from_currency}->{to_currency} on {rate_date}, "
+            f"which the snapshot implies no rate for — a window wider than the "
+            f"source published for, filled from nothing"
+        )
+    for (from_currency, to_currency, rate_date), rate, want in wrong[:5]:
+        problems.append(
+            f"fct_fx_rate has {from_currency}->{to_currency} on {rate_date} at "
+            f"{rate}, but the published rates imply {want}"
+        )
+    if not (missing or extra or wrong):
+        published_dates = len({
+            key[2] for key in expected_fx_rates("left non-publishing dates empty")
+        })
+        print(f"    values: all {len(rows)} rows equal the rate the ECB's published "
+              f"quotes imply · {published_dates} of {len(dates)} dates were "
+              f"published on, the rest filled forward")
+    else:
+        print(f"    values: {len(missing)} missing · {len(extra)} unexpected · "
+              f"{len(wrong)} wrong (first 5 of each reported)")
+
+    # 2. each wrong reading would have produced different rows.
+    for reading, description in WRONG_FX_READINGS.items():
+        changed, affected = rows_changed(
+            stored, expected_fx_rates(reading), FX_RATE_TOLERANCE
+        )
+        share = 100 * changed / len(rows)
+        print(f"    if it {description}:")
+        print(f"      {changed}/{len(rows)} rows change ({share:.0f}%), "
+              f"across {len(affected)} of {len(currencies)} currencies")
+        if not changed:
+            problems.append(
+                f"reading the snapshot the wrong way — it {description} — would "
+                f"change no row, so the assertion above passes whether the build "
+                f"is right or not"
+            )
+
+    # 3. every Market Price can be converted. Asked of the Warehouse rather than of
+    #    the snapshots, because this is a question about two tables agreeing with
+    #    each other and not about either one matching its source.
+    uncovered = warehouse.query(
+        "SELECT instrument.quotation_currency, min(price.price_date), "
+        "       max(price.price_date), count(*) "
+        "FROM fct_instrument_price AS price "
+        "JOIN dim_instrument AS instrument "
+        "  ON instrument.instrument_id = price.instrument_id "
+        "LEFT JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = price.price_date "
+        " AND rate.from_currency = instrument.quotation_currency "
+        "WHERE rate.fx_rate IS NULL "
+        "GROUP BY instrument.quotation_currency"
+    )
+    for currency, first, last, count in uncovered:
+        problems.append(
+            f"{count} Market Prices quoted in {currency} have no FX Rate on their "
+            f"own date ({first} to {last}) — a Position marked at them cannot "
+            f"reach a Reporting Currency. Either the FX window no longer covers "
+            f"the price window, or {currency} is not a currency the ECB publishes"
+        )
+    if not uncovered:
+        ((price_first, price_last),) = warehouse.query(
+            "SELECT min(price_date), max(price_date) FROM fct_instrument_price"
+        )
+        print(f"    coverage: every Market Price ({price_first} to {price_last}) "
+              f"has a rate in its own Quotation Currency on its own date")
+
+    # 4. a round trip through another currency returns what it started as.
+    round_trips = warehouse.query(
+        "SELECT out.from_currency, out.to_currency, max(abs(out.fx_rate * "
+        "       back.fx_rate - 1)) "
+        "FROM fct_fx_rate AS out "
+        "JOIN fct_fx_rate AS back "
+        "  ON back.rate_date = out.rate_date "
+        " AND back.from_currency = out.to_currency "
+        " AND back.to_currency = out.from_currency "
+        "GROUP BY out.from_currency, out.to_currency "
+        "ORDER BY 3 DESC"
+    )
+    worst_pair, worst_back, worst = round_trips[0]
+    for from_currency, to_currency, drift in round_trips:
+        if drift > ROUND_TRIP_TOLERANCE:
+            problems.append(
+                f"converting {from_currency} to {to_currency} and back changes it "
+                f"by {drift} on at least one date, more than the {ROUND_TRIP_TOLERANCE} "
+                f"the stored scale can explain — the two directions are not "
+                f"reciprocals, so one of them is stored upside down"
+            )
+    print(f"    round trip: worst drift over {len(round_trips)} ordered pairs is "
+          f"{worst} ({worst_pair} to {worst_back} and back), against a "
+          f"{ROUND_TRIP_TOLERANCE} tolerance")
 
 
 def duckdb_importers() -> list[Path]:
@@ -782,6 +1053,8 @@ def main() -> int:
             check_sources(warehouse)
             print()
             check_prices(warehouse)
+            print()
+            check_fx_rates(warehouse)
 
     check_constraints()
     print()

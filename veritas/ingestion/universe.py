@@ -10,9 +10,9 @@ universe is equity, ETF, future and currency pair (R1). Bond exposure is via bon
 ETFs."* What it does not fix is which symbols, which is what this file decides.
 """
 
-# The traded Instrument universe. Sixteen symbols, chosen so that every axis a
-# later Sub-step has to distinguish is actually present in the data rather than
-# asserted in a document:
+# The traded Instrument universe, chosen so that every axis a later Sub-step has
+# to distinguish is actually present in the data rather than asserted in a
+# document:
 #
 #   * all four instrument_type values the Instrument term permits, because a
 #     Dimension Definition that no row exercises proves nothing;

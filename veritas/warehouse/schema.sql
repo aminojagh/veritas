@@ -101,9 +101,14 @@ CREATE TABLE dim_instrument (
 -- Facts — market data (real)
 -- ---------------------------------------------------------------------------
 
--- FX Rate — the ECB reference rate from Frankfurter, and only from Frankfurter.
+-- FX Rate — the ECB reference rates from Frankfurter, and only from Frankfurter.
 -- Yahoo's EURUSD=X works but is forbidden here: two sources for one concept is
 -- the synonym disease Non-Negotiable #1 exists to prevent.
+--
+-- The ECB publishes against the euro, so a pair with the euro on one side is a
+-- published rate and a pair between two non-euro currencies is the ratio of that
+-- date's two published rates. The Glossary counts both as FX Rates and this table
+-- holds both — see the `FX Rate` row, clarified 2026-08-11.
 --
 -- Named from_currency/to_currency rather than the conventional base/quote pair
 -- on purpose. "Quote currency" is standard FX vocabulary and would sit one letter

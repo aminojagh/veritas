@@ -137,8 +137,8 @@ paste the output of a throwaway inline script into a permanent document: the
 reader cannot re-run it, the transcription can be wrong, and a summary count
 (*"checked 37 links, 0 broken"*) hides what was actually covered. **Before
 writing any new check, look in `.claude/scripts/` for one that already does it** —
-`verify_framework.py` already validates document links, skills, and the
-interpreter. A review shows the command a reader can run and the output that
+`verify_framework.py` already validates document links **and the headings their
+anchors point at**, skills, and the interpreter. A review shows the command a reader can run and the output that
 command produced, nothing else.
 
 **Citations quote.** Any claim about what another document says must include the

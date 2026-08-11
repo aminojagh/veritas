@@ -4,7 +4,8 @@ Run with:  uv run python .claude/scripts/verify_framework.py
 
 Verifies the structural promises CLAUDE.md makes: that every document it points
 at exists, that each skill is loadable and trigger-described, that no document
-links to a file that isn't there, and that we are on the pinned interpreter.
+links to a file that isn't there or to a heading that isn't in it, and that we
+are on the pinned interpreter.
 
 This does not check whether the *content* is any good — only that the framework
 is wired up. Content is Amino's review.
@@ -77,16 +78,76 @@ def check_skills() -> None:
         print(f"  skill ok   {slug:22} {len(skill.read_text().split()):>4} words")
 
 
+FENCE = re.compile(r"^\s*(?:```|~~~)")
+
+
+def heading_anchors(text: str) -> set[str]:
+    """The anchors a markdown renderer generates for a document's headings.
+
+    Lowercase the heading, drop every character that is not a word character,
+    space or hyphen, then turn spaces into hyphens. Two details are the ones that
+    matter here and both have already caused a wrong answer:
+
+    - `\\w` keeps underscores, so `fct_fx_rate` survives as itself. Treating an
+      underscore as an emphasis marker instead silently rewrites the anchor of
+      every heading that names a table.
+    - A `#` line inside a fenced block is shell or SQL, not a heading. Counting
+      one would invent an anchor that no renderer produces, so a dead link
+      pointing at it would pass this check.
+
+    A repeated heading gets `-1`, `-2` appended, which is what the renderers do
+    and what makes the second `### Changes made on review` reachable.
+    """
+    anchors: set[str] = set()
+    in_fence = False
+    for line in text.splitlines():
+        if FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence or not line.startswith("#"):
+            continue
+        slug = re.sub(r"[^\w\s-]", "", line.lstrip("#").strip().lower())
+        slug = slug.strip().replace(" ", "-")
+        base, repeat = slug, 0
+        while slug in anchors:
+            repeat += 1
+            slug = f"{base}-{repeat}"
+        anchors.add(slug)
+    return anchors
+
+
 def check_links() -> None:
-    """Relative markdown links in our own documents must resolve."""
+    """Relative markdown links in our own documents must resolve — file *and* anchor.
+
+    The `#anchor` half used to be split off and thrown away, so a link could point
+    at a heading that had been renamed or never existed and still pass. A dead
+    anchor lands the reader at the top of the right document, which reads as the
+    citation being vague rather than broken — the failure Non-Negotiable #4's
+    "citations quote" rule is trying to prevent.
+    """
     docs = sorted(DOCS.rglob("*.md")) + [CLAUDE_MD]
+    anchors: dict[Path, set[str]] = {}
+    links = anchored = 0
+
     for doc in docs:
         for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", doc.read_text()):
-            if target.startswith(("http://", "https://", "#", "mailto:")):
+            if target.startswith(("http://", "https://", "mailto:")):
                 continue
-            path = (doc.parent / target.split("#")[0]).resolve()
+            relative, _, fragment = target.partition("#")
+            path = (doc.parent / relative).resolve() if relative else doc
+            links += 1
             if not path.exists():
                 problems.append(f"{doc.relative_to(REPO_ROOT)}: dead link -> {target}")
+                continue
+            if not fragment or path.suffix != ".md":
+                continue
+            if path not in anchors:
+                anchors[path] = heading_anchors(path.read_text())
+            anchored += 1
+            if fragment not in anchors[path]:
+                problems.append(f"{doc.relative_to(REPO_ROOT)}: dead anchor -> {target}")
+
+    print(f"  links      {f'{links} links, {anchored} anchors':22} {len(docs)} documents")
 
 
 def check_interpreter() -> None:

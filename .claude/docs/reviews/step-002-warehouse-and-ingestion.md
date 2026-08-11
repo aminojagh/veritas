@@ -1530,3 +1530,471 @@ $ uv run python .claude/scripts/verify_framework.py
 
 PASS — framework is wired up correctly
 ```
+
+---
+
+## Sub-step 2.4 — Load `fct_fx_rate` from Frankfurter
+
+**What changed**
+
+The real half of Ingestion is complete. `fct_fx_rate` holds **11,840 FX Rates** —
+every ordered pair of the four currencies the traded universe is quoted in, on
+every calendar date from 2024-08-01 to 2026-08-10 — and **every Market Price in the
+Warehouse now has a rate on its own date**, which is the property that turns
+nineteen Instruments priced in four currencies into a book that can be totalled.
+
+Five things.
+
+- **`veritas/warehouse/builds/fct_fx_rate.sql`** — the third build script, and where
+  all three of this Sub-step's transforms live: the base currency gets the row
+  against itself that the response omits, non-publishing dates are filled forward,
+  and every ordered pair is derived from the two rates against the base.
+- **`veritas/ingestion/sources.py`** — `frankfurter_rates` reads one response
+  covering the whole window. `PRICE_WINDOW_YEARS` is now the single number both
+  sources take their window from; Yahoo takes it as a relative range and
+  Frankfurter as two explicit dates, and writing it once is what stops the two
+  windows drifting apart across refreshes.
+- **`veritas/ingestion/__main__.py`** — one entry in `FETCHED_TABLES`, one in
+  `BUILDS`, exactly as ADR-0004 said a source would cost. Plus a new failure the
+  pipeline refuses to complete on: a Market Price with no FX Rate on its own date.
+- **`.claude/scripts/check_warehouse.py --sources`** — a `check_fx_rates` function
+  that re-derives every rate from the committed snapshot **in Python** and compares
+  it to what the SQL built, on the same pattern `check_prices` established in 2.3.
+- **A `--refresh` was run, twice, deliberately.** This is the gap Sub-step 2.3
+  handed over, and closing it is why several of 2.3's numbers have moved. See
+  *The refresh, and what it cost*.
+
+**`check_language.py` failed first, and the fix was a root cause rather than two
+words.** It reported `'ASOF' is used in the documents but is neither in the
+Glossary's Abbreviations table nor in the exempt list`, and the same for `CASE`.
+Neither is an abbreviation; both are SQL keywords. The script already had a group
+for those, carrying a comment that it was *"derived, not remembered ... a list that
+is always one document behind"* and an instruction to re-derive it from
+`schema.sql` by hand after a schema change. Sub-step 2.4 is precisely the failure
+that design predicts: the build scripts are hand-authored SQL too, and `ASOF JOIN`
+appears in none of `schema.sql`. Adding the two words would have left the next
+Sub-step to find the third. The literal group is now a function,
+`warehouse_sql_keywords()`, which reads **every** `.sql` file under
+`veritas/warehouse/` — with `--` comments stripped, because they are prose that
+mentions ECB and UTC, and with quoted literals stripped, because those are the
+domain values the CHECK constraints name and this function has no business
+exempting registered vocabulary from the scan. The twenty keywords it derives were
+removed from the literal; the eight that remain are the vocabulary of query
+languages the ADRs *rejected*, which no file here contains.
+
+**The design decision worth arguing about: all ordered pairs, not just the EUR
+ones.** The European Central Bank (ECB) publishes rates against the euro, so
+Frankfurter's response gives three numbers per date for a four-currency universe.
+The table stores sixteen: every ordered pair including each currency against
+itself. It costs four times the rows — 11,840, against the 2,960 that four
+currencies on 740 dates would need if only the euro side were stored — and buys one
+thing: a conversion in any future Metric Definition is a single lookup rather than
+a division of two lookups. This project's subject is quietly wrong numbers, and a
+division repeated in every metric is exactly where one appears in one of them and
+nowhere else. The division is written once, here, where a check re-derives it.
+
+The pair where both sides are the same currency falls out as exactly 1 from the
+same arithmetic as every other pair rather than from a `CASE`, which is why the
+base gets a row against itself first.
+
+**A question about the Glossary, not a term proposal.** `FX Rate` is registered as
+*"Real ECB reference rate between two currencies on a date."* Twelve of the sixteen
+pairs are real ECB reference rates in that sense. The other four — the pairs
+between two non-euro currencies, `GBP->JPY` and its like — are a **ratio of two**
+published reference rates, which is what Frankfurter itself would return under
+`base=GBP` and what any FX desk would call the rate, but is not literally a number
+the ECB published. The definition can be read as covering it or not. If it should
+not, the fix is one `WHERE` clause in the final `SELECT` and the metrics do the
+division instead. **Flagged rather than decided**, because Non-Negotiable #1 makes
+this Amino's call and not mine.
+
+> **Answered 2026-08-11 —
+> [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11).**
+> The four derived pairs stay, and the Glossary row was amended to say so in its
+> own words rather than left readable both ways. The `WHERE` clause was not
+> written; nothing that executes changed. See
+> [Changes made on review — 2026-08-11 (Sub-step 2.4)](#changes-made-on-review--2026-08-11-sub-step-24).
+
+**No new term was needed, and that was deliberate.** The set of currencies this
+table must cover was going to be a constant called something like
+`CONVERTIBLE_CURRENCIES` — a domain noun the Glossary does not register. It is
+instead read from `dim_instrument.quotation_currency` in SQL, unioned with the
+currency the source publishes against. That removes the term, and it means adding
+an Instrument in a new currency widens this table by itself instead of requiring
+someone to remember a second list.
+
+### The refresh, and what it cost
+
+Sub-step 2.3 recorded, under *Deliberately left undone*: *"`--refresh` was not run,
+so the caching change to `read_source` is verified by reading rather than by
+execution ... Sub-step 2.4 adds Frankfurter and is the natural place to run a
+refresh once, deliberately."* It was, on 2026-08-11. Frankfurter had no snapshot at
+all, so this Sub-step had to open a socket regardless.
+
+**The cache claim is now checked rather than argued.** `--refresh` prints how many
+snapshots it rewrote and how many were distinct, and fails the run if any name
+appears twice — two resources share each Yahoo chart, so without the cache all
+nineteen would be fetched twice, a minute apart, and only the second fetch would be
+on disk. It reports `rewrote 23 snapshot(s), 23 distinct`.
+
+**And it moved 2.3's numbers, which is the point of R18 arriving one Sub-step
+early.** Every figure below is from the same source read a day later:
+
+| | 2.3, on 2026-08-10 | 2.4, on 2026-08-11 |
+|---|---|---|
+| `fct_instrument_price` rows | 9,549 | 9,554 |
+| price window | 2024-08-08 to 2026-08-10 | 2024-08-12 to 2026-08-10 |
+| dates with a price for at least one Instrument | 521 | 519 |
+| dates with a price for all nineteen | 452 | 453 |
+| Adjusted Close would change | 5,416 (57%) | 5,466 (57%) |
+| a UTC date would change | 1,075 (11%) | 1,081 (11%) |
+| pence as pounds would change | 1,006 (11%) | 1,008 (11%) |
+
+Yahoo's `2y` is relative to the moment it is asked, so the window slid forward a
+day and dropped four at the front. **The 2.3 review's figures are not corrected**:
+they were true on 2026-08-10, they say so, and they carry the command that produced
+them. That is what a dated measurement is for. What did need correcting is every
+place that quoted them as standing facts — `current-state.md` in four places.
+
+The one figure that did **not** move is `1.196`, the largest day-over-day ratio,
+still `CL=F` into 2026-04-08 against the 1.5 threshold. EXT-007's assumption
+survives a refresh.
+
+**Verification**
+
+```
+$ uv run python -m veritas.ingestion --refresh
+  mode: refresh (live)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+  removed data/veritas.duckdb — rebuilding
+  rewrote 23 snapshot(s), 23 distinct
+
+    [row listing as below]
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+exit: 0
+```
+
+```
+$ uv run python -m veritas.ingestion
+  mode: replay (offline)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+  removed data/veritas.duckdb — rebuilding
+
+    dim_account                   0 rows
+    dim_client                    0 rows
+  · dim_instrument               19 rows
+    fct_accounting_movement       0 rows
+    fct_balance_snapshot          0 rows
+    fct_cash_movement             0 rows
+  · fct_fx_rate               11840 rows
+  · fct_instrument_price       9554 rows
+    fct_position_snapshot         0 rows
+    fct_trade                     0 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+exit: 0
+```
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+  [the schema listing, dim_instrument block and constraint probe are unchanged in
+   shape from the runs above. The one new table:
+       fct_fx_rate  —  4 columns, 11840 rows
+           rate_date                DATE
+           from_currency            VARCHAR
+           to_currency              VARCHAR
+           fx_rate                  DECIMAL(18,8)  ]
+
+  fct_instrument_price: 9554 rows · 19 Instruments · 519 distinct dates (2024-08-12 to 2026-08-10)
+    values: all 9554 rows equal the snapshot's unadjusted close, on the exchange's own date, in the major unit
+    if it takes indicators.adjclose instead of indicators.quote:
+      5466/9554 rows change (57%), across 12 of 19 Instruments
+    if it reads a bar's timestamp as a Coordinated Universal Time (UTC) date rather than shifting it onto the exchange's clock:
+      1081/9554 rows change (11%), across 6 of 19 Instruments
+    if it skips the division by minor_units_per_major:
+      1008/9554 rows change (11%), across 2 of 19 Instruments
+    corporate actions: largest day-over-day ratio is 1.196 (CL=F into 2026-04-08), against a 1.5 threshold
+    calendars: 519 dates have a price for at least one Instrument · 453 have one for all 19 (Sub-step 2.5 chooses between them)
+
+  fct_fx_rate: 11840 rows · 4 currencies (EUR GBP JPY USD) · 740 dates (2024-08-01 to 2026-08-10)
+    values: all 11840 rows equal the rate the ECB's published quotes imply · 516 of 740 dates were published on, the rest filled forward
+    if it stores only the dates the ECB published on, instead of filling a rate forward across weekends and ECB holidays:
+      3584/11840 rows change (30%), across 4 of 4 currencies
+    if it reads a published rate as euros per unit of currency rather than currency per euro:
+      8880/11840 rows change (75%), across 4 of 4 currencies
+    coverage: every Market Price (2024-08-12 to 2026-08-10) has a rate in its own Quotation Currency on its own date
+    round trip: worst drift over 16 ordered pairs is 0.0000010841597042 (JPY to GBP and back), against a 0.00005 tolerance
+
+  seam scan: 12 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit: 0
+```
+
+**224 of the 740 dates were never published on** — weekends and ECB holidays — and
+carry the most recent rate at or before them, which is the Glossary's own sentence
+for `FX Rate` stored rather than left for each future metric to re-derive.
+
+```
+$ uv run python .claude/scripts/check_language.py
+  glossary: 88 registered terms
+  proposed terms: 0 · python files scanned: 12 · identifiers: 490
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+No term was registered in this Sub-step, which is why the Glossary count is
+unchanged at 88 against 2.3's run. The exempt count is also unchanged at 15 — the
+twenty SQL keywords moved out of a literal and into a derived set, which is a
+different group.
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  [five skills, interpreter 3.14.4]
+
+PASS — framework is wired up correctly
+```
+
+**The check was made to fail three times before being trusted**, by mutating the
+build script and re-running the pipeline and the check unchanged. Each names the
+specific mistake:
+
+| Mutation to `fct_fx_rate.sql` | What was reported |
+|---|---|
+| `ASOF JOIN` → an equality join — no fill-forward | Pipeline exits 1: `99 of 9554 Market Prices have no FX Rate on their own date`. `--sources`: `3584 missing`, and the table falls from 740 dates to 516 |
+| `quote / base` → `base / quote` — every rate upside down | `0 missing · 0 unexpected · 8880 wrong`, first offender named: `EUR->GBP on 2024-08-01 at 1.18584575, but the published rates imply 0.84328` |
+| Window ends 3 days before the last published rate — the ECB lagging Yahoo | Pipeline exits 1 at 19 unconvertible prices; `--sources` reports the missing rows *and* the coverage failure broken down by currency |
+
+The counterfactual lines move in the opposite direction under each mutation — with
+the fill-forward removed, *"if it stores only the dates the ECB published on"* falls
+from 3,584 rows to 0, and the check reports that as its own problem, because a
+counterfactual that changes nothing means the assertion above it cannot fail. The
+build script was restored byte-for-byte (`cmp` clean) and every command re-run.
+
+**Determinism.** Two consecutive replay runs produce byte-identical output,
+including every row count.
+
+**Deliberately left undone**
+
+- **The round-trip check catches an asymmetric inversion, not a symmetric one.**
+  Mutation 2 inverted *every* pair, so `A->B × B->A` was still 1 and the round trip
+  passed while 8,880 rows were wrong. That is not a hole — assertion 1 caught it
+  immediately and names the first offender — but it is worth being precise about
+  what each assertion buys. The round trip is there for the case assertion 1 cannot
+  see: a build that agrees with the re-derivation because both are wrong the same
+  way. It is the only check here that needs no second source and no second
+  implementation.
+- **Nothing yet constrains 2.5's Denomination Currencies to this set.** The
+  currencies come from `dim_instrument.quotation_currency`, and a Trade's
+  Commission, Fee and Rebate are held in its Denomination Currency, which the
+  Glossary is explicit *"a broker does not necessarily charge in the currency an
+  Instrument is quoted in"*. If 2.5 bills an Account in a currency no Instrument is
+  quoted in, `fct_fx_rate` will hold no rate for it and Gross Revenue cannot reach
+  a Reporting Currency. **Not filed as debt** — the code is right for a Warehouse
+  with no Trades in it, and the trigger cannot fire until 2.5 writes one. It is
+  recorded as a 2.5 precondition in `current-state.md`, and the natural place for
+  the assertion is beside the existing coverage one, once there is a row to assert
+  against.
+- **No index beyond the primary key.** 11,840 rows.
+
+**Look at this sceptically**
+
+1. **The build reads two tables built before it, which no foreign key enforces.**
+   `fct_fx_rate` declares no foreign key — it is keyed on `(rate_date,
+   from_currency, to_currency)` and references nothing — yet its build takes the
+   currency set from `dim_instrument` and the end of its window from
+   `fct_instrument_price`. Put it first in `BUILDS` and it produces a table with no
+   currencies and an empty window, silently. The engine cannot refuse that the way
+   it refuses an orphan `instrument_id`.
+
+   The alternative is a constant: a list of currencies and a pair of dates,
+   maintained beside the traded universe. That is worse in the specific way this
+   project cares about — it is correct on the day it is written and silently wrong
+   after the next `--refresh`, which is precisely the failure that just moved every
+   number in the table above. Deriving both from the data means the widening
+   happens by itself. The ordering risk is real and is mitigated by comment in
+   `BUILDS` rather than by structure; making it structural would mean build scripts
+   declaring dependencies, which is a mechanism this Warehouse does not have and
+   does not yet need for three files.
+
+2. **`ASOF JOIN` and `generate_series` are the second and third DuckDB-specific
+   constructs in `builds/`**, after `make_timestamp` in 2.3.
+   [DEBT-009](../debt-ledger.md) is the entry that records the seam scan cannot see
+   them — it checks `duckdb` *imports*, not dialect names. Its trigger is *"the
+   first component outside the adapter emits SQL"* and it still has not fired: all
+   three build scripts sit inside `veritas/warehouse/builds/`. But the surface it
+   would have to scan for has now tripled in one Sub-step, which is worth knowing
+   before the Semantic Layer starts rendering SQL.
+
+3. **The `1.0` for the base currency's row against itself is a literal in the SQL.**
+   Every other number in this pipeline comes from a source or from a map landed in
+   `raw`. This one is arithmetic: one euro is one euro. It is not a factor anyone
+   could tune and it is not a measurement, so it does not belong in `universe.py`
+   beside `minor_units_per_major` — but it is the one hardcoded value in the file
+   and it should be seen rather than skimmed past.
+
+**What this hands Sub-step 2.5**
+
+- **Every Section C conversion now has real rates behind it.** A Trade on any date
+  in the window converts from its Denomination Currency, a Position marks at a
+  Market Price and converts from its Quotation Currency, and Trade Date against
+  Settlement Date selects a *different* rate — which is the second half of what the
+  Glossary says that distinction moves. [DEBT-004](../debt-ledger.md) measured that
+  effect at 0.08% on the spike's data and is still open against the Gold Question
+  Set; the data to re-measure it on the full window now exists.
+- **The FX window starts eleven days before the price window and ends on the same
+  day**, so a Trade near the end of the window whose Settlement Date is T+2 will
+  reach past the last rate. 2.5 either keeps its Trades clear of the last two days
+  or the window is widened. The coverage assertion only checks Market Prices, so
+  this one would not be caught today.
+- **The calendar question from 2.3 is unchanged and still 2.5's**: 519 dates carry
+  a price for at least one Instrument, 453 for all nineteen.
+
+### Changes made on review — 2026-08-11 (Sub-step 2.4)
+
+Amino reviewed Sub-step 2.4, approved it, and ruled on the one open question. The
+implementation was approved unchanged: **no SQL, no Python and no check was
+altered**, so every verification output above still stands and the commands were
+re-run to prove exactly that.
+
+1. **An FX Rate includes the derived cross-rate** —
+   [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11).
+   The question raised above was whether the four pairs between two non-euro
+   currencies belong in a table whose term reads *"Real ECB reference rate between
+   two currencies on a date"*. Amino's answer: **they stay, and the definition is
+   widened to say so** rather than left to be read either way. The `WHERE` clause
+   the question had costed at one line was not written, and `fct_fx_rate` still
+   holds all sixteen ordered pairs.
+
+   The amended Glossary row separates the two cases in its own words — a euro-side
+   pair *is* a published reference rate, a non-euro pair is *"the ratio of that
+   date's two published rates ... which is what Frankfurter itself returns under a
+   non-euro base"* — and keeps the exclusivity that naming the ECB was always for:
+   *"a rate of any other origin is not one"*. Amending an `agreed` term is a ruling
+   rather than an edit, which is why R19 exists.
+
+2. **Two documents that restated the old wording were brought with it.**
+   `schema.sql`'s header over `fct_fx_rate` said only *"the ECB reference rate from
+   Frankfurter, and only from Frankfurter"*, which is the sentence the question was
+   about; it now states the euro-side/cross-rate split and points at the Glossary
+   row for the definition. `data-availability.md` cited the term as *"the ECB
+   reference rate from Frankfurter"* — a paraphrase in quotation marks, which the
+   citations-quote rule forbids — and now quotes the words the claim actually rests
+   on, *"sourced from the public Frankfurter API"* and *"a rate of any other origin
+   is not one"*. Both edits are comment and prose only.
+
+3. **`verify_framework.py` now checks anchors, not just files** —
+   [R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11).
+   Not part of the review; found while writing item 1. Confirming that the two new
+   links above resolved meant checking them by hand, because `check_links` split
+   every link on `#` and validated only the path — and same-document `#anchor`
+   links it skipped entirely. A dead anchor lands the reader at the top of the
+   right document, so it reads as a vague citation rather than a broken one.
+
+   Amino approved closing the gap in this Sub-step. The check now reports a `dead
+   anchor` separately from a `dead link`, and the throwaway script that found the
+   gap was **not** committed — `verify_framework.py` was the existing check that
+   should have done this, which is the rule in CLAUDE.md about looking there first.
+   That throwaway also got the slug rule wrong twice, and both mistakes are now
+   comments in `heading_anchors`: underscores are kept (`fct_fx_rate`, not
+   `fctfxrate`) and a `#` line inside a fenced block is not a heading.
+
+**Verification after the change**
+
+Re-run because the Glossary is an input to two of these checks: `check_language.py`
+reads every registered term, and `check_warehouse.py` reads the table set out of
+Glossary Section B.
+
+```
+$ uv run python .claude/scripts/check_language.py
+  glossary: 88 registered terms
+  proposed terms: 0 · python files scanned: 12 · identifiers: 502
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+The term count is **88, unchanged**: R19 amended a row rather than adding one, and
+the abbreviation counts hold because the amended text introduces no new shorthand.
+The identifier count rose from the 490 recorded earlier in this Sub-step because
+R20 added `heading_anchors` to `verify_framework.py`, which the scanner parses.
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+  [unchanged from the run recorded above — same 11,840 FX Rates over the same
+   740 dates, same two counterfactual measurements, same coverage and round-trip
+   assertions, same 9,554 Market Prices, same seam scan]
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+```
+
+```
+$ uv run python -m veritas.ingestion
+  mode: replay (offline)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+  removed data/veritas.duckdb — rebuilding
+
+    dim_account                   0 rows
+    dim_client                    0 rows
+  · dim_instrument               19 rows
+    fct_accounting_movement       0 rows
+    fct_balance_snapshot          0 rows
+    fct_cash_movement             0 rows
+  · fct_fx_rate               11840 rows
+  · fct_instrument_price       9554 rows
+    fct_position_snapshot         0 rows
+    fct_trade                     0 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+```
+
+The rebuild was run offline and rewrote the Warehouse from the committed
+snapshots — the edits above touch a comment in `schema.sql`, which is the file the
+rebuild executes, so it is the one that has to be re-run rather than reasoned about.
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  skill ok   closing-a-substep       652 words
+  skill ok   planning-a-step         564 words
+  skill ok   recording-debt          849 words
+  skill ok   registering-language    564 words
+  skill ok   writing-an-adr         1037 words
+  links      288 links, 128 anchors 22 documents
+  python     3.14.4                 /home/amino/Projects/veritas/.claude/worktrees/substep-2-4-fx-rate/.venv/bin/python3
+
+PASS — framework is wired up correctly
+exit: 0
+```
+
+The `links` line is new, from R20. The interpreter path differs from every run
+recorded above because this one was made in the `substep-2-4-fx-rate` worktree
+rather than the main checkout — same pinned CPython 3.14.4, same `uv`-managed
+environment.
+
+**The anchor check was verified by making it fail.** A check that has only ever
+passed is indistinguishable from one that returns `True`, and this one is new. A
+temporary `.claude/docs/tmp-negative-control.md` carried four links — one dead
+anchor into `glossary.md`, one dead anchor into itself, and one live example of
+each:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  links      292 links, 132 anchors 23 documents
+
+FAIL — 2 problem(s)
+  - .claude/docs/tmp-negative-control.md: dead anchor -> glossary.md#a-heading-that-does-not-exist
+  - .claude/docs/tmp-negative-control.md: dead anchor -> #no-such-heading
+exit: 1
+```
+
+Both dead anchors were caught, both live ones passed silently, and the same-file
+`#no-such-heading` is a link the previous `check_links` did not look at at all. The
+control file was then deleted and the run above re-run to confirm the tree is clean;
+it is not committed, because a fixture that must be deleted to make the suite pass
+belongs in the transcript rather than in the repository.

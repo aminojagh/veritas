@@ -79,25 +79,11 @@ KNOWN_NON_ABBREVIATIONS = {
     # quoted in ADR-0004 because resolving that disagreement is what the ingestion
     # code does.
     "ACT",
-    # SQL keywords and code-ish tokens quoted in prose.
-    #
-    # The Data Definition Language (DDL) half of this group is *derived*, not
-    # remembered. It had grown one failure at a time — "BY" and "CHECK" were added
-    # when a review quoted a constraint, "DATE", "NOT" and "OR" when the next one
-    # quoted a column — which is a list that is always one document behind. The
-    # whole keyword vocabulary of our own schema is now here, so writing about any
-    # part of it is already covered. To re-derive after a schema change:
-    #
-    #   uv run python -c "import re; print(sorted(set(re.findall(r'\b[A-Z]{2,6}\b',
-    #       open('veritas/warehouse/schema.sql').read()))))"
-    #
-    # Anything longer than six characters — VARCHAR, PRIMARY, REFERENCES,
-    # TIMESTAMP — never reaches this set, because the abbreviation candidate
-    # pattern in check_abbreviations() is `[A-Z]{2,6}`.
-    "SELECT", "CREATE", "TABLE", "WHERE", "DECIMAL", "NULL", "OWL", "RDF",
-    "SPARQL", "DAG", "CTE", "LIMIT", "JOIN", "GROUP", "ORDER",
-    "INSERT", "INTO", "FROM", "BY", "CHECK",
-    "ABS", "BIGINT", "DATE", "IN", "KEY", "NOT", "OR", "UNIQUE",
+    # Vocabulary of query languages we do *not* write, quoted in the ADRs that
+    # rejected them or in prose about SQL in general. The keywords of the SQL we do
+    # write are not here — `warehouse_sql_keywords()` derives those, for the reason
+    # given there.
+    "DECIMAL", "OWL", "RDF", "SPARQL", "DAG", "CTE", "LIMIT", "ABS",
     # Document and tooling shorthand.
     "PY", "OK", "GO", "PASS", "FAIL", "NOTE", "TODO", "KB", "MB", "GB",
     "CET", "FAQ", "BIRD", "MD", "README", "CI", "R1", "R2", "R3",
@@ -145,7 +131,43 @@ def traded_universe_tokens() -> set[str]:
     return tokens
 
 
+def warehouse_sql_keywords() -> set[str]:
+    """Shouted keywords of the hand-authored SQL in `veritas/warehouse/`.
+
+    Derived rather than remembered, for the reason the traded-universe tokens are.
+    This group used to be a literal list, re-derived by hand from `schema.sql`
+    whenever a review quoted a constraint — and Sub-step 2.4 is exactly the failure
+    that design predicts: the build scripts are hand-authored SQL too, its
+    `ASOF JOIN` and a `CASE` in a comment about one were quoted in the review, and
+    neither word appears in `schema.sql`. A list re-derived from one file is one
+    file behind. This reads every one of them, so writing about any SQL this
+    project actually contains is covered before it is written.
+
+    Two things are stripped before the keywords are taken, and both matter:
+
+      * **`--` comments**, which are prose. They mention ECB, UTC, ADR and ISO, and
+        exempting those here would silence the abbreviation check on four real
+        abbreviations because a build script happened to explain itself.
+      * **quoted literals**, which are *domain values* rather than keywords — the
+        instrument types and region codes the CHECK constraints name. Those must
+        stay visible to the scan: they are registered Glossary vocabulary, and this
+        function has no business exempting them from anything.
+
+    Anything longer than six characters — VARCHAR, PRIMARY, REFERENCES, TIMESTAMP —
+    never reaches this set, because the abbreviation candidate pattern in
+    check_abbreviations() is `[A-Z]{2,6}`.
+    """
+    keywords: set[str] = set()
+    for path in sorted((REPO_ROOT / "veritas" / "warehouse").rglob("*.sql")):
+        statements = "\n".join(
+            line.split("--")[0] for line in path.read_text().splitlines()
+        )
+        keywords.update(re.findall(r"\b[A-Z]{2,6}\b", re.sub(r"'[^']*'", " ", statements)))
+    return keywords
+
+
 KNOWN_NON_ABBREVIATIONS |= traded_universe_tokens()
+KNOWN_NON_ABBREVIATIONS |= warehouse_sql_keywords()
 
 problems: list[str] = []
 

@@ -4,10 +4,13 @@
     uv run python -m veritas.ingestion --refresh    # re-hit every source
 
 Builds the Warehouse from nothing, in the one order the foreign keys permit:
-dimensions before facts. After Sub-step 2.3 that means `dim_instrument` and
-`fct_instrument_price` — the traded Instrument universe and two years of daily
-Market Prices for it — with the other eight tables empty. Each Sub-step adds a
-source to a pipeline that already runs end-to-end rather than half-wiring one.
+dimensions before facts. After Sub-step 2.4 that means `dim_instrument`,
+`fct_instrument_price` and `fct_fx_rate` — the traded Instrument universe, two
+years of daily Market Prices for it, and the ECB reference rates every one of
+those prices has to be converted through — with the other seven tables empty.
+Each Sub-step adds a source to a pipeline that already runs end-to-end rather than
+half-wiring one. This is the whole real half of Ingestion; Sub-step 2.5 adds the
+synthetic client activity beside it.
 
 **The Warehouse is rebuilt from scratch on every run.** `schema.sql` uses plain
 `CREATE TABLE`, so there is nothing to reconcile against an existing file, and a
@@ -47,6 +50,7 @@ FETCHED_TABLES = (
     ("sec_registrant", sources.sec_registrants),
     ("yahoo_instrument", sources.yahoo_instruments),
     ("yahoo_price", sources.yahoo_prices),
+    ("frankfurter_rate", sources.frankfurter_rates),
 )
 
 DERIVED_TABLES = (
@@ -54,11 +58,14 @@ DERIVED_TABLES = (
     ("yahoo_instrument_type", sources.yahoo_instrument_types),
 )
 
-# The star tables built so far, in foreign-key order — dim_instrument must hold a
+# The star tables built so far, in dependency order — dim_instrument must hold a
 # row before fct_instrument_price may reference it, and the engine enforces that
-# rather than trusting this tuple. Sub-steps 2.4 and 2.5 append to it; nothing
-# else in this file changes when they do.
-BUILDS = ("dim_instrument", "fct_instrument_price")
+# foreign key rather than trusting this tuple. fct_fx_rate declares no foreign key
+# and is last for a different reason the engine cannot enforce: its build reads
+# both tables above it, taking the currencies it must cover from dim_instrument and
+# the end of the window from fct_instrument_price. Sub-step 2.5 appends to this;
+# nothing else in this file changes when it does.
+BUILDS = ("dim_instrument", "fct_instrument_price", "fct_fx_rate")
 
 
 def raw_resources(*, refresh: bool) -> list[object]:
@@ -105,14 +112,19 @@ def load_raw(*, refresh: bool) -> None:
     pipeline.run(raw_resources(refresh=refresh))
 
 
-def build_star_schema() -> tuple[dict[str, int], int]:
+def build_star_schema() -> tuple[dict[str, int], int, int]:
     """Create the star schema and fill it from `raw`.
 
-    Returns the row count of every star table, and how many distinct Instruments
-    `fct_instrument_price` carries a price for. The second number is what a bare
-    row count cannot say: a large pile of price rows covering every Instrument but
-    one is a Warehouse where one Position can never be marked, and it looks
-    entirely healthy in a listing.
+    Returns the row count of every star table and two numbers a bare row count
+    cannot say, both of them about a Warehouse that is silently short while looking
+    entirely healthy in a listing:
+
+      * how many distinct Instruments `fct_instrument_price` carries a price for —
+        a large pile of price rows covering every Instrument but one is a Warehouse
+        where one Position can never be marked;
+      * how many of those prices have no FX Rate on their own date — a price the
+        Warehouse holds and cannot convert to a Reporting Currency, which is a
+        Position that can be marked and still cannot be reported.
     """
     with WarehouseAdapter() as warehouse:
         warehouse.create_schema()
@@ -122,7 +134,22 @@ def build_star_schema() -> tuple[dict[str, int], int]:
         ((priced_instruments,),) = warehouse.query(
             "SELECT count(DISTINCT instrument_id) FROM fct_instrument_price"
         )
-        return counts, priced_instruments
+        # A left join rather than a NOT EXISTS, so the failing rows are the ones
+        # counted: a Market Price whose Quotation Currency has no rate on its own
+        # price_date. Any surviving row is a mark that cannot leave its own
+        # currency, which is what the FX window and the fill-forward exist to
+        # prevent and what a mismatched refresh would reintroduce.
+        ((unconvertible,),) = warehouse.query(
+            "SELECT count(*) "
+            "FROM fct_instrument_price AS price "
+            "JOIN dim_instrument AS instrument "
+            "  ON instrument.instrument_id = price.instrument_id "
+            "LEFT JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = price.price_date "
+            " AND rate.from_currency = instrument.quotation_currency "
+            "WHERE rate.fx_rate IS NULL"
+        )
+        return counts, priced_instruments, unconvertible
 
 
 def main() -> int:
@@ -173,7 +200,31 @@ def main() -> int:
                 print(f"    rewritten  {name}")
         return 1
 
-    counts, priced_instruments = build_star_schema()
+    # What a successful refresh actually did. `snapshots.REWRITTEN` was added in
+    # Sub-step 2.2 to make a *failed* refresh's half-written state visible, and the
+    # same list answers a question 2.3 could only argue in a comment: whether the
+    # cache in `read_source` really does fetch a source once however many resources
+    # read it. Two resources share each Yahoo chart, so without the cache every one
+    # of them would appear here twice — and the two fetches would return different
+    # bytes, leaving dim_instrument and fct_instrument_price built from two
+    # different observations of the same Instrument with only the second on disk.
+    if arguments.refresh:
+        rewritten_twice = sorted(
+            {name for name in snapshots.REWRITTEN
+             if snapshots.REWRITTEN.count(name) > 1}
+        )
+        print(f"  rewrote {len(snapshots.REWRITTEN)} snapshot(s), "
+              f"{len(set(snapshots.REWRITTEN))} distinct")
+        if rewritten_twice:
+            print(
+                f"\nFAIL — {rewritten_twice} were fetched more than once in one "
+                f"run, so the resources reading them saw different bytes and only "
+                f"the last fetch is on disk. The cache in snapshots.read_source is "
+                f"what prevents this"
+            )
+            return 1
+
+    counts, priced_instruments, unconvertible = build_star_schema()
 
     print()
     for table_name, count in sorted(counts.items()):
@@ -202,11 +253,22 @@ def main() -> int:
             f"never be marked"
         )
         return 1
+    if unconvertible:
+        print(
+            f"FAIL — {unconvertible} of {prices} Market Prices have no FX Rate on "
+            f"their own date, so a Position marked at them cannot be converted to "
+            f"a Reporting Currency. The FX window no longer covers the price "
+            f"window: run `uv run python -m veritas.ingestion --refresh` to bring "
+            f"both sources back to the same window"
+        )
+        return 1
 
+    rates = counts.get("fct_fx_rate", 0)
     print(
         f"PASS — the Warehouse is built · dim_instrument holds {loaded} "
         f"Instruments · fct_instrument_price holds {prices} Market Prices "
-        f"across all {priced_instruments}"
+        f"across all {priced_instruments} · fct_fx_rate holds {rates} FX Rates "
+        f"and every Market Price has one"
     )
     return 0
 
