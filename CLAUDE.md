@@ -189,6 +189,26 @@ working record. Keep them separate — do not turn the README into a changelog.
   Glossary are exempt only if the Glossary itself expands them.
 - **No unexplained bare numbers.** A figure in a document says where it came
   from, or names the script that produces it.
+- **A measurement is dated evidence, never a standing statement.** Any figure a
+  later run could refute or resize — a row count, a percentage, a largest-observed
+  value, a file size — is written as evidence: **what was measured, on what date,
+  under what settings, and the command that reproduces it.** Ideally it
+  reproduces; if it cannot, say so, because an unreproducible figure that reads
+  like a fact is the worst of the three.
+  - **Evidence lives in the Step Review that produced it**, which is dated by
+    construction and carries the command. Never in the source code.
+  - **Everywhere else refers to it** — a code comment, the Glossary, an ADR, a
+    plan. State the **rule and why it exists**, then point at the evidence or at
+    the check that prints the current figure. *"differs on nearly every bar —
+    `check_data_availability.py` prints how many"* survives the next refresh;
+    *"differs on 95.5% of 1,255 bars"* silently stops being true.
+  - **Figures fixed by the code around them are definitions, not measurements** —
+    a two-year range, the factor of 100 between pence and pounds, `2:1` as the
+    smallest split. They stay.
+
+  The reason is that nothing fails when a number in prose goes stale: no checker
+  reads comments. The sweep that established this rule found a comment that had
+  been false since the traded universe grew, and nothing had noticed.
 
 Check the framework is wired up correctly at any time:
 

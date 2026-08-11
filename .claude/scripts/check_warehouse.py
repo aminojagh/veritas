@@ -29,19 +29,25 @@ an ADR and two are promises made by comments in the schema.
      mentioned in a docstring is prose, and this file is full of it.
 
   5. `--sources` only — what ingestion loaded is what the sources said. Added by
-     Sub-step 2.2, and it grows with every source: no minor unit survives into
-     `dim_instrument`, and the loaded Instrument Symbols are exactly the universe
-     declared in `veritas/ingestion/universe.py`. Needs a filled Warehouse, so
-     run `uv run python -m veritas.ingestion` first.
+     Sub-step 2.2 and grown by every source since. For `dim_instrument`: no minor
+     unit survives, and the loaded Instrument Symbols are exactly the universe
+     declared in `veritas/ingestion/universe.py`. For `fct_instrument_price`
+     (Sub-step 2.3): every row equals the snapshot's *unadjusted* close on the
+     exchange's own trading date, the adjusted series is shown to be a different
+     number, and no day-over-day move is large enough to be a corporate action.
+     Needs a filled Warehouse, so run `uv run python -m veritas.ingestion` first.
 
-Exits non-zero if any check fails. This script grows across Step 002: Sub-steps
-2.3 and 2.4 add assertions to `--sources`, and Sub-step 2.5 adds `--distinctions`.
+Exits non-zero if any check fails. This script grows across Step 002: Sub-step 2.4
+adds assertions to `--sources`, and Sub-step 2.5 adds `--distinctions`.
 """
 
 import argparse
 import ast
+import datetime as dt
+import json
 import re
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 CLAUDE_DIR = Path(__file__).resolve().parent.parent  # <repo>/.claude
@@ -64,6 +70,23 @@ CODE_ROOTS = [REPO_ROOT / "veritas", CLAUDE_DIR / "scripts"]
 # Types that silently lose money. DECIMAL is the only numeric type this schema
 # uses for a quantity anyone will ever sum.
 FLOATING_POINT = ("DOUBLE", "FLOAT", "REAL")
+
+# Half of the last digit `fct_instrument_price.market_price` stores. A DECIMAL(18,
+# 6) built from the source's close is correct exactly when it is within this of
+# it; anything further apart is a different number rather than a rounded one.
+PRICE_TOLERANCE = Decimal("0.0000005")
+
+# The day-over-day price ratio above which a move stops being a market move and
+# starts being a corporate action. Its ceiling is not a guess: the smallest split
+# anyone performs is 2:1, so the threshold has to sit below 2. It sits well below
+# rather than just under, so that a refresh pulling a genuine crash into the window
+# gets looked at rather than waved through. The headroom between this threshold and
+# the largest move actually loaded is printed on every run rather than written
+# here, where it would be one snapshot's figure going stale in a comment.
+# R14 excluded corporate actions from the slice *on the assumption* that no loaded
+# series contains one; this is what turns that assumption into something that
+# fails the run. See EXT-007.
+SPLIT_RATIO = Decimal("1.5")
 
 problems: list[str] = []
 
@@ -272,7 +295,10 @@ def check_constraints() -> None:
 
 
 def check_sources(warehouse: WarehouseAdapter) -> None:
-    """What Sub-step 2.2 loaded is what the sources actually said.
+    """What Sub-step 2.2 loaded into `dim_instrument` is what the sources said.
+
+    `check_prices` below is the same idea for Sub-step 2.3's table — one function
+    per star table, in the order the Sub-steps built them.
 
     Two assertions, both of them the plan's, and both aimed at a trap that has
     already been measured rather than imagined:
@@ -356,7 +382,8 @@ def check_sources(warehouse: WarehouseAdapter) -> None:
     # above would still pass. This is the same failure `snapshots.py` refuses at
     # read time, asserted again at the far end where it would actually show up.
     for raw_table in ("nasdaq_symbol", "sec_registrant", "yahoo_instrument",
-                      "minor_unit_currency", "yahoo_instrument_type"):
+                      "yahoo_price", "minor_unit_currency",
+                      "yahoo_instrument_type"):
         landed = warehouse.row_count(f"raw.{raw_table}")
         print(f"    raw.{raw_table:22} {landed:>6} rows")
         if not landed:
@@ -429,6 +456,236 @@ def check_sources(warehouse: WarehouseAdapter) -> None:
     ):
         print(f"    richness: {len(types)} types (min {min(types.values())} each) · "
               f"{len(currencies)} currencies · minor unit normalised")
+
+
+# The correct reading of a Yahoo chart snapshot, and the three wrong ones the
+# build script is written to avoid. Each wrong reading is a real mistake with a
+# name — one of them is the Section C row for Market Price against Adjusted Close,
+# and the other two are what `fct_instrument_price.sql`'s two transforms exist for.
+#
+# They are here because an assertion that nothing violates proves nothing. Passing
+# "every row equals the unadjusted close on the exchange's own date" is only
+# evidence if the wrong answers would have been *different* answers, and this is
+# what measures that on the loaded data rather than assuming it.
+WRONG_READINGS = {
+    "adjusted close": "takes indicators.adjclose instead of indicators.quote",
+    "UTC date": "reads a bar's timestamp as a Coordinated Universal Time (UTC) "
+                "date rather than shifting it onto the exchange's clock",
+    "pence left as pounds": "skips the division by minor_units_per_major",
+}
+
+
+def expected_prices(wrong_reading: str | None = None) -> dict[tuple[str, dt.date], Decimal]:
+    """Re-derive the Market Price series from the committed snapshots, in Python.
+
+    **This is deliberately a second implementation of
+    `veritas/warehouse/builds/fct_instrument_price.sql`, not a call into it.** The
+    build applies three transforms — an exchange-local trading date, a minor-unit
+    division, and the dropping of a session still in progress — and a check that
+    reused the build's own SQL could only ever prove that the SQL agrees with
+    itself. Written twice, in two languages, a disagreement is a real one.
+
+    With no argument it returns what the Warehouse should hold. Passing one of
+    `WRONG_READINGS` returns what it would hold if that mistake had been made.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from veritas.ingestion.snapshots import SNAPSHOT_DIR
+    from veritas.ingestion.universe import MINOR_UNIT_CURRENCIES, TRADED_INSTRUMENTS
+
+    if wrong_reading is not None and wrong_reading not in WRONG_READINGS:
+        raise ValueError(f"unknown reading {wrong_reading!r} — have {list(WRONG_READINGS)}")
+
+    series: dict[tuple[str, dt.date], Decimal] = {}
+    for symbol in TRADED_INSTRUMENTS:
+        result = json.loads(
+            (SNAPSHOT_DIR / f"yahoo-chart-{symbol}.json").read_bytes()
+        )["chart"]["result"][0]
+        meta = result["meta"]
+
+        offset = 0 if wrong_reading == "UTC date" else meta["gmtoffset"]
+        factor = (
+            1
+            if wrong_reading == "pence left as pounds"
+            else MINOR_UNIT_CURRENCIES.get(meta["currency"], {}).get(
+                "minor_units_per_major", 1
+            )
+        )
+
+        # The bar for a session that had not closed when the snapshot was taken.
+        # `None` when the response was taken outside trading hours, in which case
+        # every bar it holds is a genuine close.
+        session_end = meta["currentTradingPeriod"]["regular"]["end"]
+        open_date = (
+            dt.datetime.fromtimestamp(session_end + offset, dt.UTC).date()
+            if meta["regularMarketTime"] < session_end
+            else None
+        )
+
+        closes = (
+            result["indicators"]["adjclose"][0]["adjclose"]
+            if wrong_reading == "adjusted close"
+            else result["indicators"]["quote"][0]["close"]
+        )
+        for stamp, close in zip(result["timestamp"], closes):
+            if close is None:
+                continue
+            price_date = dt.datetime.fromtimestamp(stamp + offset, dt.UTC).date()
+            if price_date == open_date:
+                continue
+            series[(meta["symbol"], price_date)] = Decimal(repr(close / factor))
+    return series
+
+
+def rows_changed(
+    stored: dict[tuple[str, dt.date], Decimal],
+    alternative: dict[tuple[str, dt.date], Decimal],
+) -> tuple[int, set[str]]:
+    """How many rows an alternative reading would change, and for which symbols.
+
+    A row counts as changed when the two disagree about its value *or* when only
+    one of them has it at all — a date shifted by a time zone removes one row and
+    adds another, and both are the Warehouse holding a price on a day the
+    Instrument did not close at it.
+    """
+    changed: set[tuple[str, dt.date]] = set()
+    for key in set(stored) | set(alternative):
+        here, there = stored.get(key), alternative.get(key)
+        if here is None or there is None or abs(here - there) > PRICE_TOLERANCE:
+            changed.add(key)
+    return len(changed), {symbol for symbol, _ in changed}
+
+
+def check_prices(warehouse: WarehouseAdapter) -> None:
+    """`fct_instrument_price` holds the unadjusted close, on the right date, in
+    the major unit — and the window it covers contains no corporate action.
+
+    Three assertions, all of them Sub-step 2.3's:
+
+      1. **Every row is the snapshot's unadjusted close**, re-derived
+         independently by `expected_prices`. This is one assertion covering four
+         ways to be wrong: the adjusted series, a date shifted by a time zone, a
+         pence quote carried across as pounds, and a mid-session bar stored as a
+         close.
+      2. **Each of those wrong readings would have produced different rows**, and
+         how many is printed. Without this, assertion 1 could be passing because
+         the readings happen to agree on this universe, and the traps it exists to
+         catch would be untested while looking tested.
+      3. **No day-over-day move is large enough to be a corporate action.**
+    """
+    rows = warehouse.query(
+        "SELECT instrument.instrument_symbol, price.price_date, price.market_price "
+        "FROM fct_instrument_price AS price "
+        "JOIN dim_instrument AS instrument "
+        "  ON instrument.instrument_id = price.instrument_id "
+        "ORDER BY instrument.instrument_symbol, price.price_date"
+    )
+    if not rows:
+        print("  fct_instrument_price: empty")
+        problems.append(
+            "fct_instrument_price is empty — run `uv run python -m "
+            "veritas.ingestion` before checking sources, or this check passes "
+            "vacuously"
+        )
+        return
+
+    symbols = {symbol for symbol, _, _ in rows}
+    dates = {price_date for _, price_date, _ in rows}
+    print(f"  fct_instrument_price: {len(rows)} rows · {len(symbols)} Instruments "
+          f"· {len(dates)} distinct dates ({min(dates)} to {max(dates)})")
+
+    # 1. every stored price is the snapshot's unadjusted close, on the exchange's
+    #    own date, in the major unit.
+    expected = expected_prices()
+    stored = {(symbol, price_date): price for symbol, price_date, price in rows}
+
+    missing = sorted(set(expected) - set(stored))
+    extra = sorted(set(stored) - set(expected))
+    wrong = [
+        (symbol, price_date, price, expected[(symbol, price_date)])
+        for (symbol, price_date), price in sorted(stored.items())
+        if (symbol, price_date) in expected
+        and abs(price - expected[(symbol, price_date)]) > PRICE_TOLERANCE
+    ]
+
+    for symbol, price_date in missing[:5]:
+        problems.append(
+            f"the snapshot holds a close for {symbol} on {price_date} that "
+            f"fct_instrument_price does not — the build dropped a trading day"
+        )
+    for symbol, price_date in extra[:5]:
+        problems.append(
+            f"fct_instrument_price holds {symbol} on {price_date}, which the "
+            f"snapshot has no closing price for — a date shifted by a time zone, "
+            f"or a session still in progress stored as a close"
+        )
+    for symbol, price_date, price, want in wrong[:5]:
+        problems.append(
+            f"fct_instrument_price has {symbol} on {price_date} at {price}, but "
+            f"the snapshot's unadjusted close is {want} — a factor of "
+            f"{want / price if price else 'infinity'}"
+        )
+    if not (missing or extra or wrong):
+        print(f"    values: all {len(rows)} rows equal the snapshot's unadjusted "
+              f"close, on the exchange's own date, in the major unit")
+    else:
+        print(f"    values: {len(missing)} missing · {len(extra)} unexpected · "
+              f"{len(wrong)} wrong (first 5 of each reported)")
+
+    # 2. each wrong reading would have produced different rows. The first of them
+    #    is the Adjusted Close trap `check_data_availability.py` measured on three
+    #    probe series; this measures all three on everything actually loaded, so
+    #    they are proven against the data the Warehouse holds rather than a sample.
+    for reading, description in WRONG_READINGS.items():
+        changed, affected = rows_changed(stored, expected_prices(reading))
+        share = 100 * changed / len(rows)
+        print(f"    if it {description}:")
+        print(f"      {changed}/{len(rows)} rows change ({share:.0f}%), "
+              f"across {len(affected)} of {len(symbols)} Instruments")
+        if not changed:
+            problems.append(
+                f"reading the snapshots the wrong way — it {description} — would "
+                f"change no row, so the assertion above passes whether the build "
+                f"is right or not and this universe cannot test it"
+            )
+
+    # 3. no corporate action inside the window.
+    by_symbol: dict[str, list[tuple[dt.date, Decimal]]] = {}
+    for symbol, price_date, price in rows:
+        by_symbol.setdefault(symbol, []).append((price_date, price))
+
+    largest = (Decimal(0), "", None)
+    for symbol, series in by_symbol.items():
+        for (_, before), (after_date, after) in zip(series, series[1:]):
+            if not before:
+                continue
+            ratio = max(after / before, before / after)
+            if ratio > largest[0]:
+                largest = (ratio, symbol, after_date)
+            if ratio > SPLIT_RATIO:
+                problems.append(
+                    f"{symbol} moved by a ratio of {ratio:.3f} into {after_date} "
+                    f"({before} to {after}) — larger than {SPLIT_RATIO}, so it is "
+                    f"a split or another corporate action rather than a market "
+                    f"move. R14 excluded those from the slice, so this window "
+                    f"cannot be loaded: swap the symbol in universe.py or shorten "
+                    f"the range (see EXT-007)"
+                )
+    ratio, symbol, when = largest
+    print(f"    corporate actions: largest day-over-day ratio is {ratio:.3f} "
+          f"({symbol} into {when}), against a {SPLIT_RATIO} threshold")
+
+    # Coverage, printed rather than asserted. Sub-step 2.5 writes a Snapshot on
+    # every date the Warehouse holds a Market Price (R13), and these Instruments
+    # sit on five exchange calendars, so the dates they share are fewer than the
+    # dates they cover. Which of the two 2.5 uses is 2.5's decision; being
+    # surprised by the gap is what this print exists to prevent.
+    shared = sum(
+        1 for day in dates
+        if all(day in {d for d, _ in series} for series in by_symbol.values())
+    )
+    print(f"    calendars: {len(dates)} dates have a price for at least one "
+          f"Instrument · {shared} have one for all "
+          f"{len(by_symbol)} (Sub-step 2.5 chooses between them)")
 
 
 def duckdb_importers() -> list[Path]:
@@ -523,6 +780,8 @@ def main() -> int:
         if arguments.sources:
             print()
             check_sources(warehouse)
+            print()
+            check_prices(warehouse)
 
     check_constraints()
     print()

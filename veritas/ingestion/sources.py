@@ -29,16 +29,15 @@ NASDAQ_OTHER_URL = "https://www.nasdaqtrader.com/dynamic/symdir/otherlisted.txt"
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 
-# Two years of daily bars. The range matters to Sub-step 2.3 rather than to this
-# one — 2.2 reads only the `meta` block of the response — but the snapshot is
-# fetched once and both Sub-steps read the same file, so the window is set here.
-# Two years covers the whole of the 2025 window `frankfurter-2025.json` holds,
-# which is what lets a Position be converted on the date it was held.
+# Two years of daily bars, which is the window `fct_instrument_price` ends up
+# holding — each Instrument on its own exchange calendar. Two years covers the
+# whole of the 2025 window `frankfurter-2025.json` holds, which is what lets a
+# Position be converted on the date it was held.
 YAHOO_RANGE = "2y"
 YAHOO_INTERVAL = "1d"
 
 # Both NASDAQ Trader files end with a provenance line rather than a record:
-#   File Creation Time: 0810202606:00|||||||
+#   File Creation Time: <mmddyyyyhh:mm>|||||||
 # Parsing it as a symbol produces an Instrument called "File Creation Time".
 NASDAQ_TRAILER = "File Creation Time:"
 
@@ -63,9 +62,9 @@ def nasdaq_symbols(*, refresh: bool) -> Iterator[dict[str, object]]:
 
     `nasdaqlisted.txt` carries NASDAQ-listed securities and `otherlisted.txt`
     carries the rest of the US tape. Both are needed and the plan's shorthand
-    named only the first: three of the sixteen traded Instruments are NYSE or
-    NYSE Arca listings (JNJ, SPY) that simply do not appear in `nasdaqlisted.txt`.
-    They are one directory, published together, and are treated as one source.
+    named only the first: a traded Instrument listed on NYSE or NYSE Arca (JNJ,
+    SPY) simply does not appear in `nasdaqlisted.txt`. They are one directory,
+    published together, and are treated as one source.
 
     The two files disagree on what to call the symbol column — `Symbol` against
     `ACT Symbol` — which is exactly the synonym problem Non-Negotiable #1 is
@@ -98,8 +97,8 @@ def sec_registrants(*, refresh: bool) -> Iterator[dict[str, object]]:
 
     Gives the name a security is *registered* under, which is the most
     authoritative name available for a US listing. It covers operating companies
-    rather than funds, so two of the traded exchange-traded funds are absent from
-    it — the star build left-joins for exactly that reason.
+    rather than funds, so a traded exchange-traded fund can be absent from it —
+    the star build left-joins for exactly that reason.
     """
     body = read_source("sec-company-tickers.json", SEC_TICKERS_URL, refresh=refresh)
     for entry in json.loads(body).values():
@@ -118,6 +117,23 @@ def sec_registrants(*, refresh: bool) -> Iterator[dict[str, object]]:
         }
 
 
+def yahoo_chart(symbol: str, *, refresh: bool) -> dict[str, object]:
+    """One symbol's chart response, unwrapped to the single result it contains.
+
+    Two resources read this — `yahoo_instruments` takes the `meta` block and
+    `yahoo_prices` takes the bars — and they must see the *same* response, not two
+    fetched a minute apart. `snapshots.read_source` guarantees that by caching a
+    source's bytes for the run; this function is what makes both of them ask for
+    the file by the same name.
+    """
+    url = (
+        YAHOO_CHART_URL.format(symbol=symbol)
+        + f"?range={YAHOO_RANGE}&interval={YAHOO_INTERVAL}"
+    )
+    body = read_source(f"yahoo-chart-{symbol}.json", url, refresh=refresh)
+    return json.loads(body)["chart"]["result"][0]
+
+
 def yahoo_instruments(*, refresh: bool) -> Iterator[dict[str, object]]:
     """Per-symbol metadata for the traded Instrument universe.
 
@@ -133,23 +149,73 @@ def yahoo_instruments(*, refresh: bool) -> Iterator[dict[str, object]]:
     exist to catch.
 
     Only the `meta` block is read here. The same snapshot's `timestamp` and
-    `indicators` blocks are the Market Price series, and they are Sub-step 2.3's
-    to load — one file, two halves, one Sub-step each.
+    `indicators` blocks are the Market Price series, which `yahoo_prices` below
+    loads — one file, two halves, one Sub-step each.
+
+    The last four fields are the ones `fct_instrument_price` needs and no other
+    table does. They live here, one row per Instrument, rather than repeated on
+    every price row, because they are properties of the *response* and of the
+    exchange rather than of a bar.
     """
     for symbol in TRADED_INSTRUMENTS:
-        url = (
-            YAHOO_CHART_URL.format(symbol=symbol)
-            + f"?range={YAHOO_RANGE}&interval={YAHOO_INTERVAL}"
-        )
-        body = read_source(f"yahoo-chart-{symbol}.json", url, refresh=refresh)
-        meta = json.loads(body)["chart"]["result"][0]["meta"]
+        result = yahoo_chart(symbol, refresh=refresh)
+        meta = result["meta"]
         yield {
             "instrument_symbol": meta.get("symbol", symbol),
             "quotation_currency": meta.get("currency"),
             "source_instrument_type": meta.get("instrumentType"),
             "exchange_name": meta.get("exchangeName"),
             "long_name": meta.get("longName") or meta.get("shortName"),
+            # Seconds to add to a bar's timestamp to reach the exchange's own
+            # clock. Yahoo spells it `gmtoffset`; the field name here says
+            # Coordinated Universal Time (UTC), which is what the offset is from
+            # and what the timestamps are in.
+            "utc_offset_seconds": meta.get("gmtoffset"),
+            # The two halves of "had the session closed when this was fetched?".
+            # `regularMarketTime` is the last trade Yahoo had seen;
+            # `currentTradingPeriod.regular.end` is when the session it belongs to
+            # closes. If the first is below the second, the response was taken
+            # mid-session and its final bar is a live price rather than a close.
+            "last_market_time": meta.get("regularMarketTime"),
+            "current_session_end": (
+                meta.get("currentTradingPeriod", {}).get("regular", {}).get("end")
+            ),
         }
+
+
+def yahoo_prices(*, refresh: bool) -> Iterator[dict[str, object]]:
+    """The daily Market Price series for the traded Instrument universe.
+
+    The other half of the same snapshots `yahoo_instruments` reads, and the reason
+    [DEBT-002](../../.claude/docs/debt-ledger.md) was opened: this is the
+    unofficial endpoint every Position mark depends on.
+
+    **`close`, never `adjclose`.** Both series are in the response, side by side
+    and the same length, and taking the wrong one is the wrong number
+    `check_data_availability.py` measured rather than imagined — they differ on
+    most bars for any Instrument that has paid a dividend. The Glossary settles
+    which is wanted: `Market Price` is *"the unadjusted closing price at which an
+    Instrument traded on a date"*, and `Adjusted Close` is registered as the
+    anti-pattern next to it. The field is named `unadjusted_close` here so that a
+    reader of `raw` can see which of the two was landed without going back to the
+    source.
+
+    Bars are landed exactly as the response gives them — epoch timestamp, a close
+    that may be null, no row dropped. Turning a timestamp into a `price_date` and
+    a pence quote into pounds happens in `fct_instrument_price.sql`, where every
+    other transform in this pipeline lives and where a reader looks for what was
+    done to the numbers.
+    """
+    for symbol in TRADED_INSTRUMENTS:
+        result = yahoo_chart(symbol, refresh=refresh)
+        symbol_in_response = result["meta"].get("symbol", symbol)
+        closes = result["indicators"]["quote"][0]["close"]
+        for bar_timestamp, close in zip(result["timestamp"], closes):
+            yield {
+                "instrument_symbol": symbol_in_response,
+                "bar_timestamp": bar_timestamp,
+                "unadjusted_close": close,
+            }
 
 
 def minor_unit_currencies() -> Iterator[dict[str, object]]:

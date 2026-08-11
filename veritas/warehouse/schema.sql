@@ -123,10 +123,16 @@ CREATE TABLE fct_fx_rate (
 
 -- Market Price — the unadjusted close, the only price a Position may be marked
 -- at. There is deliberately no adjusted-close column: Adjusted Close is
--- registered as an anti-pattern, it differs from the close on 95.5% of AAPL's
--- last 1,255 daily bars, and it is back-adjusted every time a dividend is paid,
--- so an Account Value marked at it is both wrong and irreproducible. Giving it
+-- registered as an anti-pattern, it differs from the close on nearly every bar of
+-- a real price series, and it is back-adjusted every time a dividend is paid, so
+-- an Account Value marked at it is both wrong and irreproducible. Giving it
 -- nowhere to land is cheaper than remembering not to use it.
+--
+-- *How far* the two series diverge is a measurement, so it is not a number in this
+-- file. It is dated evidence, produced by a committed script and reproducible
+-- offline:
+--     uv run python .claude/scripts/check_data_availability.py
+--     .claude/docs/reviews/step-001-target-state-design.md  ("What it checks")
 CREATE TABLE fct_instrument_price (
     price_date     DATE           NOT NULL,
     instrument_id  BIGINT         NOT NULL REFERENCES dim_instrument(instrument_id),

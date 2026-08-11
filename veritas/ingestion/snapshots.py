@@ -37,14 +37,28 @@ REQUEST_TIMEOUT_SECONDS = 30
 
 # Snapshots rewritten by the current `--refresh`, in the order they were written.
 #
-# A refresh is not transactional: it rewrites nineteen files one at a time, so a
-# source that dies at the fourteenth leaves the repository holding thirteen new
-# snapshots and six old ones. That mix is a perfectly plausible-looking working
-# tree and is exactly the sort of quietly-wrong state this project exists to
-# refuse, so the entry point reports this list when a refresh fails. Making the
-# inconsistency loud is cheap; making the refresh atomic is not, and would buy
+# A refresh is not transactional: it rewrites the snapshots one file at a time, so
+# a source that dies part-way leaves the repository holding some fresh files and
+# some stale ones. That mix is a perfectly plausible-looking working tree and is
+# exactly the sort of quietly-wrong state this project exists to refuse, so the
+# entry point reports this list when a refresh fails. Making the inconsistency
+# loud is cheap; making the refresh atomic is not, and would buy
 # little — the fix either way is to run `--refresh` again.
 REWRITTEN: list[str] = []
+
+# Bytes already read this run, keyed by snapshot name.
+#
+# **One source is read once per run, whatever asks for it.** Sub-step 2.3 made
+# this necessary: `yahoo_instrument` reads the `meta` block of each chart response
+# and `yahoo_price` reads the `timestamp` and `indicators` blocks of the same
+# response, so without a cache a `--refresh` would fetch every chart twice
+# — and the two fetches would not return the same bytes. A chart pulled at 14:32
+# and again at 14:33 carries a different last bar and a different
+# `regularMarketTime`, so `dim_instrument` and `fct_instrument_price` would be
+# built from two different observations of the same Instrument, and only the
+# second would still be on disk. The cache is what makes "the snapshot on disk is
+# the bytes this run used" stay true once two resources share a file.
+_ALREADY_READ: dict[str, bytes] = {}
 
 
 class SourceUnavailable(RuntimeError):
@@ -68,7 +82,14 @@ def read_source(name: str, url: str, *, refresh: bool) -> bytes:
     committed snapshot and never opens a socket. `refresh=True` fetches, writes
     the snapshot, and returns what it fetched, so the file on disk and the bytes
     this run used are the same bytes by construction rather than by a later copy.
+
+    Either way the bytes are cached under `name`, so a second caller asking for
+    the same source gets the same observation rather than a second one. See
+    `_ALREADY_READ`.
     """
+    if name in _ALREADY_READ:
+        return _ALREADY_READ[name]
+
     path = snapshot_path(name)
 
     if not refresh:
@@ -77,12 +98,14 @@ def read_source(name: str, url: str, *, refresh: bool) -> bytes:
                 f"no snapshot at {path.relative_to(REPO_ROOT)} — run "
                 f"`uv run python -m veritas.ingestion --refresh` once to create it"
             )
-        return path.read_bytes()
+        body = path.read_bytes()
+    else:
+        body = fetch(url)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+        REWRITTEN.append(name)
 
-    body = fetch(url)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(body)
-    REWRITTEN.append(name)
+    _ALREADY_READ[name] = body
     return body
 
 

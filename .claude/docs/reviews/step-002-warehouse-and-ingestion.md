@@ -988,3 +988,545 @@ traded universe's tokens are now **derived** from `TRADED_INSTRUMENTS`, the same
 way the schema-keyword group is derived from `schema.sql`. That file's own comment
 argued for this: a remembered list *"is always one document behind"*. `ACT` itself
 is listed as a source's column name, which is what it is.
+
+---
+
+## Sub-step 2.3 — Load `fct_instrument_price` from Yahoo by snapshot-and-replay
+
+**What changed**
+
+The Warehouse now holds numbers that can be aggregated. `fct_instrument_price`
+carries **9,549 Market Prices** — two years of daily closes for all nineteen
+traded Instruments, loaded offline from the snapshots Sub-step 2.2 had already
+committed. [DEBT-002](../debt-ledger.md), open since Sub-step 1.2, is **paid**.
+
+Four things, in the order they matter.
+
+- **`veritas/warehouse/builds/fct_instrument_price.sql`** — the second build
+  script, and the place all three of this Sub-step's transforms live. A bar's
+  epoch timestamp becomes a trading date *on the exchange's own clock*; a pence
+  quote is divided down to pounds; a session that had not closed when the snapshot
+  was taken is dropped. Each is argued at the line that performs it, because
+  `raw.yahoo_price` deliberately holds none of them — ADR-0004 says values in
+  `raw` are the source's, so this file is the one place a reader looks for what
+  was done to the numbers.
+- **`veritas/ingestion/sources.py`** — `yahoo_prices` reads the `timestamp` and
+  `indicators` blocks of the same nineteen chart responses whose `meta` block 2.2
+  read. `close`, never `adjclose`. Adding the source cost one entry in
+  `FETCHED_TABLES` and one in `BUILDS`, which is what ADR-0004 said it would cost.
+- **`veritas/ingestion/snapshots.py`** — `read_source` now caches a source's bytes
+  for the run. This is a defect fix, not a tidy-up: see *Look at this sceptically*.
+- **`.claude/scripts/check_warehouse.py --sources`** — grows by a `check_prices`
+  function that re-derives every price from the committed snapshots **in Python**
+  and compares it to what the SQL built, then measures what three specific wrong
+  readings would have changed.
+
+**The Sub-step's most useful output is a wrong number it caught before it landed.**
+`check_data_availability.py` converts a Yahoo bar's timestamp with
+`datetime.fromtimestamp(stamp, dt.UTC).date()`, and copying that into the build
+would have been the obvious move. It is wrong for the three currency pairs: their
+daily bars are stamped 23:00 UTC, which is midnight in London, so **every one of
+their bars would have been booked a day early**. The check reports the size of it
+on the loaded data — `1075/9549 rows change (11%), across 6 of 19 Instruments` —
+and the six are the three currency pairs plus the three futures, whose regular
+session ends at 03:59 UTC the following day and whose in-progress bar therefore
+stops being recognised as one. `EURUSD=X` is stored at `1.091381` on **2024-08-12**,
+which is the date the London market traded it; the UTC reading files it under
+2024-08-11.
+
+The in-progress bar is the second thing the Glossary decided rather than the code.
+`Market Price` is *"the unadjusted **closing** price at which an Instrument traded
+on a date"*, and eleven of the nineteen snapshots were fetched at 13:28 UTC on
+2026-08-10 — while London was still dealing and before New York opened — so their
+final bar is a live price rather than a close. It is landed in `raw` and dropped
+in the build, using `meta.regularMarketTime` against
+`meta.currentTradingPeriod.regular.end`. Without this, R12's *"a Position marked at
+that date's closing Market Price must be the Position held at the close"* would
+have been false on its first day.
+
+**Verification**
+
+```
+$ uv run python -m veritas.ingestion
+  mode: replay (offline)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+  removed data/veritas.duckdb — rebuilding
+
+    dim_account                   0 rows
+    dim_client                    0 rows
+  · dim_instrument               19 rows
+    fct_accounting_movement       0 rows
+    fct_balance_snapshot          0 rows
+    fct_cash_movement             0 rows
+    fct_fx_rate                   0 rows
+  · fct_instrument_price       9549 rows
+    fct_position_snapshot         0 rows
+    fct_trade                     0 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9549 Market Prices across all 19
+exit: 0
+```
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+  Warehouse: data/veritas.duckdb (already existed)
+  Glossary Section B names 10 tables · the Warehouse has 10
+
+  [the per-table column listing is unchanged in shape from Sub-step 2.1 and
+   elided here for length. The one row that is new:
+       fct_instrument_price  —  3 columns, 9549 rows
+           price_date               DATE
+           instrument_id            BIGINT
+           market_price             DECIMAL(18,6)  ]
+
+  dim_instrument: 19 rows · 19 Instruments declared in universe.py
+    minor units: none of ['GBp'] survived normalisation
+    symbols: all 19 declared Instruments present, none repeated
+    raw.nasdaq_symbol           13117 rows
+    raw.sec_registrant          10398 rows
+    raw.yahoo_instrument           19 rows
+    raw.yahoo_price              9586 rows
+    raw.minor_unit_currency         1 rows
+    raw.yahoo_instrument_type       4 rows
+    instrument_type: ETF 4 · currency pair 3 · equity 9 · future 3
+    quotation_currency: EUR 3 · GBP 2 · JPY 3 · USD 11
+    richness: 4 types (min 3 each) · 4 currencies · minor unit normalised
+
+  fct_instrument_price: 9549 rows · 19 Instruments · 521 distinct dates (2024-08-08 to 2026-08-10)
+    values: all 9549 rows equal the snapshot's unadjusted close, on the exchange's own date, in the major unit
+    if it takes indicators.adjclose instead of indicators.quote:
+      5416/9549 rows change (57%), across 12 of 19 Instruments
+    if it reads a bar's timestamp as a Coordinated Universal Time (UTC) date rather than shifting it onto the exchange's clock:
+      1075/9549 rows change (11%), across 6 of 19 Instruments
+    if it skips the division by minor_units_per_major:
+      1006/9549 rows change (11%), across 2 of 19 Instruments
+    corporate actions: largest day-over-day ratio is 1.196 (CL=F into 2026-04-08), against a 1.5 threshold
+    calendars: 521 dates have a price for at least one Instrument · 452 have one for all 19 (Sub-step 2.5 chooses between them)
+  constraint probe (in-memory Warehouse from the same schema.sql)
+    accepted  7 valid seed rows (positive control)
+    [fourteen refusals, unchanged from 2.1]
+
+  seam scan: 12 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit: 0
+```
+
+`check_language.py` and `verify_framework.py` both PASS; the former now scans 437
+identifiers across the same 12 Python files, against 371 at the end of 2.2, with 0
+unrecognised abbreviations.
+
+**The check was made to fail three times before being trusted**, by mutating the
+build script and re-running the pipeline and the check unchanged. All three exit
+1, and each names the specific mistake rather than reporting a generic mismatch:
+
+| Mutation to `fct_instrument_price.sql` | What `--sources` reported |
+|---|---|
+| Drop `+ yahoo.utc_offset_seconds` — read the bar as a UTC date | `180 missing · 180 unexpected · 712 wrong`, and the date range widened from 521 to 580 distinct dates |
+| Replace the minor-unit factor with `1` — carry pence across as pounds | `0 missing · 0 unexpected · 1006 wrong` |
+| Delete the in-progress clause — store a mid-session price as a close | `0 missing · 11 unexpected · 0 wrong`, and the row count rose 9,549 → 9,560 |
+
+The counterfactual lines move in the opposite direction under each mutation — with
+the time-zone shift removed, *"if it reads a bar's timestamp as a UTC date"* falls
+from 1075 rows to 3 — which is the check reporting that the build has already made
+that mistake. The build script was restored byte-for-byte afterwards and both
+commands re-run.
+
+**Determinism.** Two consecutive runs of `uv run python -m veritas.ingestion`
+produce identical output, including every row count. The Warehouse is deleted and
+rebuilt on each run, so this is a property of the snapshots rather than of the
+database file surviving.
+
+**Deliberately left undone**
+
+- **`--refresh` was not run, so the caching change to `read_source` is verified by
+  reading rather than by execution.** Running it would open nineteen sockets and
+  rewrite all 22 committed snapshots with a later window, which would silently
+  invalidate every number in this review and is Amino's call rather than mine. The
+  replay path — the one a reviewer runs and the one [DEBT-002](../debt-ledger.md)
+  is about — is fully exercised above. What is unexercised is narrow: that a
+  refresh now fetches each chart once instead of twice. The cache lookup is the
+  first statement in `read_source`, so the fetch is structurally unreachable for a
+  name already read; that is an argument, not a test, and it is the one claim in
+  this Sub-step I have not run. **Not filed as debt** — the code is right rather
+  than cheap, and a Ledger entry whose repayment is "run the command that rewrites
+  the dataset" is a wish, not a trigger. Sub-step 2.4 adds Frankfurter and is the
+  natural place to run a refresh once, deliberately.
+- **The trading-calendar gap is surfaced, not solved.** 521 dates have a price for
+  at least one Instrument; only 452 have one for all nineteen. R13 requires a
+  Snapshot on *"every date the Warehouse holds a Market Price"*, and with five
+  exchange calendars in one table those two readings differ by 69 dates. Choosing
+  between them is Sub-step 2.5's, which is why the number is printed on every run
+  rather than left to be discovered there.
+- **No index beyond the primary key**, no partitioning, no incremental load. The
+  pipeline drops and rebuilds; 9,549 rows do not justify anything else.
+
+**Look at this sceptically**
+
+1. **`read_source` now caches, and the reason is a defect I introduced and then
+   removed.** Before the cache, `yahoo_instruments` and `yahoo_prices` each called
+   `read_source` for the same chart files. In replay that is harmless — both reads
+   return the same committed bytes. Under `--refresh` it is not: every chart is
+   fetched twice, a minute or so apart, *two fetches of one chart do not return the
+   same bytes*, and the second fetch is the one left on disk.
+
+   **What "halves of one response" means, and why the line between them is real.**
+   One Yahoo chart response carries two different kinds of thing:
+
+   | half | fields | what it describes | lands in |
+   |---|---|---|---|
+   | `meta` | `currency`, `gmtoffset`, `regularMarketTime`, `currentTradingPeriod` | what the Instrument **is**, and when its exchange trades — one row per Instrument, changes almost never | `dim_instrument`, Sub-step **2.2** |
+   | `timestamp` + `indicators` | epoch stamps and closes | what the market **did** — one row per bar, append-only | `fct_instrument_price`, Sub-step **2.3** |
+
+   The objection this note answers is a fair one. It is **one file**, fetched once,
+   so loading its two halves in two Sub-steps can look like paperwork — a way of
+   getting two commits out of one download to satisfy *"one Sub-step = one
+   commit"*. If that were all it was, the honest thing would be to load both at
+   once and take one commit.
+
+   **First reason it is not: the split follows a line the schema had already
+   drawn.** The two halves are a dimension and a fact — identity against
+   observations, one row against thousands, slowly-changing against append-only.
+   That is not a categorisation invented for Yahoo's response; it is the shape
+   `schema.sql` has had since Sub-step 2.1, and the foreign key from
+   `fct_instrument_price` to `dim_instrument` means the engine *enforces* which
+   half loads first. A single combined loader would still have to build both
+   tables, in that order, from those two field groups. It would be this split with
+   the line rubbed out, not a simpler design.
+
+   **Second reason, and the one the cache proves: something has to be guaranteed
+   across the line.** `read_source(name, url)` does not promise "some bytes for
+   this source". It promises **the** bytes this run used for this source — the same
+   ones sitting on disk when the run ends. With a single reader that promise is
+   free and invisible, because there is nothing for the bytes to be inconsistent
+   *with*. The moment a second table is built from the same file, that promise
+   becomes the only thing making `dim_instrument` and `fct_instrument_price` two
+   views of **one observation** rather than two observations that happen to share a
+   filename. A boundary that needs a guarantee to hold across it is an interface —
+   which is CLAUDE.md's own test for a seam, applied to a line I had drawn in 2.2
+   without noticing it was one.
+
+   **The failure, concretely.** A `--refresh` at 14:32:00, while London is open.
+   `VOD.L`'s `meta` says the regular session ends at 16:30 and the last trade seen
+   was 14:31:58 — so the response was taken mid-session and its final bar is a live
+   price, not a close. `raw.yahoo_instrument` is built from that. Sixty seconds
+   later `yahoo_prices` fetches the same chart again: the final bar now carries a
+   different number, `regularMarketTime` reads 14:32:57, and *this* response
+   overwrites the snapshot. The Warehouse that run produced is then a mix — the
+   in-progress rule evaluated against the first response's clock, on bars taken
+   from the second.
+
+   **What that costs, split into what a check sees and what it does not.** An
+   earlier draft of this note said every check would still have passed. That was
+   too strong, and the accurate version is the more useful one:
+
+   - **Caught, if `--sources` is run after the refresh.** It re-derives every price
+     from the file on disk — the *second* response — so when two fetches straddle
+     the closing bell they disagree about whether the final bar is a close, and the
+     check reports a missing or unexpected row. That is the same signal the third
+     mutation in the table above produced.
+   - **Not caught, ever.** In the ordinary case the two responses agree about the
+     session, no row differs, and the run looks clean while its Warehouse was built
+     from bytes that are no longer on disk. ADR-0004's promise — *"`--refresh` is
+     the sole mode that needs a network, and it rewrites the snapshot with the same
+     bytes the run used"* — is then false for that run, silently, in the one mode
+     nobody re-runs to verify.
+
+   The cache is a dictionary lookup, and it makes that promise true by
+   construction rather than by timing. **It is also the change I am least confident
+   in, precisely because the failure it prevents is the one path I did not run.**
+
+2. **`market_price` stores Yahoo's float32 artifacts, and I chose that
+   deliberately.** One example carries the whole decision.
+
+   **The example.** AAPL's close on 2024-08-08. The bytes in
+   `data/snapshots/ingestion/yahoo-chart-AAPL.json` read `213.30999755859375`.
+   Yahoo serialises single-precision floats and `213.31` has no exact
+   single-precision representation, so that string is as close as this source can
+   get to the number the exchange printed. Cast to `DECIMAL(18, 6)` it becomes
+   **`213.309998`**, which is what `fct_instrument_price` holds. The alternative is
+   to store **`213.31`** — the number Yahoo meant — by rounding on the way in.
+
+   **What the difference is worth, on a Position.** A client holding 1,000 AAPL
+   shares is marked at:
+
+   | stored as | the Position is marked at |
+   |---|---|
+   | `213.309998` | $213,309.998 |
+   | `213.31` | $213,310.000 |
+   | **difference** | **$0.002** |
+
+   Two-tenths of a cent on a Position worth over two hundred thousand dollars, and
+   an answer rendered to the cent shows the same figure either way.
+
+   **Now the same 1,000 shares against the errors this file's transforms exist to
+   remove.** `VOD.L`'s last stored close is `1.205000`, because the snapshot's bar
+   reads `120.5` and the London listing quotes in **pence**. Divided down, the
+   holding is marked at **£1,205.00**. Carried across undivided, it is marked at
+   **£120,500.00** — a hundred times too much, and nothing about the number looks
+   wrong on its face. And a bar read on the wrong clock marks the Position at a
+   price from a day it was not held.
+
+   That comparison is what settled it. The artifact I am accepting moves a mark by
+   two-tenths of a cent; the mistakes the three transforms remove move it by a
+   **factor of a hundred**, or by a whole day. Rounding the first away is not a
+   step towards catching the second.
+
+   **So why not round anyway, since it is one `round()`?** Two specific reasons.
+
+   - **The three transforms make a number *correct*; rounding makes it *tidy*.** A
+     pence quote stored as pounds is wrong. A bar booked a day early is wrong. A
+     mid-session tick stored as a close is wrong. `213.309998` is not wrong — it is
+     the number the source published, carried to more digits than the source means.
+     That is a presentation concern, and the presentation layer can round at any
+     time without asking anyone. The Warehouse cannot un-round.
+   - **Rounding would make stored precision depend on a source field.** The right
+     number of digits is not simply two: Yahoo's `meta.priceHint` reads **2** for
+     `AAPL` and **4** for `EURUSD=X`, and rounding a currency pair to two decimals
+     destroys real information. So the build would have to join `priceHint` and
+     round per Instrument — and a later `--refresh` returning a different hint for
+     the same Instrument would quietly change the precision of a stored column with
+     nothing failing. The snapshots exist so the Warehouse is a function of
+     committed bytes; this would make it a function of committed bytes *plus*
+     whatever Yahoo currently thinks it means.
+
+   **What would change my mind:** if `market_price` is ever rendered to a user
+   verbatim, `213.309998` is a defect in a Grounded Answer — and the fix belongs at
+   the presentation layer rather than here. If you would rather have it on the way
+   in regardless, it is one join and one `round()` in
+   `veritas/warehouse/builds/fct_instrument_price.sql` plus the same rule in
+   `expected_prices()`, and `PRICE_TOLERANCE` stays as it is.
+3. **The 1.5 split threshold is a judgement between two measurements, not a
+   standard.** The smallest split anyone performs is 2:1; the largest single-day
+   move in the loaded window is 1.196. Anything in between works today. It is set
+   at 1.5 rather than 1.9 because a `--refresh` pulling a window containing a real
+   40% earnings collapse should not be silently accepted as normal, and rather than
+   1.3 because a check that cries wolf gets deleted. **This is the assertion most
+   likely to fire on a future refresh**, and when it does the fix is a symbol swap
+   in `universe.py`, not a raised threshold.
+4. **The in-progress rule trusts `meta.currentTradingPeriod`.** If a future
+   response omitted it, `current_session_end` would be NULL, the `NOT (...)` clause
+   would evaluate to NULL, and **every row for that Instrument would vanish**. That
+   fails loudly rather than silently — `uv run python -m veritas.ingestion` asserts
+   all nineteen Instruments are priced and exits 1 — but the diagnosis it prints
+   would point at coverage rather than at the real cause. I left it rather than add
+   a `coalesce`, because a default here means guessing whether a session had closed,
+   and guessing that is how a mid-session price becomes a close.
+5. **Nine thousand prices and no way to check one against a second source.**
+   Everything above verifies that the Warehouse faithfully carries what Yahoo said.
+   Nothing verifies that Yahoo is right. That is [DEBT-003](../debt-ledger.md)'s
+   territory — no key-free second Market Price source exists — and it is worth
+   stating plainly now that the Warehouse holds prices rather than leaving it
+   implied.
+
+**Language**
+
+No new terms, and none proposed. Every identifier added resolves to a registered
+term: `Market Price` (`fct_instrument_price.market_price`, `price_date`),
+`Instrument Symbol`, `Quotation Currency`, `Adjusted Close` — which appears only
+in the check that proves it was *not* loaded, which is the one use the Glossary's
+anti-pattern row permits.
+
+Three raw field names are the source's data under our names, and none of them is a
+domain term: `bar_timestamp`, `unadjusted_close`, `utc_offset_seconds`. The last
+is deliberately not Yahoo's spelling (`gmtoffset`): the offset is from Coordinated
+Universal Time, which is what the timestamps are in and what the Glossary's
+abbreviation table already covers. `unadjusted_close` is named for the trap — a
+reader of `raw` can see which of the two series was landed without opening the
+source.
+
+---
+
+### Changes made on review — 2026-08-11
+
+Amino reviewed Sub-step 2.3 and approved it, in two passes on the same day: two
+rulings and two rewrites first, then a widening of the second ruling and the
+approval of one Term Proposal. Everything is applied below. **No verification
+output above changed**, because nothing that executes was altered — only comment
+and document text — and the commands were re-run to prove exactly that.
+
+1. **[ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md) is
+   `accepted`** — [R17](../plan/step-002-warehouse-and-ingestion.md#r17--adr-0004-is-accepted--approved-by-amino-2026-08-11).
+   Current State had flagged the stale `proposed` status rather than flipping it;
+   Amino settled it. The status line, the [ADR index](../adr/README.md) and Current
+   State now agree. Nothing in the ADR's Decision or Consequences changed.
+
+2. **A measurement is dated evidence, and lives in a review** —
+   [R18](../plan/step-002-warehouse-and-ingestion.md#r18--a-measurement-is-dated-evidence-and-lives-in-a-review--approved-by-amino-2026-08-11),
+   raised against `fct_instrument_price.sql`'s *"300 of the 521 bars in each
+   currency pair's snapshot fall on a different date under the two readings"* and
+   then **widened by Amino the same day** to every figure a later run could refute
+   or resize, in any file. The rule is now a
+   [writing convention in CLAUDE.md](../../../CLAUDE.md#writing-conventions):
+   such a figure is written as evidence — *what was measured, when, under what
+   settings, and the command that reproduces it* — kept in the Step Review that
+   produced it, with code, the Glossary and ADRs **referring** to it rather than
+   restating the number.
+
+   **First sweep — ten comments across five files**, the run-contingent ones:
+
+   | File | Was | Now |
+   |---|---|---|
+   | `veritas/warehouse/builds/fct_instrument_price.sql` | *"300 of the 521 bars in each currency pair's snapshot"* | points at `--sources`, which prints the figure for whatever window is loaded |
+   | `veritas/warehouse/builds/fct_instrument_price.sql` | *"Eleven of the nineteen snapshots currently carry such a bar"* | *"whether a given snapshot carries such a bar depends on the minute it was fetched"* |
+   | `.claude/scripts/check_warehouse.py` | the `SPLIT_RATIO` rationale quoting *"1.196 — crude oil futures into 2026-04-08"* | the rationale, with the headroom printed on every run instead |
+   | `veritas/ingestion/sources.py` | *"three of the sixteen traded Instruments"* — **already wrong**, the universe has been nineteen since 2.2 | no count; the reason NYSE listings need the second file |
+   | `veritas/ingestion/sources.py` | *"two of the traded exchange-traded funds are absent"*; *"every one of the nine-thousand-odd price rows"*; a `File Creation Time:` line carrying one fetch's timestamp | the same points without the counts |
+   | `veritas/ingestion/snapshots.py` | *"rewrites nineteen files… dies at the fourteenth… thirteen new and six old"*; *"would fetch all nineteen charts twice"* | *"one file at a time… some fresh files and some stale ones"*; *"every chart twice"* |
+   | `veritas/ingestion/__main__.py` | *"nine thousand price rows covering eighteen of nineteen Instruments"* | *"a large pile of price rows covering every Instrument but one"* |
+
+   The `sources.py` row is the argument for the rule in miniature: that comment was
+   already false, had been since the universe grew from sixteen to nineteen
+   Instruments in 2.2, and nothing failed — no checker reads comments.
+
+   **Second sweep — the three places a measurement was standing in for evidence.**
+   The first pass had flagged one of these and left it for a ruling; the widened
+   rule settles all three, and a sweep of every remaining figure in `veritas/`,
+   `.claude/scripts/` and the Glossary found no others.
+
+   | File | Was | Now |
+   |---|---|---|
+   | `veritas/warehouse/schema.sql` | Adjusted Close *"differs from the close on 95.5% of AAPL's last 1,255 daily bars"* | *"differs from the close on nearly every bar of a real price series"*, then the command that measures it and the review that holds the dated evidence |
+   | `.claude/docs/glossary.md` — the `Adjusted Close` / `Market Price` Section C row | *"the two differ on **95.5%** of AAPL's last 1,255 daily bars"* | the same claim as **evidence**: 1,198 of 1,255, on a five-year daily AAPL request, checked 2026-08-03, reproducible offline with the command, and linked to the Step 001 review's table |
+   | `veritas/ingestion/sources.py` | *"roughly five hundred trading days per Instrument"* | the window without the count — it was an estimate of a measurement, which is the weakest form of both |
+
+   The Adjusted Close figure is the case that shows what the rule buys, because it
+   is the **best-supported number in the project** and it was still being copied
+   around as a bare fact. It reproduces exactly, offline, from a committed script:
+
+   ```
+   $ uv run python .claude/scripts/check_data_availability.py
+     [source probes and the join spike elided — the command prints all of it]
+
+     == wrong-number traps ==
+
+     Adjusted Close vs Market Price : differ on 1198/1255 bars (95.5%)
+     Quotation Currency (VOD.L)     : GBp — normalised to GBP on load
+
+     [join spike elided]
+
+   PASS — every source is obtainable and every distinction separates
+   exit: 0
+   ```
+
+   Two lines of that output are the whole point. The figure is *not* wrong today —
+   it is right, and reproducible, and it was still the wrong thing to write into
+   `schema.sql`, because the file gives a reader no way to tell whether it was
+   measured yesterday or asserted from memory two years ago. Dated evidence with a
+   command answers that question; a number in a comment cannot.
+
+   Figures fixed by the code around them were left alone, and are definitions
+   rather than measurements: the two-year range, the factor of 100 between pence
+   and pounds, `2:1` as the smallest split anyone performs.
+
+   **Nothing enforces R18, and that is not a new Ledger entry.** A checker cannot
+   reliably tell a measurement from a definition inside a comment, so this rule is
+   discipline — exactly the class
+   [DEBT-001](../debt-ledger.md#debt-001--framework-rules-rely-on-discipline-not-enforcement)
+   already holds open: *"Nothing mechanical stops any of it being skipped"*, with
+   *"judgement-dependent rules"* named there as the part hooks cannot cover.
+   Opening a second entry for the same gap would inflate the open-debt count
+   without adding a trigger.
+
+3. **Sceptical point 1 now explains the seam from the beginning** rather than
+   asserting it in one clause. It says what the two halves of a chart response are
+   (a table), states the objection it is answering, and gives two reasons the line
+   is real: the split follows the dimension/fact line `schema.sql` already draws
+   and the foreign key already enforces, and a guarantee has to hold across it —
+   `read_source` promising *the* bytes this run used, not *some* bytes.
+   **One claim was corrected while rewriting it**, and it mattered enough to be
+   worth naming: the old text said every check would still have passed under the
+   double fetch. It would not. `--sources` re-derives prices from the file on disk,
+   so two fetches straddling the closing bell disagree about the final bar and the
+   check catches it. What no check can see is the ordinary case — a Warehouse built
+   from bytes that are no longer on disk, which is ADR-0004's promise broken
+   silently.
+
+4. **Sceptical point 2 is now built on one worked example** instead of a relative
+   error. AAPL on 2024-08-08: `213.30999755859375` in the snapshot bytes,
+   `213.309998` stored, `213.31` meant — worth **$0.002** on a 1,000-share
+   Position, against the same holding of `VOD.L` marked at £120,500.00 instead of
+   £1,205.00 when the pence division is skipped. It also replaces the old reason
+   for not rounding, which was wrong: rounding would *not* have cost the check its
+   exactness, since `expected_prices()` re-implements every other transform
+   already. The two reasons that survive scrutiny are that the three transforms fix
+   numbers that are *wrong* while rounding fixes one that is merely untidy, and
+   that rounding correctly needs `meta.priceHint` — 2 for `AAPL`, 4 for
+   `EURUSD=X` — which would make a stored column's precision depend on a source
+   field that a later refresh can change with nothing failing.
+
+5. **`NYSE` is registered — approved by Amino 2026-08-11.** It is a row in the
+   Glossary's [Abbreviations table](../glossary.md#abbreviations), beside `LSE` and
+   `SEC`, expanding to **New York Stock Exchange**. It is shorthand rather than
+   Domain Language — the Abbreviations table says so of itself: *"These are **not**
+   Domain Language terms — they are shorthand"* — so it carries no definition and
+   no status, and no Section C row was needed. It reached a document only because
+   R18 moved the reasoning about NASDAQ Trader's second file out of a code comment
+   and into this review; the failing checker is quoted under *Verification* below.
+
+**Verification after the change**
+
+Comment and document text only, so the point of re-running is to show that nothing
+moved:
+
+```
+$ uv run python -m veritas.ingestion
+  mode: replay (offline)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+  removed data/veritas.duckdb — rebuilding
+
+    dim_account                   0 rows
+    dim_client                    0 rows
+  · dim_instrument               19 rows
+    fct_accounting_movement       0 rows
+    fct_balance_snapshot          0 rows
+    fct_cash_movement             0 rows
+    fct_fx_rate                   0 rows
+  · fct_instrument_price       9549 rows
+    fct_position_snapshot         0 rows
+    fct_trade                     0 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9549 Market Prices across all 19
+exit: 0
+```
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+  [unchanged from the run recorded above — same 9549 rows, same three
+   counterfactual measurements, same 1.196 largest ratio, same seam scan]
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit: 0
+```
+
+```
+$ uv run python .claude/scripts/check_language.py
+  glossary: 88 registered terms
+  proposed terms: 0 · python files scanned: 12 · identifiers: 437
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+**It failed first, and the failure is worth keeping:** *"'NYSE' is used in the
+documents but is neither in the Glossary's Abbreviations table nor in the exempt
+list"*. Moving the NYSE reasoning out of a code comment and into this review put
+the abbreviation into a document for the first time, where the checker reads it —
+code docstrings are scanned for identifiers, not prose. Registering it (item 5
+above) is why the two counts here are 88 and 24 against the 87 and 23 of the run
+recorded earlier in this Sub-step.
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  skill ok   closing-a-substep       652 words
+  skill ok   planning-a-step         564 words
+  skill ok   recording-debt          849 words
+  skill ok   registering-language    564 words
+  skill ok   writing-an-adr         1037 words
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+```

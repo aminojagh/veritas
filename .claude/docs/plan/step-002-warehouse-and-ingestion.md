@@ -1,8 +1,9 @@
 # Step 002 — Build the Warehouse and fill it
 
 - **Status:** active — written and **approved by Amino on 2026-08-05**, together
-  with every ruling in [Rulings](#rulings). Sub-step 2.1 is **committed**
-  (`5a061a7`). **Amended 2026-08-10 — see [R16](#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10):**
+  with every ruling in [Rulings](#rulings). Sub-steps 2.1 (`5a061a7`) and 2.2
+  (`0fc5a34`) are **committed**; 2.3 is built and awaiting review.
+  **Amended 2026-08-10 — see [R16](#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10):**
   the original Sub-step 2.2 splits into three, and [R6](#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
   fires, so the sqlglot spike leaves this Step. **The amendment was approved by
   Amino on 2026-08-10, and Sub-step 2.2 may begin.**
@@ -72,8 +73,8 @@ changed.
 
 ```
 veritas/warehouse/     ← 2.1   the adapter and the star schema (empty)   ✅ committed 5a061a7
-veritas/ingestion/     ← 2.2   dim_instrument         NASDAQ Trader · SEC
-                       ← 2.3   fct_instrument_price   Yahoo, by snapshot-and-replay
+veritas/ingestion/     ← 2.2   dim_instrument         NASDAQ Trader · SEC   ✅ committed 0fc5a34
+                       ← 2.3   fct_instrument_price   Yahoo, by snapshot-and-replay   ✅ built
                        ← 2.4   fct_fx_rate            Frankfurter
                        ← 2.5   synthetic sources:     Trades · Cash · Positions · balances
 ```
@@ -113,8 +114,9 @@ are four unrelated failures with four unrelated fixes.
 
 R1–R6 settled by Amino on 2026-08-05, before any code; R7–R10 on the same day,
 during Sub-step 2.1; R11–R15 on 2026-08-06, from his review of it; **R16 on
-2026-08-10**, with it. Recorded here so the Step is implemented against decisions
-rather than assumptions.
+2026-08-10**, with it; **R17–R18 on 2026-08-11**, from his review of Sub-step 2.3.
+Recorded here so the Step is implemented against decisions rather than
+assumptions.
 
 ### R1 — `Execution Price` → **approved and required**
 
@@ -261,6 +263,35 @@ Frankfurter.
 **What this does not change:** every ruling R1–R15 stands, no Sub-step's content is
 dropped, and the Step's Goal is untouched. Three commits now carry what one
 carried, in the order the foreign keys allow.
+
+### R17 — ADR-0004 is accepted → **approved by Amino 2026-08-11**
+
+[ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md) was written in
+Sub-step 2.2 and left `proposed`; Sub-step 2.3 then built on both of its decisions
+— every source read through one snapshot-and-replay mechanism, and dlt stopping at
+`raw`. Current State flagged the stale status rather than flipping it, on the
+ground that *"a status that Claude flips is not a decision anybody made"*. Amino
+made it: the ADR is now **`accepted`**, dated 2026-08-11 in the ADR itself and in
+[the ADR index](../adr/README.md). Nothing in its Decision or Consequences
+changed — this ruling settles its status, not its content.
+
+### R18 — a measurement is dated evidence, and lives in a review → **approved by Amino 2026-08-11**
+
+Raised against `fct_instrument_price.sql`'s *"300 of the 521 bars in each currency
+pair's snapshot fall on a different date under the two readings"*, then **widened
+by Amino the same day** to every figure a later run could refute or resize, in any
+file. The rule as it now stands: such a figure is written as evidence — what was
+measured, when, under what settings, and the command that reproduces it — kept in
+the Step Review that produced it, with code comments, the Glossary, ADRs and plans
+**referring** to it rather than restating the number.
+
+The rule and its reasoning live in
+[CLAUDE.md](../../../CLAUDE.md#writing-conventions); this ruling records that it
+was Amino's and when. Two sweeps followed: the ingestion code and
+`check_warehouse.py` on the first pass, then `schema.sql`'s Adjusted Close figure
+and the Glossary row behind it on the second — both recorded in the Sub-step 2.3
+review under
+[Changes made on review](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11).
 
 ---
 

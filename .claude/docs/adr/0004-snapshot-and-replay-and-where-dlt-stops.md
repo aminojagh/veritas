@@ -1,7 +1,7 @@
 # ADR-0004 — Every real source is snapshot-and-replayed, and dlt stops at `raw`
 
-- **Status:** proposed
-- **Date:** 2026-08-10
+- **Status:** accepted
+- **Date:** 2026-08-10 — accepted by Amino 2026-08-11, with Sub-step 2.3's review
 - **Decided in:** Step 002, Sub-step 2.2
 
 ## Context

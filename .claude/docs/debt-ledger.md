@@ -29,7 +29,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | ID | Title | Size | Trigger | Status |
 |---|---|---|---|---|
 | [DEBT-001](#debt-001--framework-rules-rely-on-discipline-not-enforcement) | Framework rules rely on discipline, not enforcement | M | A rule is broken in practice | open |
-| [DEBT-002](#debt-002--market-prices-depend-on-an-unofficial-endpoint) | Market prices depend on an unofficial endpoint | S | Before any reproducibility claim in `README.md` | open |
+| [DEBT-002](#debt-002--market-prices-depend-on-an-unofficial-endpoint) | Market prices depend on an unofficial endpoint | S | Before any reproducibility claim in `README.md` | **paid** (Sub-step 2.3) |
 | [DEBT-003](#debt-003--no-market-price-vendor-so-single-bonds-and-options-are-out-of-scope) | No Market Price vendor, so single bonds and options are out of scope | L | Any requirement to hold a single bond or an option | open |
 | [DEBT-004](#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal) | The FX-date distinction is too small to be a reliable evaluation signal | S | Building the Gold Question Set | open |
 | [DEBT-005](#debt-005--moved-to-ext-002) | Nothing detects Semantic Layer drift from the Warehouse | M | — | moved → [EXT-002](extension-register.md#ext-002--semantic-layer-drift-detection) |
@@ -39,7 +39,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL | open |
 | [DEBT-010](#debt-010--movement_type-has-no-registered-value-vocabulary) | `movement_type` has no registered value vocabulary | S | The first Cash Movement row is generated | **paid** (Sub-step 2.1) |
 
-**Open debt:** 6 · **Paid:** 1 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 5 · **Paid:** 2 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -174,7 +174,7 @@ document rule.
 
 ### DEBT-002 — Market prices depend on an unofficial endpoint
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 2.3, 2026-08-10, under trigger 1
 - **Opened:** Sub-step 1.2 (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** S
 - **Location:** design-level — `.claude/docs/design/data-availability.md` §3; will
@@ -237,6 +237,35 @@ those files — see [ADR-0004](adr/0004-snapshot-and-replay-and-where-dlt-stops.
 mitigation landing *before* the pipeline is the ordering the trigger wanted; the
 condition it guards against, a pipeline existing with no snapshot behind it,
 cannot now occur.
+
+**Paid, Sub-step 2.3 (2026-08-10).** Trigger 1 fired — *"the market-price
+ingestion pipeline is written"* — and the snapshot did land in the same Sub-step,
+because 2.2 had already put it there. `veritas/ingestion/sources.py` reads the
+`timestamp` and `indicators` blocks of the nineteen committed chart responses,
+`veritas/warehouse/builds/fct_instrument_price.sql` turns them into 9,549 Market
+Prices, and no socket is opened on the way: `uv run python -m veritas.ingestion`
+builds the whole Warehouse from a clean clone with the network off. The endpoint
+is now needed only to *refresh* the snapshot, never to run Veritas — which is the
+mitigation this entry was opened to buy, and it is stronger than the fix it stood
+in for, because it survives the endpoint disappearing rather than merely surviving
+it changing.
+
+**What paying it does not buy, stated so nobody reads more into it than is
+there.** The dependency is mitigated, not removed. Three things stay true:
+
+- **Triggers 2 and 3 are still live.** `README.md` does not exist yet, so the
+  reproducibility claim trigger has not fired; when it does, what the README may
+  say is *"reproducible from committed snapshots"*, not *"reproducible from
+  Yahoo"*.
+- **A refresh can still fail, and a stale snapshot is silent.** Nothing detects
+  that a committed snapshot no longer matches what the source would return —
+  recorded as an accepted cost in
+  [ADR-0004](adr/0004-snapshot-and-replay-and-where-dlt-stops.md) rather than as
+  new debt, because the data is historical and a stale 2025 window is still a
+  correct 2025 window.
+- **The window is fixed at two years by `YAHOO_RANGE`.** Widening it needs the
+  endpoint alive. That is a refresh-time dependency, which is exactly where this
+  entry wanted the dependency to end up.
 
 ---
 

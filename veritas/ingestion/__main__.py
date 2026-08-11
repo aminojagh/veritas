@@ -4,9 +4,10 @@
     uv run python -m veritas.ingestion --refresh    # re-hit every source
 
 Builds the Warehouse from nothing, in the one order the foreign keys permit:
-dimensions before facts. After Sub-step 2.2 that means `dim_instrument` and the
-other nine tables empty, which is a Warehouse that runs end-to-end rather than a
-half-wired one.
+dimensions before facts. After Sub-step 2.3 that means `dim_instrument` and
+`fct_instrument_price` — the traded Instrument universe and two years of daily
+Market Prices for it — with the other eight tables empty. Each Sub-step adds a
+source to a pipeline that already runs end-to-end rather than half-wiring one.
 
 **The Warehouse is rebuilt from scratch on every run.** `schema.sql` uses plain
 `CREATE TABLE`, so there is nothing to reconcile against an existing file, and a
@@ -45,6 +46,7 @@ FETCHED_TABLES = (
     ("nasdaq_symbol", sources.nasdaq_symbols),
     ("sec_registrant", sources.sec_registrants),
     ("yahoo_instrument", sources.yahoo_instruments),
+    ("yahoo_price", sources.yahoo_prices),
 )
 
 DERIVED_TABLES = (
@@ -52,9 +54,11 @@ DERIVED_TABLES = (
     ("yahoo_instrument_type", sources.yahoo_instrument_types),
 )
 
-# The star tables built so far, in foreign-key order. Sub-steps 2.3 and 2.4 append
-# to this tuple; nothing else in this file changes when they do.
-BUILDS = ("dim_instrument",)
+# The star tables built so far, in foreign-key order — dim_instrument must hold a
+# row before fct_instrument_price may reference it, and the engine enforces that
+# rather than trusting this tuple. Sub-steps 2.4 and 2.5 append to it; nothing
+# else in this file changes when they do.
+BUILDS = ("dim_instrument", "fct_instrument_price")
 
 
 def raw_resources(*, refresh: bool) -> list[object]:
@@ -101,13 +105,24 @@ def load_raw(*, refresh: bool) -> None:
     pipeline.run(raw_resources(refresh=refresh))
 
 
-def build_star_schema() -> dict[str, int]:
-    """Create the star schema and fill it from `raw`. Returns row counts."""
+def build_star_schema() -> tuple[dict[str, int], int]:
+    """Create the star schema and fill it from `raw`.
+
+    Returns the row count of every star table, and how many distinct Instruments
+    `fct_instrument_price` carries a price for. The second number is what a bare
+    row count cannot say: a large pile of price rows covering every Instrument but
+    one is a Warehouse where one Position can never be marked, and it looks
+    entirely healthy in a listing.
+    """
     with WarehouseAdapter() as warehouse:
         warehouse.create_schema()
         for build_name in BUILDS:
             warehouse.run_build(build_name)
-        return {name: warehouse.row_count(name) for name in warehouse.tables()}
+        counts = {name: warehouse.row_count(name) for name in warehouse.tables()}
+        ((priced_instruments,),) = warehouse.query(
+            "SELECT count(DISTINCT instrument_id) FROM fct_instrument_price"
+        )
+        return counts, priced_instruments
 
 
 def main() -> int:
@@ -158,24 +173,41 @@ def main() -> int:
                 print(f"    rewritten  {name}")
         return 1
 
-    counts = build_star_schema()
+    counts, priced_instruments = build_star_schema()
 
     print()
     for table_name, count in sorted(counts.items()):
         marker = "·" if count else " "
         print(f"  {marker} {table_name:24} {count:>6} rows")
 
+    # Every source must have arrived for every Instrument. Both failures below are
+    # silent ones: the pipeline completes, the listing looks plausible, and the
+    # Warehouse is short. Neither is a judgement about the *values* — that is
+    # `check_warehouse.py --sources`, which re-derives them from the snapshots.
+    expected = len(TRADED_INSTRUMENTS)
     loaded = counts.get("dim_instrument", 0)
+    prices = counts.get("fct_instrument_price", 0)
     print()
-    if loaded != len(TRADED_INSTRUMENTS):
+    if loaded != expected:
         print(
             f"FAIL — dim_instrument holds {loaded} rows for "
-            f"{len(TRADED_INSTRUMENTS)} traded Instruments; a symbol lost its "
+            f"{expected} traded Instruments; a symbol lost its "
             f"metadata on the way in"
         )
         return 1
+    if priced_instruments != expected:
+        print(
+            f"FAIL — fct_instrument_price covers {priced_instruments} of "
+            f"{expected} Instruments; the rest can hold a Position that can "
+            f"never be marked"
+        )
+        return 1
 
-    print(f"PASS — the Warehouse is built · dim_instrument holds {loaded} Instruments")
+    print(
+        f"PASS — the Warehouse is built · dim_instrument holds {loaded} "
+        f"Instruments · fct_instrument_price holds {prices} Market Prices "
+        f"across all {priced_instruments}"
+    )
     return 0
 
 
