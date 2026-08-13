@@ -212,6 +212,14 @@ CREATE TABLE fct_cash_movement (
 -- this row is where it is computed from. Section C's Realised/Unrealised pair is
 -- the reason it cannot live on a Position — one is banked, one is a market
 -- opinion, and only the banked one is a ledger entry.
+--
+-- `amount` carries the **magnitude** recognised, positive, exactly as fct_trade
+-- stores the same three charges — so the Glossary's own formula is literally true
+-- against this table: Net Revenue = Σcommission − Σrebate − Σfee. `realised P&L`
+-- is the one signed value, because a loss is genuinely negative. This is *not*
+-- the convention of fct_cash_movement.amount above, which is signed from the
+-- Account's side; the two tables answer different questions and a single
+-- convention across both would make one of them read backwards.
 CREATE TABLE fct_accounting_movement (
     accounting_movement_id BIGINT  PRIMARY KEY,
     account_id             BIGINT  NOT NULL REFERENCES dim_account(account_id),

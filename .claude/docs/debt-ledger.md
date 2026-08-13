@@ -36,10 +36,13 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently) | No ad-hoc exploration | — | — | **accepted** (permanent) |
 | [DEBT-007](#debt-007--moved-to-ext-003) | Metric authoring does not scale beyond a hand-written corpus | L | — | moved → [EXT-003](extension-register.md#ext-003--metric-authoring-at-scale) |
 | [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers) | The access-control story promises more than it delivers | S | Any access-control claim in `README.md` or the App | open |
-| [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL | open |
+| [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL — **🔴 fired** | open, **paying in 2.6** |
 | [DEBT-010](#debt-010--movement_type-has-no-registered-value-vocabulary) | `movement_type` has no registered value vocabulary | S | The first Cash Movement row is generated | **paid** (Sub-step 2.1) |
+| [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level) | Execution Price against Market Price cancels at book level | S | Building the Gold Question Set | open |
+| [DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The price table is sparse, so the Snapshot calendar has holes | M | The first "as of" date chosen by anything but the Snapshot calendar | open |
+| [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
 
-**Open debt:** 5 · **Paid:** 2 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 8 · **Paid:** 2 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -584,11 +587,50 @@ One draft of `check_warehouse.py --sources` did interpolate a table name into a
 there is still no component outside `veritas/warehouse/` emitting SQL, and the
 scan would still pass vacuously.
 
+**Status note, Sub-step 2.5 (2026-08-11) — the trigger's wording is now the
+question, not the code.** The seven new build scripts sit in
+`veritas/warehouse/builds/` like the three before them, and none of them uses a
+DuckDB-specific name at all — they are projections and casts. So the *dialect*
+half of this entry is exactly where it was.
+
+What 2.5 makes impossible to keep saying is that no component outside the adapter
+emits SQL. Two do: `veritas/ingestion/__main__.py` has held SELECT text since 2.2,
+and `veritas/ingestion/simulator.py` reads the three real star tables through the
+adapter in 2.5. Both are standard SQL — no dialect name, nothing assembled from a
+value — which is why earlier Sub-steps read the trigger as meaning *dialect* SQL
+and reported it unfired. That reading is defensible and it is not what the trigger
+says. **Amino's call:** reword the trigger to name the first dialect-specific
+construct outside the adapter, or accept that it has fired and the scan is owed.
+Recorded rather than decided, because narrowing a trigger to keep an entry unfired
+is the failure this Ledger exists to prevent.
+
 Repayment did get cheaper, for a reason worth recording: **`sqlglot` is now an
 installed dependency**, pulled in transitively by dlt (`sqlglot==30.15.0`). The
 repayment plan above assumed it would arrive with the Validation Gate spike, which
 [R6](plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
 has since moved to Step 003. It is available now regardless.
+
+**🔴 Trigger fired — Amino's ruling, 2026-08-13.** The question this entry put to
+him was whether to reword the trigger or accept that it had fired. **He accepted
+that it has fired, and the scan is owed.** The trigger is not narrowed: two modules
+outside `veritas/warehouse/` hold SQL text, which is what the sentence says, and
+rewriting the sentence to keep the entry unfired is the move Non-Negotiable #2
+exists to prevent.
+
+**Scheduled, not deferred.** Payment is
+[Sub-step 2.6](plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13) —
+after Sub-step 2.5 is committed and **before Step 003 is planned**, on Amino's
+instruction that the two land as separate commits. The entry stays `open` until
+that Sub-step is verified; a debt marked paid before the code exists is the
+bookkeeping this Ledger is supposed to make impossible.
+
+What 2.6 owes, from *What we should have done* above: a scan of the SQL text in
+every module outside `veritas/warehouse/` for DuckDB-specific function names, with
+the dialect list derived from `sqlglot` rather than typed by hand. It now has real
+examples to run against — `veritas/ingestion/__main__.py` and
+`veritas/ingestion/simulator.py` — so it can be shown to pass on standard SQL and
+to fail on a dialect name, which is the mutation test that stops it passing
+vacuously.
 
 ---
 
@@ -693,3 +735,230 @@ following `instrument_type`'s *"currency pair"* and `trade_side`'s *"buy"*, with
 `realised P&L` keeping its registered capitalisation the way `ETF` does. Changing
 any of them is a one-line edit in `schema.sql` while the tables are empty; it stops
 being free once 2.5 has loaded rows.
+
+---
+
+### DEBT-011 — Execution Price against Market Price cancels at book level
+
+- **Status:** open
+- **Opened:** Sub-step 2.5 (`.claude/docs/reviews/step-002-warehouse-and-ingestion.md`)
+- **Size:** S
+- **Location:** `veritas/ingestion/simulator.py` — `MIN_EXECUTION_DRIFT` and
+  `MAX_EXECUTION_DRIFT`; the `Execution Price` / `Market Price` row of Glossary
+  Section C
+
+**What we did**
+
+Generated Execution Prices that sit either side of the day's close, drawn
+symmetrically, and accepted what that does to the pair in aggregate. Every Trade
+individually is priced away from the close — `check_warehouse.py --distinctions`
+prints how many and by how much — but summing a whole book of them cancels the
+difference almost exactly, so Traded Notional valued at Execution Price and the
+same notional valued at the close come out nearly equal.
+
+This is the same failure mode as
+[DEBT-004](#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal),
+on a different Section C row, and it is filed separately because the two have
+different causes and different fixes. DEBT-004 is about a window with too little
+FX movement in it; this is about an aggregation that cancels a symmetric quantity.
+
+**What we should have done**
+
+Nothing different in the simulator. A fill is above the close as often as below —
+that is what Section C's own wording says, *"a Trade fills at whatever the market
+gave it at that moment, which is not the close except by coincidence"* — and
+introducing a systematic bias so that a book-level total diverges would be shaping
+the data to pass our own check. The real half-spread on these instruments is one
+to five basis points, which would not move the aggregate either.
+
+The gap is in **what a gold question may ask**, not in the data.
+
+**Why we deferred**
+
+The Gold Question Set does not exist yet, and the shape of the fix belongs to it:
+a question turning on this pair has to be scoped to one Account, one Instrument or
+one day, where the difference is the full per-Trade size rather than the residue
+of a cancellation. Deciding that now would be guessing at requirements that do not
+exist.
+
+**Cost while unpaid**
+
+Identical in shape to DEBT-004's, and worth restating because it is the dangerous
+kind: a gold question that asks for book-level Traded Notional and accepts an
+answer computed at the close would score a **wrong answer as correct**, because
+the wrong number is inside any plausible tolerance. Veritas would report accuracy
+on a distinction it did not actually make.
+
+**Trigger**
+
+When the Gold Question Set is built. Any gold question turning on Execution Price
+against Market Price must be scoped narrowly enough that the two differ by more
+than the result comparison's tolerance — the per-Trade figures are printed by
+`uv run python .claude/scripts/check_warehouse.py --distinctions` — or the
+question must be left out and the limitation stated.
+
+---
+
+### DEBT-012 — The price table is sparse, so the Snapshot calendar has holes
+
+- **Status:** open
+- **Opened:** Sub-step 2.5 (`.claude/docs/reviews/step-002-warehouse-and-ingestion.md`),
+  on Amino's approval of the intersection calendar (2026-08-13)
+- **Size:** M
+- **Location:** `veritas/warehouse/builds/fct_instrument_price.sql` (the table is
+  sparse per Instrument) and `veritas/ingestion/simulator.py` — `snapshot_dates`
+  in `read_market_data` (which narrows the Snapshot calendar in consequence)
+
+**What we did**
+
+Wrote a Snapshot on the dates **every** Instrument has a Market Price, rather than
+the dates **some** Instrument does. That choice is right and is approved: on a date
+the union includes and the intersection does not, some exchange was shut, so a
+Position in an Instrument listed there has no Market Price and an Account Value
+containing it would be silently short by a holding. The argument is in the
+[Sub-step 2.5 review](reviews/step-002-warehouse-and-ingestion.md#the-decision-this-sub-step-had-to-make-which-dates-a-snapshot-is-written-on).
+
+**The shortcut is one layer below that choice, and it is what this entry records.**
+`fct_instrument_price` is sparse: it holds a row only on the dates an Instrument's
+own exchange traded. Given a sparse price table the intersection is the only safe
+calendar, so the dates on which some markets traded and some did not carry no
+Snapshot at all. `--sources` prints both counts on every run:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+    calendars: N dates have a price for at least one Instrument · M have one for all …
+```
+
+The figures for the currently committed window are dated evidence in the
+[same review](reviews/step-002-warehouse-and-ingestion.md#the-decision-this-sub-step-had-to-make-which-dates-a-snapshot-is-written-on).
+
+**What we should have done**
+
+Make the price table dense, so that the intersection and the union are the same
+set and the choice above stops being a choice. Concretely: fill
+`fct_instrument_price` forward across every date any Instrument traded, and carry
+a column saying whether a row is a close the exchange actually printed or one
+carried from the previous session. Marking a holding at the last available close
+on a day its own market was shut is what portfolio valuation does; what makes it
+safe rather than a stale number is that the row says which it is, so a metric can
+exclude carried rows and a Lineage can name them.
+
+This is the shape `fct_fx_rate` already has. Sub-step 2.4 stored rates densely
+over calendar dates precisely so that no metric downstream has to fill forward for
+itself, and the review's own argument against a stale mark — *"it would have to be
+re-derived by every future metric"* — is an argument for storing the fill once,
+not for dropping the date. Two tables in one Warehouse answering "what was true on
+D" by opposite conventions is the incoherence worth removing.
+
+**Why we deferred**
+
+Sub-step 2.5's job was the client side, and the intersection made every Position
+markable on the day it was chosen — the pipeline refuses to complete otherwise, so
+nothing silent is riding on it. Adding a provenance column to
+`fct_instrument_price` changes the schema, the build, the Snapshot calendar, and
+therefore every one of the seven simulated tables that hangs off it; doing that
+inside the Sub-step that first filled them would have mixed a schema change into a
+generation change.
+
+**Cost while unpaid**
+
+**An "as of" question about one of the missing dates has no answer, and the
+absence looks like a zero.** Every Snapshot-grain metric — Cash Balance, Account
+Value, Unrealised P&L, Position Change — is an equality join on `snapshot_date`,
+which is the property `Snapshot` is registered for. On a date the calendar skips,
+that join returns no rows, and *no rows* is exactly what an Account holding
+nothing returns. A user asking what a Client was worth on a date the Tokyo
+exchange was shut gets silence or a zero rather than "that date is not in the
+Snapshot calendar", which is the wrong-number-with-a-plausible-explanation this
+project exists to prevent.
+
+Two smaller consequences follow from the same hole: a period filter whose boundary
+lands on a missing date silently uses a different boundary, and a Position Change
+across one is attributed to the next Snapshot date.
+
+**Trigger**
+
+The first "as of" date that is chosen by anything other than the Snapshot calendar
+itself. In practice, whichever of these lands first:
+
+1. A gold question naming a date — the Gold Question Set is where a date gets
+   picked for a reason unrelated to which dates happen to exist.
+2. The App accepting a date from a user.
+3. A Dimension Definition whose period boundary is a calendar date rather than a
+   Snapshot date.
+
+Until one of those exists, every date anything asks about comes from the calendar
+itself and the hole cannot be reached. After one of them exists it can be reached
+by accident, which is why the trigger is the arrival of the first one rather than
+the first wrong answer.
+
+---
+
+### DEBT-013 — The decisions that move a number live only in internal reviews
+
+- **Status:** open
+- **Opened:** Sub-step 2.5, on Amino's instruction (2026-08-13)
+- **Size:** M
+- **Location:** `.claude/docs/reviews/` (where the decisions are), `README.md` (not
+  yet written), and the code comments that cite a review rather than a public
+  document — `read_market_data` in `veritas/ingestion/simulator.py` is the example
+  that prompted this
+
+**What we did**
+
+Recorded every judgement call that changes a number a reader will see in the Step
+Review that made it. Step Reviews are the **internal working record** — `CLAUDE.md`
+says so directly: *"`README.md` is the public face for Zoomcamp reviewers. The
+`.claude/docs/` tree is the working record."* So there is currently no document a
+domain expert can open to find out how a figure was arrived at.
+
+The decisions this already applies to, all from Sub-step 2.5 and all approved:
+
+| Decision | What it changes |
+|---|---|
+| **Cost Basis uses average cost**, not first-in-first-out | Realised P&L on every partial sale |
+| **Realised P&L is gross of Commission** | Realised P&L against Gross Revenue — netting would count one charge twice |
+| **The Snapshot calendar is the intersection** of the Instruments' trading calendars ([DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)) | Which dates an "as of" question can be asked about |
+| **The two movement tables carry opposite sign conventions** | Whether Net Revenue = Σcommission − Σrebate − Σfee reads true against the ledger |
+
+The list is not closed — it grows with every remaining Step, which is the reason
+this is a documentation pass rather than a document to start now.
+
+**What we should have done**
+
+Publish a **user-facing decision register**: one document, written in the reader's
+terms rather than ours, naming each decision, the number it moves, what a reader
+should conclude when they see that number, and a link to the internal review that
+argued it. `README.md` links to it, and any code comment that today explains a
+decision at length instead points at it — one explanation, one home.
+
+The general rule this instantiates, which applies to the whole project and not
+only to these four: **a decision that changes a number a user will see needs a
+place the user can find it.** A review is evidence for us; it is not documentation
+for them.
+
+**Why we deferred**
+
+Amino's instruction on 2026-08-13: *"don't do it now, just plan it for final steps
+of the project when we want to finalize docs and submit for peer review and
+evaluation."* Writing it now means maintaining a public document through every
+remaining Step, and the register is most useful — and cheapest — written once when
+the set of decisions is complete.
+
+**Cost while unpaid**
+
+A reviewer with domain knowledge is exactly the reader most likely to notice a
+Realised P&L figure and ask which cost convention produced it, and exactly the
+reader with nowhere to look. They are then left to either assume first-in-first-out
+(and read every P&L figure as wrong) or read the source. Both outcomes damage the
+thing the project is arguing for: that a number you cannot trace is a number you
+should not trust. Making that mistake about our own numbers is the same own goal
+[DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers)
+names on access control.
+
+**Trigger**
+
+The final documentation pass — when `README.md` is written for peer review and
+evaluation. That is the same pass [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers)
+fires on, and they should be paid together: both are about a public document
+saying exactly what is true and no more.

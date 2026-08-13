@@ -44,8 +44,9 @@ reason) · `superseded`.
 | [EXT-005](#ext-005--semantic-layer-coherence-checks) | Semantic Layer coherence checks | Metric Definition fields · the same sqlglot parse as EXT-002 | M | open |
 | [EXT-006](#ext-006--position-change-attribution) | Position Change attribution | `fct_position_snapshot` · the `Position Change` Metric Definition | M | open |
 | [EXT-007](#ext-007--corporate-actions) | Corporate actions | `fct_instrument_price` · `fct_position_snapshot` · the P&L Metric Definitions | M | open |
+| [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration) | The data checks run in continuous integration | `check_warehouse.py` · `check_data_availability.py` · the one-command bring-up | M | open |
 
-**Open:** 7 · **Built:** 0 · **Dropped:** 0
+**Open:** 8 · **Built:** 0 · **Dropped:** 0
 
 ### Target State extension path, mapped
 
@@ -456,3 +457,92 @@ Either: the Warehouse is pointed at real (non-synthetic) client data, which will
 already contain corporate actions; or the loaded price window can no longer be
 kept split-free — for example a longer history, or a held Instrument chosen for a
 reason other than our convenience.
+
+---
+
+### EXT-008 — The data checks run in continuous integration
+
+- **Status:** open
+- **Opened:** Sub-step 2.5, on Amino's question about where the two data checks
+  belong (2026-08-13)
+- **Size:** M
+- **Seam:** `.claude/scripts/check_warehouse.py` and
+  `.claude/scripts/check_data_availability.py` as command-line programs that carry
+  a non-zero exit code, and `uv run python -m veritas.ingestion` as the
+  one-command, network-free bring-up they run against
+- **Motivated by:** [ADR-0004](adr/0004-snapshot-and-replay-and-where-dlt-stops.md)'s
+  accepted cost — nothing detects that a committed snapshot no longer matches what
+  the source would return — and
+  [EXT-002](#ext-002--semantic-layer-drift-detection), whose seam is *"the
+  continuous-integration check"* that does not yet exist
+
+**Two kinds of script share one directory, and only one kind is ours**
+
+`.claude/scripts/` holds four programs, and they answer to different authorities:
+
+| Script | What it checks | Whose rule |
+|---|---|---|
+| `verify_framework.py` | documents exist, links and anchors resolve, skills load | the framework in `CLAUDE.md` |
+| `check_language.py` | Glossary terms, writing conventions | the framework in `CLAUDE.md` |
+| `check_warehouse.py` | the schema, the constraints, the adapter seam, the loaded data, the Section C pairs | the **data** |
+| `check_data_availability.py` | the sources are reachable, key-free, and still contain the traps | the **data** |
+
+The first two check that the way we work is intact, and they stop mattering the
+day the framework does. The last two check that **the numbers are right**, which is
+the project's subject, and they keep mattering for as long as anything reads the
+Warehouse. Nothing today runs any of them except a person remembering to.
+
+**What the full system needs**
+
+1. **A continuous-integration job on every change** that builds the Warehouse
+   offline from the committed snapshots and runs
+   `check_warehouse.py --sources` and `--distinctions`. Every one of the checks
+   they carry — every price re-derived from its snapshot, every rate, every
+   constraint, every Section C pair, the adapter seam, the determinism of the
+   simulated half — becomes a gate rather than a habit.
+2. **A scheduled job** running `check_data_availability.py --refresh`, which is the
+   only thing that would notice a source dying or a wrong-number trap
+   disappearing. It opens a socket, so it belongs on a schedule and not on a
+   change.
+3. **A home outside `.claude/`** for the two data checks, decided at the same time.
+   `.claude/` is the working directory of the framework, and a check that a
+   continuous-integration pipeline depends on is not a framework artefact.
+
+**What the slice does instead, and why that is correct here**
+
+The scripts are written, committed, and run by hand — their output is pasted into
+the Step Review that made the claim, with the command that produced it, which is
+what Non-Negotiable #4 requires. That is genuinely sufficient at this scale: one
+author, one machine, and a review of every Sub-step by the person who commits it.
+Continuous integration adds nothing a review by Amino does not already do, on a
+repository where every change passes through him.
+
+**Why this is an extension and not debt**
+
+The scripts are right as they stand. There is no shortcut inside them to repay —
+they exit non-zero, take no arguments they cannot document, and run offline. What
+is missing is a **pipeline to run them in**, and this repository has none at all;
+adding one now would be building infrastructure for a team of one. The trigger
+test settles it: *"a continuous-integration pipeline exists"* cannot fire inside
+this project's life unless we choose to make it fire, which is the definition of a
+wish rather than a trigger.
+
+**One caveat worth stating rather than assuming.** Both scripts check *toy*
+sources today — a committed Yahoo snapshot and a seeded simulator. When the
+Warehouse points at a real source, `check_data_availability.py` may have nothing
+left to check and `check_warehouse.py --distinctions` loses its re-derivation half
+entirely, because the simulator stops being the source. So this extension should be
+built **after** that migration, not before: what a pipeline should run depends on
+what the sources are, and deciding it now would be deciding it against sources that
+are about to be replaced.
+
+**Readiness**
+
+Any one of:
+
+1. A continuous-integration pipeline exists in the repository for any reason —
+   at which point these two scripts are the first thing it should run.
+2. A second person can change the repository, so "Amino reviews every commit"
+   stops being the enforcement mechanism.
+3. The Warehouse is pointed at real sources, which is when the checks' subject
+   changes and their content has to be re-decided anyway.

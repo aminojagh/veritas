@@ -1998,3 +1998,567 @@ Both dead anchors were caught, both live ones passed silently, and the same-file
 control file was then deleted and the run above re-run to confirm the tree is clean;
 it is not committed, because a fixture that must be deleted to make the suite pass
 belongs in the transcript rather than in the repository.
+
+---
+
+## Sub-step 2.5 — Generate seeded synthetic client activity
+
+**What changed**
+
+The Warehouse is full. All ten tables of Glossary Section B hold rows, the seven
+client-activity ones for the first time, and `uv run python -m veritas.ingestion`
+builds every one of them from a clean clone with no network. This is the second
+half of the `Ingestion` term — *"market data real, client activity synthetic —
+never the reverse"* — and the end of Step 002.
+
+Four things.
+
+- **`veritas/ingestion/simulator.py`** — the seeded simulator. Two halves that do
+  not touch: `read_market_data` reads the three real star tables through the
+  adapter and returns plain Python, and `simulate` is a **pure function** of that
+  data and a seed. Every Trade is priced off a Market Price the Warehouse already
+  holds, every Position is marked at one, and every conversion goes through a real
+  FX Rate. Nothing here re-derives a price from a snapshot, which would have put a
+  second implementation of `fct_instrument_price.sql`'s transforms in the
+  repository.
+- **Seven build scripts in `veritas/warehouse/builds/`** — `dim_client`,
+  `dim_account`, `fct_trade`, `fct_cash_movement`, `fct_accounting_movement`,
+  `fct_position_snapshot`, `fct_balance_snapshot`. `dim_client.sql` carries the
+  reasoning for all seven and the other six point at it.
+- **`veritas/ingestion/__main__.py`** — a second phase, and a second dlt load. The
+  simulator runs *after* the real tables are built because it reads them, so the
+  pipeline is now: land the real sources in `raw`, build three star tables, check
+  them, read them, simulate, land the simulated rows in `raw`, build seven more.
+  Two new failures the pipeline refuses to complete on: a Position with no Market
+  Price on its own Snapshot date, and a monetary amount whose Denomination
+  Currency has no FX Rate on its own date — the second being the assertion
+  Sub-step 2.4 handed over by name, now that there is a Trade to assert against.
+- **`.claude/scripts/check_warehouse.py --distinctions`** — three checks, described
+  under *Verification*.
+
+### The decision this Sub-step had to make: which dates a Snapshot is written on
+
+R13 fixed that a Snapshot is written *"on every date the Warehouse holds a Market
+Price for"*. Sub-step 2.3 discovered that this reads two ways once the table spans
+five exchange calendars, and left the choice here. The two readings, as
+`--sources` reports them:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+    calendars: 519 dates have a price for at least one Instrument · 453 have one for all 19 (Sub-step 2.5 chooses between them)
+```
+
+**The intersection was chosen: the 453 dates every Instrument has a Market Price
+on.** The argument is markability. On a date the union includes and the
+intersection does not, some Instrument did not trade, so a Position in it has no
+Market Price on that date. There are then only two things a Snapshot can do with
+that Position, and both are worse than not writing a Snapshot that day:
+
+- **Mark it at a stale price.** That is a fill-forward, and it would have to be
+  re-derived by every future metric that touches Account Value or Unrealised P&L.
+  Storing FX Rates densely rather than making each metric fill forward was
+  precisely 2.4's decision; making the opposite choice one table over would be
+  incoherent.
+- **Leave the row out.** Then *"what was held as of D"* answers zero for something
+  that was held, which is the wrong-number-with-a-plausible-explanation this whole
+  project is about.
+
+**The cost is real and is not hidden.** Sixty-six dates on which some markets
+traded carry no Snapshot, so a Position Change across one of them is attributed to
+the next Snapshot date. That is the `Snapshot` term's own limitation — *"a Snapshot
+cannot see between its own dates"* — rather than a new one, but it is now a
+limitation with a size. The choice is load-bearing rather than cosmetic: widening
+the calendar to the union stops the pipeline dead (mutation A below).
+
+### The simulator is not a source, and still goes through `raw`
+
+Every star table in this Warehouse is filled by hand-authored SQL in
+`veritas/warehouse/builds/`, run through `run_build`. The alternative for the
+seven synthetic tables was for the pipeline to insert rows itself, which would
+have been less code — the simulator already emits Glossary vocabulary, so these
+build scripts translate nothing the way `dim_instrument.sql` translates Yahoo's
+`instrumentType`.
+
+It was rejected for three reasons, and the third is the one that decided it:
+
+1. **They are the contract.** The column list in each build is what the simulator
+   has to produce, and a column that stopped arriving would fail there rather than
+   land a null three tables downstream.
+2. **They cast.** dlt infers a wide DECIMAL for every Python `Decimal`; the star
+   schema's scale is `DECIMAL(18, 6)`. Mutation D below is that cast being wrong
+   by four decimal places, and what catches it.
+3. **One writer.** Inserting directly would make the adapter the only door for
+   three tables and one of two doors for the other seven, which is the seam
+   ADR-0002 exists to keep whole. It would also have fired
+   [DEBT-009](../debt-ledger.md)'s trigger — *"the first component outside the
+   adapter emits SQL"* — for no gain, exactly as ADR-0004 predicted when it
+   rejected the same shape for the real sources.
+
+The cost is a second dlt load in one run. The connections still never overlap:
+dlt closes before the adapter opens, the adapter closes before dlt opens again.
+
+### What the re-derivation check proves, and what it does not
+
+`check_prices` and `check_fx_rates` re-derive every row from the committed
+snapshots in Python and compare. That is a real test of the SQL, because the
+snapshot is an **independent** record of what the source said.
+
+The client side has no such record. The simulator *is* the source, so re-running
+it and comparing proves two narrower things, and it is worth being exact about
+them because the two checks look identical and are not:
+
+1. **The simulation is deterministic** — the seed is the only thing that decides
+   what is in those seven tables.
+2. **Nothing was lost or reshaped between the simulator and the star schema** —
+   dlt's inference and seven casts sit in between.
+
+It does **not** prove the simulated numbers are right; nothing could, because
+there is no outside truth to check them against. What can be checked is that the
+data has the shape the design needs, and that is what the Section C figures below
+are.
+
+**Verification**
+
+```
+$ uv run python -m veritas.ingestion
+  mode: replay (offline)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+  simulator seed: 20260811
+  removed data/veritas.duckdb — rebuilding
+
+  · dim_account                  24 rows
+  · dim_client                   12 rows
+  · dim_instrument               19 rows
+  · fct_accounting_movement    4654 rows
+  · fct_balance_snapshot      15402 rows
+  · fct_cash_movement          5921 rows
+  · fct_fx_rate               11840 rows
+  · fct_instrument_price       9554 rows
+  · fct_position_snapshot     61907 rows
+  · fct_trade                  1670 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+       the client side holds 12 Clients · 24 Accounts · 1670 Trades · every Position is markable and every amount is convertible
+```
+
+First run 2026-08-11 and **re-run 2026-08-13 after the review changes below**, both
+offline against the snapshots committed in `13b99bb`. Every row count is unchanged
+between the two — the transfer fix moves quantities, not rows — and the figures
+that did move are listed under
+[Changes made on review](#changes-made-on-review--2026-08-13-sub-step-25). Every
+figure above is a measurement and moves with a `--refresh`: the price window fixes
+the Snapshot calendar, which fixes how many Snapshot rows exist, and Yahoo's range
+is relative to the moment it is asked.
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --distinctions
+  client activity: regenerated from seed 20260811 against 453 Snapshot dates
+    dim_client                   12 rows · identical
+    dim_account                  24 rows · identical
+    fct_trade                  1670 rows · identical
+    fct_cash_movement          5921 rows · identical
+    fct_accounting_movement    4654 rows · identical
+    fct_position_snapshot     61907 rows · identical
+    fct_balance_snapshot      15402 rows · identical
+
+    fct_trade                  1670 quantities · 0 not a whole lot
+    fct_position_snapshot     61907 quantities · 0 not a whole lot
+
+  Snapshots: 453 dates · every Position has a Market Price on its own date (0 without)
+    Position Change / Trade: 3 holdings differ from the sum of their own Trades
+      account 3 · instrument 11: holds 61,307, Trades explain 36,063
+      account 5 · instrument 4: holds 102, Trades explain 255
+      account 11 · instrument 4: holds 293, Trades explain 205
+
+  1670 of 1670 Trades priced and converted to EUR
+
+  Section C — every pair, both numbers
+    Gross Revenue / Net Revenue — "reporting gross as net overstates what the business keeps"
+      Gross Revenue: 195,260.14 EUR
+      Net Revenue: 131,618.93 EUR
+      32.59% apart
+    Execution Price / Market Price — "Traded Notional at the close values trading that never happened"
+      Traded Notional at Execution Price: 262,266,110.69 EUR
+      at that date's Market Price: 262,337,407.32 EUR
+      0.03% apart
+      per Trade: 1670 of 1670 filled away from the close, the largest by 0.60%
+      at book level the two nearly cancel — see DEBT-011
+    Quotation Currency / Reporting Currency — "skipping the conversion is an FX-sized error"
+      converted to EUR: 262,266,110.69 (mixed)
+      summed unconverted: 8,312,550,002.72 (mixed)
+      96.84% apart
+
+    Trade Date / Settlement Date — "shifts revenue across period boundaries", Gross Revenue in 2025-11
+      filtered by Trade Date: 7,324.63 EUR
+      filtered by Settlement Date: 5,538.64 EUR
+      24.38% apart
+      the same row's FX half, over every Trade: 195,260.14 at each Trade Date's rate against 195,180.21 at each Settlement Date's, 0.0409% apart
+      DEBT-004: that FX half is measured against the 1% the Ledger wants for a reliable evaluation signal — does not clear it
+
+    Cash Movement / Accounting Movement — "earned on Trade Date and collected on Settlement Date", Commission in 2025-11
+      earned (Accounting): 7,324.63 EUR
+      collected (Cash): 5,534.85 EUR
+      24.44% apart
+      25 of 25 months differ by at least 0.5%
+
+    (as of the last Snapshot date, 2026-08-10)
+    Cash Balance / Account Value — "a Client with no cash and 2m of equities has a Cash Balance of zero"
+      Cash Balance: 68,302,991.96 EUR
+      Account Value (cash plus Positions marked): 114,714,721.82 EUR
+      40.46% apart
+    Realised P&L / Unrealised P&L — "one is banked, one is a market opinion"
+      Realised P&L (banked, from the ledger): 7,573,245.41 EUR
+      Unrealised P&L (open Positions, marked): 4,141,577.12 EUR
+      45.31% apart
+    Cost Basis / Execution Price — "an Execution Price is what one Trade filled at; a Cost Basis is what the whole holding cost"
+      Unrealised P&L against stored Cost Basis: 4,141,577.12 EUR
+      against the last Execution Price: 2,423,347.97 EUR
+      41.49% apart
+      over the 151 of 151 Positions on this date that a Trade touched — the rest arrived by transfer and have no last fill
+
+    Traded Notional / Trade Count — "one large trade and a thousand small ones are opposite answers"
+      busiest Account by Traded Notional: 6 (16,946,167 EUR)
+      busiest Account by Trade Count: 8 (89 Trades)
+      23 of 24 Accounts rank differently under the two
+    Client / Account — "counting Accounts and calling them clients inflates every per-client figure"
+      Clients with activity: 12 · Accounts with activity: 24
+      Gross Revenue per Client: 16,271.68 · per Account: 8,135.84 EUR
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+```
+
+**Eleven of Section C's twelve rows are measured here.** The twelfth, `Adjusted
+Close` against `Market Price`, is market data rather than client activity and is
+measured by `--sources` against the committed snapshots. Every figure is dated
+evidence from this run, on this window, and moves with a `--refresh`.
+
+Two of the eleven are close, and both are reported rather than tuned away:
+
+- **`Execution Price` / `Market Price` is 0.03% apart at book level** and 0.60% at
+  its widest on a single Trade, with all 1,670 Trades filled away from the close.
+  Fills sit either side of the close, so a book-level sum cancels them. That is a
+  true property of the quantity, not a thin simulation — and it is now
+  [DEBT-011](../debt-ledger.md), against the Gold Question Set.
+- **The FX half of `Trade Date` / `Settlement Date` is 0.0409% apart**, against the
+  1% [DEBT-004](../debt-ledger.md) wants. It does not clear it, so that entry
+  stays open with a figure measured on the full window rather than on the spike's
+  three series. The *period* half of the same row is 24.38% in its widest month,
+  which is the half a period filter actually moves.
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --sources
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_language.py
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/verify_framework.py
+PASS — framework is wired up correctly
+```
+
+**The checks were made to fail seven times before being trusted.** Each mutation
+was applied, the pipeline and the check re-run unchanged, and the file restored and
+compared byte-for-byte with `cmp`. G was added on review, on 2026-08-13, against
+the check that review produced:
+
+| Mutation | What was reported |
+|---|---|
+| A. Snapshot calendar widened to the dates *some* Instrument has a price | Pipeline raises: `the Warehouse holds no Market Price for instrument_id 4 on 2026-04-03. Its exchange did not trade that day, so a Position in it cannot be marked...` |
+| B. `TRANSFERS_IN` and `TRANSFERS_OUT` set to zero | `--distinctions` exits 1: `every holding equals the sum of its own Trades, so Position Change and Trade are the same number on this data` |
+| C. Rebate and Fee removed from every Account | `--distinctions` exits 1: `Section C pair 'Gross Revenue / Net Revenue' has collapsed: Gross Revenue is 197,457.75 and Net Revenue is 197,457.75, 0.0000% apart against a 0.50% floor` |
+| D. `fct_trade.sql` casts Execution Price to two decimal places | `--distinctions` exits 1: `1659 of 1670 rows differ from what the simulator produces from the same seed`, and separately `6 Trades filled at exactly that date's Market Price` |
+| E. Accounts in one region billed in a currency the Warehouse holds no rate for | Pipeline raises: `the Warehouse holds no FX Rate from GBP to CHF on 2024-09-02. Either the date is outside the window fct_fx_rate covers, or one of the two currencies is not one the traded universe is quoted in` |
+| F. one Market Price deleted from under a Position | `--distinctions` exits 1 with six problems, including `9 Positions have no Market Price on their own Snapshot date` |
+| G. `build_transfers` quantises to six decimal places instead of rounding to the lot — the defect this review found | `--distinctions` exits 1: `fct_position_snapshot holds 80 quantities that are not a whole lot of their own Instrument — the first is 61307.100000 of an Instrument of type 'equity', whose lot is 1` |
+
+Mutations A and E were what turned two bare `KeyError`s on a tuple into the
+sentences above: the failures were already loud, and they did not say what to do.
+
+**Determinism.** Two full rebuilds from a deleted database produce byte-identical
+output, pipeline and check alike — including every row count and every Section C
+figure:
+
+```
+$ uv run python -m veritas.ingestion > run1.txt
+$ uv run python .claude/scripts/check_warehouse.py --distinctions > check1.txt
+$ uv run python -m veritas.ingestion > run2.txt
+$ uv run python .claude/scripts/check_warehouse.py --distinctions > check2.txt
+$ diff run1.txt run2.txt && diff check1.txt check2.txt && echo IDENTICAL
+IDENTICAL
+```
+
+Determinism is not left to `Random` being seeded. Every draw in the simulator goes
+through three helpers — `pick`, `happens`, `take` — that bottom out in
+`randrange`, because `choice` and `sample` are library implementations that have
+changed shape before, and a simulation whose output moves on a Python upgrade is
+not the reproducible bring-up the Target State promises. The same helpers keep the
+whole module inside `Decimal`: a float in a draw reaches a monetary column through
+arithmetic, and this schema refuses floats in columns for reasons that apply one
+step upstream too.
+
+**Deliberately left undone**
+
+- **The `unbillable` assertion in the pipeline is a backstop that cannot currently
+  fire.** It is the check 2.4 asked for by name, and it is genuinely unreachable
+  today: the simulator converts every amount as it generates it, so an
+  unconvertible Denomination Currency raises in `convert` first — which is what
+  mutation E demonstrates. It stays because the reachable path is a *future* one
+  (a build that produces a date and currency the simulator never converted), and
+  because a check that costs one query is cheaper than rediscovering the
+  requirement. Recorded here rather than filed as debt: the code is not wrong, it
+  is early.
+- **No index beyond the primary keys.** `fct_position_snapshot` is the largest
+  table at 61,907 rows and `--distinctions` completes in seconds.
+- **The simulator writes no short Positions.** `fct_position_snapshot.quantity` is
+  signed and the schema comment says negative is a short, but a sale is capped at
+  the holding, so nothing goes below zero. Not a gap in the schema — the column's
+  shape is not a claim about what one simulator generated — but a reviewer looking
+  for a short will not find one.
+
+**Look at this sceptically**
+
+1. **Cost Basis uses average cost, and that is a choice the Glossary does not
+   make.** On a partial sale the sold quantity takes its proportional share of what
+   the whole holding cost. The alternative, first-in-first-out, needs a lot ledger
+   this schema does not have — `fct_position_snapshot` carries one Cost Basis per
+   holding, and the registered definition is *"the total for the held quantity,
+   accumulated across the Trades that built it"*, which admits exactly one reading
+   given one number. It is still an accounting policy chosen here rather than
+   agreed, and it changes Realised P&L. **Worth a ruling.**
+2. **Realised P&L is gross of Commission.** The proceeds less what the sold share
+   cost, with the Commission recognised separately as the broker's revenue in
+   `fct_accounting_movement`. Netting it into Realised P&L would count the same
+   charge twice across the two Certified Metrics. Also a convention chosen here.
+3. **The two movement tables use opposite sign conventions, and the schema now says
+   so.** `fct_cash_movement.amount` is signed from the Account's side — positive
+   enters it, which the schema already stated. `fct_accounting_movement.amount`
+   carries the magnitude recognised, positive, as `fct_trade` stores the same three
+   charges, so that Net Revenue = Σcommission − Σrebate − Σfee is literally true
+   against the table. `realised P&L` is the one signed value there. A single
+   convention across both would make one of them read backwards, but two
+   conventions is a thing a reader must be told, so a comment was added to
+   `schema.sql` beside the column. **This is the one edit this Sub-step made to a
+   file 2.1 committed.**
+4. **`simulated_*` raw table names coin no Glossary term, and that was checked
+   rather than assumed.** The names follow the source-prefix convention every raw
+   table already uses — `yahoo_price`, `nasdaq_symbol` — with the simulator as the
+   source. The word itself is already the Glossary's: the `Ingestion` row says
+   *"synthetic Trades, Cash Movements and Positions from a seeded simulator"*, and
+   `simulator.py` matches that spelling. No capitalised term was coined, so no
+   proposal is raised — but if `Simulator` should be a registered Section A
+   component alongside `Ingestion`, this is the Sub-step that should have raised
+   it.
+5. **The Section C floor is 0.5%, and it is a judgement.** A pair whose two sides
+   differ in the sixth decimal place is technically distinct and useless: no Gold
+   Question Set built on it could tell a model that confused the pair from one that
+   did not. Half a percent is where "a human would notice" was put. It is
+   deliberately not DEBT-004's 1%, which is a different bar — that one is about a
+   pair being a *reliable evaluation signal*, this one about the pair existing at
+   all.
+6. **The book is cash-heavy.** Cash Balance is 68.3m of a 114.7m Account Value, so
+   Accounts hold more cash than stock. That follows from the opening deposit being
+   computed to cover the deepest hole an Account's own trading digs, with a
+   buffer — a defensible rule that produces a conservative book. Nothing depends on
+   it, and the Cash Balance / Account Value pair separates by 40% regardless.
+
+**What this hands the rest of the project**
+
+- **Every Certified Metric can now return a number.** All eight are computable:
+  Traded Notional, Trade Count, Gross and Net Revenue, Cash Balance, Account Value,
+  Realised and Unrealised P&L. That was the claim Step 002 existed to make true,
+  and `--distinctions` computes seven of the eight as a side effect of measuring
+  the pairs.
+- **Step 002 is complete.** All five Sub-steps are built, and Step 003 — the
+  sqlglot spike deferred by [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+  — now has the real data it was moved in order to run against. Its third question
+  needs *"a query computing revenue inline from `commission`"* to return a
+  different number from the certified expression against a real warehouse; the
+  32.59% between Gross and Net Revenue is that difference.
+- **Two Ledger entries wait on the Gold Question Set**, both of the same kind and
+  both now measured on the full window rather than on a spike: DEBT-004 at 0.0409%
+  and DEBT-011 at 0.03%. Neither is a defect in the data. Both are constraints on
+  what a gold question may ask.
+
+### Changes made on review — 2026-08-13 (Sub-step 2.5)
+
+Amino's review approved the Sub-step's four decisions and asked six questions. Two
+of the six turned out to be defects and are fixed here; the rest are answered in
+place. Every figure in the verification above was re-run after these changes.
+
+#### 1. A transfer moved a fraction of a share — **fixed, and the check that would
+have caught it is now committed**
+
+The question was whether a transfer may carry a decimal quantity when a Trade must
+be a whole lot. It may not, and it was. `build_transfers` took `money(held * share)`
+and never rounded, so the one path that creates a Position *without* a Trade was
+also the one path that ignored the lot.
+
+This is a seam-level disagreement rather than a cosmetic one: a transfer moves the
+same stock a Trade moves, and a custodian can no more deliver half a share than a
+broker can fill half a share. The fix rounds to the Instrument's own lot exactly as
+the partial-sale path does, and caps at the holding so that rounding up on a
+transfer out cannot move stock the Account does not have.
+
+**Nothing reported it, which is the more important half.** Every fractional row
+satisfied the schema — `quantity` is a `DECIMAL(18, 6)`, because a column type is
+about scale and not about lots — every Snapshot was markable, and the holding sat
+inside an Account Value that looked entirely ordinary. So `--distinctions` gained
+`check_lots`, and the size of the defect is quoted from that rather than from a
+script written once to measure it. Applied as a mutation, with the rounding removed
+again:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --distinctions   # rounding removed
+    fct_trade                  1670 quantities · 0 not a whole lot
+    fct_position_snapshot     61907 quantities · 80 not a whole lot
+FAIL — 1 problem(s)
+  - fct_position_snapshot holds 80 quantities that are not a whole lot of their own
+    Instrument — the first is 61307.100000 of an Instrument of type 'equity', whose
+    lot is 1. Every path that moves stock must agree about what one unit is, and a
+    Trade and a transfer are two such paths
+```
+
+and with it restored:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py --distinctions
+    fct_trade                  1670 quantities · 0 not a whole lot
+    fct_position_snapshot     61907 quantities · 0 not a whole lot
+```
+
+Both tables are checked, not only the one that broke: a rule enforced on Trades
+alone is a rule that holds until something else moves stock, which is exactly what
+happened here.
+
+**What it moved.** Row counts are identical — the same subjects on the same dates —
+and only quantities changed, on the three transferred holdings:
+
+| Figure | Before | After |
+|---|---|---|
+| account 11 · instrument 4 holds | 292 | 293 |
+| Account Value | 114,713,966.71 EUR | 114,714,721.82 EUR |
+| Unrealised P&L | 4,141,453.20 EUR | 4,141,577.12 EUR |
+| Cost Basis / Execution Price | 41.48% apart | 41.49% apart |
+
+Nothing upstream of `build_transfers` moved: the draw sequence is unchanged, so
+every Trade, Cash Movement and Accounting Movement is byte-identical, which is why
+Gross Revenue and the Trade-side pairs are untouched.
+
+#### 2. `at_last_fill` had a fallback that could not be right — **fixed**
+
+The Cost Basis / Execution Price pair valued a holding at its last Execution Price,
+and fell back to `cost_basis` when it could not find one:
+
+```python
+quantity * last_fills.get(f"{account_id}-{instrument_id}", cost_basis)   # before
+```
+
+Wrong twice. **A Cost Basis is a total and an Execution Price is a per-unit
+price**, so multiplying the fallback by the quantity again is out by a factor of
+the holding. And it puts the left side's own number into the right side, comparing
+a figure with itself on exactly the Positions where the pair is hardest to
+separate.
+
+The honest answer to *what does it mean when a pair has no last fill* is that the
+Position arrived by transfer and nothing ever filled — there is no stand-in for a
+price that does not exist. Both sides are now summed over the Positions a Trade
+actually touched, and the count is printed, so an excluded Position is visible
+rather than papered over. On the loaded data the fallback never fired — all 151
+Positions have Trades behind them — so the printed figure was right by luck of the
+data rather than by construction.
+
+**A second, quieter fault in the same lines.** `last_fills` was built by a
+`max(trade_date)` subquery collapsed into a `dict`, and three (Account, Instrument)
+pairs carry **two** Trades on their last Trade Date, all three of them holding a
+Position on the final Snapshot date. Which of the two survived was whichever row
+the engine emitted last. It is now read in `trade_date, trade_id` order and folded
+in Python, so the tie is broken by the numbering `fct_trade` already carries.
+
+#### 3. A Section C figure depended on the engine's row order — found while fixing 2
+
+Not asked about, found by re-running: `23 of 24 Accounts rank differently` came
+back as `24 of 24` after the rebuild, on **identical** Trade data. The cause is the
+same class as the one above. Traded Notional is a Decimal total and never ties, but
+Trade Count is a small integer and Accounts routinely share one — and the ranking's
+ties were broken by `by_account`'s insertion order, which came from a `SELECT` with
+no `ORDER BY`. A figure that changes while its inputs do not is a figure nothing
+was pinning down.
+
+The trades query is now ordered by `trade_id` and both rankings break ties on
+`account_id`. The figure returned to **23 of 24** and is now reproducible by
+construction rather than stable by luck:
+
+```
+$ uv run python -m veritas.ingestion        # twice, from a deleted database
+$ uv run python .claude/scripts/check_warehouse.py --distinctions
+$ diff run1.txt run2.txt && diff check1.txt check2.txt && echo IDENTICAL
+IDENTICAL
+```
+
+#### 4. `read_market_data` now declares its parameter type
+
+It read `def read_market_data(warehouse)  # noqa: ANN001 — WarehouseAdapter`. There
+is no reason for the suppression: `veritas/ingestion/__main__.py` already imports
+`WarehouseAdapter` from `veritas.warehouse`, so the annotation creates no cycle,
+and **no linter is configured in this repository at all** — so the `noqa` silenced
+a rule nothing enforces while advertising one the project does not have. The
+parameter is annotated and the comment is gone.
+
+#### 5. Three answers that changed no code
+
+- **`held` in `build_transfers` counts non-Trade events too**, and now says so.
+  The question was whether an outgoing transfer could be oversized because `held`
+  was folded from Trade events alone. It could not, but only because `take` yields
+  each subject at most once, so no subject ever gets two transfers — the arithmetic
+  was correct by an accident of the loop rather than by construction. Each transfer
+  is now appended to `events_by_subject` as it is sited, so the sum is right in the
+  general case, and the comment states the guarantee instead of leaving it to be
+  reconstructed.
+- **`if trade["trade_side"] == "sell" and trade["realised_pnl_quoted"]`** suppresses
+  a **zero-amount** posting, not a missing one. Every sell does realise a value; it
+  can be exactly zero when proceeds equal the share of Cost Basis removed. It is
+  the same guard the three charges above it use (`if not amount: continue`), for
+  the same reason: a ledger row recognising nothing is a row that says nothing. On
+  the loaded data it suppresses nothing — 554 sells produce 554 `realised P&L`
+  postings, and no movement row of either table carries an amount of zero.
+- **The sort key in `check_client_activity` had a no-op slice.** `values[:
+  len(columns)]` is the whole tuple, since the tuple is built from those exact
+  columns. It is removed. The `(value is None, value)` wrapper stays and is now
+  explained: `trade_id` is NULL on every Cash Movement no Trade explains, and
+  Python refuses to compare `None` with an `int`.
+
+#### 6. Four Ledger and Register entries opened
+
+| Entry | Why |
+|---|---|
+| [DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The intersection calendar is approved, but the sparse price table underneath it is the shortcut. 66 dates carry no Snapshot, so an "as of" question about one has no answer and the absence reads as a zero. |
+| [DEBT-013](../debt-ledger.md#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | Average-cost Cost Basis, Realised P&L gross of Commission, and the calendar choice are argued **here**, in the internal record. A user-facing decision register is owed at the final documentation pass. |
+| [EXT-008](../extension-register.md#ext-008--the-data-checks-run-in-continuous-integration) | `check_warehouse.py` and `check_data_availability.py` check the *data*, not the framework, and belong in a continuous-integration pipeline. An extension rather than debt: the scripts are right, and no pipeline exists to put them in. |
+| [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | **Trigger ruled fired.** Paid as Sub-step 2.6, committed separately from this one — see [R21](../plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13). |
+
+**Re-verified after every change above:**
+
+```
+$ uv run python -m veritas.ingestion
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+       the client side holds 12 Clients · 24 Accounts · 1670 Trades · every Position is markable and every amount is convertible
+
+$ uv run python .claude/scripts/check_warehouse.py --distinctions
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_warehouse.py --sources
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_language.py
+  proposed terms: 0 · python files scanned: 13 · identifiers: 784
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/verify_framework.py
+  links      309 links, 146 anchors 22 documents
+PASS — framework is wired up correctly
+```
+
+Run on 2026-08-13, offline.

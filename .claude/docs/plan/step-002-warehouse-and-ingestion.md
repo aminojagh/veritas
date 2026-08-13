@@ -65,11 +65,12 @@ next Step planned, so the slip is one Step and not an open-ended deferral.
 
 ---
 
-## How the five Sub-steps divide the work
+## How the six Sub-steps divide the work
 
-Two components, five commits — **one table per Sub-step across the real half**,
+Two components, six commits — **one table per Sub-step across the real half**,
 which is what [R16](#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10)
-changed.
+changed, plus a sixth that pays a debt this Step opened
+([R21](#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13)).
 
 ```
 veritas/warehouse/     ← 2.1   the adapter and the star schema (empty)   ✅ committed 5a061a7
@@ -77,7 +78,12 @@ veritas/ingestion/     ← 2.2   dim_instrument         NASDAQ Trader · SEC   �
                        ← 2.3   fct_instrument_price   Yahoo, by snapshot-and-replay   ✅ built
                        ← 2.4   fct_fx_rate            Frankfurter
                        ← 2.5   synthetic sources:     Trades · Cash · Positions · balances
+.claude/scripts/       ← 2.6   the dialect half of the adapter seam scan — DEBT-009
 ```
+
+The sixth was not planned; it is a debt this Step opened firing inside the same
+Step. It is a Sub-step rather than an errand because it is a commit, and a commit
+in this project is a Sub-step with a review entry.
 
 **`veritas/ingestion/` and its entry point are created in 2.2 and extended by each
 Sub-step after it.** After 2.2, `uv run python -m veritas.ingestion` already builds
@@ -101,7 +107,7 @@ destination and nothing else:
 | Fails by | a wrong number arriving from outside | a right number that proves nothing |
 | Depends on | 2.1 | 2.1 **and 2.2–2.4** — Positions are marked at Market Price and converted through FX Rate |
 
-Every one of the five passes the sizing test with a conjunction-free commit
+Every one of the six passes the sizing test with a conjunction-free commit
 subject, and every adjacent pair passes `planning-a-step`'s test for splitting:
 **Amino could reasonably approve one and reject the next.** A wrong Instrument
 universe (2.2), a leaked Adjusted Close (2.3), a fill-forward that misses a
@@ -340,6 +346,39 @@ anchors and two live ones — output in the
 Scope is unchanged otherwise: `.claude/docs/**` plus `CLAUDE.md`, and `README.md`
 is still outside it.
 
+### R21 — DEBT-009 has fired, and is paid as Sub-step 2.6 → **ruled by Amino 2026-08-13**
+
+Sub-step 2.5's review put a question to Amino rather than deciding it: the trigger
+on [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
+reads *"the first component outside `veritas/warehouse/` that emits SQL"*, and two
+modules outside it now hold SQL text — `veritas/ingestion/__main__.py` since 2.2
+and `veritas/ingestion/simulator.py` in 2.5. Both are standard SQL with no
+dialect-specific name in them, which is what the entry is *about*; that is not what
+its trigger *says*.
+
+**Amino ruled that it has fired. The trigger is not reworded and the scan is
+owed.** Narrowing a trigger to keep an entry unfired is precisely the move
+Non-Negotiable #2 exists to prevent, and the entry itself said so when it recorded
+the question.
+
+**This Step therefore has six Sub-steps, not five**, and the sixth is the debt:
+
+- **2.6 pays DEBT-009**, as its own commit, **after 2.5 is committed and before
+  Step 003 is planned.** Amino's instruction was explicit about the ordering —
+  2.5 is closed out and committed first, then the debt is paid and committed
+  separately. Two changes of different kinds in one commit is the thing
+  *one Sub-step = one commit* exists to stop.
+- The sizing test still passes with no conjunction: *"scan for DuckDB-specific
+  function names outside the adapter"*. Amino could reasonably approve 2.5 and
+  reject 2.6, which is `planning-a-step`'s test for a split point.
+- **Nothing about Step 003 changes.** The sqlglot spike stays deferred by
+  [R6](#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved);
+  2.6 uses `sqlglot`'s dialect knowledge for a scan, which is not the parse-tree
+  claim that spike exists to prove.
+
+The count of five in *How the six Sub-steps divide the work* above was written
+before this ruling and is corrected there rather than left to be noticed.
+
 ---
 
 ## Sub-steps
@@ -533,6 +572,43 @@ Question Set, which this Step does not build. But the simulator's window is what
 will make repayment possible or impossible later, so the Step Review must state
 what the Trade Date versus Settlement Date FX delta came out as on the generated
 data, and whether it cleared the 1% line the spike missed.
+
+---
+
+### 2.6 — Scan for DuckDB-specific function names outside the adapter
+
+Pays [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect),
+whose trigger Amino ruled fired in
+[R21](#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13).
+**Added after 2.5, and committed separately from it.**
+
+[ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) names the
+signal that the adapter seam has stopped holding as *"a `duckdb` import **or a
+DuckDB-specific function name** anywhere outside the adapter module"*.
+`check_warehouse.py --seam` scans the first half and not the second.
+
+- Extend `check_seam` to scan the SQL text in every module outside
+  `veritas/warehouse/` for function names that belong to DuckDB and not to
+  standard SQL, with the dialect list **derived from `sqlglot`** — already an
+  installed dependency, pulled in transitively by dlt — rather than typed by hand,
+  so it goes stale honestly rather than silently.
+- The two modules it has to scan already exist and already hold SQL:
+  `veritas/ingestion/__main__.py` and `veritas/ingestion/simulator.py`. Both are
+  standard SQL today, so the scan must be shown to pass on them **and** to fail on
+  a dialect name inserted deliberately — the mutation test, without which the scan
+  passes vacuously exactly as the entry warned.
+- Nothing else changes. No pipeline behaviour, no schema, no data: this is one
+  check script growing one check.
+
+**Verification:**
+
+```bash
+uv run python .claude/scripts/check_warehouse.py
+```
+
+plus the mutation: insert a DuckDB-specific name into a query string in
+`veritas/ingestion/simulator.py`, re-run, see it named and the run fail, restore
+and compare with `cmp`.
 
 ---
 

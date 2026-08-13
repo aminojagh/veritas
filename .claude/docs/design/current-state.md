@@ -4,8 +4,8 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-11 — Sub-step 2.4 reviewed and **approved**; its one open question ruled on as [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11). **The real half of Ingestion is complete: every Market Price in the Warehouse can now be converted to a Reporting Currency.**
-**Steps completed:** Step 000 (framework) and Step 001, fully committed; Step 002 is in flight, **four of its five Sub-steps built and approved**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, **Sub-step 2.4 in `13b99bb`** — squashed onto `main` from the `worktree-substep-2-4-fx-rate` branch, carrying the implementation, its review, and the R19/R20 edits together. The worktree is gone and the working tree is clean, so **nothing is uncommitted**.
+**Last updated:** 2026-08-13 — Sub-step 2.5 reviewed by Amino, review changes applied, awaiting his commit. **The Warehouse is full: all ten tables of Glossary Section B hold rows, and every Certified Metric can now return a number.**
+**Steps completed:** Step 000 (framework) and Step 001, fully committed; **Step 002 is built end to end — five of its six Sub-steps** — with 2.5 reviewed and awaiting commit and 2.6 planned but not started. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`. **Sub-step 2.5 is uncommitted** and is what this session leaves for him.
 
 ---
 
@@ -13,142 +13,103 @@ wrong and gets fixed immediately.
 
 - **Active Step:** 002 — Build the Warehouse and fill it
   ([plan](../plan/step-002-warehouse-and-ingestion.md)), approved 2026-08-05.
-  **All four built Sub-steps are committed on `main`** — 2.1 (`5a061a7`), 2.2
-  (`0fc5a34`), 2.3 (`a58ef91`), 2.4 (`13b99bb`); the verification commands of
-  each pass and their output is in the
-  [review](../reviews/step-002-warehouse-and-ingestion.md).
-- **The plan was amended and approved on 2026-08-10
-  ([R16](../plan/step-002-warehouse-and-ingestion.md#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10)).**
-  The original Sub-step 2.2 split into three — one table per Sub-step — and
-  [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
-  fired, moving the sqlglot spike out of Step 002 and into a future Step 003.
-  Step 002 now has five Sub-steps: 2.1 `schema` ✅, 2.2 `dim_instrument` ✅,
-  2.3 `fct_instrument_price` ✅, 2.4 `fct_fx_rate` ✅ approved, 2.5 synthetic
-  activity — the only one left.
-- **Sub-step 2.4 is approved, and no question is open.** Four verification commands
-  pass and their output is in the
-  [Sub-step 2.4 section of the review](../reviews/step-002-warehouse-and-ingestion.md#sub-step-24--load-fct_fx_rate-from-frankfurter).
-- **The Glossary question is settled:
-  [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11).**
-  `FX Rate` was registered as *"Real ECB reference rate between two currencies on a
-  date"*, which read both ways once the table held all sixteen ordered pairs: twelve
-  are rates the European Central Bank (ECB) published, and the four between two
-  non-euro currencies are a **ratio of two** published rates. Amino ruled that the
-  four **stay** and the definition is widened to say so. The Glossary row now
-  separates the two cases and keeps the source exclusivity — *"a rate of any other
-  origin is not one"*. **Nothing that executes changed**: the `WHERE` clause the
-  review had costed was never written, `fct_fx_rate` still holds every ordered pair
-  it held before the ruling, and the four verification commands were re-run to prove
-  it — `check_warehouse.py --sources` prints the current row count. Two documents that restated the old
-  wording came with it — the `fct_fx_rate` header in `schema.sql` and a
-  paraphrase-in-quotes in `data-availability.md`. Applied under
-  [Changes made on review — 2026-08-11 (Sub-step 2.4)](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11-sub-step-24).
-- **One framework gap was found and closed in the same pass:
-  [R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11).**
-  Confirming that R19's own new links resolved revealed that
-  `verify_framework.py` validated the file half of a link and threw the `#anchor`
-  away. It now checks both, and was verified by being made to fail. **This is not
-  payment against [DEBT-001](../debt-ledger.md)** — that entry's unpaid half is
-  hooks enforcing *compliance*, and its own text already credits this script with
-  checking that the documents are wired together. R20 makes an existing check
-  honest; it does not add a new kind of enforcement.
-- **What was looked at first in 2.4, and survived review:** the decision to store
-  **all sixteen ordered currency pairs** rather than the four against the euro, and
-  the fact that `fct_fx_rate.sql` reads two tables built before it — its currencies
-  from `dim_instrument`, its window end from `fct_instrument_price` — with **no
-  foreign key to enforce that order**. Both are argued in the review; the second is
-  still the first item under *Look at this sceptically*, and is mitigated by comment
-  in `BUILDS` rather than by structure.
-- **A `--refresh` was run on 2026-08-11, and it moved figures 2.3 had measured.**
-  This was the gap 2.3 handed over on purpose. Yahoo's `2y` range is relative to
-  the moment it is asked, so the price window slid forward a day and dropped four
-  at the front, and every count and trap size 2.3 recorded moved with it. **The 2.3
-  review's numbers were not corrected** — they are dated evidence, true on
-  2026-08-10, and carry the command that produced them. Everything below that
-  quoted them as standing facts was. Which figures moved, and by how much, is the
-  table in the review under *The refresh, and what it cost*.
-- **[ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md) is
-  `accepted`**, dated 2026-08-11
-  ([R17](../plan/step-002-warehouse-and-ingestion.md#r17--adr-0004-is-accepted--approved-by-amino-2026-08-11)).
-  It was left `proposed` while the Sub-step that wrote it was committed and 2.3
-  built on both of its decisions; Current State flagged the stale status rather
-  than flipping it, and Amino settled it. Its Decision and Consequences are
-  unchanged.
-- **A measurement is dated evidence, and lives in a review**
-  ([R18](../plan/step-002-warehouse-and-ingestion.md#r18--a-measurement-is-dated-evidence-and-lives-in-a-review--approved-by-amino-2026-08-11)),
-  now a [writing convention in CLAUDE.md](../../../CLAUDE.md#writing-conventions).
-  Any figure a later run could refute or resize is written as evidence — what was
-  measured, when, under what settings, and the command that reproduces it — kept
-  in the Step Review that produced it, with code, the Glossary and ADRs referring
-  to it. **Two sweeps applied it:** ten run-contingent comments across five files,
-  one of which had already been false since 2.2; then `schema.sql` and the
-  Glossary's `Adjusted Close` row, which both carried the 95.5% divergence figure
-  as a bare fact. No measurement remains in `veritas/` or `.claude/scripts/`.
-- **The `read_source` cache is now checked rather than argued.** 2.3 could only
-  reason that a refresh fetches each source once however many resources read it;
-  `--refresh` now prints how many snapshots it rewrote and how many were distinct,
-  and fails the run if any name appears twice. It reports `rewrote 23
-  snapshot(s), 23 distinct`.
-- Everything
-  raised on 2026-08-05 and 2026-08-06 has been ruled on and applied — recorded as
+  **Five of six Sub-steps are built.** 2.1 (`5a061a7`), 2.2 (`0fc5a34`), 2.3
+  (`a58ef91`) and 2.4 (`13b99bb`) are committed on `main` and approved; **2.5 is
+  built, reviewed and uncommitted**. The verification commands of each pass and
+  their output is in the [review](../reviews/step-002-warehouse-and-ingestion.md).
+- **Next, in this order, and they are two commits:**
+  1. **Amino commits Sub-step 2.5.** It was reviewed on 2026-08-13, the review
+     changes are applied, and every check passes — see
+     [Changes made on review](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-13-sub-step-25).
+  2. **Then Sub-step 2.6 pays [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)**,
+     as its own commit. Amino ruled on 2026-08-13 that its trigger has fired
+     ([R21](../plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13)),
+     and that it lands **after 2.5 is committed and before Step 003 is planned**.
+     The work is one check script growing one check: scan the SQL text outside
+     `veritas/warehouse/` for DuckDB-specific function names, dialect list derived
+     from `sqlglot`.
+  - **Do not plan Step 003 before 2.6 is committed**; the route to the Target State
+    is discovered one Step at a time.
+- **The four decisions 2.5 put to Amino were all approved on 2026-08-13**, and two
+  of them left something behind:
+  1. **A Snapshot is written on the dates *every* Instrument has a Market Price**
+     — the intersection, argued under
+     [which dates a Snapshot is written on](../reviews/step-002-warehouse-and-ingestion.md#the-decision-this-sub-step-had-to-make-which-dates-a-snapshot-is-written-on).
+     Approved. **The dates it drops are now
+     [DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes):**
+     the choice is right given a sparse price table, and the sparse price table is
+     the shortcut. An "as of" question about a dropped date has no answer, and the
+     absence reads as a zero.
+  2. **Cost Basis uses average cost**, not first-in-first-out. Approved as a
+     documented behaviour rather than a silent one — see 4 below.
+  3. **`fct_accounting_movement.amount` carries magnitudes, positive**, where
+     `fct_cash_movement.amount` is signed from the Account's side. Approved. **This
+     is the one edit 2.5 made to a file 2.1 committed** — a comment beside the
+     column in `schema.sql`.
+  4. **Realised P&L is gross of Commission**, which is recognised separately as the
+     broker's revenue. Approved. Together with 2 and 1, it is owed a **user-facing**
+     home: [DEBT-013](../debt-ledger.md#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
+     records that decisions moving a number a reader will see currently live only
+     in Step Reviews, which are the internal record. Paid at the final
+     documentation pass, with [DEBT-008](../debt-ledger.md).
+- **Two defects were found on review and fixed, both in the same class.** A
+  transfer moved a fraction of a share where every Trade is a whole lot, and
+  nothing checked it — `--distinctions` now runs `check_lots` over `fct_trade` and
+  `fct_position_snapshot`, and it was made to fail before being trusted. And the
+  `Cost Basis` / `Execution Price` figure fell back to a Cost Basis when no last
+  fill existed, which is a total standing in for a per-unit price. Both are written
+  up in the review's changes section; row counts did not move, three Position-side
+  figures did.
+- **No new Glossary term was coined, and that was checked rather than assumed.**
+  The `simulated_*` raw tables follow the source-prefix convention every raw table
+  already uses, with the simulator as the source, and the word is already the
+  Glossary's own: the `Ingestion` row says *"synthetic Trades, Cash Movements and
+  Positions from a seeded simulator"*. If `Simulator` should be a registered
+  Section A component, 2.5 is the Sub-step that should have raised it.
+- **One new debt: [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level).**
+  `Execution Price` against `Market Price` separates every individual Trade and
+  nearly cancels across a whole book, because fills sit either side of the close.
+  Not a defect in the simulator — introducing a bias to make the total diverge
+  would be shaping data to pass our own check — but a constraint on what a gold
+  question may ask. Same shape as [DEBT-004](../debt-ledger.md), different cause,
+  same trigger: the Gold Question Set.
+- **Both Ledger entries that wait on the Gold Question Set now have figures
+  measured on the full window** rather than on the spike's three series. DEBT-004's
+  FX-date effect is 0.0409% and DEBT-011's is 0.03%; `--distinctions` prints both
+  on every run and says whether they clear DEBT-004's 1% line.
+- **What is settled and needs no revisiting.** Everything raised on 2026-08-05,
+  2026-08-06 and 2026-08-11 has been ruled on and applied — recorded as
+  [R7–R10](../plan/step-002-warehouse-and-ingestion.md#r7r10--four-rulings-from-writing-the-data-definition-language-ddl-2026-08-05),
   [R11–R15](../plan/step-002-warehouse-and-ingestion.md#r11r15--five-rulings-from-aminos-review-of-the-snapshot-design-2026-08-06)
-  and argued in the [Step Review](../reviews/step-002-warehouse-and-ingestion.md).
-  In short: `Cost Basis` and `Snapshot` registered and built, Snapshots are
-  **end-of-day** and **dense over trading days**, the simulator will emit
-  **transfers but not corporate actions**, [DEBT-010](../debt-ledger.md) was
-  **paid** rather than deferred, and the two excluded halves went to
+  and R16–R20. In short: `Cost Basis`, `Snapshot`, `Instrument Symbol`,
+  `Denomination Currency` and `Trade Side` registered and built; Snapshots are
+  **end-of-day** and **dense**; the simulator emits **transfers but not corporate
+  actions**; `FX Rate` covers the derived cross-rate
+  ([R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11));
+  [ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md) is `accepted`
+  ([R17](../plan/step-002-warehouse-and-ingestion.md#r17--adr-0004-is-accepted--approved-by-amino-2026-08-11));
+  a measurement is dated evidence and lives in a review
+  ([R18](../plan/step-002-warehouse-and-ingestion.md#r18--a-measurement-is-dated-evidence-and-lives-in-a-review--approved-by-amino-2026-08-11),
+  now a [writing convention in CLAUDE.md](../../../CLAUDE.md#writing-conventions));
+  and `verify_framework.py` checks anchors as well as files
+  ([R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11)).
+  The two halves excluded from the slice went to
   [EXT-006](../extension-register.md#ext-006--position-change-attribution) and
   [EXT-007](../extension-register.md#ext-007--corporate-actions).
-- **One spelling set is open to amendment, not blocking:** the `movement_type`
-  values frozen by the new `CHECK` constraints. Free to change while the tables are
-  empty, not free after **2.5** generates the Movements that fill them — see
-  [DEBT-010](../debt-ledger.md).
-- The four questions Sub-step 2.1 raised earlier were ruled on the same day and
-  are recorded as
-  [R7–R10](../plan/step-002-warehouse-and-ingestion.md#r7r10--four-rulings-from-writing-the-data-definition-language-ddl-2026-08-05):
-  `Instrument Symbol`, `Denomination Currency` and `Trade Side` are registered
-  and `agreed`; the instrument-type values were swept so the `Dimension
-  Definition` row matches the narrowed `Instrument` row.
-- **Next Sub-step:** 2.5 — the seeded synthetic client activity, and the last of
-  Step 002. It is the only Sub-step that writes no real source: the six
-  client-activity tables all come from the simulator. Four things 2.4 leaves it:
-  1. **Every Section C conversion now has real rates behind it.** A Trade converts
-     from its Denomination Currency, a Position marks at a Market Price and
-     converts from its Quotation Currency, and Trade Date against Settlement Date
-     selects a *different* rate — the second half of what the Glossary says that
-     distinction moves.
-  2. **2.5's Denomination Currencies must stay inside the four the Warehouse
-     quotes in** (EUR, GBP, JPY, USD), or `fct_fx_rate` must be widened first. Its
-     currency set is read from `dim_instrument.quotation_currency`, so a Trade
-     billed in a currency no Instrument is quoted in would have no rate and its
-     Gross Revenue could not reach a Reporting Currency. Nothing catches this
-     today — the coverage assertion only walks Market Prices — and the natural
-     place for the check is beside it, once a Trade exists to assert against.
-  3. **The FX window ends on the same day as the price window** (both 2026-08-10)
-     and starts eleven days before it. A Trade in the last two days of the window
-     settles at T+2 past the last rate, so 2.5 keeps its Trades clear of the end
-     or the window is widened.
-  4. **Adding a source is a resource plus a build script**, now with three worked
-     examples. The build SQL must stay inside `veritas/warehouse/`, which is what
-     keeps [DEBT-009](../debt-ledger.md) unfired.
-- **What Sub-step 2.5 must now implement rather than decide** (all settled as
-  R12–R14; this was Sub-step 2.3 before the R16 split): Snapshots are end-of-day;
-  dense, one row per subject on every date the
-  Warehouse holds a Market Price for; and the simulator emits a handful of
-  transfers so a Snapshot delta and a sum of Trades genuinely disagree somewhere.
-  Two checks fall out of these and belong in `--distinctions`: every
-  `snapshot_date` must exist in `fct_instrument_price.price_date`, and at least one
-  account must show a Position Change that no Trade explains.
-- **One thing 2.5 must now decide that R13 did not anticipate.** *"Every date the
-  Warehouse holds a Market Price for"* has two readings once the table spans five
-  exchange calendars: the dates on which *some* Instrument has a price, and the
-  dates on which *every* Instrument does. They differ by dozens of dates, and a
-  Snapshot on one of the dates in between marks some Positions against a price and
-  others against nothing. `check_warehouse.py --sources` prints both numbers on
-  every run so the choice is made deliberately rather than discovered.
-- **Also live from 2.1:** [DEBT-009](../debt-ledger.md) — the seam scan checks
-  `duckdb` imports but not the DuckDB-specific function names ADR-0002 named
-  alongside them.
+- **The `movement_type` spellings are now frozen in practice.**
+  [DEBT-010](../debt-ledger.md) noted they were free to change while the tables
+  were empty. 2.5 filled them, so changing one now means regenerating the client
+  side — which is one command, but it is no longer free.
+- **What Step 003 inherits.** The sqlglot spike deferred by
+  [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+  now has the real data it was moved in order to run against. Its third question
+  needs a query computing revenue inline from `commission` to return a *different
+  number* from the certified expression against a real warehouse: the 32.59%
+  between Gross and Net Revenue is that difference.
+- **[DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect),
+  opened in 2.1, has fired and is the next commit** — see *Next* above. The seam
+  scan checks `duckdb` imports but not the DuckDB-specific function names ADR-0002
+  named alongside them.
 - **Obligations recorded for later Steps**, so they are not rediscovered:
   `README.md` must list every credential Veritas touches
   ([Target State](target-state.md#what-credential-free-means)), and
@@ -161,27 +122,32 @@ wrong and gets fixed immediately.
 
 ## Summary
 
-A fully designed project with one component built and a second nearly so. The framework is in place and
-the Target State is `agreed`, so there is a fixed point to build toward: a
-natural-language analytics copilot over a brokerage warehouse, whose answers are
-grounded in a certified Semantic Layer and checked by a deterministic Validation
-Gate.
+A fully designed project with two of its nine components built. The framework is
+in place and the Target State is `agreed`, so there is a fixed point to build
+toward: a natural-language analytics copilot over a brokerage warehouse, whose
+answers are grounded in a certified Semantic Layer and checked by a deterministic
+Validation Gate.
 
 Every data source that design assumes has been verified obtainable, key-free, and
-is snapshotted into the repository. **The Warehouse exists and holds all the real
-market data it will ever hold.** The ten-table star schema of Glossary Section B
-sits behind the Warehouse Adapter — the only module in the repository that imports
-`duckdb` — and three of its ten tables now hold real data: `dim_instrument`,
-nineteen Instruments across four types and four Quotation Currencies;
-`fct_instrument_price`, two years of daily Market Prices covering all nineteen of
-them; and `fct_fx_rate`, every ordered pair of those four currencies on every
-calendar date of a window that covers the prices. All three load offline from
-committed snapshots, with no socket opened, and **every Market Price can now be
-converted to a Reporting Currency** — the row counts and windows are dated evidence
-in the [Step Review](../reviews/step-002-warehouse-and-ingestion.md#sub-step-24--load-fct_fx_rate-from-frankfurter),
-because a `--refresh` moves them. The other seven tables are empty and all seven
-are Sub-step 2.5's. Nothing above Ingestion is built: no Semantic Layer, no
-Retrieval, no application.
+is snapshotted into the repository. **The Warehouse is full.** The ten-table star
+schema of Glossary Section B sits behind the Warehouse Adapter — the only module in
+the repository that imports `duckdb` — and all ten tables hold rows. Three are
+real: `dim_instrument`, nineteen Instruments across four types and four Quotation
+Currencies; `fct_instrument_price`, two years of daily Market Prices covering all
+nineteen; and `fct_fx_rate`, every ordered pair of those four currencies on every
+calendar date of a window that covers the prices. Seven are synthetic, from a
+seeded simulator that prices every Trade off a Market Price the Warehouse already
+holds and converts through a real FX Rate: Clients, Accounts, Trades, both movement
+ledgers, and dense Position and Cash Balance Snapshots. **One command builds all
+ten offline from committed snapshots with no socket opened, and two runs are
+byte-identical.**
+
+**Every Certified Metric can now return a number** — all eight of them — and every
+pair in Glossary Section C is two measurably different numbers on the loaded data.
+The row counts, windows and Section C figures are dated evidence in the
+[Step Review](../reviews/step-002-warehouse-and-ingestion.md#sub-step-25--generate-seeded-synthetic-client-activity),
+because a `--refresh` moves them. Nothing above Ingestion is built: no Semantic
+Layer, no Retrieval, no application.
 
 ## What is built
 
@@ -197,11 +163,11 @@ Retrieval, no application.
 | Data-availability check | ✅ working | `.claude/docs/design/data-availability.md` + `.claude/scripts/check_data_availability.py`. Verdict GO. Runs offline from `data/snapshots/` or live with `--refresh`; exits non-zero if a source dies, a wrong-number trap vanishes, or a distinction collapses. |
 | Data snapshots | ✅ working | `data/snapshots/` — real 2025 FX Rates and three real price series, plus the dated probe record, owned by `check_data_availability.py`. `data/snapshots/ingestion/` beside it is the pipeline's own, one file per source and one per traded Instrument, rewritten only by `--refresh`. Both committed on purpose: they are what make the checks reproduce without network access. |
 | Founding ADRs | ✅ working | Four ADRs in `.claude/docs/adr/`, all **`accepted`**. The first three on 2026-08-03: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code. The fourth — snapshot-and-replay, and where dlt stops — was deferred to the ingestion Step ([DEBT-002](../debt-ledger.md)), written in Sub-step 2.2 and **accepted 2026-08-11** (R17). Every cost in each is classified *accepted* / *debt* / *extension*. ADR-0002 carries a dated clarification (2026-08-05) on what its sqlglot commitment forbids; its status stays `accepted`. |
-| Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, empty. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). |
+| Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, **all ten populated**. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). The two movement tables carry **opposite sign conventions** and the schema says so beside each column: cash is signed from the Account's side, accounting carries magnitudes so that Net Revenue = Σcommission − Σrebate − Σfee is literally true. |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is now checked rather than promised. `create_schema`, `tables`, `columns`, `row_count`, `execute`, `query`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. Hardcoded database path and no error handling, both licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
-| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and no `duckdb` import outside `veritas/warehouse/`. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. `--rebuild` and `--sources` are mutually exclusive — together they only prove an empty table is empty. Grows in 2.5 (`--distinctions`). |
+| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and no `duckdb` import outside `veritas/warehouse/`. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. **`--distinctions` (2.5)** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument** (added on review, 2026-08-13, after a transfer moved a fraction of a share and nothing objected), every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both — together they only prove an empty table is empty. |
 | Semantic Layer | ✗ none | — |
-| Ingestion | ◐ partial | `veritas/ingestion/` — the pipeline and **all four of its real sources**; only the synthetic half (2.5) is absent. `uv run python -m veritas.ingestion` builds the Warehouse end-to-end from a clean clone with **no network**, and two consecutive runs produce identical output. `--refresh` is the only mode that opens a socket; a refresh that fails part-way names the snapshots it had already rewritten, and one that succeeds reports how many it rewrote and how many were distinct — **failing the run if a source was fetched twice**, which is what turned 2.3's argument about the `read_source` cache into a check. dlt lands seven `raw` tables; the adapter builds `dim_instrument`, `fct_instrument_price` and `fct_fx_rate` from them, in that order, because the last takes its currencies and its window from the two before it. |
+| Ingestion | ✅ working | `veritas/ingestion/` — **both halves**: four real sources and the seeded simulator. `uv run python -m veritas.ingestion` builds all ten tables end-to-end from a clean clone with **no network**, and two consecutive runs produce byte-identical output. `--refresh` is the only mode that opens a socket; a refresh that fails part-way names the snapshots it had already rewritten, and one that succeeds reports how many it rewrote and how many were distinct — **failing the run if a source was fetched twice**. **Two phases, in an order that cannot be reversed:** dlt lands the real sources in `raw` and the adapter builds three star tables from them; then `simulator.py` *reads those three through the adapter*, generates the client side as a pure function of them and a seed, and a second dlt load plus seven more build scripts lands it. No two connections are ever open at once. The pipeline refuses to complete on four silent-shortness conditions, two of them added in 2.5: a Position with no Market Price on its own Snapshot date, and a monetary amount whose Denomination Currency has no FX Rate on its own date. |
 | Retrieval | ✗ none | — |
 | Orchestrator | ✗ none | — |
 | Validation Gate | ✗ none | — |
@@ -227,14 +193,23 @@ veritas/
 │   │   ├── adapter.py         # the Warehouse Adapter — the only duckdb importer
 │   │   ├── schema.sql         # the ten-table star schema, hand-authored
 │   │   └── builds/            # hand-authored raw→star SQL, one file per table
-│   │       ├── dim_instrument.sql
-│   │       ├── fct_instrument_price.sql
-│   │       └── fct_fx_rate.sql
+│   │       ├── dim_instrument.sql        # ─┐ the real half, built first
+│   │       ├── fct_instrument_price.sql  #  │
+│   │       ├── fct_fx_rate.sql           # ─┘
+│   │       ├── dim_client.sql            # ─┐ the synthetic half; dim_client.sql
+│   │       ├── dim_account.sql           #  │ carries the reasoning for all seven
+│   │       ├── fct_trade.sql             #  │
+│   │       ├── fct_cash_movement.sql     #  │
+│   │       ├── fct_accounting_movement.sql  │
+│   │       ├── fct_position_snapshot.sql #  │
+│   │       └── fct_balance_snapshot.sql  # ─┘
 │   └── ingestion/
 │       ├── __main__.py        # the entry point: replay by default, --refresh
 │       ├── universe.py        # the 19 traded Instruments + two vocabulary maps
 │       ├── snapshots.py       # snapshot-and-replay — the only socket in the package
-│       └── sources.py         # NASDAQ Trader · SEC · Yahoo metadata and bars, for dlt
+│       ├── sources.py         # NASDAQ Trader · SEC · Yahoo metadata and bars, for dlt
+│       └── simulator.py       # the seeded simulator — reads the real tables,
+│                              # generates the client side as a pure function
 └── .claude/
     ├── skills/                # 5 framework skills
     ├── scripts/
@@ -254,34 +229,53 @@ veritas/
 
 ## Known gaps
 
-**Everything above Ingestion**, and seven of the Warehouse's ten tables are still
-at zero rows. **All seven are Sub-step 2.5's**, and nothing blocks it.
+**Everything above Ingestion.** The Warehouse itself has no gaps left: all ten
+tables hold rows, and the two components below the Semantic Layer are done.
 
-**No Certified Metric returns a number yet, and the reason has narrowed twice.**
-After 2.2 it was that nothing aggregatable existed at all. After 2.3 the Warehouse
-held real, checked, aggregatable Market Prices — but in four Quotation Currencies
-with no way to total them. After 2.4 that last obstacle is gone: every price
-converts. What remains is the whole of the client side. Every metric the Glossary
-registers is about *client activity* — Traded Notional, Gross and Net Revenue,
-Realised and Unrealised P&L — and not one Trade, Position or Cash Movement exists,
-so a metric still returns nothing. What 2.3 and 2.4 bought is both halves of every
-mark: after 2.5, a Position has something real to be marked against **and** a
-currency to be reported in. Worth stating plainly, because "the Warehouse holds
-real market data" is true and is not the same claim as "the Warehouse can answer a
-question".
+**Every Certified Metric can now return a number**, which was the claim Step 002
+existed to make true and had narrowed three times on the way. After 2.2 nothing
+aggregatable existed. After 2.3 there were real Market Prices in four Quotation
+Currencies with no way to total them. After 2.4 every price converted, but every
+metric the Glossary registers is about *client activity* and not one Trade
+existed. 2.5 closed the last gap: all eight are computable, and
+`check_warehouse.py --distinctions` computes seven of them as a side effect of
+measuring the Section C pairs.
+
+**What that does not mean.** A metric returning a number is not a metric being
+*asked for* — there is no Semantic Layer, so no Metric Definition is written down,
+certified, or retrievable, and nothing turns a question into SQL. The arithmetic
+exists; the machine that chooses it does not.
+
+**Two Section C pairs are real but small at book level**, and both are on the
+Ledger against the Gold Question Set rather than fixed in the data:
+[DEBT-004](../debt-ledger.md) (the FX half of Trade Date against Settlement Date)
+and [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level)
+(Execution Price against Market Price). Neither is a defect in the simulator —
+making either diverge would mean shaping the data to pass our own check — and both
+are constraints on what a gold question may ask. `--distinctions` prints both
+figures on every run.
 
 One thing 2.1 chose not to settle remains on the Ledger:
 [DEBT-009](../debt-ledger.md) — the adapter seam scan checks `duckdb` imports but
-not the DuckDB-specific function names ADR-0002 also named. **Its trigger came
-close again in 2.4 and again did not fire**: all three build scripts live in
-`veritas/warehouse/builds/`, so there is still no component outside the adapter
-emitting SQL. What has changed is the size of what repaying it would have to scan
-for. 2.3 added one DuckDB-specific name, `make_timestamp`; 2.4 added two more,
-`generate_series` over dates and `ASOF JOIN` — the latter being the Glossary's
-fill-forward sentence written as an operator. All three sit inside the adapter's
-directory, so all three are licensed. [DEBT-010](../debt-ledger.md) was **paid in
-2.1** and both `movement_type` columns now carry a `CHECK`;
-[DEBT-002](../debt-ledger.md) was **paid in 2.3**, under its first trigger.
+not the DuckDB-specific function names ADR-0002 also named. All ten star-schema
+build scripts live in `veritas/warehouse/builds/`, so every dialect-specific name
+the pipeline uses is inside the licensed directory: `make_timestamp` from 2.3,
+`generate_series` over dates and `ASOF JOIN` from 2.4, and nothing new from 2.5,
+whose seven builds are projections and casts.
+
+**The trigger has fired, and Amino ruled that it has** (2026-08-13,
+[R21](../plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13)).
+It reads *"the first component outside the adapter emits SQL"*, and two modules
+outside `veritas/warehouse/` hold SQL text today: `__main__.py`, which has since
+2.2, and `simulator.py`, which reads the three real star tables in 2.5. Both are
+standard SQL with no dialect-specific name in them, which is what the entry is
+*about* — but it is not what the sentence says, and rewording a trigger to keep an
+entry unfired is the move Non-Negotiable #2 exists to prevent. **The scan is owed,
+and it is Sub-step 2.6**, committed separately from 2.5.
+
+[DEBT-010](../debt-ledger.md) was **paid in 2.1** and both `movement_type` columns
+now carry a `CHECK`; [DEBT-002](../debt-ledger.md) was **paid in 2.3**, under its
+first trigger.
 
 **The cost-basis gap is closed** (2026-08-06). This section previously read that
 Realised and Unrealised P&L *"can both be expressed as a weighted average of
@@ -333,8 +327,8 @@ which is why 2.4 hit it nowhere.
 
 ## Open debt and extensions
 
-**5 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **2 paid**, 1
-accepted permanently and 2 moved out. **7 open extensions** — see
+**8 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **2 paid**, 1
+accepted permanently and 2 moved out. **8 open extensions** — see
 [extension-register.md](../extension-register.md).
 
 The split is new as of 2026-08-04. Debt means the current code is *wrong,
@@ -363,13 +357,32 @@ life? Three Sub-step 1.3 entries failed that test and moved.
   not overstate what application-layer access enforcement guarantees. The
   engineering moved to EXT-001.
 - **DEBT-009** — the adapter seam scan checks `duckdb` imports but not the
-  DuckDB-specific function names ADR-0002 named alongside them. Fires when the
-  first component outside the adapter emits SQL.
+  DuckDB-specific function names ADR-0002 named alongside them. **Its trigger fired
+  and Amino ruled so on 2026-08-13**; it is paid by Sub-step 2.6, the next commit
+  after 2.5.
 - **DEBT-010** — **paid 2026-08-06**, in the Sub-step that opened it. Both
   `movement_type` columns now carry a `CHECK`, and the two lists differ:
   `realised P&L` is accounting-only, `deposit` is cash-only. It was paid rather
   than deferred because its justification — *"nothing consumes the values yet"* —
-  had been falsified by `Realised P&L` landing there.
+  had been falsified by `Realised P&L` landing there. 2.5 has now written rows
+  using every one of the spellings, so amending one is a regeneration rather than
+  a one-line edit.
+- **DEBT-011** — opened 2026-08-11 in Sub-step 2.5. `Execution Price` against
+  `Market Price` separates every Trade and cancels across a book. Fires on the
+  Gold Question Set, like DEBT-004 and for the same reason: a gold question that
+  turns on the pair must be scoped narrowly enough that the two differ by more
+  than the comparison's tolerance, or be left out with the limitation stated.
+- **DEBT-012** — opened 2026-08-13 on Amino's approval of the Snapshot calendar.
+  `fct_instrument_price` is sparse per Instrument, so the calendar has to be the
+  intersection and the dates it drops carry no Snapshot at all. An "as of"
+  question about one of them returns nothing, which is indistinguishable from an
+  Account holding nothing. Fires on the first "as of" date chosen by anything
+  other than the calendar itself.
+- **DEBT-013** — opened 2026-08-13, also on Amino's instruction. The decisions that
+  move a number a reader will see — average-cost Cost Basis, Realised P&L gross of
+  Commission, the Snapshot calendar, the two sign conventions — are argued in Step
+  Reviews, which `CLAUDE.md` designates the internal working record. A user-facing
+  decision register is owed at the final documentation pass, with DEBT-008.
 - **EXT-006** — attributing a `Position Change` to its cause (Trade, transfer,
   corporate action). Opened 2026-08-06 against the `fct_position_snapshot` seam.
   The metric as registered promises the change, not the cause, so the slice is
@@ -381,6 +394,13 @@ life? Three Sub-step 1.3 entries failed that test and moved.
   actions on the ground that no loaded price series contains one, and
   `--sources` fails the run if any day-over-day ratio exceeds 1.5. The largest in
   the currently loaded window is 1.196.
+- **EXT-008** — the two data checks run in continuous integration. Opened
+  2026-08-13 on Amino's question about where they belong. `check_warehouse.py` and
+  `check_data_availability.py` check the **data**, where `verify_framework.py` and
+  `check_language.py` check the way we work — and nothing runs any of them except a
+  person remembering to. An extension rather than debt: the scripts are right as
+  they stand and this repository has no pipeline to put them in, so the trigger
+  could only fire if we chose to make it fire.
 
 [DEBT-001](../debt-ledger.md)'s trigger **fired** in Sub-step 1.3 — a framework
 rule agreed in 1.2 was broken in 1.3. Partially paid by `check_language.py` and

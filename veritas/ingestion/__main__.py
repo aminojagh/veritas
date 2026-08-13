@@ -4,13 +4,20 @@
     uv run python -m veritas.ingestion --refresh    # re-hit every source
 
 Builds the Warehouse from nothing, in the one order the foreign keys permit:
-dimensions before facts. After Sub-step 2.4 that means `dim_instrument`,
-`fct_instrument_price` and `fct_fx_rate` — the traded Instrument universe, two
-years of daily Market Prices for it, and the ECB reference rates every one of
-those prices has to be converted through — with the other seven tables empty.
-Each Sub-step adds a source to a pipeline that already runs end-to-end rather than
-half-wiring one. This is the whole real half of Ingestion; Sub-step 2.5 adds the
-synthetic client activity beside it.
+dimensions before facts. After Sub-step 2.5 that is the whole of it — all ten
+tables of Glossary Section B, in two phases that cannot be reordered:
+
+  **1. The real half.** `dim_instrument`, `fct_instrument_price` and `fct_fx_rate`
+  — the traded Instrument universe, two years of daily Market Prices for it, and
+  the ECB reference rates every one of those prices has to be converted through.
+  Each comes from a key-free public source, snapshotted into the repository.
+
+  **2. The synthetic half.** The seven client-activity tables, from the seeded
+  simulator in `simulator.py`. It runs *after* phase 1 because it reads it: every
+  Trade is priced off a Market Price the Warehouse already holds and every
+  conversion goes through a real FX Rate. That ordering is the Glossary's
+  `Ingestion` rule made structural — *"market data real, client activity
+  synthetic — never the reverse"*.
 
 **The Warehouse is rebuilt from scratch on every run.** `schema.sql` uses plain
 `CREATE TABLE`, so there is nothing to reconcile against an existing file, and a
@@ -18,11 +25,15 @@ pipeline whose output depends on how many times it has run is not the
 reproducible bring-up the whole snapshot-and-replay design is for. The database
 file is gitignored; the snapshots are what carry the data between clones.
 
-The two connections in this file are sequential and never overlap. dlt's DuckDB
-destination opens its own — the awkwardness R4 was raised to settle — so it runs
-to completion and closes before the adapter opens. R4's ruling is what makes that
-acceptable: dlt does extract-and-load into `raw`, and the star schema, the thing
-every Metric Definition will quote, stays entirely behind the adapter.
+**No two connections in this file are ever open at once.** dlt's DuckDB
+destination opens its own — the awkwardness R4 was raised to settle — so each dlt
+load runs to completion and closes before the adapter opens, and the adapter
+closes before the next load. R4's ruling is what makes that acceptable: dlt does
+extract-and-load into `raw`, and the star schema, the thing every Metric
+Definition will quote, stays entirely behind the adapter. Sub-step 2.5 adds a
+second dlt load rather than a second *kind* of writer: the simulator's rows land
+in `raw` and are built into star tables by hand-authored SQL, exactly as every
+real source's are.
 """
 
 import argparse
@@ -30,7 +41,7 @@ import sys
 
 import dlt
 
-from veritas.ingestion import snapshots, sources
+from veritas.ingestion import simulator, snapshots, sources
 from veritas.ingestion.snapshots import SNAPSHOT_DIR, SourceUnavailable
 from veritas.ingestion.universe import TRADED_INSTRUMENTS
 from veritas.warehouse import DATABASE_PATH, WarehouseAdapter
@@ -58,24 +69,40 @@ DERIVED_TABLES = (
     ("yahoo_instrument_type", sources.yahoo_instrument_types),
 )
 
-# The star tables built so far, in dependency order — dim_instrument must hold a
-# row before fct_instrument_price may reference it, and the engine enforces that
-# foreign key rather than trusting this tuple. fct_fx_rate declares no foreign key
-# and is last for a different reason the engine cannot enforce: its build reads
-# both tables above it, taking the currencies it must cover from dim_instrument and
-# the end of the window from fct_instrument_price. Sub-step 2.5 appends to this;
-# nothing else in this file changes when it does.
-BUILDS = ("dim_instrument", "fct_instrument_price", "fct_fx_rate")
+# The star tables built from real sources, in dependency order — dim_instrument
+# must hold a row before fct_instrument_price may reference it, and the engine
+# enforces that foreign key rather than trusting this tuple. fct_fx_rate declares
+# no foreign key and is last for a different reason the engine cannot enforce: its
+# build reads both tables above it, taking the currencies it must cover from
+# dim_instrument and the end of the window from fct_instrument_price.
+MARKET_BUILDS = ("dim_instrument", "fct_instrument_price", "fct_fx_rate")
+
+# The star tables built from the simulator, in dependency order. Every ordering
+# here *is* enforced by a declared foreign key: an Account needs its Client, a
+# Trade needs its Account and its Instrument, and a movement needs its Trade.
+CLIENT_BUILDS = (
+    "dim_client",
+    "dim_account",
+    "fct_trade",
+    "fct_cash_movement",
+    "fct_accounting_movement",
+    "fct_position_snapshot",
+    "fct_balance_snapshot",
+)
 
 
 def raw_resources(*, refresh: bool) -> list[object]:
-    """Every raw source and vocabulary map, wrapped as a dlt resource."""
+    """Every real source and vocabulary map, wrapped as a dlt resource."""
     rows_by_table = [
         (table_name, generator(refresh=refresh))
         for table_name, generator in FETCHED_TABLES
     ] + [
         (table_name, generator()) for table_name, generator in DERIVED_TABLES
     ]
+    return as_resources(rows_by_table)
+
+
+def as_resources(rows_by_table: list[tuple[str, object]]) -> list[object]:
     return [
         dlt.resource(rows, name=table_name, write_disposition="replace")
         for table_name, rows in rows_by_table
@@ -101,23 +128,28 @@ def source_failure(error: BaseException) -> SourceUnavailable | None:
     return None
 
 
-def load_raw(*, refresh: bool) -> None:
-    """Extract every source and land it in the `raw` schema."""
+def load_raw(resources: list[object]) -> None:
+    """Land a set of resources in the `raw` schema.
+
+    Called twice — once for the real sources and once for the simulator's rows —
+    against the same pipeline name and the same dataset. Each `replace` load
+    touches only the tables in the resources it was handed, so the second does not
+    disturb the first.
+    """
     pipeline = dlt.pipeline(
         pipeline_name="veritas_ingestion",
         destination=dlt.destinations.duckdb(str(DATABASE_PATH)),
         dataset_name="raw",
         progress=None,
     )
-    pipeline.run(raw_resources(refresh=refresh))
+    pipeline.run(resources)
 
 
-def build_star_schema() -> tuple[dict[str, int], int, int]:
-    """Create the star schema and fill it from `raw`.
+def build_market_tables() -> tuple[int, int]:
+    """Create the star schema and fill its three real tables from `raw`.
 
-    Returns the row count of every star table and two numbers a bare row count
-    cannot say, both of them about a Warehouse that is silently short while looking
-    entirely healthy in a listing:
+    Returns two numbers a bare row count cannot say, both of them about a
+    Warehouse that is silently short while looking entirely healthy in a listing:
 
       * how many distinct Instruments `fct_instrument_price` carries a price for —
         a large pile of price rows covering every Instrument but one is a Warehouse
@@ -128,9 +160,8 @@ def build_star_schema() -> tuple[dict[str, int], int, int]:
     """
     with WarehouseAdapter() as warehouse:
         warehouse.create_schema()
-        for build_name in BUILDS:
+        for build_name in MARKET_BUILDS:
             warehouse.run_build(build_name)
-        counts = {name: warehouse.row_count(name) for name in warehouse.tables()}
         ((priced_instruments,),) = warehouse.query(
             "SELECT count(DISTINCT instrument_id) FROM fct_instrument_price"
         )
@@ -149,7 +180,75 @@ def build_star_schema() -> tuple[dict[str, int], int, int]:
             " AND rate.from_currency = instrument.quotation_currency "
             "WHERE rate.fx_rate IS NULL"
         )
-        return counts, priced_instruments, unconvertible
+        return priced_instruments, unconvertible
+
+
+def simulate_client_activity() -> dict[str, list[dict]]:
+    """Read the real half of the Warehouse and generate the synthetic half.
+
+    The read and the generation are separate calls on purpose: the adapter is open
+    only for the read, so the connection is closed again before dlt opens its own
+    to land what came back.
+    """
+    with WarehouseAdapter() as warehouse:
+        market = simulator.read_market_data(warehouse)
+    return simulator.simulate(market)
+
+
+def build_client_tables() -> tuple[dict[str, int], int, int]:
+    """Fill the seven client-activity tables, and count what could not be valued.
+
+    Two more silent-shortness numbers, in the same shape as the market ones and
+    for the same reason — each is a Warehouse that lists a plausible row count and
+    cannot answer a question it promises:
+
+      * Positions with no Market Price on their own Snapshot date. A Position that
+        cannot be marked has no Unrealised P&L and no Account Value, and R13's
+        density rule exists precisely to make this number zero.
+      * monetary rows whose Denomination Currency has no FX Rate on their own
+        date. Sub-step 2.4 handed this over by name: the coverage assertion it
+        wrote walks Market Prices only, so a Trade billed in a currency no
+        Instrument is quoted in would have no rate and its Gross Revenue could not
+        reach a Reporting Currency. There is now a Trade to assert against.
+    """
+    with WarehouseAdapter() as warehouse:
+        for build_name in CLIENT_BUILDS:
+            warehouse.run_build(build_name)
+        counts = {name: warehouse.row_count(name) for name in warehouse.tables()}
+        ((unmarkable,),) = warehouse.query(
+            "SELECT count(*) "
+            "FROM fct_position_snapshot AS position "
+            "LEFT JOIN fct_instrument_price AS price "
+            "  ON price.price_date = position.snapshot_date "
+            " AND price.instrument_id = position.instrument_id "
+            "WHERE price.market_price IS NULL"
+        )
+        # Every date a monetary amount is dated by, against the currency it is
+        # held in. A UNION ALL rather than four queries, so one number answers
+        # "can every amount in this Warehouse reach a Reporting Currency?" —
+        # including a Trade's settlement_date, which selects a different rate from
+        # its trade_date and is the half a careless check would miss.
+        ((unbillable,),) = warehouse.query(
+            "WITH billed AS ( "
+            "    SELECT trade_date AS on_date, denomination_currency FROM fct_trade "
+            "    UNION ALL "
+            "    SELECT settlement_date, denomination_currency FROM fct_trade "
+            "    UNION ALL "
+            "    SELECT movement_date, denomination_currency FROM fct_cash_movement "
+            "    UNION ALL "
+            "    SELECT movement_date, denomination_currency "
+            "      FROM fct_accounting_movement "
+            "    UNION ALL "
+            "    SELECT snapshot_date, denomination_currency "
+            "      FROM fct_balance_snapshot "
+            ") "
+            "SELECT count(*) FROM billed "
+            "LEFT JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.on_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            "WHERE rate.fx_rate IS NULL"
+        )
+        return counts, unmarkable, unbillable
 
 
 def main() -> int:
@@ -169,6 +268,7 @@ def main() -> int:
     print(f"  mode: {mode}")
     print(f"  snapshots: {SNAPSHOT_DIR.relative_to(REPO_ROOT)}")
     print(f"  universe: {len(TRADED_INSTRUMENTS)} Instruments")
+    print(f"  simulator seed: {simulator.SEED}")
 
     # Rebuilt from scratch, so a run never depends on a previous one. See the
     # module docstring — this is the reproducibility property, not a convenience.
@@ -177,7 +277,7 @@ def main() -> int:
         print(f"  removed {DATABASE_PATH.relative_to(REPO_ROOT)} — rebuilding")
 
     try:
-        load_raw(refresh=arguments.refresh)
+        load_raw(raw_resources(refresh=arguments.refresh))
     except Exception as error:
         unavailable = source_failure(error)
         if unavailable is None:
@@ -224,21 +324,44 @@ def main() -> int:
             )
             return 1
 
-    counts, priced_instruments, unconvertible = build_star_schema()
+    priced_instruments, unconvertible = build_market_tables()
+
+    # Both failures below are silent ones: the pipeline completes, the listing
+    # looks plausible, and the Warehouse is short. Neither is a judgement about the
+    # *values* — that is `check_warehouse.py --sources`, which re-derives them from
+    # the snapshots. They are checked here, before the simulator runs, because the
+    # simulator reads all three of these tables: generating a client book on top of
+    # a Warehouse that is missing an Instrument's prices would bake the gap into
+    # every Position it writes.
+    expected = len(TRADED_INSTRUMENTS)
+    if priced_instruments != expected:
+        print(
+            f"\nFAIL — fct_instrument_price covers {priced_instruments} of "
+            f"{expected} Instruments; the rest can hold a Position that can "
+            f"never be marked"
+        )
+        return 1
+    if unconvertible:
+        print(
+            f"\nFAIL — {unconvertible} Market Prices have no FX Rate on their own "
+            f"date, so a Position marked at them cannot be converted to a "
+            f"Reporting Currency. The FX window no longer covers the price "
+            f"window: run `uv run python -m veritas.ingestion --refresh` to bring "
+            f"both sources back to the same window"
+        )
+        return 1
+
+    simulated = simulate_client_activity()
+    load_raw(as_resources(list(simulated.items())))
+    counts, unmarkable, unbillable = build_client_tables()
 
     print()
     for table_name, count in sorted(counts.items()):
         marker = "·" if count else " "
         print(f"  {marker} {table_name:24} {count:>6} rows")
 
-    # Every source must have arrived for every Instrument. Both failures below are
-    # silent ones: the pipeline completes, the listing looks plausible, and the
-    # Warehouse is short. Neither is a judgement about the *values* — that is
-    # `check_warehouse.py --sources`, which re-derives them from the snapshots.
-    expected = len(TRADED_INSTRUMENTS)
-    loaded = counts.get("dim_instrument", 0)
-    prices = counts.get("fct_instrument_price", 0)
     print()
+    loaded = counts.get("dim_instrument", 0)
     if loaded != expected:
         print(
             f"FAIL — dim_instrument holds {loaded} rows for "
@@ -246,29 +369,37 @@ def main() -> int:
             f"metadata on the way in"
         )
         return 1
-    if priced_instruments != expected:
+    if unmarkable:
         print(
-            f"FAIL — fct_instrument_price covers {priced_instruments} of "
-            f"{expected} Instruments; the rest can hold a Position that can "
-            f"never be marked"
+            f"FAIL — {unmarkable} Positions have no Market Price on their own "
+            f"Snapshot date, so they cannot be marked and no Account Value "
+            f"containing them is complete. The Snapshot calendar and the price "
+            f"calendar have come apart — see `read_market_data` in simulator.py"
         )
         return 1
-    if unconvertible:
+    if unbillable:
         print(
-            f"FAIL — {unconvertible} of {prices} Market Prices have no FX Rate on "
-            f"their own date, so a Position marked at them cannot be converted to "
-            f"a Reporting Currency. The FX window no longer covers the price "
-            f"window: run `uv run python -m veritas.ingestion --refresh` to bring "
-            f"both sources back to the same window"
+            f"FAIL — {unbillable} monetary amounts are held in a Denomination "
+            f"Currency with no FX Rate on their own date, so their Gross Revenue "
+            f"cannot reach a Reporting Currency. Either the simulator billed an "
+            f"Account in a currency no Instrument is quoted in, or a Trade "
+            f"settled past the end of the FX window"
         )
         return 1
 
+    prices = counts.get("fct_instrument_price", 0)
     rates = counts.get("fct_fx_rate", 0)
     print(
         f"PASS — the Warehouse is built · dim_instrument holds {loaded} "
         f"Instruments · fct_instrument_price holds {prices} Market Prices "
         f"across all {priced_instruments} · fct_fx_rate holds {rates} FX Rates "
         f"and every Market Price has one"
+    )
+    print(
+        f"       the client side holds {counts.get('dim_client', 0)} Clients · "
+        f"{counts.get('dim_account', 0)} Accounts · "
+        f"{counts.get('fct_trade', 0)} Trades · every Position is markable and "
+        f"every amount is convertible"
     )
     return 0
 

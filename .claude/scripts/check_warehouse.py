@@ -41,8 +41,17 @@ an ADR and two are promises made by comments in the schema.
      and a currency converted through another and back is unchanged.
      Needs a filled Warehouse, so run `uv run python -m veritas.ingestion` first.
 
-Exits non-zero if any check fails. This script grows across Step 002: Sub-step 2.5
-adds `--distinctions`.
+  6. `--distinctions` only — the client side has the shape the design needs.
+     Added by Sub-step 2.5, the Sub-step that generated it. Four parts: every
+     client-activity row is exactly what the simulator produces from the same
+     seed; every quantity is a whole lot of its own Instrument; every Snapshot can
+     be marked and at least one Position Change is one no Trade explains; and
+     **every pair in Glossary Section C is two different numbers**, printed side by
+     side with how far apart they are. A pair that has collapsed fails the run,
+     because a distinction the data cannot tell apart is one no evaluation over
+     that data can test for. Needs a filled Warehouse.
+
+Exits non-zero if any check fails.
 """
 
 import argparse
@@ -959,6 +968,799 @@ def check_fx_rates(warehouse: WarehouseAdapter) -> None:
           f"{ROUND_TRIP_TOLERANCE} tolerance")
 
 
+# -- Sub-step 2.5: the client side, and the pairs it exists to keep apart ------
+
+# The Reporting Currency every monetary figure below is expressed in. `Reporting
+# Currency` is registered as *"the single currency a Grounded Answer is expressed
+# in. Every monetary metric must state one"* — this check answers monetary
+# questions, so it states one. The euro, because `fct_fx_rate` derives every pair
+# through it, so a euro figure is one stored rate away from a published one.
+REPORTING_CURRENCY = "EUR"
+
+# How far apart the two sides of a Section C pair must be before the pair counts
+# as separated, as a share of the larger side.
+#
+# Equality is the wrong bar. Two numbers that differ in the sixth decimal place
+# are technically distinct and tell a reader nothing: a Gold Question Set built on
+# them could not distinguish a model that confused the pair from one that did not,
+# which is the whole reason the plan requires "every Section C distinction is a
+# different number". Half a percent is the floor for "a human would notice".
+#
+# It is deliberately *not* the 1% line DEBT-004 names. That entry is about one
+# specific pair being a reliable evaluation signal; this is the floor for the pair
+# existing at all.
+MIN_DISTINCTION_GAP = Decimal("0.005")
+
+# Every client-activity table, the simulator output it is built from, and the
+# columns that must match. The SQL is written out per table rather than assembled
+# from the column tuple: this script sits outside veritas/warehouse/, and building
+# a statement out of names here is the construct ADR-0002 tells even the adapter to
+# avoid.
+CLIENT_ACTIVITY_TABLES = (
+    (
+        "dim_client",
+        "simulated_client",
+        ("client_id", "client_name", "client_region"),
+        "SELECT client_id, client_name, client_region "
+        "FROM dim_client ORDER BY client_id",
+    ),
+    (
+        "dim_account",
+        "simulated_account",
+        ("account_id", "client_id", "account_name"),
+        "SELECT account_id, client_id, account_name "
+        "FROM dim_account ORDER BY account_id",
+    ),
+    (
+        "fct_trade",
+        "simulated_trade",
+        ("trade_id", "account_id", "instrument_id", "trade_date", "settlement_date",
+         "trade_side", "quantity", "execution_price", "commission", "fee", "rebate",
+         "denomination_currency"),
+        "SELECT trade_id, account_id, instrument_id, trade_date, settlement_date, "
+        "       trade_side, quantity, execution_price, commission, fee, rebate, "
+        "       denomination_currency "
+        "FROM fct_trade ORDER BY trade_id",
+    ),
+    (
+        "fct_cash_movement",
+        "simulated_cash_movement",
+        ("cash_movement_id", "account_id", "trade_id", "movement_date",
+         "movement_type", "amount", "denomination_currency"),
+        "SELECT cash_movement_id, account_id, trade_id, movement_date, "
+        "       movement_type, amount, denomination_currency "
+        "FROM fct_cash_movement ORDER BY cash_movement_id",
+    ),
+    (
+        "fct_accounting_movement",
+        "simulated_accounting_movement",
+        ("accounting_movement_id", "account_id", "trade_id", "movement_date",
+         "movement_type", "amount", "denomination_currency"),
+        "SELECT accounting_movement_id, account_id, trade_id, movement_date, "
+        "       movement_type, amount, denomination_currency "
+        "FROM fct_accounting_movement ORDER BY accounting_movement_id",
+    ),
+    (
+        "fct_position_snapshot",
+        "simulated_position_snapshot",
+        ("snapshot_date", "account_id", "instrument_id", "quantity", "cost_basis"),
+        "SELECT snapshot_date, account_id, instrument_id, quantity, cost_basis "
+        "FROM fct_position_snapshot "
+        "ORDER BY snapshot_date, account_id, instrument_id",
+    ),
+    (
+        "fct_balance_snapshot",
+        "simulated_balance_snapshot",
+        ("snapshot_date", "account_id", "denomination_currency", "cash_balance"),
+        "SELECT snapshot_date, account_id, denomination_currency, cash_balance "
+        "FROM fct_balance_snapshot "
+        "ORDER BY snapshot_date, account_id, denomination_currency",
+    ),
+)
+
+
+def share(part: Decimal, whole: Decimal) -> Decimal:
+    """`part` as a share of `whole`, or zero if there is no whole."""
+    return part / whole if whole else Decimal("0")
+
+
+def gap(left: Decimal, right: Decimal) -> Decimal:
+    """How far apart two figures are, as a share of the larger."""
+    return share(abs(left - right), max(abs(left), abs(right)))
+
+
+def distinction(
+    row: str,
+    left_label: str,
+    left: Decimal,
+    right_label: str,
+    right: Decimal,
+    *,
+    unit: str = REPORTING_CURRENCY,
+    minimum: Decimal = MIN_DISTINCTION_GAP,
+) -> None:
+    """Print both sides of one Section C row, and fail if they have collapsed.
+
+    The pair is named by the Glossary's own words, so a reader can put the figure
+    next to the sentence it is evidence for.
+    """
+    apart = gap(left, right)
+    print(f"    {row}")
+    print(f"      {left_label}: {left:,.2f} {unit}".rstrip())
+    print(f"      {right_label}: {right:,.2f} {unit}".rstrip())
+    print(f"      {apart:.2%} apart")
+    if apart < minimum:
+        problems.append(
+            f"Section C pair '{row}' has collapsed: {left_label} is {left:,.2f} "
+            f"and {right_label} is {right:,.2f}, {apart:.4%} apart against a "
+            f"{minimum:.2%} floor. A pair the data cannot tell apart is a "
+            f"distinction the Gold Question Set cannot test for"
+        )
+
+
+def check_client_activity(warehouse: WarehouseAdapter) -> None:
+    """Every client-activity row is exactly what the simulator produces.
+
+    The same re-derive-and-compare shape as `check_prices` and `check_fx_rates`
+    above, and it is worth being precise about what it does and does not prove,
+    because the two cases differ.
+
+    A Market Price has an **independent** source of truth: the committed snapshot
+    is what Yahoo said, so re-deriving a price in Python and comparing it to what
+    the SQL built genuinely tests the SQL. The client side has no such source —
+    the simulator *is* the source. So this proves two narrower things, both of
+    which are load-bearing and neither of which is "the simulated numbers are
+    right":
+
+      1. **The simulation is deterministic.** Re-running it against the same
+         Warehouse produces the same rows, so the seed is the only thing that
+         decides what is in these seven tables. Without this the plan's
+         requirement — *"two runs from the same seed produce identical row counts
+         and identical distinction figures"* — is a claim nobody has checked.
+      2. **Nothing was lost or reshaped between the simulator and the star
+         schema.** dlt's inference and the seven build scripts' casts sit between
+         them, and a DECIMAL that arrived with the wrong scale, a date that became
+         a timestamp or a null `trade_id` that became a zero would all show up
+         here as a row that differs.
+
+    Whether the *shape* of the generated activity is any good is what
+    `check_distinctions` measures, and Amino's review is what judges it.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from veritas.ingestion import simulator
+
+    market = simulator.read_market_data(warehouse)
+    regenerated = simulator.simulate(market)
+    print(f"  client activity: regenerated from seed {simulator.SEED} against "
+          f"{len(market.snapshot_dates)} Snapshot dates")
+
+    for table_name, raw_name, columns, sql in CLIENT_ACTIVITY_TABLES:
+        loaded = warehouse.query(sql)
+        rows = regenerated[raw_name]
+        expected = sorted(
+            (tuple(row[column] for column in columns) for row in rows),
+            # Sorted into the order the query above asks for. Every `ORDER BY` in
+            # CLIENT_ACTIVITY_TABLES leads with that table's primary key, and a
+            # primary key is unique, so ordering the simulator's rows by the whole
+            # tuple lands them in the same order — the columns after the key never
+            # get to break a tie, because there are no ties.
+            #
+            # `(value is None, value)` rather than `value` because `trade_id` is
+            # NULL on every Cash Movement no Trade explains — a deposit, a
+            # withdrawal — and Python refuses to compare None with an int. It sorts
+            # None last, which is also where the engine puts it.
+            key=lambda values: tuple((value is None, value) for value in values),
+        )
+        if len(loaded) != len(expected):
+            problems.append(
+                f"{table_name} holds {len(loaded)} rows and the simulator "
+                f"produces {len(expected)} from the same seed — either the "
+                f"simulation is not deterministic or the build script dropped rows"
+            )
+            continue
+
+        print(f"    {table_name:24} {len(loaded):>6} rows · identical")
+
+        differing = [
+            (built, made)
+            for built, made in zip(loaded, expected)
+            if list(built) != list(made)
+        ]
+        if differing:
+            built, made = differing[0]
+            problems.append(
+                f"{table_name}: {len(differing)} of {len(loaded)} rows differ from "
+                f"what the simulator produces from the same seed. First: the "
+                f"Warehouse holds {built} and the simulator made {made}"
+            )
+
+
+def check_distinctions(warehouse: WarehouseAdapter) -> None:
+    """Every Section C pair is two different numbers on the loaded data.
+
+    Section C is headed *"Distinctions we must not blur"*, and says why the whole
+    project turns on them: confusing one for another produces *"a correct program
+    computing the wrong number — the failure that is hardest to notice and most
+    expensive to trust"*. A Warehouse where the two sides of a pair happen to be
+    equal cannot catch that failure, and no evaluation over it can either.
+
+    So this is not a check that the arithmetic works. It is a check that the
+    **data has the shape the design needs**: that a question about Gross Revenue
+    and the same question about Net Revenue come back with different answers.
+
+    One pair is absent because it is checked elsewhere on better evidence:
+    `Adjusted Close` against `Market Price` is market data, not client activity,
+    and `--sources` measures it against the committed snapshots.
+    """
+    if not warehouse.row_count("fct_trade"):
+        problems.append(
+            "fct_trade is empty — run `uv run python -m veritas.ingestion` before "
+            "checking distinctions, or every pair below collapses to zero against "
+            "zero and this check passes vacuously"
+        )
+        return
+
+    # Every Trade, with the three rates a Trade needs to be valued: its billing
+    # currency on Trade Date and again on Settlement Date, and its Instrument's
+    # Quotation Currency on Trade Date. Joined rather than looked up per row, so
+    # that a missing rate removes the Trade from the result and shows up as a
+    # count mismatch rather than as a silently smaller total.
+    trades = warehouse.query(
+        "SELECT trade.trade_id, trade.account_id, account.client_id, "
+        "       trade.trade_date, trade.settlement_date, trade.trade_side, "
+        "       trade.quantity, trade.execution_price, trade.commission, "
+        "       trade.fee, trade.rebate, price.market_price, "
+        "       billed_on_trade.fx_rate, billed_on_settlement.fx_rate, "
+        "       quoted_on_trade.fx_rate "
+        "FROM fct_trade AS trade "
+        "JOIN dim_account AS account "
+        "  ON account.account_id = trade.account_id "
+        "JOIN dim_instrument AS instrument "
+        "  ON instrument.instrument_id = trade.instrument_id "
+        "JOIN fct_instrument_price AS price "
+        "  ON price.price_date = trade.trade_date "
+        " AND price.instrument_id = trade.instrument_id "
+        "JOIN fct_fx_rate AS billed_on_trade "
+        "  ON billed_on_trade.rate_date = trade.trade_date "
+        " AND billed_on_trade.from_currency = trade.denomination_currency "
+        " AND billed_on_trade.to_currency = ? "
+        "JOIN fct_fx_rate AS billed_on_settlement "
+        "  ON billed_on_settlement.rate_date = trade.settlement_date "
+        " AND billed_on_settlement.from_currency = trade.denomination_currency "
+        " AND billed_on_settlement.to_currency = ? "
+        "JOIN fct_fx_rate AS quoted_on_trade "
+        "  ON quoted_on_trade.rate_date = trade.trade_date "
+        " AND quoted_on_trade.from_currency = instrument.quotation_currency "
+        " AND quoted_on_trade.to_currency = ? "
+        "ORDER BY trade.trade_id",
+        [REPORTING_CURRENCY] * 3,
+    )
+    total_trades = warehouse.row_count("fct_trade")
+    print(f"  {len(trades)} of {total_trades} Trades priced and converted to "
+          f"{REPORTING_CURRENCY}")
+    if len(trades) != total_trades:
+        problems.append(
+            f"only {len(trades)} of {total_trades} Trades could be valued in "
+            f"{REPORTING_CURRENCY} — a Trade with no Market Price on its Trade "
+            f"Date, or no FX Rate on one of its two dates, is a Trade no monetary "
+            f"metric can include and none of the figures below counts"
+        )
+
+    gross = net = Decimal("0")
+    gross_at_settlement = Decimal("0")
+    notional_executed = notional_at_close = Decimal("0")
+    notional_unconverted = Decimal("0")
+    by_account: dict[int, list[Decimal]] = {}
+    by_client: dict[int, Decimal] = {}
+    fills_away_from_close = 0
+    largest_fill_gap = Decimal("0")
+    # The same Gross Revenue, bucketed by each of a Trade's two dates. Only the
+    # date column differs between them — the amount and the rate are identical —
+    # so the gap between the two is exactly what a period filter moves.
+    by_trade_month: dict[tuple[int, int], Decimal] = {}
+    by_settlement_month: dict[tuple[int, int], Decimal] = {}
+
+    for (_, account_id, client_id, trade_date, settlement, _, quantity,
+         execution_price, commission, fee, rebate, market_price, billed,
+         billed_later, quoted) in trades:
+        if execution_price != market_price:
+            fills_away_from_close += 1
+        largest_fill_gap = max(largest_fill_gap, gap(execution_price, market_price))
+        earned_here = commission * billed
+        for buckets, when in (
+            (by_trade_month, trade_date),
+            (by_settlement_month, settlement),
+        ):
+            key = (when.year, when.month)
+            buckets[key] = buckets.get(key, Decimal("0")) + earned_here
+        gross += commission * billed
+        net += (commission - rebate - fee) * billed
+        gross_at_settlement += commission * billed_later
+        notional_executed += quantity * execution_price * quoted
+        notional_at_close += quantity * market_price * quoted
+        # The mistake, not the metric: adding a JPY notional to a EUR one because
+        # both columns are called `quantity * execution_price`.
+        notional_unconverted += quantity * execution_price
+        counted = by_account.setdefault(account_id, [Decimal("0"), Decimal("0")])
+        counted[0] += quantity * execution_price * quoted
+        counted[1] += 1
+        by_client[client_id] = by_client.get(client_id, Decimal("0")) + (
+            commission * billed
+        )
+
+    print()
+    print("  Section C — every pair, both numbers")
+
+    distinction(
+        "Gross Revenue / Net Revenue — "
+        "\"reporting gross as net overstates what the business keeps\"",
+        "Gross Revenue", gross, "Net Revenue", net,
+    )
+
+    # Execution Price against Market Price is the one pair that separates a Trade
+    # and not a book. Fills sit either side of the close — a Trade fills at
+    # whatever the market gave it at that moment, which is above the close as often
+    # as below — so summing 1,600 of them cancels most of the difference out. That
+    # is a true property of the quantity rather than a thin simulation, so the pair
+    # is checked where it actually bites: on the Trades themselves.
+    distinction(
+        "Execution Price / Market Price — "
+        "\"Traded Notional at the close values trading that never happened\"",
+        "Traded Notional at Execution Price", notional_executed,
+        "at that date's Market Price", notional_at_close,
+        minimum=Decimal("0"),
+    )
+    print(f"      per Trade: {fills_away_from_close} of {len(trades)} filled away "
+          f"from the close, the largest by {largest_fill_gap:.2%}")
+    print(f"      at book level the two nearly cancel — see DEBT-011")
+    if fills_away_from_close < len(trades):
+        problems.append(
+            f"{len(trades) - fills_away_from_close} Trades filled at exactly that "
+            f"date's Market Price, so Execution Price and Market Price are the "
+            f"same number on them — Section C's row says a fill is the close "
+            f"'except by coincidence', and this is not coincidence at that scale"
+        )
+
+    distinction(
+        "Quotation Currency / Reporting Currency — "
+        "\"skipping the conversion is an FX-sized error\"",
+        f"converted to {REPORTING_CURRENCY}", notional_executed,
+        "summed unconverted", notional_unconverted,
+        unit="(mixed)",
+    )
+
+    # Trade Date against Settlement Date, which Section C says moves the number
+    # *twice*. Both halves are measured, because they are wildly different sizes
+    # and quoting only one would misrepresent the row:
+    #
+    #   the period half — a month's revenue filtered by one date or the other,
+    #                     which moves whole Trades across the boundary
+    #   the FX half     — the same Commission converted at each date's own rate,
+    #                     which is what DEBT-004 is about
+    print()
+    widest_period = max(
+        set(by_trade_month) | set(by_settlement_month),
+        key=lambda month: gap(
+            by_trade_month.get(month, Decimal("0")),
+            by_settlement_month.get(month, Decimal("0")),
+        ),
+    )
+    distinction(
+        f"Trade Date / Settlement Date — \"shifts revenue across period "
+        f"boundaries\", Gross Revenue in "
+        f"{widest_period[0]}-{widest_period[1]:02d}",
+        "filtered by Trade Date", by_trade_month.get(widest_period, Decimal("0")),
+        "filtered by Settlement Date",
+        by_settlement_month.get(widest_period, Decimal("0")),
+    )
+    fx_delta = gap(gross, gross_at_settlement)
+    print(f"      the same row's FX half, over every Trade: {gross:,.2f} at each "
+          f"Trade Date's rate against {gross_at_settlement:,.2f} at each "
+          f"Settlement Date's, {fx_delta:.4%} apart")
+    print(f"      DEBT-004: that FX half is measured against the 1% the Ledger "
+          f"wants for a reliable evaluation signal — "
+          f"{'clears' if fx_delta >= Decimal('0.01') else 'does not clear'} it")
+
+    # Cash against Accounting, on one component — Commission — so the only thing
+    # that differs between the two sides is *when* it was recognised. Comparing
+    # whole tables would compare different things: cash holds settlements and
+    # deposits, accounting holds Realised P&L, and neither has a counterpart.
+    def monthly(sql: str) -> dict[tuple[int, int], Decimal]:
+        buckets: dict[tuple[int, int], Decimal] = {}
+        for movement_date, amount, rate in warehouse.query(
+            sql, [REPORTING_CURRENCY]
+        ):
+            key = (movement_date.year, movement_date.month)
+            buckets[key] = buckets.get(key, Decimal("0")) + abs(amount) * rate
+        return buckets
+
+    collected = monthly(
+        "SELECT movement.movement_date, movement.amount, rate.fx_rate "
+        "FROM fct_cash_movement AS movement "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = movement.movement_date "
+        " AND rate.from_currency = movement.denomination_currency "
+        " AND rate.to_currency = ? "
+        "WHERE movement.movement_type = 'commission'"
+    )
+    earned = monthly(
+        "SELECT movement.movement_date, movement.amount, rate.fx_rate "
+        "FROM fct_accounting_movement AS movement "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = movement.movement_date "
+        " AND rate.from_currency = movement.denomination_currency "
+        " AND rate.to_currency = ? "
+        "WHERE movement.movement_type = 'commission'"
+    )
+    months = sorted(set(collected) | set(earned))
+    differing = [
+        month
+        for month in months
+        if gap(earned.get(month, Decimal("0")), collected.get(month, Decimal("0")))
+        >= MIN_DISTINCTION_GAP
+    ]
+    widest = max(
+        months,
+        key=lambda month: gap(
+            earned.get(month, Decimal("0")), collected.get(month, Decimal("0"))
+        ),
+    )
+    print()
+    distinction(
+        f"Cash Movement / Accounting Movement — \"earned on Trade Date and "
+        f"collected on Settlement Date\", Commission in {widest[0]}-{widest[1]:02d}",
+        "earned (Accounting)", earned.get(widest, Decimal("0")),
+        "collected (Cash)", collected.get(widest, Decimal("0")),
+    )
+    print(f"      {len(differing)} of {len(months)} months differ by at least "
+          f"{MIN_DISTINCTION_GAP:.1%}")
+    if not differing:
+        problems.append(
+            "Commission earned and Commission collected agree in every month — "
+            "no period boundary falls inside a settlement cycle, so the Cash "
+            "against Accounting Movement pair is untestable on this data"
+        )
+
+    # The Snapshot side: Cash Balance against Account Value, and Realised against
+    # Unrealised P&L, both as of the last Snapshot date.
+    ((last_snapshot,),) = warehouse.query(
+        "SELECT max(snapshot_date) FROM fct_position_snapshot"
+    )
+    # Summed in Python rather than by the engine, here and for the ledger below.
+    # A DECIMAL(18, 6) amount times a DECIMAL(18, 8) rate needs 36 digits, and
+    # DuckDB computes it in DECIMAL(18) and raises on overflow — a JPY balance is
+    # large enough to hit it. Casting both sides wider would work and would put an
+    # engine-specific width in a script outside veritas/warehouse/; Python's
+    # Decimal has no width to overflow, and the rest of this file already does its
+    # arithmetic there.
+    cash_balance = sum(
+        (
+            balance * rate
+            for balance, rate in warehouse.query(
+                "SELECT balance.cash_balance, rate.fx_rate "
+                "FROM fct_balance_snapshot AS balance "
+                "JOIN fct_fx_rate AS rate "
+                "  ON rate.rate_date = balance.snapshot_date "
+                " AND rate.from_currency = balance.denomination_currency "
+                " AND rate.to_currency = ? "
+                "WHERE balance.snapshot_date = ?",
+                [REPORTING_CURRENCY, last_snapshot],
+            )
+        ),
+        Decimal("0"),
+    )
+    positions = warehouse.query(
+        "SELECT position.account_id, position.instrument_id, position.quantity, "
+        "       position.cost_basis, price.market_price, rate.fx_rate "
+        "FROM fct_position_snapshot AS position "
+        "JOIN dim_instrument AS instrument "
+        "  ON instrument.instrument_id = position.instrument_id "
+        "JOIN fct_instrument_price AS price "
+        "  ON price.price_date = position.snapshot_date "
+        " AND price.instrument_id = position.instrument_id "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = position.snapshot_date "
+        " AND rate.from_currency = instrument.quotation_currency "
+        " AND rate.to_currency = ? "
+        "WHERE position.snapshot_date = ?",
+        [REPORTING_CURRENCY, last_snapshot],
+    )
+    marked = sum(
+        (quantity * market_price * rate for _, _, quantity, _, market_price, rate
+         in positions),
+        Decimal("0"),
+    )
+    unrealised = sum(
+        ((quantity * market_price - cost_basis) * rate
+         for _, _, quantity, cost_basis, market_price, rate in positions),
+        Decimal("0"),
+    )
+    realised = sum(
+        (
+            amount * rate
+            for amount, rate in warehouse.query(
+                "SELECT movement.amount, rate.fx_rate "
+                "FROM fct_accounting_movement AS movement "
+                "JOIN fct_fx_rate AS rate "
+                "  ON rate.rate_date = movement.movement_date "
+                " AND rate.from_currency = movement.denomination_currency "
+                " AND rate.to_currency = ? "
+                "WHERE movement.movement_type = 'realised P&L'",
+                [REPORTING_CURRENCY],
+            )
+        ),
+        Decimal("0"),
+    )
+
+    print()
+    print(f"    (as of the last Snapshot date, {last_snapshot})")
+    distinction(
+        "Cash Balance / Account Value — \"a Client with no cash and 2m of "
+        "equities has a Cash Balance of zero\"",
+        "Cash Balance", cash_balance,
+        "Account Value (cash plus Positions marked)", cash_balance + marked,
+    )
+    distinction(
+        "Realised P&L / Unrealised P&L — \"one is banked, one is a market "
+        "opinion\"",
+        "Realised P&L (banked, from the ledger)", realised,
+        "Unrealised P&L (open Positions, marked)", unrealised,
+    )
+
+    # Cost Basis against Execution Price, on the same open Positions: what the
+    # holding cost, against pricing it at the last thing that happened to it.
+    #
+    # Read as rows and folded in Python rather than asked for as one aggregate,
+    # because "the last fill" is ambiguous in SQL and not in the domain: two Trades
+    # can share a Trade Date, and a `max(trade_date)` subquery returns both, leaving
+    # which one survives to whichever row the engine happened to emit last. Ordering
+    # by `trade_date` and then `trade_id` breaks that tie the way fct_trade already
+    # numbers them, and the last write into the dictionary wins.
+    last_fills: dict[tuple[int, int], Decimal] = {}
+    for account_id, instrument_id, execution_price in warehouse.query(
+        "SELECT account_id, instrument_id, execution_price FROM fct_trade "
+        "ORDER BY trade_date, trade_id"
+    ):
+        last_fills[(account_id, instrument_id)] = execution_price
+
+    # Both sides are summed over the **same** Positions — the ones a Trade actually
+    # touched — so the only thing that differs between them is which cost measure
+    # was used, which is what the pair is about.
+    #
+    # A Position with no Trade behind it has no last Execution Price at all: it
+    # arrived by transfer, and nothing ever filled. There is no stand-in for one.
+    # Substituting the Cost Basis, as an earlier version of this check did, is wrong
+    # twice over — a Cost Basis is a total where an Execution Price is a per-unit
+    # price, so multiplying it by the quantity again is out by a factor of the
+    # holding; and it puts the left side's own number into the right side, which
+    # compares a figure with itself on exactly the Positions where the pair is
+    # hardest to separate. Excluding them and saying how many is the honest version.
+    touched = [row for row in positions if (row[0], row[1]) in last_fills]
+    unrealised_touched = sum(
+        ((quantity * market_price - cost_basis) * rate
+         for _, _, quantity, cost_basis, market_price, rate in touched),
+        Decimal("0"),
+    )
+    at_last_fill = sum(
+        (
+            quantity * (market_price - last_fills[(account_id, instrument_id)]) * rate
+            for account_id, instrument_id, quantity, _, market_price, rate in touched
+        ),
+        Decimal("0"),
+    )
+    distinction(
+        "Cost Basis / Execution Price — \"an Execution Price is what one Trade "
+        "filled at; a Cost Basis is what the whole holding cost\"",
+        "Unrealised P&L against stored Cost Basis", unrealised_touched,
+        "against the last Execution Price", at_last_fill,
+    )
+    print(f"      over the {len(touched)} of {len(positions)} Positions on this "
+          f"date that a Trade touched — the rest arrived by transfer and have no "
+          f"last fill")
+
+    # Traded Notional against Trade Count, and Client against Account. Both are
+    # about a ranking rather than a total: "one large trade and a thousand small
+    # ones are opposite answers to 'was this a busy month'", and counting Accounts
+    # and calling them Clients "inflates every per-client figure".
+    print()
+    # Both rankings break their ties on `account_id`, and the query above is
+    # ordered, so the figure below is decided by the data rather than by the order
+    # the engine returned rows in. This matters here and not in the sums beside it:
+    # a sum does not care what order it is taken in, and Traded Notional is a
+    # Decimal total that never ties — but Trade Count is a small integer and
+    # Accounts routinely share one, so without a stated tie-break the count ranking,
+    # and the number of Accounts said to disagree with it, is whatever the scan
+    # happened to emit first.
+    by_notional = [
+        account for account, _ in sorted(
+            by_account.items(), key=lambda item: (-item[1][0], item[0])
+        )
+    ]
+    by_count = [
+        account for account, _ in sorted(
+            by_account.items(), key=lambda item: (-item[1][1], item[0])
+        )
+    ]
+    disagreements = sum(
+        1 for left, right in zip(by_notional, by_count) if left != right
+    )
+    print("    Traded Notional / Trade Count — \"one large trade and a thousand "
+          "small ones are opposite answers\"")
+    print(f"      busiest Account by Traded Notional: {by_notional[0]} "
+          f"({by_account[by_notional[0]][0]:,.0f} {REPORTING_CURRENCY})")
+    print(f"      busiest Account by Trade Count: {by_count[0]} "
+          f"({by_account[by_count[0]][1]:,.0f} Trades)")
+    print(f"      {disagreements} of {len(by_account)} Accounts rank differently "
+          f"under the two")
+    if not disagreements:
+        problems.append(
+            "ranking Accounts by Traded Notional and by Trade Count gives the "
+            "same order, so 'volume' has one answer on this data and the "
+            "Ambiguous Term cannot be exercised"
+        )
+
+    accounts = len(by_account)
+    clients = len(by_client)
+    print("    Client / Account — \"counting Accounts and calling them clients "
+          "inflates every per-client figure\"")
+    print(f"      Clients with activity: {clients} · "
+          f"Accounts with activity: {accounts}")
+    print(f"      Gross Revenue per Client: {share(gross, Decimal(clients)):,.2f} "
+          f"· per Account: {share(gross, Decimal(accounts)):,.2f} "
+          f"{REPORTING_CURRENCY}")
+    if clients >= accounts:
+        problems.append(
+            f"{clients} Clients hold {accounts} Accounts — with no Client holding "
+            f"more than one, per-client and per-account figures are the same "
+            f"number and the pair cannot be blurred"
+        )
+
+
+def check_snapshots(warehouse: WarehouseAdapter) -> None:
+    """The two rules R12 and R13 fixed for Snapshots, checked on the loaded rows.
+
+    Both are about a Snapshot being *markable*. A Position the Warehouse holds and
+    cannot price is an Account Value that is silently short by a holding, and it
+    looks exactly like an Account that does not hold it.
+    """
+    for table_name, sql in (
+        (
+            "fct_position_snapshot",
+            "SELECT count(DISTINCT snapshot_date) FROM fct_position_snapshot "
+            "WHERE snapshot_date NOT IN (SELECT price_date FROM fct_instrument_price)",
+        ),
+        (
+            "fct_balance_snapshot",
+            "SELECT count(DISTINCT snapshot_date) FROM fct_balance_snapshot "
+            "WHERE snapshot_date NOT IN (SELECT price_date FROM fct_instrument_price)",
+        ),
+    ):
+        ((orphan_dates,),) = warehouse.query(sql)
+        if orphan_dates:
+            problems.append(
+                f"{table_name} holds {orphan_dates} Snapshot dates the Warehouse "
+                f"has no Market Price for at all — R13 fixes that a Snapshot is "
+                f"written on the dates prices exist for, so these cannot be marked"
+            )
+
+    # The stronger reading, and the one Sub-step 2.5 chose: not just that the date
+    # has *some* price, but that this Instrument has one on it.
+    ((unmarkable,),) = warehouse.query(
+        "SELECT count(*) "
+        "FROM fct_position_snapshot AS position "
+        "LEFT JOIN fct_instrument_price AS price "
+        "  ON price.price_date = position.snapshot_date "
+        " AND price.instrument_id = position.instrument_id "
+        "WHERE price.market_price IS NULL"
+    )
+    ((dates,),) = warehouse.query(
+        "SELECT count(DISTINCT snapshot_date) FROM fct_position_snapshot"
+    )
+    print(f"  Snapshots: {dates} dates · every Position has a Market Price on its "
+          f"own date ({unmarkable} without)")
+    if unmarkable:
+        problems.append(
+            f"{unmarkable} Positions have no Market Price on their own Snapshot "
+            f"date, so they cannot be marked. The Snapshot calendar was chosen as "
+            f"the dates *every* Instrument has a price precisely so this is zero"
+        )
+
+    # Position Change against Trade. Every Position starts at zero, so the holding
+    # on the last Snapshot date is the sum of everything that ever moved it — and
+    # the sum of its Trades is only part of that. The gap is the transfers, which
+    # is the whole content of the Section C row: "deriving position change from
+    # trades alone silently loses those".
+    unexplained = warehouse.query(
+        "SELECT position.account_id, position.instrument_id, position.quantity, "
+        "       coalesce(traded.net_quantity, 0) AS net_quantity "
+        "FROM fct_position_snapshot AS position "
+        "LEFT JOIN ( "
+        "    SELECT account_id, instrument_id, "
+        "           sum(CASE WHEN trade_side = 'buy' THEN quantity "
+        "                    ELSE -quantity END) AS net_quantity "
+        "    FROM fct_trade GROUP BY account_id, instrument_id "
+        ") AS traded "
+        "  ON traded.account_id = position.account_id "
+        " AND traded.instrument_id = position.instrument_id "
+        "WHERE position.snapshot_date = "
+        "      (SELECT max(snapshot_date) FROM fct_position_snapshot) "
+        "  AND position.quantity <> coalesce(traded.net_quantity, 0)"
+    )
+    print(f"    Position Change / Trade: {len(unexplained)} holdings differ from "
+          f"the sum of their own Trades")
+    for account_id, instrument_id, quantity, net_quantity in unexplained:
+        print(f"      account {account_id} · instrument {instrument_id}: "
+              f"holds {quantity:,.0f}, Trades explain {net_quantity:,.0f}")
+    if not unexplained:
+        problems.append(
+            "every holding equals the sum of its own Trades, so Position Change "
+            "and Trade are the same number on this data — R14 requires the "
+            "simulator to emit transfers, and none reached the Warehouse"
+        )
+
+
+def check_lots(warehouse: WarehouseAdapter) -> None:
+    """Every quantity the Warehouse holds is a whole lot of its own Instrument.
+
+    `LOT_SIZE` in the simulator is the statement of what one unit of each
+    instrument type is: nobody trades 86,431.5 units of a currency pair, a future
+    is a whole number of contracts, and no custodian delivers half a share. The
+    schema cannot express that rule — `quantity` is a `DECIMAL(18, 6)`, because a
+    column type is about scale and not about lots — so it is checked here or
+    nowhere.
+
+    **Added by Sub-step 2.5's review, after nowhere turned out to be the answer.**
+    `build_transfers` quantised to six decimal places instead of rounding to the
+    lot, so the one path that moves a Position *without* a Trade was also the one
+    path that disagreed with every Trade about what a whole unit is. Nothing
+    reported it: every row satisfied the schema, every Snapshot was markable, and
+    the fractional holding sat inside an Account Value that looked entirely
+    ordinary. That is the shape of failure this project is about, arriving in our
+    own generator.
+
+    Both tables are checked, not just the one that broke. A Trade and a Position
+    are two records of the same stock, and a rule enforced on one of them is a rule
+    that holds until the other one moves.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from veritas.ingestion.simulator import LOT_SIZE
+
+    for table_name, sql in (
+        (
+            "fct_trade",
+            "SELECT instrument.instrument_type, trade.quantity "
+            "FROM fct_trade AS trade "
+            "JOIN dim_instrument AS instrument "
+            "  ON instrument.instrument_id = trade.instrument_id",
+        ),
+        (
+            "fct_position_snapshot",
+            "SELECT instrument.instrument_type, position.quantity "
+            "FROM fct_position_snapshot AS position "
+            "JOIN dim_instrument AS instrument "
+            "  ON instrument.instrument_id = position.instrument_id",
+        ),
+    ):
+        rows = warehouse.query(sql)
+        broken = [
+            (instrument_type, quantity)
+            for instrument_type, quantity in rows
+            if quantity % LOT_SIZE[instrument_type]
+        ]
+        print(f"    {table_name:24} {len(rows):>6} quantities · "
+              f"{len(broken)} not a whole lot")
+        if broken:
+            instrument_type, quantity = broken[0]
+            problems.append(
+                f"{table_name} holds {len(broken)} quantities that are not a whole "
+                f"lot of their own Instrument — the first is {quantity} of an "
+                f"Instrument of type {instrument_type!r}, whose lot is "
+                f"{LOT_SIZE[instrument_type]}. "
+                f"Every path that moves stock must agree about what one unit is, "
+                f"and a Trade and a transfer are two such paths"
+            )
+
+
 def duckdb_importers() -> list[Path]:
     """Every Python file that imports `duckdb`, adapter or not.
 
@@ -1028,12 +1830,20 @@ def main() -> int:
         help="also check what ingestion loaded against what the sources said — "
              "run `uv run python -m veritas.ingestion` first",
     )
+    parser.add_argument(
+        "--distinctions",
+        action="store_true",
+        help="also check the client side: that the simulator reproduces it "
+             "exactly, that every Snapshot is markable, and that every Glossary "
+             "Section C pair is two different numbers",
+    )
     arguments = parser.parse_args()
 
-    if arguments.rebuild and arguments.sources:
+    if arguments.rebuild and (arguments.sources or arguments.distinctions):
         parser.error(
-            "--rebuild empties the Warehouse and --sources checks what is in it, "
-            "so together they only ever prove that an empty table is empty"
+            "--rebuild empties the Warehouse and --sources and --distinctions "
+            "check what is in it, so together they only ever prove that an empty "
+            "table is empty"
         )
 
     if arguments.rebuild and DATABASE_PATH.exists():
@@ -1055,6 +1865,16 @@ def main() -> int:
             check_prices(warehouse)
             print()
             check_fx_rates(warehouse)
+
+        if arguments.distinctions:
+            print()
+            check_client_activity(warehouse)
+            print()
+            check_lots(warehouse)
+            print()
+            check_snapshots(warehouse)
+            print()
+            check_distinctions(warehouse)
 
     check_constraints()
     print()
