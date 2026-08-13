@@ -4,8 +4,8 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-13 — Sub-step 2.5 reviewed by Amino, review changes applied, awaiting his commit. **The Warehouse is full: all ten tables of Glossary Section B hold rows, and every Certified Metric can now return a number.**
-**Steps completed:** Step 000 (framework) and Step 001, fully committed; **Step 002 is built end to end — five of its six Sub-steps** — with 2.5 reviewed and awaiting commit and 2.6 planned but not started. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`. **Sub-step 2.5 is uncommitted** and is what this session leaves for him.
+**Last updated:** 2026-08-13 — Sub-step 2.5 committed; Sub-step 2.6 built and awaiting Amino's review. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is now checked in both the halves ADR-0002 named.**
+**Steps completed:** Step 000 (framework) and Step 001, fully committed; **Step 002 is built end to end, all six Sub-steps**, five of them committed. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`. **Sub-step 2.6 is uncommitted** and is what this session leaves for him.
 
 ---
 
@@ -13,23 +13,35 @@ wrong and gets fixed immediately.
 
 - **Active Step:** 002 — Build the Warehouse and fill it
   ([plan](../plan/step-002-warehouse-and-ingestion.md)), approved 2026-08-05.
-  **Five of six Sub-steps are built.** 2.1 (`5a061a7`), 2.2 (`0fc5a34`), 2.3
-  (`a58ef91`) and 2.4 (`13b99bb`) are committed on `main` and approved; **2.5 is
-  built, reviewed and uncommitted**. The verification commands of each pass and
-  their output is in the [review](../reviews/step-002-warehouse-and-ingestion.md).
-- **Next, in this order, and they are two commits:**
-  1. **Amino commits Sub-step 2.5.** It was reviewed on 2026-08-13, the review
-     changes are applied, and every check passes — see
-     [Changes made on review](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-13-sub-step-25).
-  2. **Then Sub-step 2.6 pays [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)**,
-     as its own commit. Amino ruled on 2026-08-13 that its trigger has fired
+  **All six Sub-steps are built.** 2.1 (`5a061a7`), 2.2 (`0fc5a34`), 2.3
+  (`a58ef91`), 2.4 (`13b99bb`) and 2.5 (`ce2961a`) are committed on `main` and
+  approved; **2.6 is built and uncommitted**. The verification commands of each
+  pass and their output is in the
+  [review](../reviews/step-002-warehouse-and-ingestion.md). **The plan is closed
+  out at `in review`** and becomes `done` when 2.6 lands — nothing in the Step is
+  outstanding besides that one commit.
+- **Next, in this order:**
+  1. **Amino reviews and commits Sub-step 2.6** — see the
+     [review entry](../reviews/step-002-warehouse-and-ingestion.md#sub-step-26--scan-for-duckdb-specific-function-names-outside-the-adapter).
+     It pays [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect),
+     whose trigger he ruled fired on 2026-08-13
      ([R21](../plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13)),
-     and that it lands **after 2.5 is committed and before Step 003 is planned**.
-     The work is one check script growing one check: scan the SQL text outside
-     `veritas/warehouse/` for DuckDB-specific function names, dialect list derived
-     from `sqlglot`.
+     and it was to land as its own commit after 2.5 — which it does.
+  2. **Then Step 002 is finished and Step 003 gets planned**, using
+     `planning-a-step`. Its shape is already fixed by
+     [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved):
+     the sqlglot spike that proves — or disproves — the Validation Gate's
+     parse-tree claim, whose approved 2026-08-05 wording is preserved verbatim
+     under [Deferred to Step 003](../plan/step-002-warehouse-and-ingestion.md#deferred-to-step-003--prove-the-validation-gates-parse-tree-claim).
   - **Do not plan Step 003 before 2.6 is committed**; the route to the Target State
     is discovered one Step at a time.
+- **Three things Sub-step 2.6 leaves for the reviewer to push on**, all argued in
+  its review section under *Look at this sceptically*: `generate_series` is not
+  standard SQL and the scan does not flag it, because sqlglot files it as
+  dialect-neutral; `DIALECT_PROBES` is exempt from the scan it feeds, because the
+  probes are real DuckDB SQL living in a scanned file; and `sqlglot` was promoted
+  from a transitive dependency to a declared one, which the plan text did not ask
+  for.
 - **The four decisions 2.5 put to Amino were all approved on 2026-08-13**, and two
   of them left something behind:
   1. **A Snapshot is written on the dates *every* Instrument has a Market Price**
@@ -105,11 +117,16 @@ wrong and gets fixed immediately.
   now has the real data it was moved in order to run against. Its third question
   needs a query computing revenue inline from `commission` to return a *different
   number* from the certified expression against a real warehouse: the 32.59%
-  between Gross and Net Revenue is that difference.
+  between Gross and Net Revenue is that difference. **Its first bullet — `uv add
+  sqlglot` — is already done**, in 2.6, which needed the library for the dialect
+  scan. And its fourth question, on DuckDB → BigQuery retargeting, is what tells us
+  whether that scan should stay name-based at all.
 - **[DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect),
-  opened in 2.1, has fired and is the next commit** — see *Next* above. The seam
-  scan checks `duckdb` imports but not the DuckDB-specific function names ADR-0002
-  named alongside them.
+  opened in 2.1, is paid — that is what 2.6 is.** The seam scan checked `duckdb`
+  imports and not the DuckDB-specific function names ADR-0002 named alongside them;
+  it now checks both. The name list is subtracted out of `sqlglot`'s own dialect
+  tables rather than typed, three probes prove the scan's teeth on every run, and
+  both ingestion modules were mutated with a dialect name and made to fail.
 - **Obligations recorded for later Steps**, so they are not rediscovered:
   `README.md` must list every credential Veritas touches
   ([Target State](target-state.md#what-credential-free-means)), and
@@ -131,7 +148,9 @@ Validation Gate.
 Every data source that design assumes has been verified obtainable, key-free, and
 is snapshotted into the repository. **The Warehouse is full.** The ten-table star
 schema of Glossary Section B sits behind the Warehouse Adapter — the only module in
-the repository that imports `duckdb` — and all ten tables hold rows. Three are
+the repository that imports `duckdb`, and the only place a DuckDB-specific function
+name appears, both of which are now checked rather than promised — and all ten
+tables hold rows. Three are
 real: `dim_instrument`, nineteen Instruments across four types and four Quotation
 Currencies; `fct_instrument_price`, two years of daily Market Prices covering all
 nineteen; and `fct_fx_rate`, every ordered pair of those four currencies on every
@@ -153,7 +172,7 @@ Layer, no Retrieval, no application.
 
 | Component | State | Notes |
 |---|---|---|
-| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **Two declared dependencies**: `duckdb==1.5.5` (2.1) and `dlt==1.29.1` (2.2). dlt brings roughly forty transitive packages, among them `sqlglot==30.15.0` — which is now installed a Step earlier than anything planned to use it, and makes [DEBT-009](../debt-ledger.md) cheaper to repay. The three framework check scripts remain stdlib-only. |
+| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **Three declared dependencies**: `duckdb` (2.1), `dlt` (2.2) and `sqlglot` (2.6). dlt brings roughly forty transitive packages, sqlglot among them — 2.6 promoted it to a declared dependency because `check_warehouse.py` now imports it, and a transitive dependency is one someone else's release notes can remove. `uv add sqlglot` installed nothing: the locked version did not move. The three stdlib-only check scripts — `verify_framework.py`, `check_language.py`, `check_data_availability.py` — are still stdlib-only; `check_warehouse.py` is the one that imports third-party code, and now imports two libraries rather than one. |
 | Development framework | ✅ working | `CLAUDE.md`, `.claude/docs/` tree, five skills in `.claude/skills/`. |
 | Framework self-check | ✅ working | `.claude/scripts/verify_framework.py` — structure only (documents exist, links resolve, skills load, interpreter pinned), passes. **Links now include their `#anchor`** ([R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11), 2026-08-11): the fragment used to be split off and discarded, so a link to a renamed heading passed, and same-document `#anchor` links were not checked at all. It reports a `dead anchor` distinct from a `dead link` and prints how many links and anchors it checked. Verified by making it fail against a temporary document with two dead anchors, in the [Sub-step 2.4 changes-on-review section](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11-sub-step-24). Scope is `.claude/docs/**` plus `CLAUDE.md`; `README.md` is outside it. |
 | Language check | ✅ working | `.claude/scripts/check_language.py` — content rules: component names registered, no `proposed` term in code, abbreviations resolvable. Passes. Parses code with `ast` so it checks identifiers, not prose. Partial payment of [DEBT-001](../debt-ledger.md). |
@@ -165,7 +184,7 @@ Layer, no Retrieval, no application.
 | Founding ADRs | ✅ working | Four ADRs in `.claude/docs/adr/`, all **`accepted`**. The first three on 2026-08-03: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code. The fourth — snapshot-and-replay, and where dlt stops — was deferred to the ingestion Step ([DEBT-002](../debt-ledger.md)), written in Sub-step 2.2 and **accepted 2026-08-11** (R17). Every cost in each is classified *accepted* / *debt* / *extension*. ADR-0002 carries a dated clarification (2026-08-05) on what its sqlglot commitment forbids; its status stays `accepted`. |
 | Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, **all ten populated**. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). The two movement tables carry **opposite sign conventions** and the schema says so beside each column: cash is signed from the Account's side, accounting carries magnitudes so that Net Revenue = Σcommission − Σrebate − Σfee is literally true. |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is now checked rather than promised. `create_schema`, `tables`, `columns`, `row_count`, `execute`, `query`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. Hardcoded database path and no error handling, both licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
-| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and no `duckdb` import outside `veritas/warehouse/`. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. **`--distinctions` (2.5)** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument** (added on review, 2026-08-13, after a transfer moved a fraction of a share and nothing objected), every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both — together they only prove an empty table is empty. |
+| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and **the adapter seam holds in both the halves [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) named** — no `duckdb` import outside `veritas/warehouse/`, and no DuckDB-specific function name in the SQL any module out there emits. The dialect half (2.6) reads every string literal sqlglot parses as a statement and names any function call standard SQL does not have; which names those are is subtracted out of sqlglot's own dialect tables rather than typed, so the list tracks the library. Three probes run every time — standard SQL clean, `strftime` named, `list_aggregate` named — and a probe reading wrong fails the run. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. **`--distinctions` (2.5)** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument** (added on review, 2026-08-13, after a transfer moved a fraction of a share and nothing objected), every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both — together they only prove an empty table is empty. |
 | Semantic Layer | ✗ none | — |
 | Ingestion | ✅ working | `veritas/ingestion/` — **both halves**: four real sources and the seeded simulator. `uv run python -m veritas.ingestion` builds all ten tables end-to-end from a clean clone with **no network**, and two consecutive runs produce byte-identical output. `--refresh` is the only mode that opens a socket; a refresh that fails part-way names the snapshots it had already rewritten, and one that succeeds reports how many it rewrote and how many were distinct — **failing the run if a source was fetched twice**. **Two phases, in an order that cannot be reversed:** dlt lands the real sources in `raw` and the adapter builds three star tables from them; then `simulator.py` *reads those three through the adapter*, generates the client side as a pure function of them and a seed, and a second dlt load plus seven more build scripts lands it. No two connections are ever open at once. The pipeline refuses to complete on four silent-shortness conditions, two of them added in 2.5: a Position with no Market Price on its own Snapshot date, and a monetary amount whose Denomination Currency has no FX Rate on its own date. |
 | Retrieval | ✗ none | — |
@@ -255,23 +274,31 @@ making either diverge would mean shaping the data to pass our own check — and 
 are constraints on what a gold question may ask. `--distinctions` prints both
 figures on every run.
 
-One thing 2.1 chose not to settle remains on the Ledger:
-[DEBT-009](../debt-ledger.md) — the adapter seam scan checks `duckdb` imports but
-not the DuckDB-specific function names ADR-0002 also named. All ten star-schema
-build scripts live in `veritas/warehouse/builds/`, so every dialect-specific name
-the pipeline uses is inside the licensed directory: `make_timestamp` from 2.3,
-`generate_series` over dates and `ASOF JOIN` from 2.4, and nothing new from 2.5,
-whose seven builds are projections and casts.
+The one thing 2.1 chose not to settle is now settled.
+[DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
+— the adapter seam scan checked `duckdb` imports but not the DuckDB-specific
+function names ADR-0002 also named — **fired and was paid in 2.6**. Amino ruled the
+trigger fired on 2026-08-13
+([R21](../plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13)):
+it reads *"the first component outside the adapter emits SQL"*, and two modules
+outside `veritas/warehouse/` hold SQL text — `__main__.py` since 2.2 and
+`simulator.py` since 2.5. Both are standard SQL with no dialect-specific name in
+them, which is what the entry was *about*, but it is not what the sentence said, and
+rewording a trigger to keep an entry unfired is the move Non-Negotiable #2 exists to
+prevent.
 
-**The trigger has fired, and Amino ruled that it has** (2026-08-13,
-[R21](../plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13)).
-It reads *"the first component outside the adapter emits SQL"*, and two modules
-outside `veritas/warehouse/` hold SQL text today: `__main__.py`, which has since
-2.2, and `simulator.py`, which reads the three real star tables in 2.5. Both are
-standard SQL with no dialect-specific name in them, which is what the entry is
-*about* — but it is not what the sentence says, and rewording a trigger to keep an
-entry unfired is the move Non-Negotiable #2 exists to prevent. **The scan is owed,
-and it is Sub-step 2.6**, committed separately from 2.5.
+**Both modules still scan clean, and that is now a result rather than an
+assertion.** All ten star-schema build scripts live in `veritas/warehouse/builds/`,
+so every dialect-specific name the pipeline uses is inside the licensed directory:
+`make_timestamp` from 2.3, `generate_series` over dates and `ASOF JOIN` from 2.4,
+and nothing new from 2.5, whose seven builds are projections and casts.
+
+**What the scan does not cover**, so nobody reads the seam as fully mechanical: SQL
+assembled at run time is not a literal and is invisible to it — that is the
+Validation Gate's subject, not a static scan's — and a name sqlglot files as
+dialect-neutral passes even where it is not standard SQL, `generate_series` being
+the example this project already uses. Both are argued in the
+[2.6 review](../reviews/step-002-warehouse-and-ingestion.md#sub-step-26--scan-for-duckdb-specific-function-names-outside-the-adapter).
 
 [DEBT-010](../debt-ledger.md) was **paid in 2.1** and both `movement_type` columns
 now carry a `CHECK`; [DEBT-002](../debt-ledger.md) was **paid in 2.3**, under its
@@ -327,7 +354,7 @@ which is why 2.4 hit it nowhere.
 
 ## Open debt and extensions
 
-**8 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **2 paid**, 1
+**7 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **3 paid**, 1
 accepted permanently and 2 moved out. **8 open extensions** — see
 [extension-register.md](../extension-register.md).
 
@@ -356,10 +383,12 @@ life? Three Sub-step 1.3 entries failed that test and moved.
 - **DEBT-008** — narrowed to what can fire here: the README and App must
   not overstate what application-layer access enforcement guarantees. The
   engineering moved to EXT-001.
-- **DEBT-009** — the adapter seam scan checks `duckdb` imports but not the
-  DuckDB-specific function names ADR-0002 named alongside them. **Its trigger fired
-  and Amino ruled so on 2026-08-13**; it is paid by Sub-step 2.6, the next commit
-  after 2.5.
+- **DEBT-009** — **paid 2026-08-13** in Sub-step 2.6, under the trigger Amino ruled
+  had fired the same day. The seam scan now checks the DuckDB-specific function
+  names ADR-0002 named alongside the imports, with the name list derived from
+  sqlglot rather than typed. Two boundaries are stated rather than closed:
+  run-time-assembled SQL is invisible to a static scan, and the list is exactly as
+  good as sqlglot's dialect tables.
 - **DEBT-010** — **paid 2026-08-06**, in the Sub-step that opened it. Both
   `movement_type` columns now carry a `CHECK`, and the two lists differ:
   `realised P&L` is accounting-only, `deposit` is cash-only. It was paid rather

@@ -1,8 +1,11 @@
 # Step 002 — Build the Warehouse and fill it
 
-- **Status:** active — written and **approved by Amino on 2026-08-05**, together
-  with every ruling in [Rulings](#rulings). Sub-steps 2.1 (`5a061a7`) and 2.2
-  (`0fc5a34`) are **committed**; 2.3 is built and awaiting review.
+- **Status:** in review — every Sub-step is built. Written and **approved by Amino
+  on 2026-08-05**, together with every ruling in [Rulings](#rulings). Sub-steps 2.1
+  (`5a061a7`), 2.2 (`0fc5a34`), 2.3 (`a58ef91`), 2.4 (`13b99bb`) and 2.5
+  (`ce2961a`) are **committed**; 2.6 is the sixth and last, reviewed and awaiting
+  its commit. **The Step is `done` when 2.6 lands**, and nothing in it is
+  outstanding besides that commit.
   **Amended 2026-08-10 — see [R16](#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10):**
   the original Sub-step 2.2 splits into three, and [R6](#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
   fires, so the sqlglot spike leaves this Step. **The amendment was approved by
@@ -75,10 +78,10 @@ changed, plus a sixth that pays a debt this Step opened
 ```
 veritas/warehouse/     ← 2.1   the adapter and the star schema (empty)   ✅ committed 5a061a7
 veritas/ingestion/     ← 2.2   dim_instrument         NASDAQ Trader · SEC   ✅ committed 0fc5a34
-                       ← 2.3   fct_instrument_price   Yahoo, by snapshot-and-replay   ✅ built
-                       ← 2.4   fct_fx_rate            Frankfurter
-                       ← 2.5   synthetic sources:     Trades · Cash · Positions · balances
-.claude/scripts/       ← 2.6   the dialect half of the adapter seam scan — DEBT-009
+                       ← 2.3   fct_instrument_price   Yahoo, by snapshot-and-replay   ✅ committed a58ef91
+                       ← 2.4   fct_fx_rate            Frankfurter   ✅ committed 13b99bb
+                       ← 2.5   synthetic sources:     Trades · Cash · Positions · balances   ✅ committed ce2961a
+.claude/scripts/       ← 2.6   the dialect half of the adapter seam scan — DEBT-009   ✅ built
 ```
 
 The sixth was not planned; it is a debt this Step opened firing inside the same

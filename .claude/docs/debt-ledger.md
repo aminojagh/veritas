@@ -36,13 +36,13 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently) | No ad-hoc exploration | — | — | **accepted** (permanent) |
 | [DEBT-007](#debt-007--moved-to-ext-003) | Metric authoring does not scale beyond a hand-written corpus | L | — | moved → [EXT-003](extension-register.md#ext-003--metric-authoring-at-scale) |
 | [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers) | The access-control story promises more than it delivers | S | Any access-control claim in `README.md` or the App | open |
-| [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL — **🔴 fired** | open, **paying in 2.6** |
+| [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL — **🔴 fired** | **paid** (Sub-step 2.6) |
 | [DEBT-010](#debt-010--movement_type-has-no-registered-value-vocabulary) | `movement_type` has no registered value vocabulary | S | The first Cash Movement row is generated | **paid** (Sub-step 2.1) |
 | [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level) | Execution Price against Market Price cancels at book level | S | Building the Gold Question Set | open |
 | [DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The price table is sparse, so the Snapshot calendar has holes | M | The first "as of" date chosen by anything but the Snapshot calendar | open |
 | [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
 
-**Open debt:** 8 · **Paid:** 2 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 7 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -520,7 +520,8 @@ App Step, not at the end.
 
 ### DEBT-009 — The seam scan checks imports but not the dialect
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 2.6, 2026-08-13, as its own commit, under the
+  trigger Amino ruled had fired the same day
 - **Opened:** Sub-step 2.1 (`.claude/docs/reviews/step-002-warehouse-and-ingestion.md`)
 - **Size:** S
 - **Location:** `.claude/scripts/check_warehouse.py` — `duckdb_importers` and
@@ -631,6 +632,37 @@ examples to run against — `veritas/ingestion/__main__.py` and
 `veritas/ingestion/simulator.py` — so it can be shown to pass on standard SQL and
 to fail on a dialect name, which is the mutation test that stops it passing
 vacuously.
+
+**✅ Paid — Sub-step 2.6, 2026-08-13.** `check_seam` now runs both halves of
+ADR-0002's signal. The dialect half reads every string literal sqlglot parses as a
+SQL statement, in every module outside `veritas/warehouse/`, and names any function
+call in it that standard SQL does not have. The name list is
+`DuckDB.Parser.FUNCTIONS - Parser.FUNCTIONS`, taken from sqlglot at import, so it
+tracks the library rather than someone's memory of DuckDB's manual. `sqlglot` was
+promoted from a transitive dependency of dlt to a declared one in the same
+Sub-step, because a check that imports it is a direct dependant of it.
+
+**It was proved rather than asserted, twice over.** Three probes run on every run —
+standard SQL comes back clean, `strftime` is named as DuckDB's, `list_aggregate` is
+named as one sqlglot knows nowhere — and the run fails if any probe reads wrong, so
+the scan cannot quietly lose its teeth. On top of that, both real modules were
+mutated with a dialect name and the run was made to fail on each, then restored and
+compared byte-for-byte. Output in the
+[Step Review](reviews/step-002-warehouse-and-ingestion.md#sub-step-26--scan-for-duckdb-specific-function-names-outside-the-adapter).
+
+**What the scan does not cover**, stated here so nobody reads the entry as
+promising more than it does. It sees SQL a module has *written down*; SQL assembled
+at run time is not a literal and is invisible to it, which is a boundary rather
+than a gap — generated SQL is the Validation Gate's subject, and
+[ADR-0003](adr/0003-validation-gate-is-deterministic-code.md) inspects a parse tree
+at run time precisely because no static scan can. And it is exactly as good as
+sqlglot's own dialect tables: a name sqlglot files as dialect-neutral passes even
+where it is not in the SQL standard, `generate_series` being the example this
+project already uses. That boundary is deliberate — a hand-typed list is what this
+entry rejected, because it goes stale in silence — and whether it needs
+transpilation-level checking instead is a question
+[Step 003's spike](plan/step-002-warehouse-and-ingestion.md#deferred-to-step-003--prove-the-validation-gates-parse-tree-claim)
+answers with its fourth claim, on DuckDB → BigQuery retargeting.
 
 ---
 

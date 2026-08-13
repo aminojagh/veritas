@@ -2562,3 +2562,229 @@ PASS — framework is wired up correctly
 ```
 
 Run on 2026-08-13, offline.
+
+---
+
+## Sub-step 2.6 — Scan for DuckDB-specific function names outside the adapter
+
+**What changed**
+
+[DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
+is paid. `check_seam` now runs both halves of the signal
+[ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) named — *"a
+`duckdb` import **or a DuckDB-specific function name** anywhere outside the adapter
+module"* — where Sub-step 2.1 shipped only the first. One check script, one more
+check, no pipeline behaviour and no schema touched.
+
+The dialect half works in three moves.
+
+- **The name list is derived, not typed.** sqlglot builds each dialect's function
+  table on top of one dialect-neutral table, so what DuckDB *adds* to that table is
+  the list of names this project may not use outside the adapter — and it comes
+  from the library that would have to transpile them, which is the only opinion
+  that matters. `duckdb_function_names()` is that subtraction. The entry rejected a
+  hand-typed list for a specific reason: nothing fails when a comment goes stale,
+  so a typed list would quietly stop matching DuckDB as DuckDB grew.
+- **SQL is found by parsing, not by matching text.** Every string literal in every
+  module outside `veritas/warehouse/` is offered to sqlglot, and the ones it reads
+  as a statement are the SQL. This repository writes *about* SQL constantly — the
+  word `FROM` appears in more English sentences here than in queries — which is the
+  same argument `duckdb_importers` already makes for parsing imports rather than
+  grepping for `duckdb`.
+- **Names are read off the dialect-neutral parse.** A function the neutral table
+  does not know is left as an anonymous call carrying the name as written, so
+  `count(` and `max(` never appear and `CREATE TABLE dim_account (` is a table
+  rather than a call to something named `dim_account`. Each name found comes back
+  with whether sqlglot knows it as DuckDB's; both answers fail the run, because a
+  name DuckDB owns is a dialect assumption that escaped the adapter and a name
+  sqlglot knows nowhere is one it cannot transpile either.
+
+**`sqlglot` was promoted to a declared dependency** — `uv add sqlglot`. It was
+already installed, pulled in transitively by dlt, and the plan's wording leaned on
+that. But a check that imports a library is a direct dependant of it, and a
+transitive dependency is one someone else's release notes can remove.
+`uv add` resolved 41 packages and installed none: the version in the lock file did
+not move. This is also the `uv add sqlglot` that
+[Step 003's deferred spike](../plan/step-002-warehouse-and-ingestion.md#deferred-to-step-003--prove-the-validation-gates-parse-tree-claim)
+lists as its first bullet, so that bullet is now already done.
+
+**Verification**
+
+The check itself, on the repository as it stands:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py
+  seam scan: 13 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+  dialect scan: sqlglot files 51 function names under DuckDB that standard SQL does not have
+    probe: clean
+    probe: STRFTIME
+    probe: LIST_AGGREGATE
+      4 SQL statements in veritas/ingestion/__main__.py
+      5 SQL statements in veritas/ingestion/simulator.py
+     49 SQL statements in .claude/scripts/check_warehouse.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit=0
+```
+
+Read that as three separate claims. The **probe** lines are the scan's teeth,
+checked on every run against SQL written to test it: a standard query comes back
+clean, `strftime` is named as DuckDB's, and `list_aggregate` is named as one
+sqlglot knows nowhere. Those two are not arbitrary — they are the examples DEBT-009
+itself used. The **statement counts** are what was covered, printed per file rather
+than totalled, because a total hides which modules were read. And the absence of
+any finding is the result: no module outside the adapter calls a function standard
+SQL does not have.
+
+**The scan was made to fail, on real modules and not only on fixtures.** A dialect
+name was inserted into one query string in each of the two ingestion modules that
+hold SQL, exactly as the plan specifies:
+
+```
+$ sed -i 's/"SELECT max(rate_date) FROM fct_fx_rate"/"SELECT epoch(max(rate_date)) FROM fct_fx_rate"/' veritas/ingestion/simulator.py
+$ sed -i "s/\"SELECT count(DISTINCT instrument_id) FROM fct_instrument_price\"/\"SELECT list_aggregate(instrument_id, 'count') FROM fct_instrument_price\"/" veritas/ingestion/__main__.py
+$ uv run python .claude/scripts/check_warehouse.py
+  dialect scan: sqlglot files 51 function names under DuckDB that standard SQL does not have
+    probe: clean
+    probe: STRFTIME
+    probe: LIST_AGGREGATE
+      4 SQL statements in veritas/ingestion/__main__.py
+      5 SQL statements in veritas/ingestion/simulator.py
+     49 SQL statements in .claude/scripts/check_warehouse.py
+
+FAIL — 2 problem(s)
+  - veritas/ingestion/__main__.py:166 emits SQL calling LIST_AGGREGATE(), which sqlglot knows in no dialect, so it cannot transpile it — ADR-0002 names a DuckDB-specific function name outside the adapter as the signal that the seam has stopped holding
+  - veritas/ingestion/simulator.py:398 emits SQL calling EPOCH(), which sqlglot knows as DuckDB's and not as standard SQL's — ADR-0002 names a DuckDB-specific function name outside the adapter as the signal that the seam has stopped holding
+exit=1
+```
+
+Both verdicts fire, each names its own file and line, and neither mutation is a
+contrived shape: `epoch(...)` wraps an existing aggregate and `list_aggregate(...)`
+replaces one. Then restored, and the restoration checked rather than assumed:
+
+```
+$ git checkout -- veritas/ingestion/simulator.py veritas/ingestion/__main__.py
+$ cmp <pre-mutation copy> veritas/ingestion/simulator.py && echo identical
+identical
+$ cmp <pre-mutation copy> veritas/ingestion/__main__.py && echo identical
+identical
+```
+
+**The probes were made to fail too**, because a control that has only ever passed
+is a control that might be returning `True`. Changing the clean probe's expected
+answer to `STRFTIME`:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py
+FAIL — 1 problem(s)
+  - the dialect scan reads 'SELECT count(*) FROM fct_trade' as clean and it has to read it as ('STRFTIME',) — the scan cannot be trusted about the repository when it is wrong about SQL written to test it
+exit=1
+```
+
+Restored and compared the same way. **The rest of the suite, re-run after every
+edit above**, because a declared dependency and a module-level import touch every
+mode of the script:
+
+```
+$ uv run python -m veritas.ingestion
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+       the client side holds 12 Clients · 24 Accounts · 1670 Trades · every Position is markable and every amount is convertible
+exit=0
+
+$ uv run python .claude/scripts/check_warehouse.py --sources
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit=0
+
+$ uv run python .claude/scripts/check_warehouse.py --distinctions
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit=0
+
+$ uv run python .claude/scripts/check_language.py
+  proposed terms: 0 · python files scanned: 13 · identifiers: 806
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+PASS — documents agree with the Glossary and the writing conventions
+exit=0
+```
+
+Run on 2026-08-13, offline. Every row count and every Section C figure Sub-step 2.5
+recorded reproduces unchanged, which is the point of running the full suite for a
+change that should not have moved a number: it did not.
+
+**Deliberately left undone**
+
+No new Ledger entry. The three boundaries below are boundaries of what this check
+is *for*, not shortcuts inside it — but each is written down, because a reader who
+assumes the seam is now fully mechanical would be over-reading it.
+
+- **SQL assembled at run time is invisible.** The scan reads SQL a module has
+  written down. An f-string, a concatenation, anything a generator returns is not a
+  literal. That is the Validation Gate's subject rather than this one's:
+  [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) inspects a parse
+  tree at run time precisely because no static scan can, and the Orchestrator does
+  not exist yet. Stated in `sql_statements`' docstring so the next person to read
+  the check sees it there rather than here.
+- **The walk globs `*.py`, so no `.sql` file is read — anywhere.** Inside
+  `veritas/warehouse/` that is right: the build scripts are the one place licensed
+  to be DuckDB-specific, and `make_timestamp` and `ASOF JOIN` sit there on purpose.
+  Outside it there is nothing to read today, and a `.sql` file appearing there later
+  would **not** be picked up on its own — that needs a second glob, which is a code
+  change. Left undone for the reason DEBT-009 gave for not writing this scan at all
+  in 2.1: it would be written against zero examples.
+- **The scan is exactly as good as sqlglot's dialect tables.** A name sqlglot files
+  as dialect-neutral passes even where it is not in the SQL standard;
+  `generate_series`, which `fct_fx_rate.sql` uses inside the adapter, is the example
+  this project already contains. Deriving the list is what makes it track the
+  library instead of a memory, and that is the trade — see below.
+
+**Look at this sceptically**
+
+- **The `generate_series` gap is the one I would push on.** ADR-0002's sentence says
+  "a DuckDB-specific function name", and in the ordinary sense `generate_series` is
+  one — it is not standard SQL. sqlglot's neutral table holds it, so the scan does
+  not object. My argument for accepting that: ADR-0002 puts sqlglot in charge of
+  retargeting, so "specific to DuckDB" is fairly read as "specific to DuckDB *as
+  sqlglot understands dialects*", and a name sqlglot files as neutral is one it
+  renders per dialect. The counter-argument is that this quietly redefines the
+  ADR's words to match what was easy to build. If you take the counter-argument, the
+  fix is not a hand-typed list — it is checking retargeting directly rather than by
+  name, which is what
+  [Step 003's spike](../plan/step-002-warehouse-and-ingestion.md#deferred-to-step-003--prove-the-validation-gates-parse-tree-claim)
+  measures in its fourth claim. I would rather learn what transpilation actually
+  does before rebuilding the scan around a guess about it.
+- **`DIALECT_PROBES` is exempt from the scan it feeds.** The probes are real,
+  deliberately DuckDB-specific SQL sitting in a file the scan reads, so without an
+  exemption the check fails on its own test data — the one finding that means
+  nothing. The exemption is structural: literals in the assignment to that name, in
+  the syntax tree, not a text pattern. The hole it opens is real and small — SQL put
+  in a tuple by that name, in a scanned file, is invisible. The alternative was a
+  fixture file outside the scanned tree, which is more machinery and moves the
+  probes away from the expected answers they are paired with. The alternative I
+  rejected outright was writing the probe SQL as an f-string so the scan would skip
+  it, which is dodging our own check.
+- **Docstrings are skipped wholesale.** Prose by construction, and this file's
+  docstrings quote the very names the scan hunts for. But a docstring holding a
+  worked example query would not be read, and I did not treat that as a loss.
+- **The scan silences sqlglot's logger for the whole process.** It is offered every
+  string literal in the repository, most of which are English, so "could not parse,
+  falling back to a generic command" is the expected outcome rather than news. The
+  cost is that a sqlglot warning we *would* want is silenced too, in every mode of
+  this script and not only in the seam check.
+- **`check_warehouse.py` scans itself**, and holds by far the most SQL of the three
+  files. That is deliberate — it emits SQL against the Warehouse like any other
+  module, and exempting the checker from its own check is the hole this Sub-step
+  exists to close — but it does mean the largest single contributor to the
+  statement count is the check's own measurement code.
+- **Promoting `sqlglot` to a declared dependency was not in the plan text**, which
+  called it "already an installed dependency, pulled in transitively by dlt". I did
+  it anyway and would defend it, but it is a change to `pyproject.toml` and
+  `uv.lock` in a Sub-step whose plan says "nothing else changes".
+
+**Language**
+
+No term added, renamed, or proposed. Nothing here names a domain concept: `dialect`,
+`seam` and `adapter` are ordinary technical English, and the Glossary's own
+`Warehouse Adapter` row already uses all three in exactly this sense — *"Holds the
+connection and the engine's dialect; nothing DuckDB-specific exists outside it. The
+seam an engine swap lands on."* The registered term this Sub-step is about is
+`Warehouse Adapter`, and it gained no new meaning.

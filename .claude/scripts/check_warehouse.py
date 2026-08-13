@@ -22,11 +22,18 @@ an ADR and two are promises made by comments in the schema.
      schema.sql, and every one must be refused — preceded by valid rows as a
      positive control, so the probe cannot pass by rejecting everything.
 
-  4. The seam holds. ADR-0002 commits that all warehouse access goes through the
-     adapter and names the signal that it has stopped: "a `duckdb` import ...
-     anywhere outside the adapter module". This scans for exactly that, by
-     parsing the import statements rather than grepping the text — a `duckdb`
-     mentioned in a docstring is prose, and this file is full of it.
+  4. The seam holds, in both the halves ADR-0002 names. That ADR commits that all
+     warehouse access goes through the adapter, and names the signal that it has
+     stopped as "a `duckdb` import **or a DuckDB-specific function name** anywhere
+     outside the adapter module". Both halves parse rather than grep: a `duckdb`
+     in a docstring is prose, and this file is full of it.
+
+       * The import half reads each module's import statements.
+       * The dialect half reads each module's SQL — every string literal sqlglot
+         parses as a statement — and reports any function name in it that standard
+         SQL does not have. Which names those are is derived from sqlglot rather
+         than typed here, so the list tracks the library instead of someone's
+         memory. Added by Sub-step 2.6, paying DEBT-009.
 
   5. `--sources` only — what ingestion loaded is what the sources said. Added by
      Sub-step 2.2 and grown by every source since. For `dim_instrument`: no minor
@@ -58,10 +65,16 @@ import argparse
 import ast
 import datetime as dt
 import json
+import logging
 import re
 import sys
 from decimal import Decimal
 from pathlib import Path
+
+import sqlglot
+from sqlglot import exp
+from sqlglot.dialects.duckdb import DuckDB
+from sqlglot.parser import Parser
 
 CLAUDE_DIR = Path(__file__).resolve().parent.parent  # <repo>/.claude
 REPO_ROOT = CLAUDE_DIR.parent                        # <repo>
@@ -71,14 +84,43 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
 
+# sqlglot logs a warning whenever it cannot parse a string and falls back to a
+# generic Command node. The dialect scan below offers it every string literal in
+# the repository, most of which are English, so that warning is the expected
+# outcome for almost all of them rather than news.
+logging.getLogger("sqlglot").setLevel(logging.CRITICAL)
+
 # The one directory licensed to know the engine. ADR-0002: the Warehouse Adapter
 # "holds the connection and the engine's dialect; nothing DuckDB-specific exists
 # outside it".
 ADAPTER_DIR = REPO_ROOT / "veritas" / "warehouse"
 
-# Everywhere the import scan looks. Both roots hold code that could reach for the
-# engine directly, and .claude/scripts/ is the likelier of the two to be tempted.
+# Everywhere both halves of the seam scan look. Both roots hold code that could
+# reach for the engine directly, and .claude/scripts/ is the likelier of the two
+# to be tempted.
 CODE_ROOTS = [REPO_ROOT / "veritas", CLAUDE_DIR / "scripts"]
+
+# What makes a string literal SQL rather than a sentence: sqlglot reads it as one
+# of these. Anything it reads as a bare column, an identifier, or its generic
+# Command fallback is prose that happened to start with a SQL word — "Create the
+# star schema and fill its three real tables" is a docstring in this repository.
+SQL_STATEMENTS = (
+    exp.Select, exp.Union, exp.Insert, exp.Create, exp.Delete, exp.Update,
+    exp.Subquery,
+)
+
+# The teeth of the dialect scan, checked on every run against SQL written here
+# rather than against whatever the repository happens to contain. Without them a
+# clean scan proves nothing: it reads the same either way whether the code is
+# portable or the name list is empty. Each probe exercises one verdict — a
+# standard query is left alone, a name sqlglot files under DuckDB is named, and so
+# is a name sqlglot has never heard of. `strftime` and `list_aggregate` are not
+# arbitrary: they are the two examples DEBT-009 itself used.
+DIALECT_PROBES = (
+    ("SELECT count(*) FROM fct_trade", ()),
+    ("SELECT strftime(price_date, '%Y') FROM fct_instrument_price", ("STRFTIME",)),
+    ("SELECT list_aggregate(quantity, 'sum') FROM fct_trade", ("LIST_AGGREGATE",)),
+)
 
 # Types that silently lose money. DECIMAL is the only numeric type this schema
 # uses for a quantity anyone will ever sum.
@@ -1787,8 +1829,124 @@ def duckdb_importers() -> list[Path]:
     return found
 
 
+def duckdb_function_names() -> set[str]:
+    """Function names sqlglot files under DuckDB and not under standard SQL.
+
+    Derived, not typed. sqlglot builds every dialect's function table on top of
+    one dialect-neutral table, so what DuckDB adds to that table *is* the list of
+    names this project may not use outside the adapter — and it comes from the
+    library that would have to transpile them, which is the only opinion that
+    matters. A list typed into this file would be one person's memory of DuckDB's
+    manual, and it would go stale silently: nothing would fail when DuckDB grew a
+    function, because nothing reads a comment.
+
+    What this cannot see is a name sqlglot considers dialect-neutral when it is
+    not — `generate_series` is in the neutral table and is not in the SQL standard.
+    The scan is exactly as good as sqlglot's own dialect knowledge, which is the
+    trade [ADR-0002](../docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md)
+    already made when it put sqlglot in charge of retargeting.
+    """
+    return {name for name in DuckDB.Parser.FUNCTIONS if name not in Parser.FUNCTIONS}
+
+
+DUCKDB_FUNCTIONS = duckdb_function_names()
+
+
+def sql_statements(path: Path) -> list[tuple[int, str]]:
+    """Every string literal in `path` that sqlglot reads as a SQL statement.
+
+    Parsed rather than matched, for the reason `duckdb_importers` parses: this
+    repository writes about SQL constantly, and the word FROM appears in more
+    English sentences here than in queries.
+
+    Two kinds of string are skipped, both structurally — by where they sit in the
+    syntax tree rather than by what they look like, so neither exemption can widen
+    quietly.
+
+      * **Docstrings**, which are prose by construction. The ones in this file
+        quote the very function names the scan looks for, including two lines
+        above this one.
+      * **`DIALECT_PROBES`**, the SQL this file writes in order to test the scan.
+        It is deliberately DuckDB-specific and is never sent anywhere, so it is a
+        fixture in the sense the fourteen invalid rows of `check_constraints` are
+        — and this scan reads the SQL a module *emits*. Without this the check
+        fails on its own test data, which is the one finding that means nothing.
+        The cost is stated rather than hidden: SQL put in a tuple by that name, in
+        a scanned file, is invisible here.
+
+    What this reads is SQL a module has **written down**. SQL assembled at run
+    time — an f-string, a join, anything a generator returns — is not a literal
+    and is not seen. That is a boundary rather than an oversight: the SQL an
+    Orchestrator generates is the Validation Gate's subject
+    ([ADR-0003](../docs/adr/0003-validation-gate-is-deterministic-code.md)), which
+    inspects a parse tree at run time precisely because no static scan can.
+    """
+    tree = ast.parse(path.read_text(), filename=str(path))
+    documentation = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(
+            node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
+        )
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+        and isinstance(node.body[0].value.value, str)
+    }
+    fixtures = {
+        id(constant)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "DIALECT_PROBES"
+            for target in node.targets
+        )
+        for constant in ast.walk(node.value)
+        if isinstance(constant, ast.Constant)
+    }
+
+    found: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            continue
+        if id(node) in documentation or id(node) in fixtures:
+            continue
+        try:
+            parsed = sqlglot.parse_one(node.value, dialect="duckdb")
+        except sqlglot.errors.SqlglotError:
+            continue
+        if isinstance(parsed, SQL_STATEMENTS):
+            found.append((node.lineno, node.value))
+    return found
+
+
+def unportable_functions(sql: str) -> list[tuple[str, bool]]:
+    """The function names in `sql` that standard SQL does not have.
+
+    Read off the *dialect-neutral* parse, where a function sqlglot's neutral table
+    does not know is left as an anonymous call carrying the name as written. That
+    is what makes this precise where matching text is not: `count(` and `max(` are
+    known functions and never appear, and `CREATE TABLE dim_account (` is a table
+    rather than a call to something named `dim_account`.
+
+    Each name comes back with whether sqlglot knows it as DuckDB's. Both answers
+    are findings and neither is worse: a name DuckDB owns is a dialect assumption
+    that has escaped the adapter, and a name sqlglot knows in no dialect at all is
+    one it cannot transpile either — the risk ADR-0002 calls transpilation being
+    "good but not total".
+    """
+    tree = sqlglot.parse_one(sql, error_level=sqlglot.ErrorLevel.RAISE)
+    names = sorted({call.name.upper() for call in tree.find_all(exp.Anonymous)})
+    return [(name, name in DUCKDB_FUNCTIONS) for name in names]
+
+
 def check_seam() -> None:
-    """No module outside veritas/warehouse/ imports duckdb."""
+    """No module outside veritas/warehouse/ reaches for the engine.
+
+    Two halves, because ADR-0002 names two signals and Sub-step 2.1 shipped one of
+    them ([DEBT-009](../docs/debt-ledger.md)): a `duckdb` import, and a
+    DuckDB-specific function name in the SQL a module emits.
+    """
     importers = duckdb_importers()
     scanned = sum(len(list(root.rglob("*.py"))) for root in CODE_ROOTS if root.exists())
     print(f"  seam scan: {scanned} Python files · "
@@ -1807,6 +1965,53 @@ def check_seam() -> None:
         problems.append(
             "no module imports duckdb at all — the adapter cannot be reaching the "
             "engine, so this check is passing vacuously"
+        )
+
+    print(f"  dialect scan: sqlglot files {len(DUCKDB_FUNCTIONS)} function names "
+          f"under DuckDB that standard SQL does not have")
+
+    for probe, expected in DIALECT_PROBES:
+        found = tuple(name for name, _ in unportable_functions(probe))
+        verdict = ", ".join(found) if found else "clean"
+        print(f"    probe: {verdict}")
+        if found != expected:
+            problems.append(
+                f"the dialect scan reads {probe!r} as {found or 'clean'} and it has "
+                f"to read it as {expected or 'clean'} — the scan cannot be trusted "
+                f"about the repository when it is wrong about SQL written to test it"
+            )
+
+    # Python modules only. A `.sql` file is read nowhere: inside the adapter it is
+    # licensed to be DuckDB-specific, and outside it none exists — one appearing
+    # there later needs a second glob rather than turning up on its own.
+    statements = 0
+    for root in CODE_ROOTS:
+        for path in sorted(root.rglob("*.py")):
+            if path == ADAPTER_DIR or ADAPTER_DIR in path.parents:
+                continue
+            emitted = sql_statements(path)
+            if not emitted:
+                continue
+            statements += len(emitted)
+            print(f"    {len(emitted):3} SQL statements in {path.relative_to(REPO_ROOT)}")
+            for line, sql in emitted:
+                for name, duckdb_owns_it in unportable_functions(sql):
+                    whose = (
+                        "sqlglot knows as DuckDB's and not as standard SQL's"
+                        if duckdb_owns_it
+                        else "sqlglot knows in no dialect, so it cannot transpile it"
+                    )
+                    problems.append(
+                        f"{path.relative_to(REPO_ROOT)}:{line} emits SQL calling "
+                        f"{name}(), which {whose} — ADR-0002 names a DuckDB-specific "
+                        f"function name outside the adapter as the signal that the "
+                        f"seam has stopped holding"
+                    )
+
+    if not statements:
+        problems.append(
+            "no module outside veritas/warehouse/ emits SQL at all — there is "
+            "nothing for the dialect scan to read, so it is passing vacuously"
         )
 
 
