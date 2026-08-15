@@ -107,7 +107,7 @@ One rule landed first, then one new script grown one claim at a time, then the
 document that rules on it.
 
 ```
-.claude/scripts/     ← 3.1   scan exemptions scoped to the file they live in — R3 widened
+.claude/scripts/     ← 3.1   scan exemptions scoped to the file they live in — R3 widened   ✅ approved 2026-08-15
                      ← 3.2   certified-metrics-only: does a certified expression survive?   (claims 1 and 3)
                      ← 3.3   Restricted Columns: can one hide behind SELECT * or an alias?   (claim 2)
                      ← 3.4   dialect retargeting: where does DuckDB → BigQuery stop?         (claim 4)

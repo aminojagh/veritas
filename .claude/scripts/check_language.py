@@ -84,9 +84,11 @@ KNOWN_NON_ABBREVIATIONS = {
     # write are not here — `warehouse_sql_keywords()` derives those, for the reason
     # given there.
     "DECIMAL", "OWL", "RDF", "SPARQL", "DAG", "CTE", "LIMIT", "ABS",
-    # Document and tooling shorthand.
+    # Document and tooling shorthand. HEAD is git's name for the current commit —
+    # an ordinary word shouted by convention, not something a reader looks up, and
+    # any review that compares its work against the committed version says it.
     "PY", "OK", "GO", "PASS", "FAIL", "NOTE", "TODO", "KB", "MB", "GB",
-    "CET", "FAQ", "BIRD", "MD", "README", "CI", "R1", "R2", "R3",
+    "CET", "FAQ", "BIRD", "MD", "README", "CI", "R1", "R2", "R3", "HEAD",
     "DEBT", "EXT", "ADR",  # register identifier prefixes, e.g. EXT-001
     # Ordinary words that happen to be shouted: flow-diagram step labels,
     # document section markers, and the operating agreement's own filename.
@@ -109,7 +111,9 @@ KNOWN_NON_ABBREVIATIONS = {
     # Glossary's Abbreviations table already, so listing them would be dead text.)
     "SE", "CORP", "PLC", "LTD", "INC", "NV", "AG", "SA", "REIT",
     # Module-level constant names quoted in prose, e.g. "add its name to BUILDS".
-    "BUILDS", "SEED",
+    # EXEMPT is this file's own, and a review that sweeps the check scripts for
+    # exemptions has to be able to name the one that is called that.
+    "BUILDS", "SEED", "EXEMPT",
 }
 
 

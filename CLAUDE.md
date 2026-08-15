@@ -146,6 +146,14 @@ words it relies on. A bare link is not evidence — it is an invitation to assum
 the target says what the sentence needs it to say, which is how a real line gets
 stretched into support for a claim it never made. Quote it, or do not cite it.
 
+**An exemption is scoped to where it is needed.** A check that excuses something
+names the **file** and the **symbol** it excuses, never a symbol alone — an
+exemption claimable by writing a magic name is a hole any later file can walk
+through, and the directories these checks scan are the directories we keep adding
+files to. An unavoidable exemption is stated in the Step Review that takes it,
+along with what it still costs inside the file it applies to, because narrowing an
+exemption removes the loophole and not the cost.
+
 ---
 
 ## Session resumption

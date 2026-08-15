@@ -122,6 +122,20 @@ DIALECT_PROBES = (
     ("SELECT list_aggregate(quantity, 'sum') FROM fct_trade", ("LIST_AGGREGATE",)),
 )
 
+# Where the dialect scan's one fixture exemption applies, as (file, symbol) rather
+# than as a symbol on its own.
+#
+# The scan reads the SQL a module emits, and this file writes SQL in order to test
+# the scan — so its own probes have to be excused or the check fails on its own
+# test data. What must not follow from that is an exemption claimable by *name*:
+# `.claude/scripts/` is a scanned root, so a later script that puts real SQL in a
+# tuple called DIALECT_PROBES would take the exemption by accident and the scan
+# would go quiet about it. Naming the file closes that, and is the general rule
+# CLAUDE.md's Non-Negotiable #4 now states.
+FIXTURE_EXEMPTIONS = {
+    (".claude/scripts/check_warehouse.py", "DIALECT_PROBES"),
+}
+
 # Types that silently lose money. DECIMAL is the only numeric type this schema
 # uses for a quantity anyone will ever sum.
 FLOATING_POINT = ("DOUBLE", "FLOAT", "REAL")
@@ -1859,20 +1873,23 @@ def sql_statements(path: Path) -> list[tuple[int, str]]:
     repository writes about SQL constantly, and the word FROM appears in more
     English sentences here than in queries.
 
-    Two kinds of string are skipped, both structurally — by where they sit in the
-    syntax tree rather than by what they look like, so neither exemption can widen
-    quietly.
+    Two kinds of string are skipped, and each is scoped to exactly what it
+    excuses rather than to what a string looks like.
 
-      * **Docstrings**, which are prose by construction. The ones in this file
-        quote the very function names the scan looks for, including two lines
+      * **Docstrings**, which are prose by construction. What is excused here is a
+        *position* in the syntax tree — one the language defines, not a name any
+        file can choose — so the exemption cannot widen. The docstrings in this
+        file quote the very function names the scan looks for, including two lines
         above this one.
-      * **`DIALECT_PROBES`**, the SQL this file writes in order to test the scan.
-        It is deliberately DuckDB-specific and is never sent anywhere, so it is a
-        fixture in the sense the fourteen invalid rows of `check_constraints` are
-        — and this scan reads the SQL a module *emits*. Without this the check
-        fails on its own test data, which is the one finding that means nothing.
-        The cost is stated rather than hidden: SQL put in a tuple by that name, in
-        a scanned file, is invisible here.
+      * **A fixture listed in `FIXTURE_EXEMPTIONS`**, which is one entry:
+        `DIALECT_PROBES` **in this file**. That tuple is the SQL this file writes
+        in order to test the scan. It is deliberately DuckDB-specific and is never
+        sent anywhere, so it is a fixture in the sense the fourteen invalid rows of
+        `check_constraints` are — and this scan reads the SQL a module *emits*.
+        Without the exemption the check fails on its own test data, which is the
+        one finding that means nothing. Naming the file removes the loophole and
+        not the cost, and the cost is stated rather than hidden: SQL put in a tuple
+        by that name **inside this file** is still invisible here.
 
     What this reads is SQL a module has **written down**. SQL assembled at run
     time — an f-string, a join, anything a generator returns — is not a literal
@@ -1893,12 +1910,14 @@ def sql_statements(path: Path) -> list[tuple[int, str]]:
         and isinstance(node.body[0].value, ast.Constant)
         and isinstance(node.body[0].value.value, str)
     }
+    here = path.relative_to(REPO_ROOT).as_posix()
+    exempt = {symbol for file, symbol in FIXTURE_EXEMPTIONS if file == here}
     fixtures = {
         id(constant)
         for node in ast.walk(tree)
         if isinstance(node, ast.Assign)
         and any(
-            isinstance(target, ast.Name) and target.id == "DIALECT_PROBES"
+            isinstance(target, ast.Name) and target.id in exempt
             for target in node.targets
         )
         for constant in ast.walk(node.value)
