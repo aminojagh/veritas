@@ -4,44 +4,46 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-13 — Sub-step 2.5 committed; Sub-step 2.6 built and awaiting Amino's review. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is now checked in both the halves ADR-0002 named.**
-**Steps completed:** Step 000 (framework) and Step 001, fully committed; **Step 002 is built end to end, all six Sub-steps**, five of them committed. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`. **Sub-step 2.6 is uncommitted** and is what this session leaves for him.
+**Last updated:** 2026-08-15 — **Step 002 is finished and committed in full**, and **Step 003 is planned and approved**, awaiting its own planning commit before Sub-step 3.1 begins. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is now checked in both the halves ADR-0002 named.**
+**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`. Nothing from Step 002 is outstanding.
 
 ---
 
 ## Resume here
 
-- **Active Step:** 002 — Build the Warehouse and fill it
-  ([plan](../plan/step-002-warehouse-and-ingestion.md)), approved 2026-08-05.
-  **All six Sub-steps are built.** 2.1 (`5a061a7`), 2.2 (`0fc5a34`), 2.3
-  (`a58ef91`), 2.4 (`13b99bb`) and 2.5 (`ce2961a`) are committed on `main` and
-  approved; **2.6 is built and uncommitted**. The verification commands of each
-  pass and their output is in the
-  [review](../reviews/step-002-warehouse-and-ingestion.md). **The plan is closed
-  out at `in review`** and becomes `done` when 2.6 lands — nothing in the Step is
-  outstanding besides that one commit.
-- **Next, in this order:**
-  1. **Amino reviews and commits Sub-step 2.6** — see the
-     [review entry](../reviews/step-002-warehouse-and-ingestion.md#sub-step-26--scan-for-duckdb-specific-function-names-outside-the-adapter).
-     It pays [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect),
-     whose trigger he ruled fired on 2026-08-13
-     ([R21](../plan/step-002-warehouse-and-ingestion.md#r21--debt-009-has-fired-and-is-paid-as-sub-step-26--ruled-by-amino-2026-08-13)),
-     and it was to land as its own commit after 2.5 — which it does.
-  2. **Then Step 002 is finished and Step 003 gets planned**, using
-     `planning-a-step`. Its shape is already fixed by
-     [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved):
-     the sqlglot spike that proves — or disproves — the Validation Gate's
-     parse-tree claim, whose approved 2026-08-05 wording is preserved verbatim
-     under [Deferred to Step 003](../plan/step-002-warehouse-and-ingestion.md#deferred-to-step-003--prove-the-validation-gates-parse-tree-claim).
-  - **Do not plan Step 003 before 2.6 is committed**; the route to the Target State
-    is discovered one Step at a time.
-- **Three things Sub-step 2.6 leaves for the reviewer to push on**, all argued in
-  its review section under *Look at this sceptically*: `generate_series` is not
-  standard SQL and the scan does not flag it, because sqlglot files it as
-  dialect-neutral; `DIALECT_PROBES` is exempt from the scan it feeds, because the
-  probes are real DuckDB SQL living in a scanned file; and `sqlglot` was promoted
-  from a transitive dependency to a declared one, which the plan text did not ask
-  for.
+- **Nothing is half-done, and no code is in flight.** The working tree is clean at
+  `6a16d3d`. Step 002's [plan](../plan/step-002-warehouse-and-ingestion.md) is
+  `done` — all six Sub-steps committed, each verified by a command whose output is
+  in the [review](../reviews/step-002-warehouse-and-ingestion.md).
+- **Active Step:** 003 — Prove the Validation Gate's parse-tree claim
+  ([plan](../plan/step-003-validation-feasibility.md)), **written and approved
+  2026-08-15**. It is the sqlglot spike
+  [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
+  moved out of Step 002, whose approved 2026-08-05 wording is preserved verbatim
+  under [Deferred to Step 003](../plan/step-002-warehouse-and-ingestion.md#deferred-to-step-003--prove-the-validation-gates-parse-tree-claim)
+  and whose four questions the plan changes in no way.
+- **Next:** Amino commits the Step 003 plan on its own, then **Sub-step 3.1
+  begins** — *Scope every scan exemption to the file it lives in*. Then 3.2 the
+  certified-metrics-only tracer, 3.3 Restricted Columns, 3.4 DuckDB → BigQuery
+  retargeting, 3.5 the go/no-go document. **No implementation code exists yet.**
+- **The plan's four questions were all approved on 2026-08-15**, recorded as
+  [R1–R4](../plan/step-003-validation-feasibility.md#rulings): `Restricted Column`
+  is a registered term as of Sub-step 3.3; the spike's certified expressions stay
+  Python literals, so the Semantic Layer's file format is not fixed inside a spike;
+  **an exemption names the file as well as the symbol** — widened by Amino from the
+  new script to every exemption, which is what Sub-step 3.1 is and why the Step has
+  five Sub-steps rather than four; and Step 003 is the spike alone, with the
+  Semantic Layer as the expected Step 004.
+- **Do not plan Step 004** — the route to the Target State is discovered one Step
+  at a time.
+- **Sub-step 2.6 was committed unchanged**, so the three points its review put up
+  under *Look at this sceptically* stand as built, with no ruling recorded against
+  them: `generate_series` is not standard SQL and the scan does not flag it,
+  because sqlglot files it as dialect-neutral; `DIALECT_PROBES` is exempt from the
+  scan it feeds, because the probes are real DuckDB SQL living in a scanned file;
+  and `sqlglot` was promoted from a transitive dependency to a declared one, which
+  the plan text did not ask for. The first and third are inputs to Step 003 —
+  claim 4 measures whether a name-based scan is the right instrument at all.
 - **The four decisions 2.5 put to Amino were all approved on 2026-08-13**, and two
   of them left something behind:
   1. **A Snapshot is written on the dates *every* Instrument has a Market Price**
@@ -112,7 +114,9 @@ wrong and gets fixed immediately.
   [DEBT-010](../debt-ledger.md) noted they were free to change while the tables
   were empty. 2.5 filled them, so changing one now means regenerating the client
   side — which is one command, but it is no longer free.
-- **What Step 003 inherits.** The sqlglot spike deferred by
+- **What Step 003 inherits**, and what its
+  [plan](../plan/step-003-validation-feasibility.md) is built on. The sqlglot spike
+  deferred by
   [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
   now has the real data it was moved in order to run against. Its third question
   needs a query computing revenue inline from `commission` to return a *different

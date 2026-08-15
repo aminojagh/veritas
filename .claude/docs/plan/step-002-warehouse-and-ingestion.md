@@ -1,11 +1,11 @@
 # Step 002 — Build the Warehouse and fill it
 
-- **Status:** in review — every Sub-step is built. Written and **approved by Amino
-  on 2026-08-05**, together with every ruling in [Rulings](#rulings). Sub-steps 2.1
-  (`5a061a7`), 2.2 (`0fc5a34`), 2.3 (`a58ef91`), 2.4 (`13b99bb`) and 2.5
-  (`ce2961a`) are **committed**; 2.6 is the sixth and last, reviewed and awaiting
-  its commit. **The Step is `done` when 2.6 lands**, and nothing in it is
-  outstanding besides that commit.
+- **Status:** **done** — 2026-08-13, when Sub-step 2.6 landed in `6a16d3d`.
+  Written and **approved by Amino on 2026-08-05**, together with every ruling in
+  [Rulings](#rulings). All six Sub-steps are committed: 2.1 (`5a061a7`), 2.2
+  (`0fc5a34`), 2.3 (`a58ef91`), 2.4 (`13b99bb`), 2.5 (`ce2961a`) and 2.6
+  (`6a16d3d`). Nothing in the Step is outstanding. The spike it deferred is now
+  [Step 003](step-003-validation-feasibility.md).
   **Amended 2026-08-10 — see [R16](#r16--the-original-sub-step-22-splits-into-three--approved-by-amino-2026-08-10):**
   the original Sub-step 2.2 splits into three, and [R6](#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
   fires, so the sqlglot spike leaves this Step. **The amendment was approved by
@@ -81,7 +81,7 @@ veritas/ingestion/     ← 2.2   dim_instrument         NASDAQ Trader · SEC   �
                        ← 2.3   fct_instrument_price   Yahoo, by snapshot-and-replay   ✅ committed a58ef91
                        ← 2.4   fct_fx_rate            Frankfurter   ✅ committed 13b99bb
                        ← 2.5   synthetic sources:     Trades · Cash · Positions · balances   ✅ committed ce2961a
-.claude/scripts/       ← 2.6   the dialect half of the adapter seam scan — DEBT-009   ✅ built
+.claude/scripts/       ← 2.6   the dialect half of the adapter seam scan — DEBT-009   ✅ committed 6a16d3d
 ```
 
 The sixth was not planned; it is a debt this Step opened firing inside the same
@@ -623,6 +623,12 @@ and compare with `cmp`.
 fired on 2026-08-10.** The text below is the approved 2026-08-05 wording, kept
 verbatim so Step 003's plan starts from it rather than from memory. It is **not**
 planned here, and Step 003 is not written until Step 002 ships.
+
+> **Step 002 shipped on 2026-08-13, and
+> [Step 003 was planned from this text](step-003-validation-feasibility.md) on
+> 2026-08-15, changing none of its four questions.** The wording below stays as it was
+> approved; the plan is where the decomposition, the verification and the three
+> things the intervening Sub-steps changed are argued.
 
 A spike, not the Gate. The question is narrow and answerable: **can sqlglot
 decide, from a parse tree alone, that a generated query computes a Certified
