@@ -41,8 +41,9 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level) | Execution Price against Market Price cancels at book level | S | Building the Gold Question Set | open |
 | [DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The price table is sparse, so the Snapshot calendar has holes | M | The first "as of" date chosen by anything but the Snapshot calendar | open |
 | [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
+| [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate | open |
 
-**Open debt:** 7 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 8 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -168,8 +169,25 @@ mechanism.
   committed script* and *citations quote* — and `closing-a-substep` gained the
   rationalizations that produced this failure.
 
-**Still unpaid:** the hook layer. Nothing mechanically blocks a commit by Claude,
-a missing Ledger entry, or a review that skips a section. The trigger having
+**Second coverage gap, found in Sub-step 3.2 on 2026-08-18 — a document link inside
+code is checked by nobody.** Amino ruled that a reference to a project document made
+from *inside code* is written as a resolvable markdown link rather than as prose, so
+that the final documentation pass can find every internal `.claude/docs/` link and
+swap it for a user-facing one. `verify_framework.py`'s `check_links` resolves links
+and their anchors in `.claude/docs/**/*.md` and `CLAUDE.md` only, so the links carried
+in `.claude/scripts/*.py` — `check_warehouse.py` and `check_validation_feasibility.py`
+both carry them — rest entirely on somebody remembering to look, which is this entry's
+subject exactly. The fix is one glob wider in `check_links`, plus a decision about
+what a link inside a `.py` file may point at. **It must be paid before the final
+documentation pass** ([DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)),
+because that pass works from the set of links a checker can enumerate: a docstring
+link that has rotted by then is invisible at the one moment it is being read. It is
+recorded here rather than as an entry of its own because it is not a new species of
+problem — it is this one, in a place no mechanism reaches yet.
+
+**Still unpaid:** the hook layer, and the one-glob widening above. Nothing
+mechanically blocks a commit by Claude, a missing Ledger entry, or a review that
+skips a section, and nothing reads a link inside a `.py` file. The trigger having
 fired once, the next occurrence should buy the hooks rather than another
 document rule.
 
@@ -994,3 +1012,57 @@ The final documentation pass — when `README.md` is written for peer review and
 evaluation. That is the same pass [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers)
 fires on, and they should be paid together: both are about a public document
 saying exactly what is true and no more.
+### DEBT-014 — The spike allows a query the Gate must reject
+
+- **Status:** open
+- **Opened:** Sub-step 3.2 (`.claude/docs/reviews/step-003-validation-feasibility.md`),
+  on Amino's ruling of 2026-08-18
+- **Size:** S
+- **Location:** `.claude/scripts/check_validation_feasibility.py` — the `BLIND_SPOT`
+  probe kind and the probe `notional through the wrong currency`
+
+**What we did**
+
+Recorded, as a passing measurement, that the tracer **allows** `Traded Notional`
+converted out of the Trade's Denomination Currency instead of the Instrument's
+Quotation Currency. The two columns both sit on `fct_trade`, the projection is
+identical either way, and the tracer reads the projection — so the query traces to
+the certified expression and the run exits zero while printing `ALLOWED` beside a
+figure that is 96.39% away from the right one on the currently loaded data (the run
+prints both numbers and the gap; see the
+[Sub-step 3.2 review](reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric)).
+
+**What we should have done**
+
+Reject it. A Metric Definition has to carry its Join Path, and the Validation Gate
+has to check the join and not only the projection. When that exists, this probe's
+expected verdict flips from allowed to rejected, `BLIND_SPOT` stops being one of the
+kinds a passing run can contain, and the probe becomes an ordinary Shadow Metric.
+
+**Why we deferred**
+
+There is no Validation Gate to reject it with — Step 003 is a spike, and its output
+is the boundary rather than the enforcement. Encoding the blind spot as a *failure*
+today would mean a check that cannot pass until a component two Steps away is built,
+and the [Step 003 plan](plan/step-003-validation-feasibility.md) is explicit that *"a
+shape that fails is a finding, not a failure"*. Amino ruled on 2026-08-18 that the
+encoding stands **on the condition** that the Gate, once built, makes this case fail
+correctly. This entry is that condition, moved out of a review and onto the Ledger
+where it has a Trigger.
+
+**Cost while unpaid**
+
+The spike's own output reads as full marks when it is not: a reader skimming the
+`claim 1` block sees `ALLOWED` on every certified probe and on this one, and has to
+notice the probe's `kind` to learn that this line is the bad news. Anything that
+quotes the run — a later plan, the go/no-go in Sub-step 3.5, a README — inherits that
+reading unless it repeats the caveat. It is also the one place in this repository
+where a check passes while demonstrating a wrong answer, which is precisely the shape
+[DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) was opened
+about in a different component.
+
+**Trigger**
+
+The Sub-step that builds the Validation Gate. That Sub-step is not done until
+`notional through the wrong currency` is rejected by the Gate, and until this probe
+in the spike expects a rejection rather than an allowance.
