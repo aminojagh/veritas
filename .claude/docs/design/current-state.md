@@ -4,37 +4,59 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-18 — **Step 002 is finished and committed in full**, the Step 003 plan and Sub-step 3.1 are committed, and **Sub-step 3.2 is written, verified, reviewed by Amino on 2026-08-18 and awaiting his commit**. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike now exists and has answered two of its four claims.**
-**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`**. **Sub-step 3.2's hash is not recorded here because this file is part of its own commit** — 3.3 fills it in, which is how every hash above arrived.
+**Last updated:** 2026-08-19 — **Step 002 is finished and committed in full**, the Step 003 plan and Sub-steps 3.1 and 3.2 are committed, and **Sub-step 3.3 is written, verified and awaiting Amino's review and commit**. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has answered three of its four claims — tracing, Restricted Columns and the Shadow Metric's numbers — leaving only dialect retargeting.**
+**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`**. **Sub-step 3.3's hash is not recorded here because this file is part of its own commit** — 3.4 fills it in, which is how every hash above arrived.
 
 ---
 
 ## Resume here
 
-- **Sub-step 3.2 is written, verified and reviewed, and is the one awaiting Amino's
-  commit.** One new file, `.claude/scripts/check_validation_feasibility.py`, plus the
-  Ledger entry Amino's review opened; no schema change, no pipeline behaviour, no
-  `veritas/validation/` directory. Every verification command was re-run on
-  2026-08-18 against the Warehouse built on 2026-08-15, and the output is in the
-  [review](../reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric),
-  including the mutations that show which probes are load-bearing.
-- **Amino's review on 2026-08-18 changed three things and approved the rest.**
+- **Sub-step 3.3 is written, verified, reviewed by Amino on 2026-08-19 and awaiting
+  his commit.** Three files: `.claude/scripts/check_validation_feasibility.py` grows
+  claim 2, `.claude/docs/glossary.md` gains the `Restricted Column` row, and the
+  plan gains
+  [R6](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19).
+  No Ledger entry, no schema change, no pipeline behaviour, still no
+  `veritas/validation/` directory. Every verification command was run on 2026-08-19
+  against a Warehouse rebuilt the same day, and the output is in the
+  [review](../reviews/step-003-validation-feasibility.md#sub-step-33--probe-whether-a-restricted-column-can-hide-from-the-parse-tree),
+  including three mutations showing which probes are load-bearing.
+- **Amino's review on 2026-08-19 changed three things and approved the rest.**
+  1. **A union probe was added to claim 2** — Net Revenue by region in one branch
+     and by Client name in the other. It is the claim 2 counterpart of
+     `half-certified union`, and it now fails Sub-step 3.2's traversal mutation
+     alongside it.
+  2. **A probe that completes the set is kept, wherever it is found** — ruled and
+     recorded as [R6](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19)
+     in the plan rather than in a Step Review, because it governs every Sub-step
+     that measures a boundary. Enumerate at planning time; keep what implementation
+     turns up; account for why the enumeration missed it. `hidden behind a derived
+     table` stays.
+  3. **The fail-closed over-strictness was fixed rather than recorded as debt.**
+     Claim 2 no longer reads every scope's projections; it walks each output
+     column's lineage back to the base-table columns that produced it, so a Client
+     name projected inside an unfoldable subquery and aggregated away is no longer
+     counted. `sqlglot.lineage` runs `qualify` and no other rule, so the number of
+     rewrites this file trusts is still two.
+- **Sub-step 3.2 was committed in `89fee55` after Amino's 2026-08-18 review**, which
+  changed three things and approved the rest.
   1. **The blind spot may pass now, on condition the Gate makes it fail later** —
      opened as [DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject),
      whose Trigger is the Sub-step that builds the Validation Gate.
   2. **The larger-than-planned probe set is a planning shortcoming, not scope
      creep** — a Step that measures a boundary should enumerate the shapes it will
-     measure at planning time, the way Sub-step 3.3's plan already does.
+     measure at planning time, the way Sub-step 3.3's plan already does. **3.3 ships
+     one probe past its own enumeration**, for the reason above; the ruling applies
+     to it and has not been given.
   3. **Mutation 2 in the review did not reproduce**, and now does. Reverting the
      tracer to the first version takes two edits rather than one: narrowing the
      traversal to the root scope *and* removing the guard that skips a scope whose
-     node is not a `SELECT`. With only the first edit the run still passes — the
-     union is rejected for computing nothing, which is fail-closed but is not the
-     traversal doing the work. Both runs are in the review.
+     node is not a `SELECT`. Both `sed` commands still reproduce after 3.3 moved the
+     lines they edit into `projected_expressions`, which 3.3's review re-ran and
+     records.
   4. **The tracer's docstrings now explain sqlglot step by step** — what
      `parse_one`, `optimize`, `build_scope`, `find_all` and the two generator flags
-     each do, and why `isolate_tables` is turned off. No behaviour changed: the same
-     sixteen verdicts and the same numbers.
+     each do, and why `isolate_tables` is turned off.
 - **Sub-step 3.1 was committed unchanged in `d840fa8`**, so its three points under
   *Look at this sceptically* stand as built with no ruling recorded against them:
   the Sub-step that narrowed one exemption widened another (`EXEMPT` and `HEAD`
@@ -70,6 +92,34 @@ wrong and gets fixed immediately.
   6. **`Traded Notional` cannot be computed as the Glossary defines it** — it
      overflows — so its certified expression carries a widening cast, which the
      script proves is required on every run.
+- **What 3.3 found, in five lines.** Claim 2 is **answered and holds** on all nine
+  shapes measured.
+  1. **The schema is what makes it hold.** `SELECT *` over a join reaching
+     `dim_client` projects a Client's name while the text `client_name` appears
+     nowhere in the query. Expanding the star against the real schema is the only
+     thing that finds it.
+  2. **ADR-0003's rejection of text matching is now measured, and it was
+     understated.** The two disagree on **5 of 9 shapes** — one the text cannot see,
+     and **four legitimate queries the text would reject**: a comment explaining why
+     the column was left out, a label carrying the name as data, a filter on a Client
+     with only a total returned, and a count of distinct Clients. A mutation makes the
+     detector *be* text matching and the run fails on all five at once.
+  3. **The two parse-tree claims are independent, and claim 2 is the only one
+     standing in four cases.** Four shapes compute Net Revenue's certified expression
+     exactly — claim 1 allows all four — and all four put a Client's name in the
+     answer. **A Gate implementing certified-metrics-only alone would ship the leak.**
+  4. **Reaching the answer is a different question from appearing in the statement.**
+     A Client name projected inside an unfoldable subquery and aggregated into
+     `count(*)` is in the statement and in nobody's answer. Reading every scope's
+     projections — which is what claim 1 needs — rejects it; walking each output
+     column's lineage does not.
+  5. **The union probe detects claim 1's hole as well as claim 2's.** Putting 3.2's
+     traversal back to the outermost scope now fails two probes rather than one.
+- **The filter-only shape is allowed by design and is not a hole.** A query filtered
+  to one Client returning only a total does leak by inference, and the Target State's
+  flow assigns that to a different check on the same list — *"Access Profile
+  predicate present"*. Claim 2 is the projection rule; the predicate rule is its
+  neighbour and this Step measures one of them.
 - **A hole in the tracer was found and closed inside 3.2**: reading the outermost
   scope alone meant a union's second branch was never examined, so a statement with
   a certified first branch and a Shadow Metric second branch was allowed. Measured
@@ -87,11 +137,12 @@ wrong and gets fixed immediately.
   hole is measured rather than asserted: the same mutation passes `HEAD`'s check
   and fails the narrowed one. **3.2 is the file that R3 was raised about, and it
   passes the dialect scan claiming no exemption at all.**
-- **Next: Sub-step 3.3** — Restricted Columns (claim 2), which registers
-  `Restricted Column` in the Glossary per
-  [R1](../plan/step-003-validation-feasibility.md#r1--term-proposal-restricted-column--approved-by-amino-2026-08-15)
-  because it is the Sub-step that first gives the term a code identifier. Then 3.4
-  DuckDB → BigQuery retargeting, 3.5 the go/no-go document. **No component row has
+- **Next: Sub-step 3.4** — DuckDB → BigQuery retargeting (claim 4), which belongs
+  to [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) rather than
+  ADR-0003 and is the Step's
+  [pre-agreed split point](../plan/step-003-validation-feasibility.md#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15):
+  if 3.3's review grows the Step, 3.4 becomes Step 004 and 3.5 returns its go/no-go
+  with retargeting named as unanswered. Then 3.5, the go/no-go document. **No component row has
   moved off `✗ none` and none will in this Step** — a spike moves what is known,
   not what is built. Any session resuming here runs
   `uv run python -m veritas.ingestion` first, because the Warehouse is gitignored
@@ -103,7 +154,10 @@ wrong and gets fixed immediately.
   **an exemption names the file as well as the symbol** — widened by Amino from the
   new script to every exemption, which is what Sub-step 3.1 is and why the Step has
   five Sub-steps rather than four; and Step 003 is the spike alone, with the
-  Semantic Layer as the expected Step 004.
+  Semantic Layer as the expected Step 004. **R6 was ruled later, on 2026-08-19**, at
+  Sub-step 3.3's review: a probe that completes the set is kept wherever it is
+  found, and the Sub-step that finds one owes the account of why the enumeration
+  missed it.
 - **Do not plan Step 004** — the route to the Target State is discovered one Step
   at a time.
 - **Sub-step 2.6 was committed unchanged**, so the three points its review put up
@@ -256,7 +310,7 @@ which is the Sub-step that rules on them.
 
 | Component | State | Notes |
 |---|---|---|
-| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **Three declared dependencies**: `duckdb` (2.1), `dlt` (2.2) and `sqlglot` (2.6). dlt brings roughly forty transitive packages, sqlglot among them — 2.6 promoted it to a declared dependency because `check_warehouse.py` now imports it, and a transitive dependency is one someone else's release notes can remove. `uv add sqlglot` installed nothing: the locked version did not move. **Sub-step 3.2 added a fifth check script and no dependency.** The three stdlib-only check scripts — `verify_framework.py`, `check_language.py`, `check_data_availability.py` — are still stdlib-only; `check_warehouse.py` and `check_validation_feasibility.py` are the two that import third-party code, and both import the same two libraries the project already declares. |
+| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **Three declared dependencies**: `duckdb` (2.1), `dlt` (2.2) and `sqlglot` (2.6). dlt brings roughly forty transitive packages, sqlglot among them — 2.6 promoted it to a declared dependency because `check_warehouse.py` now imports it, and a transitive dependency is one someone else's release notes can remove. `uv add sqlglot` installed nothing: the locked version did not move. **Sub-step 3.2 added a fifth check script and no dependency, and Sub-step 3.3 added neither.** The three stdlib-only check scripts — `verify_framework.py`, `check_language.py`, `check_data_availability.py` — are still stdlib-only; `check_warehouse.py` and `check_validation_feasibility.py` are the two that import third-party code, and both import the same two libraries the project already declares. |
 | Development framework | ✅ working | `CLAUDE.md`, `.claude/docs/` tree, five skills in `.claude/skills/`. Non-Negotiable #4 gained a rule in 3.1: **an exemption is scoped to where it is needed** — a check that excuses something names the file as well as the symbol, never a symbol alone. |
 | Framework self-check | ✅ working | `.claude/scripts/verify_framework.py` — structure only (documents exist, links resolve, skills load, interpreter pinned), passes. **Links now include their `#anchor`** ([R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11), 2026-08-11): the fragment used to be split off and discarded, so a link to a renamed heading passed, and same-document `#anchor` links were not checked at all. It reports a `dead anchor` distinct from a `dead link` and prints how many links and anchors it checked. Verified by making it fail against a temporary document with two dead anchors, in the [Sub-step 2.4 changes-on-review section](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11-sub-step-24). Scope is `.claude/docs/**` plus `CLAUDE.md`; `README.md` is outside it. |
 | Language check | ✅ working | `.claude/scripts/check_language.py` — content rules: component names registered, no `proposed` term in code, abbreviations resolvable. Passes. Parses code with `ast` so it checks identifiers, not prose. Partial payment of [DEBT-001](../debt-ledger.md). |
@@ -269,7 +323,7 @@ which is the Sub-step that rules on them.
 | Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, **all ten populated**. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). The two movement tables carry **opposite sign conventions** and the schema says so beside each column: cash is signed from the Account's side, accounting carries magnitudes so that Net Revenue = Σcommission − Σrebate − Σfee is literally true. |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is now checked rather than promised. `create_schema`, `tables`, `columns`, `row_count`, `execute`, `query`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. Hardcoded database path and no error handling, both licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
 | Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and **the adapter seam holds in both the halves [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) named** — no `duckdb` import outside `veritas/warehouse/`, and no DuckDB-specific function name in the SQL any module out there emits. The dialect half (2.6) reads every string literal sqlglot parses as a statement and names any function call standard SQL does not have; which names those are is subtracted out of sqlglot's own dialect tables rather than typed, so the list tracks the library. Three probes run every time — standard SQL clean, `strftime` named, `list_aggregate` named — and a probe reading wrong fails the run. Those probes are the scan's **one fixture exemption**, and since 3.1 it is scoped to the file it lives in: `FIXTURE_EXEMPTIONS` names `.claude/scripts/check_warehouse.py` as well as the symbol `DIALECT_PROBES`, so no other scanned file can claim it by choosing that name. Pointing the entry at a file that does not exist makes the run fail loudly, so a stale exemption cannot widen quietly. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. **`--distinctions` (2.5)** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument** (added on review, 2026-08-13, after a transfer moved a fraction of a share and nothing objected), every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both — together they only prove an empty table is empty. |
-| Validation feasibility spike | ✅ working | `.claude/scripts/check_validation_feasibility.py` (3.2) — the sqlglot spike, answering claims 1 and 3 of [Step 003](../plan/step-003-validation-feasibility.md). **Not the Validation Gate and not a thin version of one**: it creates no `veritas/validation/` directory and ships no component. A tracer — parse, resolve against the real schema read through `WarehouseAdapter.columns`, rename table aliases back to their base table, canonicalise every projection that aggregates — plus sixteen probes, each declaring the verdict this Sub-step measured for it. A statement is allowed when it computes at least one metric expression and **every** one traces to a certified expression. Three certified expressions live as Python literals ([R2](../plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15)), so the Semantic Layer's file format stays unfixed. Every executable probe is executed through the adapter and checked **against another probe's number** rather than against a figure written in the script. It exits non-zero if any verdict or any relation changes, in either direction — a spike's job is to hold its finding still. Figures and the two mutations are dated evidence in the [review](../reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric). |
+| Validation feasibility spike | ✅ working | `.claude/scripts/check_validation_feasibility.py` (3.2, 3.3) — the sqlglot spike, answering claims 1, 2 and 3 of [Step 003](../plan/step-003-validation-feasibility.md). **Not the Validation Gate and not a thin version of one**: it creates no `veritas/validation/` directory and ships no component. A tracer — parse, resolve against the real schema read through `WarehouseAdapter.columns`, rename table aliases back to their base table, canonicalise every projection that aggregates — plus sixteen probes, each declaring the verdict this Sub-step measured for it. A statement is allowed when it computes at least one metric expression and **every** one traces to a certified expression. Three certified expressions live as Python literals ([R2](../plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15)), so the Semantic Layer's file format stays unfixed. Every executable probe is executed through the adapter and checked **against another probe's number** rather than against a figure written in the script. It exits non-zero if any verdict or any relation changes, in either direction — a spike's job is to hold its finding still. **Sub-step 3.3 added claim 2.** `resolve` now holds the rewriting settings both claims are judged under, and each claim reads the result its own way: `projected_expressions` walks every scope for claim 1, and `columns_reaching_the_answer` walks each output column's lineage for claim 2, so a column that never reaches the answer is not counted. Nine more probes, each judged three ways — from the parse tree, by searching the query's text (ADR-0003's rejected alternative), and by claim 1's tracer. Figures and the mutations are dated evidence in the [3.2](../reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric) and [3.3](../reviews/step-003-validation-feasibility.md#sub-step-33--probe-whether-a-restricted-column-can-hide-from-the-parse-tree) reviews. |
 | Semantic Layer | ✗ none | — |
 | Ingestion | ✅ working | `veritas/ingestion/` — **both halves**: four real sources and the seeded simulator. `uv run python -m veritas.ingestion` builds all ten tables end-to-end from a clean clone with **no network**, and two consecutive runs produce byte-identical output. `--refresh` is the only mode that opens a socket; a refresh that fails part-way names the snapshots it had already rewritten, and one that succeeds reports how many it rewrote and how many were distinct — **failing the run if a source was fetched twice**. **Two phases, in an order that cannot be reversed:** dlt lands the real sources in `raw` and the adapter builds three star tables from them; then `simulator.py` *reads those three through the adapter*, generates the client side as a pure function of them and a seed, and a second dlt load plus seven more build scripts lands it. No two connections are ever open at once. The pipeline refuses to complete on four silent-shortness conditions, two of them added in 2.5: a Position with no Market Price on its own Snapshot date, and a monetary amount whose Denomination Currency has no FX Rate on its own date. |
 | Retrieval | ✗ none | — |
@@ -320,7 +374,7 @@ veritas/
     │   ├── verify_framework.py        # structure: docs, links, skills, interpreter
     │   ├── check_language.py          # content: Glossary + writing conventions
     │   ├── check_warehouse.py         # schema vs Glossary, constraints, adapter seam
-    │   ├── check_validation_feasibility.py  # the sqlglot spike — claims 1 and 3
+    │   ├── check_validation_feasibility.py  # the sqlglot spike — claims 1, 2 and 3
     │   └── check_data_availability.py
     └── docs/
         ├── glossary.md
@@ -351,15 +405,16 @@ measuring the Section C pairs.
 certified, or retrievable, and nothing turns a question into SQL. The arithmetic
 exists; the machine that chooses it does not.
 
-**Two of the spike's four claims are answered; two are not.** Sub-step 3.2 measured
-tracing (claim 1) and the Shadow Metric (claim 3). **Restricted Columns (claim 2)
-and DuckDB → BigQuery retargeting (claim 4) are untouched**, and no verdict has been
-recorded on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) — that
-is Sub-step 3.5's job, and `.claude/docs/design/validation-feasibility.md` does not
-exist yet. Of the Validation Gate's five checks the spike has looked at one:
-certified-metrics-only. The Access Profile predicate, bounded scan and read-only
-are unexamined; an `INSERT` is refused by the tracer, but incidentally rather than
-by a rule.
+**Three of the spike's four claims are answered; one is not.** Sub-step 3.2
+measured tracing (claim 1) and the Shadow Metric (claim 3), and Sub-step 3.3 measured
+Restricted Columns (claim 2). **DuckDB → BigQuery retargeting (claim 4) is
+untouched**, and no verdict has been recorded on
+[ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) — that is Sub-step
+3.5's job, and `.claude/docs/design/validation-feasibility.md` does not exist yet. Of
+the Validation Gate's five checks the spike has now looked at two:
+certified-metrics-only and no restricted columns. The Access Profile predicate,
+bounded scan and read-only are unexamined; an `INSERT` is refused by the tracer, but
+incidentally rather than by a rule.
 
 **Two Section C pairs are real but small at book level**, and both are on the
 Ledger against the Gold Question Set rather than fixed in the data:

@@ -143,7 +143,9 @@ go/no-go on the parse-tree claim without it, saying so.
 Four questions were put to Amino with this plan and **all four were approved on
 2026-08-15**. R3 was approved *and widened*, which is why the Step has five
 Sub-steps. R5 records the split point offered alongside them, approved the same
-day.
+day. **R6 was ruled during the Step**, at Sub-step 3.3's review on 2026-08-19, and
+is recorded here rather than in a Step Review because it governs every Sub-step
+that measures a boundary, not only the one that raised it.
 
 ### R1 — Term Proposal: `Restricted Column` → **approved by Amino 2026-08-15**
 
@@ -232,6 +234,32 @@ Agreed in advance for
 [R6](step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)'s
 reason: the option should be on the table before the Step starts rather than
 offered at review, when it is already too late to have cost nothing.
+
+### R6 — a probe that completes the set is kept, wherever it is found → **ruled by Amino 2026-08-19**
+
+Raised by Sub-step 3.3, which shipped a probe the plan's own enumeration had not
+listed — the subquery defeat named in the ADR-0003 quote the Sub-step is built on.
+Sub-step 3.2 had raised the same question in the other direction, and the ruling
+there was that a larger-than-planned probe set is a planning shortcoming rather
+than scope creep. R6 is that ruling completed:
+
+> We have to find all useful probes as much as possible, either through planning
+> or implementation. It is much better that we find all in the planning phase,
+> because doing so means we have a comprehensive understanding of our design.
+> However, if something emerges during the implementation and we know is useful
+> for probe set completion, we must keep it.
+
+Both halves bind. **The planning half is the one with teeth**: a Step that measures
+a boundary enumerates the shapes it will measure before it starts, and a probe
+discovered during implementation is evidence that the enumeration was incomplete —
+which is a fact about the design's clarity, not only about the Sub-step. **The
+implementation half forbids the tidy response**: a probe that completes the set is
+not dropped to keep a Sub-step inside its plan, and it is not deferred to a later
+Step where the set it completes no longer exists.
+
+What a Sub-step owes when this happens is the account: which probe, why the
+enumeration missed it, and what it found. Sub-step 3.3's review carries all three
+for the two probes it added past its plan.
 
 ## Sub-steps
 

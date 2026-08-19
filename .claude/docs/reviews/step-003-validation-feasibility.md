@@ -702,3 +702,382 @@ registered term used as registered: `Certified Metric`, `Shadow Metric`,
 passes with the same 88 registered terms and 0 proposed terms in code, over 14
 Python files rather than 13. `Restricted Column` stays unregistered until Sub-step
 3.3, which is the Sub-step that gives it an identifier.
+
+## Sub-step 3.3 — Probe whether a Restricted Column can hide from the parse tree
+
+**What changed**
+
+Three files: `.claude/scripts/check_validation_feasibility.py` grows claim 2,
+`.claude/docs/glossary.md` gains one row, and the
+[Step 003 plan](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19)
+gains R6, ruled during this Sub-step's review. Nothing else moved — no schema
+change, no pipeline behaviour, still no `veritas/validation/` directory.
+
+- **`Restricted Column` is registered in Glossary Section A**, `agreed`, in the
+  wording [R1](../plan/step-003-validation-feasibility.md#r1--term-proposal-restricted-column--approved-by-amino-2026-08-15)
+  approved on 2026-08-15 — *"a column an Access Profile forbids from appearing in a
+  Grounded Answer's projection"* — with one clause added saying what *in the
+  projection* is judged on, because that is the half of the term this Sub-step
+  measured. It sits directly under `Access Profile`, the term it depends on. This is
+  the Sub-step that gives it a code identifier, which is why it is registered here
+  rather than in 3.2.
+- **`dim_client.client_name` is the Restricted Column the probes use**, held as a
+  `(table, column)` pair rather than as a bare name: a parse tree resolves a column
+  to the table it came from, and a Gate that forbade the *name* would forbid it on
+  every table that had one.
+- **The rewriting settings moved into one function, `resolve`.** Parse, `qualify`
+  against the real schema, `merge_subqueries`, `expand_stars` on, `isolate_tables`
+  off — the settings both claims are judged under now live in one place, and each
+  claim reads the result its own way.
+- **The two claims read that result differently, because they ask different
+  questions.** Claim 1 walks every scope: a metric expression computed anywhere in
+  the statement is one the Gate must place. Claim 2 asks the narrower question the
+  Target State actually states — *does this column reach the answer* — and uses
+  `sqlglot.lineage` to walk back from each output column to the base-table columns
+  that produced it.
+- **Nine shapes, each judged three ways**: from the parse tree (the verdict a Gate
+  would act on), by searching the query's text for the restricted name (ADR-0003's
+  rejected alternative), and by claim 1's tracer (which shows the two claims are
+  separate checks). All three are recorded per probe, and the run fails if **any** of
+  them moves.
+- **Exits non-zero in both directions.** A Restricted Column reaching the answer
+  unseen is a leak; a Restricted Column reported where the answer carries none is the
+  false positive that makes a Gate something people route around. **Four of the nine
+  probes exist only to measure the second.**
+
+**What it found.** Five things.
+
+1. **Claim 2 holds on all nine shapes, and the schema is what makes it hold.**
+   `SELECT *` over a join reaching `dim_client` projects a Client's name while the
+   text `client_name` appears nowhere in the query. Only expanding the star against
+   the real schema finds it, and mutation 1 below turns that expansion off and
+   watches the query become allowed.
+2. **ADR-0003's rejection of text matching is now a measurement, and it was
+   understated.** Text matching and the parse tree disagree on **5 of the 9 shapes**.
+   One is the miss the ADR predicted. The other four are the direction the ADR did
+   not dwell on: text matching **rejects four perfectly legitimate queries** — a
+   generator explaining in a comment why it grouped by region instead, a label
+   carrying the withheld column's name as data, a query that filters on a Client and
+   reports only a total, and a count of distinct Clients. Mutation 3 makes the
+   detector *be* ADR-0003's rejected alternative and the run fails on all five at
+   once.
+3. **The two parse-tree claims are independent checks, and claim 2 is the only one
+   standing in four cases.** `net revenue by client`, `aliased to a benign name`,
+   `hidden behind a derived table` and `a union branch that names the Client` all
+   compute Net Revenue's certified expression exactly — claim 1 allows all four — and
+   all four put a Client's name in the answer. The `claim 1` column prints `traces`
+   beside each of them. **A Gate that implemented certified-metrics-only alone would
+   ship the leak**, which is worth stating plainly because certified-metrics-only is
+   the claim ADR-0003 is mostly argued on.
+4. **Reaching the answer is a different question from appearing in the statement,
+   and only the second one is easy.** A Client name projected inside a subquery that
+   cannot be folded away, then aggregated into `count(*)`, is in the statement and in
+   nobody's answer. Reading every scope's projections — the reading claim 1 needs —
+   rejects it. `sqlglot.lineage` is what separates the two, and it costs no new
+   trust: it runs `qualify` and nothing else, so the two rewrites this file relies on
+   are still the only two.
+5. **The union probe detects claim 1's hole as well as claim 2's.** Putting Sub-step
+   3.2's traversal back to reading the outermost scope now fails two probes rather
+   than one: `half-certified union` on claim 1, and the new union probe's `claim 1`
+   column, which flips from `traces` to `—`. One shape, two claims, one mutation.
+
+**The three things Amino asked for on 2026-08-19, and what each became**
+
+1. **A union probe for claim 2 — added.** `a union branch that names the Client`:
+   Net Revenue by region in one branch, Net Revenue by Client name in the other. Both
+   branches compute the certified expression, so claim 1 allows the whole statement;
+   the leak is in the branch a Gate reading the outermost scope never reaches. It is
+   the claim 2 counterpart of `half-certified union`, and it produced finding 5.
+2. **The probe-set question — ruled, and recorded as
+   [R6](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19)
+   in the plan** rather than only here, because it governs every Sub-step that
+   measures a boundary. `hidden behind a derived table` stays. What this Sub-step
+   owes under R6 is the account of why the enumeration missed it: the plan quotes
+   ADR-0003's **four** defeats and then lists probes for **three**, and the subquery
+   is the one the list drops. The miss is in the paraphrase, not in the reasoning —
+   which is the cheapest kind to catch at planning time and the one a reader of the
+   plan would not have spotted.
+3. **The fail-closed over-strictness — fixed, not recorded as debt.** The judgement
+   was that the fix is cheap, and it is argued below rather than asserted.
+
+**Why the fix was cheap enough to take now**
+
+The question was whether a Restricted Column projected inside a subquery and
+aggregated away should be repaid or recorded. Three things settled it.
+
+- **It was reachable, and by an ordinary question.** `merge_subqueries` folds most
+  subqueries away, and a folded subquery's columns disappear with it — so the
+  over-strictness only bites where the subquery cannot be folded. `SELECT count(*)
+  FROM (SELECT DISTINCT client_name …)` is exactly that shape, and *how many distinct
+  Clients traded* is not an exotic question. It is now the
+  `projected inside, aggregated away` probe.
+- **The fix is one library function, and it widens nothing.** `sqlglot.lineage` takes
+  one output column and walks back to the base-table columns that produced it,
+  through subqueries `merge_subqueries` could not flatten and through both branches
+  of a union. It runs `qualify` internally and no other optimizer rule, so the count
+  of rewrites this file trusts is unchanged at two — which mattered, because
+  ADR-0003 calls sqlglot *"load-bearing safety infrastructure"* and the alternative
+  was hand-writing recursive column provenance inside a spike.
+- **It introduces no leak, which was checked rather than assumed.** Every shape that
+  must be caught is still caught, including a subquery that genuinely does reach the
+  answer and a statement with two output columns of the same name — the case that
+  would otherwise defeat a lineage lookup done by name, and the reason every output
+  column is numbered before its lineage is asked for.
+
+**Verification**
+
+Every check below was run on **2026-08-19**, offline, in the order shown, against a
+Warehouse rebuilt the same day by the first command. The figures are that rebuild's.
+
+```
+$ uv run python -m veritas.ingestion
+  · fct_instrument_price       9554 rows
+  · fct_position_snapshot     61907 rows
+  · fct_trade                  1670 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+       the client side holds 12 Clients · 24 Accounts · 1670 Trades · every Position is markable and every amount is convertible
+exit=0
+```
+
+The spike, claim 2's section in full. Claim 1's and claim 3's output is unchanged
+from the [Sub-step 3.2 run](#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric)
+except for the conversion-predicate count, which rises from 13 to 21 as the new
+probes are read by the same currency check:
+
+```
+$ uv run python .claude/scripts/check_validation_feasibility.py
+  Warehouse: data/veritas.duckdb · 10 tables · 1670 Trades
+  Reporting Currency: EUR, stated in 21 conversion predicates and checked against every probe
+  ...
+  claim 2 — can a Restricted Column reach the projection unseen?
+    Restricted Columns: 1, as Python literals in this script (R2)
+      dim_client.client_name
+    verdict   text      claim 1   shape                                 in the projection
+    REJECTED  matched   traces    net revenue by client                 dim_client.client_name
+    REJECTED  missed    —         star over a join to dim_client        dim_client.client_name
+    REJECTED  matched   traces    aliased to a benign name              dim_client.client_name
+    REJECTED  matched   traces    hidden behind a derived table         dim_client.client_name
+    REJECTED  matched   traces    a union branch that names the Client  dim_client.client_name
+    ALLOWED   matched   traces    the name in a comment                 —
+    ALLOWED   matched   traces    the name in a string literal          —
+    ALLOWED   matched   traces    the name in a filter only             —
+    ALLOWED   matched   —         projected inside, aggregated away     —
+
+    text matching and the parse tree disagree on 5 of 9 shapes: 1 the text cannot see, 4 it would reject with no Restricted Column in the projection at all
+  ...
+PASS — every probe's verdict and every probe's number is the one this spike recorded
+exit=0
+```
+
+The new statements pass the dialect scan **without claiming an exemption**, which is
+what [R3](../plan/step-003-validation-feasibility.md#r3--an-exemption-names-the-file-as-well-as-the-symbol--approved-and-widened-by-amino-2026-08-15)
+requires. The file's readable statements rise from 16 to 25 — nine probes, of which
+the deliberately unparseable one is still not SQL:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py
+  seam scan: 14 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+  dialect scan: sqlglot files 51 function names under DuckDB that standard SQL does not have
+    probe: clean
+    probe: STRFTIME
+    probe: LIST_AGGREGATE
+      4 SQL statements in veritas/ingestion/__main__.py
+      5 SQL statements in veritas/ingestion/simulator.py
+     25 SQL statements in .claude/scripts/check_validation_feasibility.py
+     49 SQL statements in .claude/scripts/check_warehouse.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit=0
+```
+
+The documents and the identifiers. The Glossary goes from 88 registered terms to 89,
+and the new identifiers are not flagged because `Restricted Column` is `agreed`
+rather than `proposed`:
+
+```
+$ uv run python .claude/scripts/check_language.py
+  glossary: 89 registered terms
+  proposed terms: 0 · python files scanned: 14 · identifiers: 917
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+exit=0
+
+$ uv run python .claude/scripts/verify_framework.py
+  links      399 links, 223 anchors 24 documents
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+exit=0
+```
+
+**The probes were made to have teeth, by three mutations.** A detector that says
+*restricted* to everything passes all five probes that must be rejected, and one that
+says *clear* to everything passes the four that must not be — so only breaking it in
+a named way shows which probes are load-bearing. Each mutation below is one `sed`
+command a reader can paste; the file was restored and compared byte-for-byte with
+`cmp` after every one.
+
+**Mutation 1 — stop expanding `SELECT *` against the schema.** One flag, and the one
+shape whose restricted name exists nowhere in its own text is allowed:
+
+```
+$ sed -i 's/^            expand_stars=True,$/            expand_stars=False,/' .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+    REJECTED  matched   traces    net revenue by client                 dim_client.client_name
+    ALLOWED   missed    —         star over a join to dim_client        —
+    REJECTED  matched   traces    aliased to a benign name              dim_client.client_name
+    REJECTED  matched   traces    hidden behind a derived table         dim_client.client_name
+    REJECTED  matched   traces    a union branch that names the Client  dim_client.client_name
+    ALLOWED   matched   traces    the name in a comment                 —
+    ALLOWED   matched   traces    the name in a string literal          —
+    ALLOWED   matched   traces    the name in a filter only             —
+    ALLOWED   matched   —         projected inside, aggregated away     —
+
+FAIL — 1 problem(s)
+  - probe 'star over a join to dim_client' projects a Restricted Column and the parse tree did not find one — the Gate would let it through. the restricted name appears nowhere in this query, and the query projects it. Only the schema knows what the star expands to, which is the shape ADR-0003 named and the one that cannot be matched as text at all
+exit=1
+```
+
+Nothing else moves, which is the point: the star is the only shape that needs the
+schema, and without the schema it is invisible to the text **and** to the tree.
+
+**Mutation 2 — read every scope's projections instead of the answer's lineage**,
+which is the fail-closed version this Sub-step replaced. It is the mutation that
+proves the fix was worth taking:
+
+```
+$ sed -i 's|^    reaching = columns_reaching_the_answer(sql, schema)$|    reaching = {(c.table, c.name) for e in projected_expressions(sql, schema) for c in e.find_all(exp.Column)}|' .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+    REJECTED  matched   —         projected inside, aggregated away     dim_client.client_name
+
+FAIL — 1 problem(s)
+  - probe 'projected inside, aggregated away' projects no Restricted Column and the parse tree found ['dim_client.client_name'] — a false positive, which is the failure this probe measures. how many distinct Clients traded — an ordinary question whose answer is one number and carries no name. ...
+exit=1
+```
+
+Every other verdict is unchanged, which is the other half of the argument: the
+lineage reading is **more precise, not more permissive**. It rejects everything the
+scope walk rejected and one thing fewer that nobody's answer carries.
+
+**Mutation 3 — make the detector *be* ADR-0003's rejected alternative.** The Gate
+implemented as text matching, in one line, against the same nine probes:
+
+```
+$ sed -i "s|^    reaching = columns_reaching_the_answer(sql, schema)$|    reaching = {(t, c) for t, c in RESTRICTED_COLUMNS if c in sql.lower()}|" .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+    REJECTED  matched   traces    net revenue by client                 dim_client.client_name
+    ALLOWED   missed    —         star over a join to dim_client        —
+    REJECTED  matched   traces    aliased to a benign name              dim_client.client_name
+    REJECTED  matched   traces    hidden behind a derived table         dim_client.client_name
+    REJECTED  matched   traces    a union branch that names the Client  dim_client.client_name
+    REJECTED  matched   traces    the name in a comment                 dim_client.client_name
+    REJECTED  matched   traces    the name in a string literal          dim_client.client_name
+    REJECTED  matched   traces    the name in a filter only             dim_client.client_name
+    REJECTED  matched   —         projected inside, aggregated away     dim_client.client_name
+
+FAIL — 5 problem(s)
+exit=1
+```
+
+**One leak and four refusals of legitimate queries**, from the deterministic option
+ADR-0003 says is *"deterministic without being correct"*. That sentence is now a
+measurement.
+
+**Sub-step 3.2's two recorded mutations still reproduce**, which is worth checking
+because 3.3 moved the lines they edit. Dropping `merge_subqueries` still rejects
+`derived table` and `common table expression`. Narrowing the traversal to the root
+scope still allows `half-certified union` — and now also flips the new union probe's
+`claim 1` column, so that mutation reports **two** problems rather than one. Both
+`sed` commands in that review apply unchanged.
+
+**Deliberately left undone**
+
+No new Debt Ledger entry, and one was actively considered and rejected on its merits:
+the fail-closed over-strictness was **fixed** rather than recorded, for the reasons
+under *Why the fix was cheap enough to take now*. Recording it would have put an entry
+on the Ledger whose repayment was a ten-line change available the same afternoon.
+
+The Restricted Columns are Python literals for
+[R2](../plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15)'s
+reason applied unchanged — an Access Profile is a part of the Validation Gate that
+does not exist yet, and a spike is the wrong place to decide what one looks like on
+disk. R2's own words are that this leaves nothing wrong: *"a spike input is not a
+shortcut version of a seam"*.
+
+[DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+does not fire, for the reason the plan gave: this review is the internal working
+record, not the public face. Claim 2's result does sharpen the entry's cost
+statement — the parse-tree check works, and it protects **exactly one path** — but
+the entry already says exactly that and needs no edit.
+
+The filter-only shape is **allowed by design and is not a hole in the Gate**. A query
+filtered to one Client and returning only a total does leak by inference, and the
+Target State's flow already assigns that to a different check on the same list:
+*"Access Profile predicate present"*. Claim 2 is the projection rule; the predicate
+rule is its neighbour, and this Step measures one of them.
+
+**Look at this sceptically**
+
+New in this pass:
+
+- **`lineage` is a second resolution pass over a statement already resolved.**
+  `resolve` runs `qualify` and `merge_subqueries`; `lineage` is handed the result and
+  runs `qualify` again over it. It is idempotent in every shape measured here and it
+  adds no rule beyond the two already trusted — but it is two passes where one would
+  do, and a reader looking for the single place a statement is rewritten will find
+  two.
+- **Numbering the output columns mutates the resolved tree.** Every projection is
+  replaced with an aliased copy before its lineage is asked for, because `lineage`
+  looks a column up **by name** and a generated query may name two outputs the same
+  thing — `SELECT *` over this schema does it by itself. The numbering is what makes
+  the second one visible. It relies on `.selects` naming a union's outputs from its
+  first branch, which is where a union's output names genuinely come from, and which
+  the union probe exercises.
+- **The over-strict shape the fix corrects is rejected by claim 1 anyway**, because
+  counting Clients is not a Certified Metric. So the fix changes no verdict a Gate
+  running both checks would reach **today**. It buys precision that starts mattering
+  the moment the Semantic Layer certifies a counting metric, which is Step 004's
+  subject. Anyone who thinks a spike should not spend ten lines on that should say so
+  now.
+- **`columns_reaching_the_answer` is the piece of this Sub-step that most resembles
+  the Gate rather than a measurement of it.** It is still a spike function — it
+  returns a set of columns and rules on nothing — but it is the first code here that
+  a Gate could plausibly lift whole, and the plan's *Not in this Step* is explicit
+  that no `veritas/validation/` directory exists. Nothing was moved; the risk is that
+  the answer to *is this feasible* is now partly *because we wrote it*.
+
+Raised in the first pass and approved by Amino on 2026-08-19:
+
+- **The Glossary row carries a clause the approved wording did not** — what *in the
+  projection* is judged on. R1's wording is the first sentence verbatim.
+- **The `verdict` column reuses claim 1's words, `ALLOWED` and `REJECTED`, for a
+  different rule.** It reads as the Gate's verdict under claim 2 alone. The
+  alternative was a second vocabulary for one idea, which Non-Negotiable #1 exists to
+  prevent.
+- **One Restricted Column is a register with one entry**, the same shape 3.1's
+  `FIXTURE_EXEMPTIONS` was flagged for. `dim_client.client_name` is genuinely the only
+  candidate in the ten tables of Section B.
+- **`found_by_text` is my construction of ADR-0003's rejected alternative, not the
+  ADR's.** It lower-cases both sides and searches for the column name — no tokenising,
+  no comment stripping. A more careful text matcher would strip comments and string
+  literals and would score better than 5 disagreements out of 9. What it could never
+  do is the star expansion, so finding 2's *direction* holds for any text matcher and
+  the *count* is specific to this one.
+- **`client_name` is a substring nothing else in this schema contains**, and
+  `found_by_text` relies on that without saying so in code. A `parent_client_name`
+  column would make the text baseline match where the parse tree does not — one more
+  disagreement, and an accidental one.
+
+**Language**
+
+One term added: **`Restricted Column`**, Glossary Section A, `agreed`, per R1. It is
+used as registered in `RESTRICTED_COLUMNS`, `RestrictedColumnProbe`,
+`RESTRICTED_COLUMN_PROBES` and `restricted_columns_in_projection`. Nothing was
+renamed and nothing is proposed. The other domain nouns in the new code are all
+registered terms used as registered: `Access Profile`, `Certified Metric`, `Client`,
+`Grounded Answer`, `Net Revenue`, `Reporting Currency`, `Validation Gate`.
+`check_language.py` passes with 89 registered terms, 0 proposed terms in code, and
+917 identifiers over the same 14 Python files.

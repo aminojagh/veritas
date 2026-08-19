@@ -1,5 +1,5 @@
-"""Probe whether a generated query can be traced to a Certified Metric from its
-parse tree alone — the claim ADR-0003 rests on and nothing has ever run.
+"""Probe what a Validation Gate can and cannot see in a generated query's parse
+tree — the claim ADR-0003 rests on and nothing has ever run.
 
 Run with:  uv run python -m veritas.ingestion            # the Warehouse is gitignored
            uv run python .claude/scripts/check_validation_feasibility.py
@@ -10,7 +10,7 @@ how its answer stops being falsifiable. What it produces is a measurement, and
 Sub-step 3.5 turns that into a go or a no-go on
 [ADR-0003](../docs/adr/0003-validation-gate-is-deterministic-code.md).
 
-Two of the four claims in the [Step 003 plan](../docs/plan/step-003-validation-feasibility.md):
+Three of the four claims in the [Step 003 plan](../docs/plan/step-003-validation-feasibility.md):
 
   **Claim 1 — tracing.** A certified expression has to stay recognisable in a
   generated query's parse tree under the rewrites a generator performs for its
@@ -22,6 +22,31 @@ Two of the four claims in the [Step 003 plan](../docs/plan/step-003-validation-f
   measurement changing: a shape that traced yesterday and does not today, or the
   reverse.
 
+  **Claim 2 — the Restricted Column that must not reach the projection.** The
+  Gate's other parse-tree rule, in the
+  [Target State](../docs/design/target-state.md#flow)'s words: *"no restricted
+  column in the projection"*. ADR-0003 rejected matching the text of a query
+  on the ground that
+
+    > a restricted name in a comment, a column aliased to something benign, a
+    > subquery, or a `SELECT *` that expands to include a restricted column all
+    > defeat text matching — and none of those are adversarial, they are ordinary
+    > SQL
+
+  which is an argument rather than a measurement. So each shape below is judged
+  **twice** — once by searching the query's text for the restricted name, once
+  from its parse tree — and both verdicts are recorded. The shapes where the two
+  agree measure nothing. The ones where they disagree are the finding, and they
+  fall on both sides: a query text matching lets through, and queries it would
+  reject that are perfectly legitimate.
+
+  The question the parse tree is asked is **does this column reach the answer**,
+  not does this name appear in the statement. A column in a filter, a name in a
+  comment, and a column projected inside a subquery and aggregated away before the
+  answer are all in the statement and in none of them does a reader of the Grounded
+  Answer see a Client's name. `columns_reaching_the_answer` is where that
+  distinction is made, and four of the shapes below are there to hold it in place.
+
   **Claim 3 — the Shadow Metric it must catch.** A tracer that says yes to every
   statement passes claim 1 and catches nothing, so the statements that must be
   **rejected** are here beside the ones that must be allowed. Every probe that can
@@ -30,11 +55,15 @@ Two of the four claims in the [Step 003 plan](../docs/plan/step-003-validation-f
   certified number, rejecting it would be an argument about naming. Each of these
   returns a different number, so allowing one means answering the question wrongly.
 
-The certified expressions are **Python literals in this file**, per
+The certified expressions and the Restricted Columns are **Python literals in this
+file**, per
 [R2](../docs/plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15).
 They are probe inputs, not a corpus: writing them as `semantic/metrics/*.yaml`
 would fix the Semantic Layer's file format inside a spike, and that format is a
-seam three Extension Register entries land against.
+seam three Extension Register entries land against. The same reasoning covers the
+Restricted Columns unchanged — an Access Profile is a part of the Validation Gate
+that does not exist yet, and a spike is the wrong place to decide what one looks
+like on disk.
 
 Exits non-zero if any verdict or any number is not the one recorded here.
 """
@@ -46,6 +75,7 @@ from typing import NamedTuple
 
 import sqlglot
 from sqlglot import exp
+from sqlglot.lineage import lineage
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.merge_subqueries import merge_subqueries
 from sqlglot.optimizer.qualify import qualify
@@ -139,6 +169,19 @@ CERTIFIED_EXPRESSIONS = {
         "sum(CAST(fct_trade.quantity AS DECIMAL(38, 6)) "
         "* fct_trade.execution_price * fct_fx_rate.fx_rate)",
 }
+
+# The Restricted Columns claim 2 probes for. A `Restricted Column` is registered as
+# *"a column an Access Profile forbids from appearing in a Grounded Answer's
+# projection"*, and `dim_client.client_name` is the one this Warehouse offers: of
+# the ten tables in Glossary Section B it is the only column naming a firm rather
+# than describing a Trade, a Position or a price.
+#
+# Held as (table, column) rather than as a bare name, because a parse tree resolves
+# a column to the table it came from and a Gate that forbade the *name* would
+# forbid it everywhere it appeared. Two tables are free to have a `name` column and
+# for only one of them to be restricted.
+RESTRICTED_COLUMNS = frozenset({("dim_client", "client_name")})
+
 
 # What each probe's verdict means. Every probe declares one, so that "did not
 # trace" is never left to the reader to interpret as good or bad news.
@@ -439,6 +482,265 @@ PROBES = (
     ),
 )
 
+class RestrictedColumnProbe(NamedTuple):
+    """One statement, and what this Sub-step measured about it from three angles.
+
+    `reaches_projection` is the parse tree's answer: True when a Restricted Column
+    is among the columns this statement projects, once `SELECT *` has been expanded
+    against the real schema. It is the verdict the Gate would act on.
+
+    `found_by_text` is what ADR-0003's rejected alternative says — the restricted
+    name searched for in the query's text. It is recorded beside the parse tree's
+    answer so that the rejection is a measurement: a shape where the two disagree
+    is a query text matching gets wrong, in one direction or the other.
+
+    `traces` is claim 1's verdict on the same statement. The two claims are
+    separate checks over the same parse tree, and a statement that computes a
+    Certified Metric perfectly and still must not run is what shows it.
+    """
+
+    name: str
+    reaches_projection: bool
+    found_by_text: bool
+    traces: bool
+    why: str
+    sql: str
+
+
+# The shapes claim 2 is measured on. Five that must be caught: the obvious one,
+# the three ADR-0003's rejected alternative names as defeating text matching — a
+# star expansion, a benign output alias and a subquery — and a union, where the leak
+# is in a branch the outermost scope does not reach. Then four that must **not** be
+# caught: three where the restricted name is in the statement but not in the answer,
+# and one where the column is projected inside a subquery and aggregated away before
+# the answer.
+#
+# The four that must not be caught matter as much as the five that must. A Gate that
+# refuses every query mentioning a restricted name in a comment, or every query that
+# counts distinct Clients, is a Gate people route around — and a Gate people route
+# around protects nothing.
+RESTRICTED_COLUMN_PROBES = (
+    RestrictedColumnProbe(
+        name="net revenue by client",
+        reaches_projection=True,
+        found_by_text=True,
+        traces=True,
+        why="the plain case: a Client's name beside the metric, which is what "
+            "\"net revenue by client\" generates. Claim 1 allows it — the metric "
+            "expression is Net Revenue's certified one — so this is the probe "
+            "that shows the two claims are different checks",
+        sql="SELECT client.client_name AS client_name, "
+            "       sum((billed.commission - billed.rebate - billed.fee) "
+            "           * rate.fx_rate) AS net_revenue "
+            "FROM fct_trade AS billed "
+            "JOIN dim_account AS account "
+            "  ON account.account_id = billed.account_id "
+            "JOIN dim_client AS client "
+            "  ON client.client_id = account.client_id "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = 'EUR' "
+            "GROUP BY client.client_name "
+            "ORDER BY client.client_name",
+    ),
+    RestrictedColumnProbe(
+        name="star over a join to dim_client",
+        reaches_projection=True,
+        found_by_text=False,
+        traces=False,
+        why="the restricted name appears nowhere in this query, and the query "
+            "projects it. Only the schema knows what the star expands to, which "
+            "is the shape ADR-0003 named and the one that cannot be matched as "
+            "text at all",
+        sql="SELECT * "
+            "FROM fct_trade AS billed "
+            "JOIN dim_account AS account "
+            "  ON account.account_id = billed.account_id "
+            "JOIN dim_client AS client "
+            "  ON client.client_id = account.client_id",
+    ),
+    RestrictedColumnProbe(
+        name="aliased to a benign name",
+        reaches_projection=True,
+        found_by_text=True,
+        traces=True,
+        why="the same Client name, output as `name`. Nothing in the result set "
+            "says which column it came from, so a Gate reading the answer's "
+            "column headings sees a benign one — the parse tree is read before "
+            "the alias rather than after it",
+        sql="SELECT client.client_name AS name, "
+            "       sum((billed.commission - billed.rebate - billed.fee) "
+            "           * rate.fx_rate) AS net_revenue "
+            "FROM fct_trade AS billed "
+            "JOIN dim_account AS account "
+            "  ON account.account_id = billed.account_id "
+            "JOIN dim_client AS client "
+            "  ON client.client_id = account.client_id "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = 'EUR' "
+            "GROUP BY client.client_name "
+            "ORDER BY client.client_name",
+    ),
+    RestrictedColumnProbe(
+        name="hidden behind a derived table",
+        reaches_projection=True,
+        found_by_text=True,
+        traces=True,
+        why="the fourth defeat ADR-0003's quote names — a subquery — with the "
+            "Client name renamed inside it and only the benign name selected "
+            "outside. The statement computes Net Revenue's certified expression "
+            "exactly, so claim 1 allows it and claim 2 is the only thing standing "
+            "between a Client's name and the answer",
+        sql="SELECT anonymised.label AS label, "
+            "       sum(anonymised.net_revenue) AS net_revenue "
+            "FROM ( "
+            "  SELECT client.client_name AS label, "
+            "         (billed.commission - billed.rebate - billed.fee) "
+            "         * rate.fx_rate AS net_revenue "
+            "  FROM fct_trade AS billed "
+            "  JOIN dim_account AS account "
+            "    ON account.account_id = billed.account_id "
+            "  JOIN dim_client AS client "
+            "    ON client.client_id = account.client_id "
+            "  JOIN fct_fx_rate AS rate "
+            "    ON rate.rate_date = billed.trade_date "
+            "   AND rate.from_currency = billed.denomination_currency "
+            "   AND rate.to_currency = 'EUR' "
+            ") AS anonymised "
+            "GROUP BY anonymised.label "
+            "ORDER BY anonymised.label",
+    ),
+    RestrictedColumnProbe(
+        name="a union branch that names the Client",
+        reaches_projection=True,
+        found_by_text=True,
+        traces=True,
+        why="Net Revenue by region, and Net Revenue by Client name, in one "
+            "statement. Both branches compute the certified expression, so claim 1 "
+            "allows the whole thing; the leak is in the branch a Gate reading the "
+            "outermost scope would never reach. The claim 1 counterpart is the "
+            "`half-certified union` probe, which is how that hole was found",
+        sql="SELECT client.client_region AS label, "
+            "       sum((billed.commission - billed.rebate - billed.fee) "
+            "           * rate.fx_rate) AS net_revenue "
+            "FROM fct_trade AS billed "
+            "JOIN dim_account AS account "
+            "  ON account.account_id = billed.account_id "
+            "JOIN dim_client AS client "
+            "  ON client.client_id = account.client_id "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = 'EUR' "
+            "GROUP BY client.client_region "
+            "UNION ALL "
+            "SELECT client.client_name AS label, "
+            "       sum((billed.commission - billed.rebate - billed.fee) "
+            "           * rate.fx_rate) AS net_revenue "
+            "FROM fct_trade AS billed "
+            "JOIN dim_account AS account "
+            "  ON account.account_id = billed.account_id "
+            "JOIN dim_client AS client "
+            "  ON client.client_id = account.client_id "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = 'EUR' "
+            "GROUP BY client.client_name",
+    ),
+    RestrictedColumnProbe(
+        name="the name in a comment",
+        reaches_projection=False,
+        found_by_text=True,
+        traces=True,
+        why="a generator that was told the column is restricted, said so in a "
+            "comment, and grouped by region instead. Rejecting this is the false "
+            "positive claim 2 is measured on: the query obeys the rule and names "
+            "the rule while obeying it",
+        sql="SELECT client.client_region AS client_region, "
+            "       /* grouped by region because client_name is restricted */ "
+            "       sum((billed.commission - billed.rebate - billed.fee) "
+            "           * rate.fx_rate) AS net_revenue "
+            "FROM fct_trade AS billed "
+            "JOIN dim_account AS account "
+            "  ON account.account_id = billed.account_id "
+            "JOIN dim_client AS client "
+            "  ON client.client_id = account.client_id "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = 'EUR' "
+            "GROUP BY client.client_region "
+            "ORDER BY client.client_region",
+    ),
+    RestrictedColumnProbe(
+        name="the name in a string literal",
+        reaches_projection=False,
+        found_by_text=True,
+        traces=True,
+        why="the restricted name as data rather than as a column — a label saying "
+            "which column was left out. A string is not an identifier, and the "
+            "difference is one a parse tree makes and a substring search cannot",
+        sql="SELECT 'client_name' AS withheld_column, "
+            "       sum((billed.commission - billed.rebate - billed.fee) "
+            "           * rate.fx_rate) AS net_revenue "
+            "FROM fct_trade AS billed "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = 'EUR'",
+    ),
+    RestrictedColumnProbe(
+        name="the name in a filter only",
+        reaches_projection=False,
+        found_by_text=True,
+        traces=True,
+        why="one Client's revenue, with the name in the WHERE clause and out of "
+            "the projection. The rule being measured is the Target State's — *no "
+            "restricted column in the projection* — so this is allowed, and "
+            "whether a filter on a column nobody reads should be is a different "
+            "question this Step does not widen into",
+        sql="SELECT sum((billed.commission - billed.rebate - billed.fee) "
+            "           * rate.fx_rate) AS net_revenue "
+            "FROM fct_trade AS billed "
+            "JOIN dim_account AS account "
+            "  ON account.account_id = billed.account_id "
+            "JOIN dim_client AS client "
+            "  ON client.client_id = account.client_id "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = 'EUR' "
+            "WHERE client.client_name = 'Northwind Asset Management'",
+    ),
+
+    RestrictedColumnProbe(
+        name="projected inside, aggregated away",
+        reaches_projection=False,
+        found_by_text=True,
+        traces=False,
+        why="how many distinct Clients traded — an ordinary question whose answer "
+            "is one number and carries no name. The Client name is projected "
+            "inside a subquery that cannot be folded away, and never reaches the "
+            "answer. Rejecting this is the false positive a Gate that reads every "
+            "scope commits; claim 1 rejects it too, for the unrelated reason that "
+            "counting Clients is not a Certified Metric",
+        sql="SELECT count(*) AS clients "
+            "FROM ( "
+            "  SELECT DISTINCT client.client_name AS label "
+            "  FROM fct_trade AS billed "
+            "  JOIN dim_account AS account "
+            "    ON account.account_id = billed.account_id "
+            "  JOIN dim_client AS client "
+            "    ON client.client_id = account.client_id "
+            ") AS traded",
+    ),
+)
+
+
 problems: list[str] = []
 
 
@@ -493,57 +795,32 @@ def certified_forms() -> dict[str, str]:
     }
 
 
-def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]:
-    """The canonical form of every projected expression that computes something.
+def resolve(sql: str, schema: dict[str, dict[str, str]]) -> exp.Expression:
+    """Parse one statement and rewrite it into the form both claims are judged on.
 
-    This is the tracer. Three steps, and each one is doing a job that a string
-    comparison cannot:
+    The shared half of the two parse-tree claims, and the only place the rewriting
+    settings live. `qualify` attaches every column to the table it came from using
+    the real schema and expands `SELECT *` into the columns that star actually
+    stands for; `merge_subqueries` folds a derived table or a common table
+    expression (CTE) back into the statement that selects from it. After this a
+    certified expression written across a subquery boundary is one expression
+    again, and a star is a list of real columns.
 
-      1. **Resolve.** `qualify` attaches every column to the table it came from,
-         using the real schema, and `merge_subqueries` folds a derived table or a
-         CTE back into the statement that selects from it. After this a certified
-         expression written across a subquery boundary is one expression again.
-      2. **Rename back to the base table.** Resolution qualifies columns with
-         whatever alias the generator chose, so `billed.commission` stays
-         `billed.commission`. Each alias is replaced by the table it stands for,
-         which is what makes aliasing invisible without making anything else
-         invisible with it.
-      3. **Keep only the projections that aggregate.** A projection with no
-         aggregate in it is a grouping column — `client_region` sitting beside the
-         metric — which belongs to a Dimension Definition rather than to this
-         claim. The rule being measured is the
-         [Target State](../docs/design/target-state.md#flow)'s: *"every metric
-         expression traces to a Certified Metric"*, and a grouping column is not a
-         metric expression. Which columns may appear in a projection **at all** is
-         a different question — claim 2's, in
-         [Sub-step 3.3](../docs/plan/step-003-validation-feasibility.md#33--probe-whether-a-restricted-column-can-hide-from-the-parse-tree).
-
-    **Every scope, not only the outermost one.** The first version of this
-    function read the root scope's projections alone, which is right for every
-    shape above and wrong for a union. A union node projects nothing itself, and
-    asking it for its projections hands back its **first branch's** — so the tracer
-    read one branch, read it with no table sources to resolve aliases against, and
-    never looked at the second at all. A statement whose first branch is certified
-    and whose second is a Shadow Metric would have been judged on the first. The
-    `half-certified union` probe is that case, and it is here because writing this
-    docstring is what found it.
+    Claim 1 then reads the result one way and claim 2 another, in the two functions
+    below.
 
     Raises `TracerRefused` if sqlglot cannot read the statement.
     """
-    # Four sqlglot calls do the work: `parse_one` turns SQL text into a tree of
-    # `exp.*` nodes, `optimize` rewrites that tree with the rules it is handed,
-    # `build_scope` indexes the rewritten tree by SELECT, and `canonical` above
-    # writes a tree back out as text. The comments below mark which docstring step
-    # each call is serving.
+    # `parse_one` turns SQL text into a tree of `exp.*` nodes; `optimize` rewrites
+    # that tree with the rules it is handed and returns a new one.
     try:
-        # Step 1, parse. One statement in, its root node out — `exp.Select` here,
-        # `exp.Union` for a union. Bad syntax raises instead of returning a tree.
+        # One statement in, its root node out — `exp.Select` here, `exp.Union` for a
+        # union. Bad syntax raises instead of returning a tree.
         statement = sqlglot.parse_one(sql, dialect=DIALECT)
-        # Step 1, resolve. `optimize` applies each rule in `rules` to the tree in
-        # turn and returns a new one. `qualify` is handed the schema and uses it to
-        # give every column the table it came from; `merge_subqueries` needs no
-        # schema and flattens subqueries away.
-        resolved = optimize(
+        # `optimize` applies each rule in `rules` to the tree in turn. `qualify` is
+        # handed the schema and uses it to give every column the table it came
+        # from; `merge_subqueries` needs no schema and flattens subqueries away.
+        return optimize(
             statement,
             schema=schema,
             dialect=DIALECT,
@@ -559,9 +836,44 @@ def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]
             # wrapped, instead of folding the subqueries the generator wrote.
             # Turned off, each rule does exactly the one job it is here for.
             isolate_tables=False,
+            # `qualify`'s default, written out because claim 2 rests on it: a
+            # `SELECT *` is replaced by the columns the schema says that star
+            # stands for. Without it the projection holds one `exp.Star` node, no
+            # column name is anywhere in the statement, and a Restricted Column
+            # reaches the answer with nothing in the text or the tree to catch it.
+            expand_stars=True,
         )
     except sqlglot.errors.SqlglotError as failure:
         raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
+
+
+def projected_expressions(
+    sql: str, schema: dict[str, dict[str, str]]
+) -> list[exp.Expression]:
+    """Claim 1's reading: every expression projected in every scope, on base tables.
+
+    One step on top of `resolve`. Resolution qualifies columns with whatever alias
+    the generator chose, so `billed.commission` stays `billed.commission`; each
+    alias is replaced by the table it stands for, which is what makes aliasing
+    invisible without making anything else invisible with it.
+
+    **Every scope, not only the outermost one.** The first version of this code read
+    the root scope's projections alone, which is right for every shape here and
+    wrong for a union. A union node projects nothing itself, and asking it for its
+    projections hands back its **first branch's** — so it read one branch, read it
+    with no table sources to resolve aliases against, and never looked at the second
+    at all. A statement whose first branch is certified and whose second is a Shadow
+    Metric would have been judged on the first. The `half-certified union` probe is
+    that case, and it is here because writing this docstring is what found it.
+
+    Reading every scope is right for claim 1: a metric expression computed anywhere
+    in the statement is a metric expression the Gate must place. It is **not** right
+    for claim 2, which asks a narrower question and gets its own reading in
+    `columns_reaching_the_answer` below.
+
+    Raises `TracerRefused` if sqlglot cannot read the statement.
+    """
+    resolved = resolve(sql, schema)
 
     # `build_scope` returns one `Scope` per SELECT: the SELECT itself in
     # `scope.expression`, and in `scope.sources` what each name in its FROM and
@@ -572,7 +884,7 @@ def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]
     if root is None:
         raise TracerRefused("sqlglot built no scope for the statement")
 
-    found: list[str] = []
+    found: list[exp.Expression] = []
     # `traverse()` yields every scope in the tree, innermost first and the root
     # last, so each branch of a union is read on its own turn round this loop.
     for scope in root.traverse():
@@ -581,9 +893,9 @@ def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]
         # projected is the hole described above.
         if not isinstance(scope.expression, exp.Select):
             continue
-        # Step 2, the lookup: alias -> the base table it stands for. A source that
-        # is another Scope is a subquery `merge_subqueries` could not flatten, and
-        # is left out of this map because its projections are read on its own turn.
+        # The lookup: alias -> the base table it stands for. A source that is
+        # another Scope is a subquery `merge_subqueries` could not flatten, and is
+        # left out of this map because its projections are read on its own turn.
         base_tables = {
             name: source.name
             for name, source in scope.sources.items()
@@ -595,20 +907,159 @@ def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]
             # `unalias()` strips an `AS revenue` wrapper and leaves the expression
             # that computes. The copy keeps the rename below out of `resolved`.
             expression = projection.unalias().copy()
-            # Step 3. `find_all` walks a subtree for nodes of one type, and
-            # `exp.AggFunc` is the base class sqlglot gives every aggregate — so
-            # this asks whether anything here aggregates without listing `sum`,
-            # `count` and `avg` by name.
-            if not list(expression.find_all(exp.AggFunc)):
-                continue
-            # Step 2, applied: `billed.commission` becomes `fct_trade.commission`,
-            # edited into this copy of the tree. Whatever alias the generator chose
-            # is gone by the time the expression is written back out as text.
+            # `billed.commission` becomes `fct_trade.commission`, edited into this
+            # copy of the tree. Whatever alias the generator chose is gone by the
+            # time the expression is read.
             for column in expression.find_all(exp.Column):
                 if column.table in base_tables:
                     column.set("table", exp.to_identifier(base_tables[column.table]))
-            found.append(canonical(expression))
+            found.append(expression)
     return found
+
+
+def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]:
+    """Claim 1's half: the canonical form of every projection that computes something.
+
+    A projection with no aggregate in it is a grouping column — `client_region`
+    sitting beside the metric — which belongs to a Dimension Definition rather than
+    to this claim. The rule being measured is the
+    [Target State](../docs/design/target-state.md#flow)'s: *"every metric
+    expression traces to a Certified Metric"*, and a grouping column is not a
+    metric expression. Which columns may appear in a projection **at all** is a
+    different question — claim 2's, in `columns_reaching_the_answer` below.
+
+    `find_all` walks a subtree for nodes of one type, and `exp.AggFunc` is the base
+    class sqlglot gives every aggregate — so this asks whether anything aggregates
+    without listing `sum`, `count` and `avg` by name.
+    """
+    return [
+        canonical(expression)
+        for expression in projected_expressions(sql, schema)
+        if list(expression.find_all(exp.AggFunc))
+    ]
+
+
+def certified_metrics_only(
+    expressions: list[str], corpus: dict[str, str]
+) -> tuple[bool, list[str], list[str]]:
+    """Claim 1's rule: allowed, what it traced to, and what it could not place.
+
+    The rule is the Target State's, verbatim: *"every metric expression traces to
+    a Certified Metric"*. **Every**, not *some* — so a statement is allowed when it
+    computes at least one metric expression and all of them trace, and is rejected
+    otherwise. Written as *some*, a statement could carry a certified expression
+    and a Shadow Metric side by side and be allowed on the strength of the first,
+    which is the `half-certified union` probe.
+    """
+    traced = [corpus.get(expression) for expression in expressions]
+    hit = [name for name in traced if name is not None]
+    untraced = [
+        expression
+        for expression, name in zip(expressions, traced)
+        if name is None
+    ]
+    return bool(expressions) and not untraced, hit, untraced
+
+
+# The alias every output column is given before its lineage is asked for. A
+# generated query is free to name two output columns the same thing — `SELECT *`
+# over a join does it by itself, twice over on this schema — and lineage is asked
+# for a column *by name*, so a duplicate name would answer for the first column and
+# leave the second unexamined. Numbering the outputs first removes the ambiguity
+# rather than hoping a generator avoids it.
+ANSWER_COLUMN = "answer_column_"
+
+
+def columns_reaching_the_answer(
+    sql: str, schema: dict[str, dict[str, str]]
+) -> set[tuple[str, str]]:
+    """Claim 2's reading: every base-table column that reaches the statement's output.
+
+    **Reaching the answer is the question, not appearing in the statement.** The
+    rule is the [Target State](../docs/design/target-state.md#flow)'s *"no restricted
+    column in the projection"*, and *the projection* means the columns a reader of
+    the Grounded Answer sees. Three kinds of column are therefore not returned, and
+    each is a probe:
+
+      * a column in a WHERE clause, a JOIN condition or a GROUP BY, which no reader
+        of the answer sees;
+      * a column projected inside a subquery and aggregated away before the answer
+        — `count(*)` over `SELECT DISTINCT client_name` shows nobody a Client's
+        name;
+      * a name that is not a column at all: a comment, or a string literal.
+
+    `sqlglot.lineage` is what makes the second one answerable. It takes one output
+    column and walks back through every scope to the base-table columns that
+    produced it, following a subquery `merge_subqueries` could not flatten and both
+    branches of a union. Reading the projections of every scope instead — which is
+    what claim 1 does, correctly, for its own question — counts a column the answer
+    never carries, and rejects the ordinary query that asks how many distinct
+    Clients traded.
+
+    **It adds no new trust.** `lineage` runs `qualify` and nothing else, so the two
+    rewrites this file is willing to rely on are still the only two. It is handed
+    the already-resolved statement so that a `SELECT *` is expanded before it starts.
+
+    Raises `TracerRefused` if sqlglot cannot read the statement.
+    """
+    resolved = resolve(sql, schema)
+
+    # Number the output columns. `.selects` on a union is its first branch's
+    # projection list, which is where a union's output names come from, so
+    # numbering there names the outputs of both branches.
+    for position, projection in enumerate(resolved.selects):
+        projection.replace(
+            exp.alias_(projection.unalias().copy(), f"{ANSWER_COLUMN}{position}")
+        )
+
+    reaching: set[tuple[str, str]] = set()
+    try:
+        for position in range(len(resolved.selects)):
+            # `lineage` returns a tree of `Node`s: the root is the output column,
+            # and walking it reaches one leaf per base-table column that feeds it.
+            # A leaf carries the table it came from in `source` and the column as
+            # `<source alias>.<column>` in `name`.
+            for step in lineage(
+                f"{ANSWER_COLUMN}{position}", resolved, schema=schema, dialect=DIALECT
+            ).walk():
+                if isinstance(step.source, exp.Table) and "." in step.name:
+                    reaching.add((step.source.name, step.name.split(".")[-1]))
+    except sqlglot.errors.SqlglotError as failure:
+        raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
+    return reaching
+
+
+def restricted_columns_in_projection(
+    sql: str, schema: dict[str, dict[str, str]]
+) -> list[str]:
+    """Claim 2's verdict: the Restricted Columns that reach the statement's answer."""
+    reaching = columns_reaching_the_answer(sql, schema)
+    return sorted(
+        f"{table}.{column}" for table, column in reaching & RESTRICTED_COLUMNS
+    )
+
+
+def found_by_text(sql: str) -> list[str]:
+    """What ADR-0003's rejected alternative sees: the restricted name, in the text.
+
+    Lower-cased on both sides and nothing else — no tokenising, no stripping of
+    comments or string literals — because the alternative ADR-0003 rejected is
+    matching text, and handing it a parser first is giving it the very thing it was
+    rejected for lacking.
+    """
+    lowered = sql.lower()
+    return sorted(
+        f"{table}.{column}"
+        for table, column in RESTRICTED_COLUMNS
+        if column in lowered
+    )
+
+
+def probe_statements() -> list[tuple[str, str]]:
+    """Every probe in this file, claim 1's and claim 2's, as (name, statement)."""
+    return [(probe.name, probe.sql) for probe in PROBES] + [
+        (probe.name, probe.sql) for probe in RESTRICTED_COLUMN_PROBES
+    ]
 
 
 def check_reporting_currency() -> None:
@@ -619,9 +1070,9 @@ def check_reporting_currency() -> None:
     back out of the parse tree here rather than trusted.
     """
     converting = 0
-    for probe in PROBES:
+    for name, sql in probe_statements():
         try:
-            statement = sqlglot.parse_one(probe.sql, dialect=DIALECT)
+            statement = sqlglot.parse_one(sql, dialect=DIALECT)
         except sqlglot.errors.SqlglotError:
             continue
         for comparison in statement.find_all(exp.EQ):
@@ -638,7 +1089,7 @@ def check_reporting_currency() -> None:
             converting += 1
             if literals[0].this != REPORTING_CURRENCY:
                 problems.append(
-                    f"probe {probe.name!r} converts to {literals[0].this!r} where "
+                    f"probe {name!r} converts to {literals[0].this!r} where "
                     f"this file reports every figure in {REPORTING_CURRENCY} — the "
                     f"printed numbers would be labelled with a currency they are "
                     f"not in"
@@ -665,16 +1116,8 @@ def describe_tracer() -> dict[str, str]:
 
 
 def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> None:
-    """Claim 1: judge every probe by the Gate's own rule, and compare the verdict
-    with the one this Sub-step recorded.
-
-    The rule is the Target State's, verbatim: *"every metric expression traces to
-    a Certified Metric"*. **Every**, not *some* — so a statement is allowed when
-    it computes at least one metric expression and all of them trace, and is
-    rejected otherwise. Written as *some*, a statement could carry a certified
-    expression and a Shadow Metric side by side and be allowed on the strength of
-    the first, which is the `half-certified union` probe.
-    """
+    """Claim 1: judge every probe by `certified_metrics_only`, and compare the
+    verdict with the one this Sub-step recorded."""
     for probe in PROBES:
         expected_allowed = probe.kind in (CERTIFIED, BLIND_SPOT)
         try:
@@ -700,14 +1143,7 @@ def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> N
                 f"probe and is now measuring nothing"
             )
 
-        traced = [corpus.get(expression) for expression in expressions]
-        hit = [name for name in traced if name is not None]
-        untraced = [
-            expression
-            for expression, name in zip(expressions, traced)
-            if name is None
-        ]
-        allowed = bool(expressions) and not untraced
+        allowed, hit, untraced = certified_metrics_only(expressions, corpus)
 
         # `dict.fromkeys` drops repeats and keeps first-seen order: one statement
         # can compute the same metric in more than one projection, and printing
@@ -742,6 +1178,86 @@ def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> N
              for kind in (CERTIFIED, FORM, SHADOW, BLIND_SPOT, REFUSED)}
     print()
     print("    " + " · ".join(f"{count} {kind}" for kind, count in kinds.items()))
+
+
+def check_restricted_columns(
+    corpus: dict[str, str], schema: dict[str, dict[str, str]]
+) -> None:
+    """Claim 2: judge every shape twice — from the text and from the parse tree —
+    and compare both answers with the ones this Sub-step recorded.
+
+    Neither answer is assumed. A shape both agree on measures nothing, so the run
+    prints the pair for every probe and fails if **either** moves: the parse tree
+    missing a Restricted Column is a leak, the parse tree finding one where there
+    is none is the false positive that makes a Gate unusable, and the text column
+    changing means ADR-0003's rejected alternative is no longer the thing being
+    compared against.
+    """
+    print(f"    Restricted Columns: {len(RESTRICTED_COLUMNS)}, as Python literals "
+          f"in this script (R2)")
+    for table, column in sorted(RESTRICTED_COLUMNS):
+        print(f"      {table}.{column}")
+    print(f"    {'verdict':<10}{'text':<10}{'claim 1':<10}"
+          f"{'shape':<38}in the projection")
+
+    unseen_by_text = 0
+    rejected_by_text_alone = 0
+    for probe in RESTRICTED_COLUMN_PROBES:
+        try:
+            projected = restricted_columns_in_projection(probe.sql, schema)
+            traces, _, _ = certified_metrics_only(
+                metric_expressions(probe.sql, schema), corpus
+            )
+        except TracerRefused as refusal:
+            problems.append(
+                f"probe {probe.name!r} is a claim 2 probe and the tracer could not "
+                f"read it at all ({refusal}) — its verdict is a parse failure "
+                f"rather than the measurement recorded here"
+            )
+            continue
+
+        by_text = found_by_text(probe.sql)
+        print(f"    {'REJECTED' if projected else 'ALLOWED':<10}"
+              f"{'matched' if by_text else 'missed':<10}"
+              f"{'traces' if traces else '—':<10}"
+              f"{probe.name:<38}{', '.join(projected) or '—'}")
+
+        if probe.reaches_projection and not projected:
+            problems.append(
+                f"probe {probe.name!r} projects a Restricted Column and the parse "
+                f"tree did not find one — the Gate would let it through. {probe.why}"
+            )
+        if not probe.reaches_projection and projected:
+            problems.append(
+                f"probe {probe.name!r} projects no Restricted Column and the parse "
+                f"tree found {projected} — a false positive, which is the failure "
+                f"this probe measures. {probe.why}"
+            )
+        if probe.found_by_text != bool(by_text):
+            problems.append(
+                f"probe {probe.name!r} was recorded as "
+                f"{'matched' if probe.found_by_text else 'missed'} by text matching "
+                f"and is now {'matched' if by_text else 'missed'} — the alternative "
+                f"ADR-0003 rejected is no longer the one being measured against"
+            )
+        if probe.traces != traces:
+            problems.append(
+                f"probe {probe.name!r} was recorded as "
+                f"{'tracing' if probe.traces else 'not tracing'} to a Certified "
+                f"Metric and now does the opposite — claim 1's verdict on a claim 2 "
+                f"probe has moved, so the two claims are no longer independent in "
+                f"the way this run reports"
+            )
+
+        unseen_by_text += probe.reaches_projection and not probe.found_by_text
+        rejected_by_text_alone += probe.found_by_text and not probe.reaches_projection
+
+    print()
+    print(f"    text matching and the parse tree disagree on "
+          f"{unseen_by_text + rejected_by_text_alone} of "
+          f"{len(RESTRICTED_COLUMN_PROBES)} shapes: {unseen_by_text} the text "
+          f"cannot see, {rejected_by_text_alone} it would reject with no Restricted "
+          f"Column in the projection at all")
 
 
 def gap(left: Decimal, right: Decimal) -> Decimal:
@@ -884,6 +1400,9 @@ def main() -> int:
         print("  claim 1 — does a certified expression survive the shapes a "
               "generator writes?")
         check_traces(corpus, schema)
+        print()
+        print("  claim 2 — can a Restricted Column reach the projection unseen?")
+        check_restricted_columns(corpus, schema)
         print()
         print("  claim 3 — what each shape actually returns, through the adapter")
         check_widening_cast(warehouse)
