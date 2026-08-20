@@ -4,40 +4,76 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-19 — **Step 002 is finished and committed in full**, the Step 003 plan and Sub-steps 3.1 and 3.2 are committed, and **Sub-step 3.3 is written, verified and awaiting Amino's review and commit**. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has answered three of its four claims — tracing, Restricted Columns and the Shadow Metric's numbers — leaving only dialect retargeting.**
-**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`**. **Sub-step 3.3's hash is not recorded here because this file is part of its own commit** — 3.4 fills it in, which is how every hash above arrived.
+**Last updated:** 2026-08-19 — **Step 002 is finished and committed in full**, the Step 003 plan and Sub-steps 3.1, 3.2 and 3.3 are committed, and **Sub-step 3.4 is written, verified and awaiting Amino's review and commit**. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has now answered all four of its claims — tracing, Restricted Columns, the Shadow Metric's numbers and dialect retargeting — leaving only the go/no-go document that rules on them.**
+**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`**. **Sub-step 3.4's hash is not recorded here because this file is part of its own commit** — 3.5 fills it in, which is how every hash above arrived.
 
 ---
 
 ## Resume here
 
-- **Sub-step 3.3 is written, verified, reviewed by Amino on 2026-08-19 and awaiting
-  his commit.** Three files: `.claude/scripts/check_validation_feasibility.py` grows
-  claim 2, `.claude/docs/glossary.md` gains the `Restricted Column` row, and the
-  plan gains
-  [R6](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19).
-  No Ledger entry, no schema change, no pipeline behaviour, still no
-  `veritas/validation/` directory. Every verification command was run on 2026-08-19
-  against a Warehouse rebuilt the same day, and the output is in the
-  [review](../reviews/step-003-validation-feasibility.md#sub-step-33--probe-whether-a-restricted-column-can-hide-from-the-parse-tree),
-  including three mutations showing which probes are load-bearing.
-- **Amino's review on 2026-08-19 changed three things and approved the rest.**
+- **Sub-step 3.4 is written, verified and awaiting Amino's review and commit.**
+  One file: `.claude/scripts/check_validation_feasibility.py` grows claim 4 — the
+  DuckDB → BigQuery round trip. No Ledger entry, no Glossary term, no schema change,
+  no pipeline behaviour, still no `veritas/validation/` directory. Every verification
+  command was run on 2026-08-19 against a Warehouse rebuilt the same day, and the
+  output is in the
+  [review](../reviews/step-003-validation-feasibility.md#sub-step-34--probe-duckdb--bigquery-retargeting-on-the-sql-veritas-will-generate),
+  including three new mutations and a re-run of all five recorded by 3.2 and 3.3.
+- **What 3.4 found, in five lines.** Claim 4 is **answered**, and the answer splits
+  in two: the verdicts survive and one expression's meaning does not.
+  1. **All 25 statements keep both parse-tree verdicts through the round trip.** A
+     Gate reading a retargeted statement reaches the same decision as one reading
+     the original — on the shapes that must trace, the Shadow Metrics that must
+     not, and the Restricted Column probes on both sides.
+  2. **`Traded Notional`'s widening cast is erased by retargeting.**
+     `DECIMAL(38, 6)` and `DECIMAL(18, 6)` — the width the metric needs and the
+     width `fct_trade.quantity` is stored at — both become the single word
+     `NUMERIC`, so the two arrive in BigQuery as **the same statement**.
+  3. **No certified-metrics-only check can notice that**, because the corpus is
+     retargeted by the same rewrite and collapses identically. Claim 1 still says
+     *traces*, correctly, about the question it was asked.
+  4. **DEBT-009's open question is answered: no.** Transpile-and-compare is not
+     strictly better than the name list `check_seam` uses — the two are blind to
+     disjoint classes. The round trip passes **39 of the 50 measurable DuckDB-only
+     names sqlglot knows** through unchanged, because sqlglot emits an
+     untranslatable name as it found it and the round trip reads its own failure as
+     portability. The name list misses `generate_series` and misses a cast by
+     construction.
+  5. **The loss in 2 is in a construct the existing scan cannot see**, and
+     ADR-0002's stated mitigation names *functions*. **That is 3.5's to rule on** —
+     the plan puts the Ledger entry there, so 3.4 opens none.
+- **Two defects were found in 3.4's own debt sweep and fixed rather than recorded.**
+  The retargeted run was reading the Warehouse's own schema with an argument for why
+  that was harmless; it now retargets the schema too. And `round_trip_rewrites`
+  compared parse trees by `repr()`, which reported three portable DuckDB names as
+  unportable — the BigQuery parser records a default argument the DuckDB parser
+  leaves absent. sqlglot's `==` is structural and is what the code uses now; the
+  population count in finding 4 moved from 13/37 to 11/39.
+- **The Step's split point was read as not having fired.**
+  [R5](../plan/step-003-validation-feasibility.md#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15)
+  offers 3.4 as Step 004 against *"review-driven growth"* past the five-Sub-step
+  ceiling. 3.2 and 3.3 each shipped probes past their own enumeration and neither
+  added a Sub-step, so the Step is still five and 3.4 is still the fourth. **This is
+  a reading, not a ruling** — it is the last item under *Look at this sceptically*
+  in 3.4's review, and Amino can still split the Step.
+- **Sub-step 3.3 was committed in `23020e9` after Amino's 2026-08-19 review**, which
+  changed three things and approved the rest.
   1. **A union probe was added to claim 2** — Net Revenue by region in one branch
      and by Client name in the other. It is the claim 2 counterpart of
-     `half-certified union`, and it now fails Sub-step 3.2's traversal mutation
+     `half-certified union`, and it fails Sub-step 3.2's traversal mutation
      alongside it.
   2. **A probe that completes the set is kept, wherever it is found** — ruled and
      recorded as [R6](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19)
      in the plan rather than in a Step Review, because it governs every Sub-step
      that measures a boundary. Enumerate at planning time; keep what implementation
-     turns up; account for why the enumeration missed it. `hidden behind a derived
-     table` stays.
+     turns up; account for why the enumeration missed it. **3.4 owes that account
+     and gives it** — its retargeting probes were enumerated by the plan exactly,
+     its five detector probes were not.
   3. **The fail-closed over-strictness was fixed rather than recorded as debt.**
      Claim 2 no longer reads every scope's projections; it walks each output
-     column's lineage back to the base-table columns that produced it, so a Client
-     name projected inside an unfoldable subquery and aggregated away is no longer
-     counted. `sqlglot.lineage` runs `qualify` and no other rule, so the number of
-     rewrites this file trusts is still two.
+     column's lineage back to the base-table columns that produced it. `sqlglot.lineage`
+     runs `qualify` and no other rule, so the number of rewrites this file trusts is
+     still two.
 - **Sub-step 3.2 was committed in `89fee55` after Amino's 2026-08-18 review**, which
   changed three things and approved the rest.
   1. **The blind spot may pass now, on condition the Gate makes it fail later** —
@@ -45,15 +81,19 @@ wrong and gets fixed immediately.
      whose Trigger is the Sub-step that builds the Validation Gate.
   2. **The larger-than-planned probe set is a planning shortcoming, not scope
      creep** — a Step that measures a boundary should enumerate the shapes it will
-     measure at planning time, the way Sub-step 3.3's plan already does. **3.3 ships
-     one probe past its own enumeration**, for the reason above; the ruling applies
-     to it and has not been given.
+     measure at planning time, the way Sub-step 3.3's plan already does. **The
+     ruling was completed as [R6](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19)
+     at 3.3's review**, and both halves bind every later Sub-step.
   3. **Mutation 2 in the review did not reproduce**, and now does. Reverting the
      tracer to the first version takes two edits rather than one: narrowing the
      traversal to the root scope *and* removing the guard that skips a scope whose
-     node is not a `SELECT`. Both `sed` commands still reproduce after 3.3 moved the
-     lines they edit into `projected_expressions`, which 3.3's review re-ran and
-     records.
+     node is not a `SELECT`. Both `sed` commands still reproduce after 3.4, which
+     re-ran all five recorded mutations — **and two of 3.3's own no longer apply**,
+     because 3.4 gave `columns_reaching_the_answer` a `dialect` argument and the
+     recorded `sed` now matches nothing. A `sed` that matches nothing exits 0 and
+     the run passes, which reads exactly like a mutation that broke nothing;
+     [3.4's review](../reviews/step-003-validation-feasibility.md#sub-step-34--probe-duckdb--bigquery-retargeting-on-the-sql-veritas-will-generate)
+     carries the corrected commands and their output.
   4. **The tracer's docstrings now explain sqlglot step by step** — what
      `parse_one`, `optimize`, `build_scope`, `find_all` and the two generator flags
      each do, and why `isolate_tables` is turned off.
@@ -137,14 +177,25 @@ wrong and gets fixed immediately.
   hole is measured rather than asserted: the same mutation passes `HEAD`'s check
   and fails the narrowed one. **3.2 is the file that R3 was raised about, and it
   passes the dialect scan claiming no exemption at all.**
-- **Next: Sub-step 3.4** — DuckDB → BigQuery retargeting (claim 4), which belongs
-  to [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) rather than
-  ADR-0003 and is the Step's
-  [pre-agreed split point](../plan/step-003-validation-feasibility.md#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15):
-  if 3.3's review grows the Step, 3.4 becomes Step 004 and 3.5 returns its go/no-go
-  with retargeting named as unanswered. Then 3.5, the go/no-go document. **No component row has
-  moved off `✗ none` and none will in this Step** — a spike moves what is known,
-  not what is built. Any session resuming here runs
+- **Next: Sub-step 3.5** — the go/no-go document,
+  `.claude/docs/design/validation-feasibility.md`, in the shape of
+  [`data-availability.md`](data-availability.md): how to reproduce it, a verdict per
+  claim, the findings, the rulings, and an explicit **go** or **no-go** on
+  [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) with a dated
+  status note on it either way. It is the last Sub-step of the Step. Three things
+  are waiting for it specifically:
+  1. **ADR-0002 is owed a status note too**, not only ADR-0003 — claim 4 is its
+     claim, and 3.4's finding 5 lands on its mitigation wording.
+  2. **The one conditional Ledger entry**, per the plan: 3.4 measured that
+     transpile-and-compare is *not* strictly better, so the entry the plan
+     described is not the one to open. What wants a home is that the measured loss
+     sits in a construct the scan cannot see.
+  3. **The constraints on Step 004** already gathered by 3.2 and 3.4 — a Metric
+     Definition must carry its Join Path, the Semantic Layer must publish a form the
+     Orchestrator pastes rather than a formula it re-derives, and a retargeted
+     certified expression is not the same artefact as a hand-written one.
+  **No component row has moved off `✗ none` and none will in this Step** — a spike
+  moves what is known, not what is built. Any session resuming here runs
   `uv run python -m veritas.ingestion` first, because the Warehouse is gitignored
   and the spike's probes execute against real data.
 - **The plan's four questions were all approved on 2026-08-15**, recorded as

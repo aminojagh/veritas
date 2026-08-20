@@ -1081,3 +1081,413 @@ registered terms used as registered: `Access Profile`, `Certified Metric`, `Clie
 `Grounded Answer`, `Net Revenue`, `Reporting Currency`, `Validation Gate`.
 `check_language.py` passes with 89 registered terms, 0 proposed terms in code, and
 917 identifiers over the same 14 Python files.
+
+---
+
+## Sub-step 3.4 — Probe DuckDB → BigQuery retargeting on the SQL Veritas will generate
+
+**What changed**
+
+One file: `.claude/scripts/check_validation_feasibility.py` grows claim 4. No
+schema change, no pipeline behaviour, no `veritas/validation/` directory, no new
+Glossary term, no Ledger entry.
+
+Claim 4 belongs to
+[ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) rather than
+ADR-0003, which is why the plan made it the Step's
+[split point](../plan/step-003-validation-feasibility.md#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15).
+**The split point did not fire.** R5 offers it against *"review-driven growth"*
+that would push the Step past `planning-a-step`'s ceiling of five Sub-steps.
+3.2 and 3.3 each shipped probes past their own enumeration and neither added a
+Sub-step, so the Step is still the five it was planned as and 3.4 is still the
+fourth. Amino can of course still split it; nothing here assumes he cannot.
+
+The work is in three parts.
+
+1. **The tracer learned a second dialect.** `canonical`, `certified_forms`,
+   `resolve`, `projected_expressions`, `metric_expressions`,
+   `columns_reaching_the_answer` and `restricted_columns_in_projection` each take
+   a `dialect`, defaulting to the Warehouse's. Nothing about the home run changed;
+   the default is what keeps claims 1–3 reading exactly as 3.3 left them.
+
+2. **Every statement 3.2 and 3.3 built is retargeted and re-judged.**
+   `check_retargeting` transpiles each of the 25 statements to BigQuery, re-parses
+   it there, and puts it through **both** parse-tree readings against a corpus and
+   a schema retargeted the same way. Both readings for every statement, not each
+   probe's own — claim 4 is not asking whether a probe still demonstrates what it
+   was built for, it is asking whether the round trip moved anything a Gate reads.
+
+3. **Two questions the round trip does not answer by surviving.**
+   `check_cast_collapse` asks what happened to the one certified expression that
+   carries an engine-shaped detail, and `check_dialect_detectors` answers the
+   question [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
+   left open in writing.
+
+**What claim 4 found, in five lines**
+
+1. **Claim 4 holds on the verdicts, completely.** All 25 statements keep both
+   parse-tree verdicts through the round trip — the seven that must trace, the
+   Shadow Metrics that must not, the five that project a Restricted Column and the
+   four that must not be caught. **A Gate reading a retargeted statement reaches
+   the same decision as one reading the original.**
+
+2. **A surviving verdict is not surviving meaning, and the gap has a name.**
+   `Traded Notional`'s certified expression carries a widening cast that
+   `check_widening_cast` proves is required — without it the engine refuses the
+   statement. Retargeted, `DECIMAL(38, 6)` becomes the single word `NUMERIC`.
+   So does `DECIMAL(18, 6)`, the width `fct_trade.quantity` is stored at. **The
+   two arrive in BigQuery as the same statement**, and the distinction that makes
+   the metric computable is gone from it.
+
+3. **The tracer is silent about that, and silent for a structural reason.** The
+   corpus is retargeted by the same rewrite as the query, so both collapse
+   identically and still match: claim 1 says *traces*, and it is right about the
+   question it was asked. **Nothing in a certified-metrics-only check can notice a
+   round trip that loses a type**, because it compares like with like.
+
+4. **DEBT-009's answer is no — and not in the way the plan expected.** The plan
+   asked whether transpile-and-compare is *strictly better* than the name list
+   `check_seam` uses. It is not better; the two are blind to disjoint classes. The
+   round trip misses a DuckDB name sqlglot cannot translate, **because sqlglot
+   emits an untranslatable name unchanged and the round trip reads its own failure
+   as portability** — 39 of the 50 measurable DuckDB-only names sqlglot knows. The
+   name list misses `generate_series`, which sqlglot files as dialect-neutral, and
+   misses a cast by construction, because a cast is not a function call.
+
+5. **The construct where the meaning was actually lost is the one the existing
+   scan cannot see.** Findings 2 and 4 are the same fact from two directions: the
+   loss is in a cast, and ADR-0002's stated mitigation is *"treat any DuckDB-only
+   function in a Metric Definition as a review comment"*. **A function is the
+   wrong unit.** This is 3.5's to rule on, per the plan, which is why no Ledger
+   entry is opened here.
+
+**Verification**
+
+The plan's verification for 3.4 is *"as 3.2"*. Both commands, run on 2026-08-19
+against a Warehouse rebuilt the same day with `uv run python -m veritas.ingestion`:
+
+```
+$ uv run python .claude/scripts/check_validation_feasibility.py
+  claim 4 — does either verdict move on the way to bigquery?
+    schema retargeted with the statements: 45 of 53 column types are spelled differently in bigquery
+    corpus retargeted to bigquery, which is what a Gate in front of that engine would hold:
+      Gross Revenue     SUM(`fct_trade`.`commission` * `fct_fx_rate`.`fx_rate`)
+      Net Revenue       SUM((`fct_trade`.`commission` - `fct_trade`.`rebate` - `fct_trade`.`fee`) * `fct_fx_rate`.`fx_rate`)
+      Traded Notional   SUM(CAST(`fct_trade`.`quantity` AS NUMERIC) * `fct_trade`.`execution_price` * `fct_fx_rate`.`fx_rate`)
+            shape                                 verdict at home                             retargeted
+    same    bare                                  ALLOWED · Gross Revenue
+    same    aliased                               ALLOWED · Gross Revenue
+    same    derived table                         ALLOWED · Gross Revenue
+    same    common table expression               ALLOWED · Gross Revenue
+    same    net revenue                           ALLOWED · Net Revenue
+    same    net revenue by region                 ALLOWED · Net Revenue
+    same    traded notional                       ALLOWED · Traded Notional
+    same    commuted subtraction                  REJECTED · nothing certified
+    same    commuted multiplication               REJECTED · nothing certified
+    same    open-coded net revenue                REJECTED · nothing certified
+    same    unconverted commission                REJECTED · nothing certified
+    same    rebate silently dropped               REJECTED · nothing certified
+    same    notional through the wrong currency   ALLOWED · Traded Notional
+    same    half-certified union                  REJECTED · Gross Revenue
+    same    unknown table                         REJECTED · nothing certified
+    same    unparseable                           refused by the tracer
+    same    net revenue by client                 ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    star over a join to dim_client        REJECTED · nothing certified · restricted: dim_client.client_name
+    same    aliased to a benign name              ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    hidden behind a derived table         ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    a union branch that names the Client  ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    the name in a comment                 ALLOWED · Net Revenue
+    same    the name in a string literal          ALLOWED · Net Revenue
+    same    the name in a filter only             ALLOWED · Net Revenue
+    same    projected inside, aggregated away     REJECTED · nothing certified
+
+    25 of 25 statements keep both parse-tree verdicts through the round trip
+
+  claim 4 — what the round trip preserves is not what it means
+    the cast is load-bearing: fct_trade.quantity is stored as DECIMAL(18,6), and Traded Notional's certified expression widens it
+      widened   SUM(CAST(fct_trade.quantity AS NUMERIC) * fct_trade.execution_price * fct_fx_rate.fx_rate)
+      unwidened SUM(CAST(fct_trade.quantity AS NUMERIC) * fct_trade.execution_price * fct_fx_rate.fx_rate)
+    both arrive in bigquery as the same statement — the width is erased, and claim 1 still traces because the corpus was erased with it
+
+  claim 4 — DEBT-009's question: is transpile-and-compare the better dialect scan?
+    name list   round trip  statement
+    clean       clean       SELECT count(*) FROM fct_trade
+    FLAGGED     FLAGGED     SELECT strftime(price_date, '%Y') FROM fct_instrument_price
+    FLAGGED     clean       SELECT list_aggregate(quantity, 'sum') FROM fct_trade
+    clean       FLAGGED     SELECT * FROM generate_series(1, 10)
+    clean       FLAGGED     SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade
+
+    the two disagree on 3 of 5 statements, and in both directions: 1 the name list catches alone, 2 the round trip catches alone
+    over every DuckDB-only name sqlglot knows: 51 names, 1 that parse at none of the argument counts tried
+      the name list catches all 51 by construction — it is that table
+      the round trip catches 11 and passes 39 through unchanged, because sqlglot emits a name it cannot translate as it found it
+
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+exit=0
+```
+
+The claim 1, 2 and 3 sections of that run are unchanged from 3.3 and are not
+re-pasted here; 3.3's review holds them.
+
+The second command is the one that matters most for this Sub-step, because claim 4
+adds SQL literals to a file inside `check_seam`'s scanned roots:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py
+  seam scan: 14 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+  dialect scan: sqlglot files 51 function names under DuckDB that standard SQL does not have
+    probe: clean
+    probe: STRFTIME
+    probe: LIST_AGGREGATE
+      4 SQL statements in veritas/ingestion/__main__.py
+      5 SQL statements in veritas/ingestion/simulator.py
+     28 SQL statements in .claude/scripts/check_validation_feasibility.py
+     49 SQL statements in .claude/scripts/check_warehouse.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit=0
+```
+
+**28 statements read in this file and no exemption claimed**, which is
+[R3](../plan/step-003-validation-feasibility.md#r3--an-exemption-names-the-file-as-well-as-the-symbol--approved-and-widened-by-amino-2026-08-15)
+still holding after a Sub-step whose subject is dialect-specific SQL. It holds by
+design rather than by luck — see *the exemption that was not taken* below.
+
+The two framework checks, unchanged and run on the same code:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  links      402 links, 226 anchors 24 documents
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+PASS — framework is wired up correctly
+exit=0
+
+$ uv run python .claude/scripts/check_language.py
+  proposed terms: 0 · python files scanned: 14 · identifiers: 959
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+PASS — documents agree with the Glossary and the writing conventions
+exit=0
+```
+
+**The exemption that was not taken**
+
+Three of the five statements `check_dialect_detectors` needs are DuckDB-specific
+by construction — they exist in order to be caught — and an SQL literal in this
+file is read by the very scan being measured. Writing them here would have needed a
+second `FIXTURE_EXEMPTIONS` entry.
+
+They are **borrowed instead of copied**: `PORTABLE, TRANSLATABLE, UNTRANSLATABLE =
+DIALECT_PROBES` unpacks `check_warehouse.py`'s own exempt fixture, in the file that
+owns the exemption. Unpacked rather than indexed, so a probe added or removed there
+fails this file loudly; and each borrowed probe's recorded scan verdict is checked
+against `DIALECT_PROBES` at run time rather than restated, so the two files cannot
+drift into describing different scans. `FIXTURE_EXEMPTIONS` still holds one entry.
+
+The other two statements are written here as literals and pass the scan **because
+it reads them as clean** — which is finding 4, not a convenience.
+
+**The probes were made to have teeth, by three mutations**
+
+Each is one `sed`, each reproduces, and each is caught by a different check. Every
+mutated run was restored from a copy taken before it, and `diff -q` against that
+copy confirmed the restore before the next.
+
+**Mutation 1 — the transpiler gives up and hands back what it was given.** The
+failure mode that matters most, because it is the one that reads as success:
+
+```
+$ sed -i 's|^        return sqlglot.transpile(sql, read=DIALECT, write=dialect)\[0\]$|        return sql|' .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+FAIL — 3 problem(s)
+  - the widening cast and the stored width DECIMAL(18,6) used to retarget to the same bigquery statement and no longer do — sqlglot now carries the width across, so the loss this Sub-step recorded has been fixed upstream. Retire the finding rather than leaving a document describing a collapse that has stopped happening
+  - retargeting reads 'SELECT * FROM generate_series(1, 10)' as clean where this Sub-step measured it as flagged — sqlglot's translation of it has changed. ...
+  - retargeting reads 'SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade' as clean where this Sub-step measured it as flagged — sqlglot's translation of it has changed. ...
+exit=1
+```
+
+**`check_retargeting` says nothing about it**, and that is worth reading rather
+than glossing: it is a *differential* check, so a change that moves home and
+retargeted equally is invisible to it by design. The two checks that catch this are
+the two that compare against something other than the round trip's own output.
+
+**Mutation 2 — compare the round trip as text rather than as parse trees.** The
+mistake a reader would most naturally make, and the reason the control probe exists:
+
+```
+$ sed -i 's|^    return home != away$|    return sql != retarget(sql)|' .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+      the round trip catches 44 and passes 6 through unchanged, ...
+FAIL — 1 problem(s)
+  - retargeting reads 'SELECT count(*) FROM fct_trade' as flagged where this Sub-step measured it as clean — sqlglot's translation of it has changed. the control — standard SQL, and neither detector has anything to say about it. ...
+exit=1
+```
+
+`count(*)` is standard SQL and is reported as a dialect problem, because a
+generator upper-cases it on the way through. The population count moves from 11 to
+44 in the same run — a detector that fires on nearly everything, which is the same
+as one that fires on nothing.
+
+**Mutation 3 — judge the retargeted statement against the home corpus**, i.e.
+retarget the query and forget the Metric Definition:
+
+```
+$ sed -i 's|^                retarget(sql), away_schema, away, TARGET_DIALECT$|                retarget(sql), away_schema, corpus, TARGET_DIALECT|' .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+FAIL — 16 problem(s)
+  - probe 'aliased to a benign name' is judged ALLOWED · Net Revenue · restricted: dim_client.client_name at home and REJECTED · nothing certified · restricted: dim_client.client_name after the round trip to bigquery — a Gate would reach a different decision about the same question depending on which engine it was standing in front of, which is the failure claim 4 exists to find
+exit=1
+```
+
+Sixteen of 25 statements move. This is the mutation that shows finding 1 is a real
+result rather than an artefact of comparing a thing with itself — and, read the
+other way, it is exactly how the corpus retargeting produces finding 3's blindness.
+
+**The earlier Sub-steps' mutations, re-run — and two of them no longer apply**
+
+3.3's review checked 3.2's mutations because 3.3 moved the lines they edit. 3.4
+moves more lines, so all five were re-run.
+
+| Recorded in | Mutation | As recorded |
+|---|---|---|
+| 3.2 | drop `merge_subqueries` from `TRACING_RULES` | reproduces — `FAIL — 5 problem(s)` |
+| 3.2 | traversal back to the root scope, both edits | reproduces — `FAIL — 2 problem(s)` |
+| 3.3 | `expand_stars=False` | reproduces — `FAIL — 1 problem(s)` |
+| 3.3 | scope walk instead of lineage | **no longer applies — the `sed` matches nothing and the run passes** |
+| 3.3 | the detector becomes text matching | **no longer applies — same cause** |
+
+Both broken commands target the line
+`    reaching = columns_reaching_the_answer(sql, schema)`, which is now
+`    reaching = columns_reaching_the_answer(sql, schema, dialect)`. A `sed` that
+matches nothing exits 0 and leaves the file untouched, so the run **passes** and
+reads exactly like a mutation that failed to break anything — which is why this
+table says *no longer applies* rather than *no longer reproduces*. With the
+argument added they reproduce unchanged:
+
+```
+$ sed -i 's|^    reaching = columns_reaching_the_answer(sql, schema, dialect)$|    reaching = {(c.table, c.name) for e in projected_expressions(sql, schema, dialect) for c in e.find_all(exp.Column)}|' .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+FAIL — 1 problem(s)
+  - probe 'projected inside, aggregated away' projects no Restricted Column and the parse tree found ['dim_client.client_name'] — a false positive, which is the failure this probe measures. ...
+exit=1
+
+$ sed -i "s|^    reaching = columns_reaching_the_answer(sql, schema, dialect)\$|    reaching = {(t, c) for t, c in RESTRICTED_COLUMNS if c in sql.lower()}|" .claude/scripts/check_validation_feasibility.py
+$ uv run python .claude/scripts/check_validation_feasibility.py
+FAIL — 5 problem(s)
+exit=1
+```
+
+3.2's first mutation now reports **5** problems across three probes rather than the
+two its own review recorded, for the reason 3.3 already noted — it added a probe
+that reads claim 1's verdict. Claim 4 adds nothing to that count, per the
+differential-check point under mutation 1.
+
+**Two things the debt sweep found, both fixed rather than recorded**
+
+Both were written the cheap way first, and both were caught by asking for a
+measurement instead of accepting an argument.
+
+1. **The retargeted run was reading the Warehouse's own schema**, `BIGINT` and
+   `VARCHAR` included, with a docstring arguing that the rewrites only read column
+   names. The argument is probably true and it is not worth making: `retarget_schema`
+   costs three lines and removes the question. The run now prints that 45 of 53
+   column types are spelled differently in BigQuery, so a reader can see the schema
+   really was retargeted rather than take it on trust.
+
+2. **`round_trip_rewrites` compared two parse trees by `repr()`, and that was a
+   defect, not a style choice.** sqlglot's `==` is structural; `repr` is a text
+   dump of it, and the BigQuery parser records a default argument
+   (`null_propagation=False`) that the DuckDB parser leaves absent. Three
+   DuckDB-only names — `LIST_APPEND` and `LIST_PREPEND` at two arities — came back
+   as *rewritten by the round trip* when the two trees are the same nodes and
+   sqlglot merely spells the function differently in each dialect. **They are
+   portable and were being reported as not.** The population count in finding 4 is
+   11/39 with `==` and was 13/37 with `repr`.
+
+**Deliberately left undone**
+
+- **No Debt Ledger entry.** The plan assigns one conditionally — *"If a
+  transpile-and-compare test is strictly better than the name list `check_seam`
+  uses, that is a finding with a home — a Ledger entry against the existing scan,
+  opened in 3.5."* It is not strictly better, so that condition is not met. The
+  finding that **does** want a home is a different one — that the loss is in a cast
+  and ADR-0002's mitigation names functions — and the plan puts the opening of it in
+  3.5, which is also where ADR-0002 gets its status note. Opening it here would
+  pre-empt the Sub-step whose whole job is to rule on what these measurements mean.
+- **Nothing is executed against BigQuery.** Claim 4 as the plan defines it is a
+  parse-tree claim — *"transpiled to BigQuery, re-parsed, and put through claim 1's
+  tracer again"* — and there is no BigQuery instance here by ADR-0002's own
+  decision. So finding 2 is a statement about the SQL that would be sent, not about
+  what BigQuery would do with it. See below.
+- **No Data Definition Language**, per
+  [R3 of Step 002](../plan/step-002-warehouse-and-ingestion.md#r3--hand-authored-ddl-inside-the-adapter--allowed-with-the-reasoning-written-down).
+
+**Look at this sceptically**
+
+1. **Finding 2 is a textual measurement presented as a risk, and the two are not
+   the same thing.** What is measured is that the widened and unwidened expressions
+   become one BigQuery statement. What is *not* measured is whether BigQuery would
+   then overflow, because nothing here can run a BigQuery query. BigQuery's
+   `NUMERIC` is fixed at precision 38 scale 9, so it has 29 integer digits where
+   `DECIMAL(38, 6)` has 32 — narrower than asked for, and wider than the
+   `DECIMAL(18, 6)` that provably fails here. **It is entirely possible the
+   retargeted statement computes fine.** The defensible claim is the narrow one: the
+   round trip erases a distinction the Warehouse needs, and no check in this file
+   would notice. Whether that erasure costs a number on BigQuery is unanswerable
+   from here, and 3.5 should say so rather than round it up.
+2. **`check_retargeting` compares a thing with a version of itself, and mutation 3
+   is the only reason to believe it.** Query, corpus and schema all go through one
+   rewrite. That is the right model of a Gate — the Semantic Layer's expression is
+   retargeted alongside the query — but it means "25 of 25 unchanged" is a weaker
+   statement than it looks, and finding 3 is the same property seen as a limitation.
+   If Amino thinks the stronger measurement is worth having, the shape would be a
+   Gate holding a **hand-written BigQuery** certified expression rather than a
+   transpiled one; that is a Semantic Layer question and it is Step 004's.
+3. **`PROBE_ARITIES = (0, 1, 2, 3)` is a guess, and one name escapes it.**
+   `LIST_HAS_ANY` parses at none of the four, so the population is 50 of 51 and the
+   run says so. A different set of arities would give a different denominator.
+   Nothing rests on the exact number — the finding is that the round trip misses
+   most of the class — but the number is construction-dependent and should not be
+   quoted as though it were a property of sqlglot alone.
+4. **This file now imports `check_warehouse`.** Two check scripts are coupled where
+   there were none, and the second `sys.path.insert` exists only for that. The
+   alternative was reimplementing `unportable_functions`, which would answer
+   DEBT-009's question about a copy of the scan rather than the scan — but it is a
+   coupling, and if `check_warehouse.py` gains a module-level side effect this file
+   pays for it at import.
+5. **Borrowing `DIALECT_PROBES` keeps `FIXTURE_EXEMPTIONS` at one entry, and it also
+   ties this Sub-step's probe set to another file's.** Three of five detector
+   statements are only as good as the three `check_warehouse.py` happens to hold. A
+   run-time check keeps the two from disagreeing, but it cannot notice that the
+   borrowed set is the wrong shape for the question being asked here.
+6. **R6 applies and the enumeration was the plan's, not mine.** 3.4's plan
+   enumerates its retargeting probes exactly — *"every statement 3.2 and 3.3
+   built"* — and that is what ran, 25 of 25. It does **not** enumerate the detector
+   probes, because it states the DEBT-009 question without naming the statements
+   that would answer it. So five probes arrived at implementation time. The R6
+   account: the enumeration missed them because the plan wrote the question in
+   prose (*"if a transpile-and-compare test is strictly better"*) rather than as a
+   comparison needing cases on both sides of a disagreement, and a question phrased
+   that way hides that it needs a probe set at all. They are kept, and they are what
+   finding 4 rests on.
+7. **The split point was read as not having fired.** Reasoning at the top of this
+   section. If Amino reads R5's *"review-driven growth"* as counting the extra
+   probes 3.2 and 3.3 shipped, then 3.4 should have been Step 004 and this
+   Sub-step is early rather than wrong — the work stands either way, and what would
+   change is which document it lands in.
+
+**Language**
+
+No terms added, renamed, or proposed. `dialect`, `transpile` and `retarget` are
+technical rather than domain vocabulary, and ADR-0002 already uses *"retargets"* in
+prose. The domain nouns in the new code — `Certified Metric`, `Restricted Column`,
+`Reporting Currency`, `Traded Notional` — are registered and spelled as registered.
+`check_language.py` reports `proposed terms: 0` over 965 identifiers.
+
+The abbreviation check did fail once on this review's own prose, on the SQL cast
+keyword written in upper case inside a code span. It was **reworded to lower case
+rather than added to the exempt list**, which is the precedent 3.2 set for the same
+failure: the exempt list still holds 15 entries. A SQL keyword shouted in a sentence
+is not an abbreviation the Glossary owes a reader an expansion of, but it is also
+not worth buying a permanent exemption for — and the check reads code spans, so the
+backticks do not excuse it.

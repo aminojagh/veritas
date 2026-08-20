@@ -10,7 +10,7 @@ how its answer stops being falsifiable. What it produces is a measurement, and
 Sub-step 3.5 turns that into a go or a no-go on
 [ADR-0003](../docs/adr/0003-validation-gate-is-deterministic-code.md).
 
-Three of the four claims in the [Step 003 plan](../docs/plan/step-003-validation-feasibility.md):
+The four claims in the [Step 003 plan](../docs/plan/step-003-validation-feasibility.md):
 
   **Claim 1 — tracing.** A certified expression has to stay recognisable in a
   generated query's parse tree under the rewrites a generator performs for its
@@ -55,6 +55,30 @@ Three of the four claims in the [Step 003 plan](../docs/plan/step-003-validation
   certified number, rejecting it would be an argument about naming. Each of these
   returns a different number, so allowing one means answering the question wrongly.
 
+  **Claim 4 — the trip to BigQuery.**
+  [ADR-0002](../docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) put
+  sqlglot in charge of retargeting and conceded in the same breath that
+  transpilation is *"good but not total"*. So every statement above is transpiled
+  into the target dialect, re-parsed there, and put back through **both** readings,
+  and the pair of verdicts is compared with the pair the statement got at home.
+  This is ADR-0002's claim rather than ADR-0003's, which is why the plan made it
+  the Step's split point.
+
+  **A surviving verdict is not surviving meaning**, and the two are measured
+  apart. `check_cast_collapse` is the case: the widening cast `Traded Notional`
+  cannot be computed without, arrives in the target dialect as one word that no
+  longer says what was widened — and the tracer says nothing, because the
+  certified expression it compares against was collapsed by the same rewrite. A
+  round trip is worth checking for what it preserves *and* for what it quietly
+  agrees to.
+
+  Claim 4 also answers the question
+  [DEBT-009](../docs/debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
+  left open in writing — whether a transpile-and-compare test would be a better
+  dialect scan than the name list `check_seam` uses. `check_dialect_detectors`
+  runs the two over the same statements and over every DuckDB-only function name
+  sqlglot knows, and reports where each is blind.
+
 The certified expressions and the Restricted Columns are **Python literals in this
 file**, per
 [R2](../docs/plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15).
@@ -85,6 +109,7 @@ CLAUDE_DIR = Path(__file__).resolve().parent.parent  # <repo>/.claude
 REPO_ROOT = CLAUDE_DIR.parent                        # <repo>
 
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 
 from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
 # E402 is pycodestyle/ruff's "module-level import not at top of file".
@@ -92,10 +117,34 @@ from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
 # or the script can't find the package when run from .claude/scripts/.
 # The comment tells the linter that specific line is deliberate, and suppresses nothing else.
 
-# The engine the probes are written against. ADR-0002 puts sqlglot in charge of
-# retargeting, and Sub-step 3.4 is the one that asks what survives the trip to
-# BigQuery; here every statement is read in the dialect it would actually run in.
+from check_warehouse import (  # noqa: E402
+    DIALECT_PROBES,
+    DUCKDB_FUNCTIONS,
+    unportable_functions,
+)
+# Claim 4 asks whether a transpile-and-compare test would be a better dialect scan
+# than the one `check_seam` runs. The honest way to ask that is to run **the scan
+# itself**, so `unportable_functions` and the name table it reads are imported
+# rather than reimplemented here: a second copy would answer the question about the
+# copy, and would go on answering it after the original changed.
+#
+# `DIALECT_PROBES` is imported for a second reason, and it is the reason this file
+# still claims no exemption from that scan. Three of the statements claim 4 needs
+# are DuckDB-specific by construction — they exist to be caught — and SQL literals
+# in this file are read by the dialect scan, which would fail on them. Those three
+# statements already exist, as `check_warehouse.py`'s own exempt fixture, in the
+# file that owns the exemption. Importing them is what keeps `FIXTURE_EXEMPTIONS`
+# at one entry instead of two.
+
+# The engine the probes are written against. Every statement is read in the
+# dialect it would actually run in.
 DIALECT = "duckdb"
+
+# The engine claim 4 retargets to. Not an arbitrary second dialect: ADR-0002
+# rejected it for the slice while calling it *"the real target engine"* and *"the
+# actual target"*, and the extension path it names goes here. A round trip to a
+# dialect nobody intends to use would measure sqlglot rather than the migration.
+TARGET_DIALECT = "bigquery"
 
 # The Reporting Currency every monetary figure below is expressed in, matching
 # `check_warehouse.py --distinctions` so the two scripts' numbers are comparable.
@@ -768,7 +817,31 @@ def warehouse_schema(warehouse: WarehouseAdapter) -> dict[str, dict[str, str]]:
     }
 
 
-def canonical(expression: exp.Expression) -> str:
+def retarget(sql: str, dialect: str = TARGET_DIALECT) -> str:
+    """One statement, rewritten from the Warehouse's dialect into another engine's.
+
+    This is the whole of what ADR-0002 means by the engine swap being *"an adapter
+    implementation plus a sqlglot dialect parameter"*. `transpile` parses in the
+    read dialect and writes in the write dialect, so what comes back is text an
+    engine that has never heard of DuckDB is expected to accept.
+
+    Handed the Warehouse's own dialect it returns the statement untouched, so
+    nothing at home pays for a round trip it does not take.
+
+    Raises `TracerRefused` for the same reason the tracer does: a statement sqlglot
+    cannot parse cannot be transpiled either, and the two failures have one cause.
+    A retargeting that silently returned the original would be the worst answer
+    available — it reads as "portable" and is the opposite.
+    """
+    if dialect == DIALECT:
+        return sql
+    try:
+        return sqlglot.transpile(sql, read=DIALECT, write=dialect)[0]
+    except sqlglot.errors.SqlglotError as failure:
+        raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
+
+
+def canonical(expression: exp.Expression, dialect: str = DIALECT) -> str:
     """One expression, written the one way this file compares expressions.
 
     `Expression.sql()` writes a parse tree back out as text, and the two flags
@@ -783,19 +856,38 @@ def canonical(expression: exp.Expression) -> str:
     Both are about spelling and not about meaning: DuckDB is case-insensitive, and
     quoting an identifier there does not change what it refers to. Without the two
     flags the tracer would report differences no engine would.
+
+    `dialect` is what makes claim 4 possible: the same expression written as
+    BigQuery quotes identifiers with backticks rather than double quotes, so a
+    retargeted statement and a retargeted corpus have to be written by the same
+    generator or every comparison between them fails on punctuation.
     """
-    return expression.sql(dialect=DIALECT, identify=True, normalize=True)
+    return expression.sql(dialect=dialect, identify=True, normalize=True)
 
 
-def certified_forms() -> dict[str, str]:
-    """Canonical form -> the Certified Metric it is. The tracer's whole corpus."""
+def certified_forms(dialect: str = DIALECT) -> dict[str, str]:
+    """Canonical form -> the Certified Metric it is. The tracer's whole corpus.
+
+    In a dialect other than the Warehouse's, each expression is transpiled before
+    it is canonicalised, because that is what a Gate standing in front of that
+    engine would hold: the Semantic Layer publishes one expression and the same
+    retargeting that rewrites the query rewrites the corpus.
+
+    **That is also why the tracer cannot see a lossy round trip.** Query and
+    corpus go through one rewrite, so anything the rewrite erases is erased on
+    both sides and the two still match. Claim 4 measures the verdict here and the
+    meaning in `check_cast_collapse`, and the second is not implied by the first.
+    """
     return {
-        canonical(sqlglot.parse_one(expression, dialect=DIALECT)): name
+        canonical(sqlglot.parse_one(retarget(expression, dialect), dialect=dialect),
+                  dialect): name
         for name, expression in CERTIFIED_EXPRESSIONS.items()
     }
 
 
-def resolve(sql: str, schema: dict[str, dict[str, str]]) -> exp.Expression:
+def resolve(
+    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
+) -> exp.Expression:
     """Parse one statement and rewrite it into the form both claims are judged on.
 
     The shared half of the two parse-tree claims, and the only place the rewriting
@@ -816,14 +908,14 @@ def resolve(sql: str, schema: dict[str, dict[str, str]]) -> exp.Expression:
     try:
         # One statement in, its root node out — `exp.Select` here, `exp.Union` for a
         # union. Bad syntax raises instead of returning a tree.
-        statement = sqlglot.parse_one(sql, dialect=DIALECT)
+        statement = sqlglot.parse_one(sql, dialect=dialect)
         # `optimize` applies each rule in `rules` to the tree in turn. `qualify` is
         # handed the schema and uses it to give every column the table it came
         # from; `merge_subqueries` needs no schema and flattens subqueries away.
         return optimize(
             statement,
             schema=schema,
-            dialect=DIALECT,
+            dialect=dialect,
             rules=TRACING_RULES,
             # `optimize` passes this to `qualify` as True by default, on the
             # library's own comment that it is "needed for other optimizations to
@@ -848,7 +940,7 @@ def resolve(sql: str, schema: dict[str, dict[str, str]]) -> exp.Expression:
 
 
 def projected_expressions(
-    sql: str, schema: dict[str, dict[str, str]]
+    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
 ) -> list[exp.Expression]:
     """Claim 1's reading: every expression projected in every scope, on base tables.
 
@@ -873,7 +965,7 @@ def projected_expressions(
 
     Raises `TracerRefused` if sqlglot cannot read the statement.
     """
-    resolved = resolve(sql, schema)
+    resolved = resolve(sql, schema, dialect)
 
     # `build_scope` returns one `Scope` per SELECT: the SELECT itself in
     # `scope.expression`, and in `scope.sources` what each name in its FROM and
@@ -917,7 +1009,9 @@ def projected_expressions(
     return found
 
 
-def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]:
+def metric_expressions(
+    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
+) -> list[str]:
     """Claim 1's half: the canonical form of every projection that computes something.
 
     A projection with no aggregate in it is a grouping column — `client_region`
@@ -933,8 +1027,8 @@ def metric_expressions(sql: str, schema: dict[str, dict[str, str]]) -> list[str]
     without listing `sum`, `count` and `avg` by name.
     """
     return [
-        canonical(expression)
-        for expression in projected_expressions(sql, schema)
+        canonical(expression, dialect)
+        for expression in projected_expressions(sql, schema, dialect)
         if list(expression.find_all(exp.AggFunc))
     ]
 
@@ -971,7 +1065,7 @@ ANSWER_COLUMN = "answer_column_"
 
 
 def columns_reaching_the_answer(
-    sql: str, schema: dict[str, dict[str, str]]
+    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
 ) -> set[tuple[str, str]]:
     """Claim 2's reading: every base-table column that reaches the statement's output.
 
@@ -1002,7 +1096,7 @@ def columns_reaching_the_answer(
 
     Raises `TracerRefused` if sqlglot cannot read the statement.
     """
-    resolved = resolve(sql, schema)
+    resolved = resolve(sql, schema, dialect)
 
     # Number the output columns. `.selects` on a union is its first branch's
     # projection list, which is where a union's output names come from, so
@@ -1020,7 +1114,7 @@ def columns_reaching_the_answer(
             # A leaf carries the table it came from in `source` and the column as
             # `<source alias>.<column>` in `name`.
             for step in lineage(
-                f"{ANSWER_COLUMN}{position}", resolved, schema=schema, dialect=DIALECT
+                f"{ANSWER_COLUMN}{position}", resolved, schema=schema, dialect=dialect
             ).walk():
                 if isinstance(step.source, exp.Table) and "." in step.name:
                     reaching.add((step.source.name, step.name.split(".")[-1]))
@@ -1030,10 +1124,10 @@ def columns_reaching_the_answer(
 
 
 def restricted_columns_in_projection(
-    sql: str, schema: dict[str, dict[str, str]]
+    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
 ) -> list[str]:
     """Claim 2's verdict: the Restricted Columns that reach the statement's answer."""
-    reaching = columns_reaching_the_answer(sql, schema)
+    reaching = columns_reaching_the_answer(sql, schema, dialect)
     return sorted(
         f"{table}.{column}" for table, column in reaching & RESTRICTED_COLUMNS
     )
@@ -1383,6 +1477,397 @@ def check_numbers(warehouse: WarehouseAdapter) -> None:
                 )
 
 
+# ---------------------------------------------------------------------------
+# Claim 4 — the trip to BigQuery
+# ---------------------------------------------------------------------------
+
+# What a statement is judged to be, once, so home and retargeted can be compared
+# as values rather than by reading two tables side by side. A statement sqlglot
+# cannot read gets this instead of a verdict, and it is the same value whether the
+# parse failed at home or the transpile failed on the way out — those are one
+# cause, not two.
+REFUSED_BY_THE_TRACER = ("refused",)
+
+
+def both_verdicts(
+    sql: str,
+    schema: dict[str, dict[str, str]],
+    corpus: dict[str, str],
+    dialect: str = DIALECT,
+) -> tuple[object, ...]:
+    """Claim 1's verdict and claim 2's on one statement, as one comparable value.
+
+    Both, for every statement, rather than each probe being asked only the
+    question it was written for. Claim 4 is not asking whether the probe still
+    demonstrates what it was built to demonstrate — it is asking whether the round
+    trip moved **anything** a Gate would read, and a rewrite that left the metric
+    expressions alone while changing which columns reach the answer would be
+    invisible to a narrower comparison.
+    """
+    try:
+        allowed, hit, _ = certified_metrics_only(
+            metric_expressions(sql, schema, dialect), corpus
+        )
+        projected = restricted_columns_in_projection(sql, schema, dialect)
+    except TracerRefused:
+        return REFUSED_BY_THE_TRACER
+    # `dict.fromkeys` for the reason `check_traces` uses it: one statement can
+    # compute a metric twice, and the repeat is noise in a comparison.
+    return (allowed, tuple(dict.fromkeys(hit)), tuple(projected))
+
+
+def render_verdict(verdict: tuple[object, ...]) -> str:
+    """One verdict, in the width the table below prints it."""
+    if verdict == REFUSED_BY_THE_TRACER:
+        return "refused by the tracer"
+    allowed, hit, projected = verdict
+    detail = ", ".join(hit) if hit else "nothing certified"
+    if projected:
+        detail += f" · restricted: {', '.join(projected)}"
+    return f"{'ALLOWED' if allowed else 'REJECTED'} · {detail}"
+
+
+def retarget_schema(
+    schema: dict[str, dict[str, str]], dialect: str = TARGET_DIALECT
+) -> dict[str, dict[str, str]]:
+    """The Warehouse's catalogue, with every column type written in `dialect`.
+
+    `DataType.build` parses a type name in one dialect and the generator writes it
+    in another, which is the same trip `retarget` makes for a statement — with one
+    difference worth knowing about, because claim 4's central finding lives in it.
+    A type node written on its own keeps its precision, so `DECIMAL(18, 6)` becomes
+    `NUMERIC(18, 6)` here. The same type inside a `CAST` in a statement does not:
+    `check_cast_collapse` measures where it goes.
+    """
+    return {
+        table: {
+            column: exp.DataType.build(column_type, dialect=DIALECT).sql(dialect)
+            for column, column_type in columns.items()
+        }
+        for table, columns in schema.items()
+    }
+
+
+def check_retargeting(
+    corpus: dict[str, str], schema: dict[str, dict[str, str]]
+) -> None:
+    """Claim 4: does either parse-tree verdict move when the statement is retargeted?
+
+    Every statement claims 1 and 2 were measured on is transpiled into
+    `TARGET_DIALECT`, re-parsed there, and put back through both readings against a
+    corpus retargeted the same way. **A verdict that moves is the finding**, named
+    with what it was and what it became; the Step's output is where retargeting
+    stops, wherever that falls.
+
+    The schema is retargeted with the statements, because a Gate standing in front
+    of another engine reads that engine's catalogue: `BIGINT` and `VARCHAR` are not
+    words BigQuery uses. Retargeting the types costs three lines and removes the
+    question, which is cheaper than leaving the Warehouse's own schema in place and
+    arguing that the rewrites only read column names.
+    """
+    away = certified_forms(TARGET_DIALECT)
+    away_schema = retarget_schema(schema)
+    respelled = sum(
+        column_type != away_schema[table][column]
+        for table, columns in schema.items()
+        for column, column_type in columns.items()
+    )
+    print(f"    schema retargeted with the statements: "
+          f"{respelled} of {sum(len(c) for c in schema.values())} column types are "
+          f"spelled differently in {TARGET_DIALECT}")
+    print(f"    corpus retargeted to {TARGET_DIALECT}, which is what a Gate in "
+          f"front of that engine would hold:")
+    for form, name in sorted(away.items(), key=lambda item: item[1]):
+        print(f"      {name:<18}{form}")
+    print(f"    {'':<8}{'shape':<38}{'verdict at home':<44}retargeted")
+
+    moved = 0
+    for name, sql in probe_statements():
+        home_verdict = both_verdicts(sql, schema, corpus)
+        try:
+            away_verdict = both_verdicts(
+                retarget(sql), away_schema, away, TARGET_DIALECT
+            )
+        except TracerRefused:
+            away_verdict = REFUSED_BY_THE_TRACER
+
+        same = home_verdict == away_verdict
+        moved += not same
+        print(f"    {'same' if same else 'MOVED':<8}{name:<38}"
+              f"{render_verdict(home_verdict):<44}"
+              f"{'' if same else render_verdict(away_verdict)}")
+        if not same:
+            problems.append(
+                f"probe {name!r} is judged {render_verdict(home_verdict)} at home "
+                f"and {render_verdict(away_verdict)} after the round trip to "
+                f"{TARGET_DIALECT} — a Gate would reach a different decision about "
+                f"the same question depending on which engine it was standing in "
+                f"front of, which is the failure claim 4 exists to find"
+            )
+
+    print()
+    print(f"    {len(probe_statements()) - moved} of {len(probe_statements())} "
+          f"statements keep both parse-tree verdicts through the round trip")
+
+
+def check_cast_collapse(schema: dict[str, dict[str, str]]) -> None:
+    """A surviving verdict is not surviving meaning, and here is the one that is not.
+
+    `check_widening_cast` above proves that `Traded Notional`'s certified expression
+    computes only because of its widening cast: without it the engine refuses the
+    statement. This asks what that cast is after the round trip, and the answer is
+    that it is gone — not translated wrongly, **erased**. The width the column is
+    stored at and the width the metric has to be computed at, arrive in
+    `TARGET_DIALECT` as the same single word, so the retargeted statement no longer
+    contains the distinction that makes the metric computable.
+
+    The tracer is silent about it for the reason `certified_forms` gives: the
+    corpus was collapsed by the same rewrite, so the two still match and claim 1
+    still says *traces*. That is the finding — **not that the round trip fails, but
+    that it succeeds while losing something, and that the check built to notice
+    cannot.**
+
+    Fails if the collapse stops happening, because then this finding has expired
+    and the documents stating it are wrong.
+    """
+    # The width the Warehouse actually stores, read from the Warehouse rather than
+    # written down: the type this Sub-step compares against is whatever
+    # `fct_trade.quantity` is today, not whatever it was when this was written.
+    stored = schema["fct_trade"]["quantity"]
+    certified = CERTIFIED_EXPRESSIONS["Traded Notional"]
+
+    def with_cast_width(width: str) -> str:
+        """The certified expression with its cast rewritten to `width`."""
+        tree = sqlglot.parse_one(certified, dialect=DIALECT)
+        for cast in tree.find_all(exp.Cast):
+            cast.set("to", exp.DataType.build(width, dialect=DIALECT))
+        return tree.sql(dialect=DIALECT)
+
+    widened = certified
+    unwidened = with_cast_width(stored)
+    print(f"    the cast is load-bearing: fct_trade.quantity is stored as "
+          f"{stored}, and Traded Notional's certified expression widens it")
+    print(f"      widened   {retarget(widened)}")
+    print(f"      unwidened {retarget(unwidened)}")
+
+    if retarget(widened) == retarget(unwidened):
+        print(f"    both arrive in {TARGET_DIALECT} as the same statement — the "
+              f"width is erased, and claim 1 still traces because the corpus was "
+              f"erased with it")
+        return
+
+    problems.append(
+        f"the widening cast and the stored width {stored} used to retarget to the "
+        f"same {TARGET_DIALECT} statement and no longer do — sqlglot now carries "
+        f"the width across, so the loss this Sub-step recorded has been fixed "
+        f"upstream. Retire the finding rather than leaving a document describing a "
+        f"collapse that has stopped happening"
+    )
+
+
+class DetectorProbe(NamedTuple):
+    """One statement and what each of the two dialect detectors makes of it.
+
+    `named_by_the_scan` is what `check_seam`'s existing scan says — a function name
+    sqlglot files under DuckDB that standard SQL does not have.
+    `rewritten_by_the_round_trip` is what the alternative says — whether
+    transpiling into `TARGET_DIALECT` produced a different parse tree, meaning
+    sqlglot had to restructure the statement to say it there.
+    """
+
+    sql: str
+    named_by_the_scan: bool
+    rewritten_by_the_round_trip: bool
+    why: str
+
+
+# The three statements the existing scan catches are `check_warehouse.py`'s own
+# probes, unpacked in the order that file lists them. Unpacked rather than indexed
+# so that a probe added or removed there fails this file loudly instead of silently
+# measuring a different statement, and each one's recorded scan verdict is checked
+# against `DIALECT_PROBES` in `check_dialect_detectors` rather than restated here.
+#
+# They are borrowed rather than copied because they are DuckDB-specific by
+# construction — they exist to be caught — and an SQL literal in this file is read
+# by that same scan. Copying them here would need a second `FIXTURE_EXEMPTIONS`
+# entry; borrowing them needs none, and this file goes on claiming no exemption.
+PORTABLE, TRANSLATABLE, UNTRANSLATABLE = DIALECT_PROBES
+
+# The two statements the existing scan misses are written here, and they can be,
+# because the scan reads them as clean — which is the finding rather than a
+# convenience. Neither contains a function name sqlglot files under DuckDB: one is
+# a name it files as belonging to no dialect in particular, and the other is not a
+# function call at all.
+DETECTOR_PROBES = (
+    DetectorProbe(
+        sql=PORTABLE[0],
+        named_by_the_scan=False,
+        rewritten_by_the_round_trip=False,
+        why="the control — standard SQL, and neither detector has anything to say "
+            "about it. Without it a run where both detectors fired on everything "
+            "would read the same as this one",
+    ),
+    DetectorProbe(
+        sql=TRANSLATABLE[0],
+        named_by_the_scan=True,
+        rewritten_by_the_round_trip=True,
+        why="a DuckDB name that BigQuery spells differently and sqlglot knows how "
+            "to translate. Both detectors see it, which is the easy case and the "
+            "one neither is chosen on",
+    ),
+    DetectorProbe(
+        sql=UNTRANSLATABLE[0],
+        named_by_the_scan=True,
+        rewritten_by_the_round_trip=False,
+        why="a DuckDB name sqlglot has no translation for, so it is emitted "
+            "unchanged and the round trip finds nothing to report. **The round "
+            "trip reads its own failure as portability**, which is the worst "
+            "direction for a detector to be wrong in",
+    ),
+    DetectorProbe(
+        sql="SELECT * FROM generate_series(1, 10)",
+        named_by_the_scan=False,
+        rewritten_by_the_round_trip=True,
+        why="the blind spot DEBT-009 already names in writing: sqlglot files this "
+            "one as belonging to no dialect, so no name is flagged, and BigQuery "
+            "reaches it through UNNEST(GENERATE_ARRAY(...)) instead",
+    ),
+    DetectorProbe(
+        sql="SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade",
+        named_by_the_scan=False,
+        rewritten_by_the_round_trip=True,
+        why="Traded Notional's widening cast, which is not a function call at all. "
+            "A scan that reads function names cannot see it by construction, and "
+            "it is the construct check_cast_collapse measures the loss in",
+    ),
+)
+
+# The argument counts tried when putting a bare function name through the round
+# trip. sqlglot's parser rejects a known function called with the wrong number of
+# arguments, so a name is retried until one parses and reported as unmeasurable if
+# none does — which is a fourth outcome rather than a silent absence.
+PROBE_ARITIES = (0, 1, 2, 3)
+
+
+def round_trip_rewrites(sql: str) -> bool:
+    """Did retargeting have to restructure the statement, or only respell it?
+
+    Compared as parse trees rather than as text, and this is the whole of what
+    makes the comparison mean anything. Every statement's text changes on the way
+    through a generator — keywords are upper-cased, `x::INT` becomes `CAST(x AS
+    INT)` — and a detector that read a changed string as a dialect problem would
+    fire on all of them. DuckDB's `SELECT * EXCLUDE (c)` and BigQuery's
+    `SELECT * EXCEPT (c)` are the same tree spelled two ways, and that is portable.
+
+    What is not portable is a tree the target dialect cannot hold in the shape the
+    source wrote it: a different function, a different structure, a narrower type.
+
+    The comparison is sqlglot's own `==` on two nodes, and the alternative that
+    looks equivalent is not. Writing each tree out with `repr` and comparing the
+    text overcounts: a parser is free to record a default argument its opposite
+    number leaves absent, and three of the DuckDB-only names below come back from
+    the BigQuery parser carrying `null_propagation=False` on a node the DuckDB
+    parser built without it. Same node, same children, same meaning — and two
+    different strings. `==` reads them as the one tree they are.
+    """
+    home = sqlglot.parse_one(sql, dialect=DIALECT)
+    away = sqlglot.parse_one(retarget(sql), dialect=TARGET_DIALECT)
+    return home != away
+
+
+def check_dialect_detectors() -> None:
+    """DEBT-009's open question: would transpile-and-compare be the better scan?
+
+    That entry paid half of ADR-0002's dialect signal with a name list read off
+    sqlglot's own dialect tables, said plainly what the list cannot see, and left
+    the question open in writing — *"whether it needs transpilation-level checking
+    instead is a question Step 003's spike answers with its fourth claim"*. **Better
+    than** is the question, so both detectors are run over the same statements and
+    the answer is where they disagree, not where either one is impressive alone.
+
+    Then the same question is asked of a population rather than of five hand-picked
+    statements: every DuckDB-only name sqlglot knows is put through the round trip,
+    so the count is over the whole set the existing scan exists to catch rather
+    than over the examples someone chose to write down. Those calls are assembled
+    at run time because the set is sqlglot's and changes with it — there is no
+    version of this measurement that can be written as literals.
+    """
+    for probe, (sql, expected) in zip(DETECTOR_PROBES, DIALECT_PROBES):
+        if probe.sql is sql and probe.named_by_the_scan != bool(expected):
+            problems.append(
+                f"probe {sql!r} is borrowed from check_warehouse.py, which records "
+                f"it as {'flagged' if expected else 'clean'}, and this file records "
+                f"it as {'flagged' if probe.named_by_the_scan else 'clean'} — the "
+                f"two files disagree about the scan they are both describing"
+            )
+
+    print(f"    {'name list':<12}{'round trip':<12}statement")
+    scan_alone = round_trip_alone = 0
+    for probe in DETECTOR_PROBES:
+        named = bool(unportable_functions(probe.sql))
+        rewritten = round_trip_rewrites(probe.sql)
+        print(f"    {'FLAGGED' if named else 'clean':<12}"
+              f"{'FLAGGED' if rewritten else 'clean':<12}{probe.sql}")
+
+        if named != probe.named_by_the_scan:
+            problems.append(
+                f"the existing scan reads {probe.sql!r} as "
+                f"{'flagged' if named else 'clean'} where this Sub-step measured it "
+                f"as {'flagged' if probe.named_by_the_scan else 'clean'} — the "
+                f"comparison DEBT-009 asked for is no longer between the two "
+                f"detectors this file describes"
+            )
+        if rewritten != probe.rewritten_by_the_round_trip:
+            problems.append(
+                f"retargeting reads {probe.sql!r} as "
+                f"{'flagged' if rewritten else 'clean'} where this Sub-step measured "
+                f"it as {'flagged' if probe.rewritten_by_the_round_trip else 'clean'}"
+                f" — sqlglot's translation of it has changed. {probe.why}"
+            )
+
+        scan_alone += probe.named_by_the_scan and not probe.rewritten_by_the_round_trip
+        round_trip_alone += (
+            probe.rewritten_by_the_round_trip and not probe.named_by_the_scan
+        )
+
+    print()
+    print(f"    the two disagree on {scan_alone + round_trip_alone} of "
+          f"{len(DETECTOR_PROBES)} statements, and in both directions: "
+          f"{scan_alone} the name list catches alone, {round_trip_alone} the round "
+          f"trip catches alone")
+
+    unchanged, rewritten_count, unmeasurable = 0, 0, 0
+    for name in sorted(DUCKDB_FUNCTIONS):
+        for arity in PROBE_ARITIES:
+            call = f"SELECT {name}({', '.join(['x'] * arity)}) FROM t"
+            try:
+                rewritten_here = round_trip_rewrites(call)
+            except (TracerRefused, sqlglot.errors.SqlglotError):
+                continue
+            rewritten_count += rewritten_here
+            unchanged += not rewritten_here
+            break
+        else:
+            unmeasurable += 1
+
+    print(f"    over every DuckDB-only name sqlglot knows: {len(DUCKDB_FUNCTIONS)} "
+          f"names, {unmeasurable} that parse at none of the argument counts tried")
+    print(f"      the name list catches all {len(DUCKDB_FUNCTIONS)} by construction "
+          f"— it is that table")
+    print(f"      the round trip catches {rewritten_count} and passes {unchanged} "
+          f"through unchanged, because sqlglot emits a name it cannot translate as "
+          f"it found it")
+
+    if not unchanged:
+        problems.append(
+            "every DuckDB-only name sqlglot knows is now rewritten by the round "
+            "trip, so transpile-and-compare has become at least as strong as the "
+            "name list on the class the name list was built for — the answer this "
+            "Sub-step gave DEBT-009 was measured against a weaker transpiler and "
+            "should be re-decided rather than left standing"
+        )
+
+
 def main() -> int:
     if not DATABASE_PATH.exists():
         print(f"  no Warehouse at {DATABASE_PATH.relative_to(REPO_ROOT)} — run "
@@ -1407,6 +1892,17 @@ def main() -> int:
         print("  claim 3 — what each shape actually returns, through the adapter")
         check_widening_cast(warehouse)
         check_numbers(warehouse)
+        print()
+        print(f"  claim 4 — does either verdict move on the way to "
+              f"{TARGET_DIALECT}?")
+        check_retargeting(corpus, schema)
+        print()
+        print("  claim 4 — what the round trip preserves is not what it means")
+        check_cast_collapse(schema)
+        print()
+        print("  claim 4 — DEBT-009's question: is transpile-and-compare the "
+              "better dialect scan?")
+        check_dialect_detectors()
 
     print()
     if problems:
@@ -1414,8 +1910,8 @@ def main() -> int:
         for problem in problems:
             print(f"  - {problem}")
         return 1
-    print("PASS — every probe's verdict and every probe's number is the one this "
-          "spike recorded")
+    print("PASS — every probe's verdict, every probe's number and every "
+          "detector's reading is the one this spike recorded")
     return 0
 
 
