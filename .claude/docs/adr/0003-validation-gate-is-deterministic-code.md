@@ -134,6 +134,49 @@ where it measures answer quality after the fact and never gates execution.
   gate. The signal: any proposal to let a judge's score influence whether a query
   runs.
 
+### Status note, 2026-08-20 — the parse-tree claim was measured: **go**
+
+Not a change of decision, and the status stays `accepted`. This ADR was written on
+2026-08-03 on an argument, and the Step 001 review said so in as many words —
+*"sqlglot is load-bearing and unproven here… I believe this works but have not built
+it"*. [Step 003](../plan/step-003-validation-feasibility.md) built
+`.claude/scripts/check_validation_feasibility.py` and ran it against the real schema
+and the real data. The findings, the reproduction command and the go/no-go are in
+[validation-feasibility.md](../design/validation-feasibility.md); what belongs here is
+what the measurement did to this ADR's own sentences.
+
+**The central bet holds.** A certified expression stays recognisable in a generated
+query's parse tree through aliasing, a derived table, a common table expression and a
+Dimension Definition applied to the metric; a query computing revenue inline is
+rejected; a Restricted Column is found in all five shapes that put it in a
+projection, including a `SELECT *` whose text never names it, and is not reported in
+four shapes that do not.
+
+**The rejected alternative is now a measurement rather than an argument.** This ADR
+rejected string matching as *"deterministic without being correct"*, and named the
+four shapes that defeat it. Text matching and the parse tree disagree on **5 of 9
+shapes** — one leak, and **four legitimate queries text matching refuses**. The
+false-refusal half is the larger one and this ADR did not dwell on it.
+
+**Two costs are confirmed, and one is sharper than written.** *"Coverage is only as
+good as a hand-written rule set"* now has a named instance rather than a general
+worry: a certified expression **does not pin down its join**, so `Traded Notional`
+converted through the wrong currency column has an identical projection, traces, and
+is 96.39% wrong on the loaded data. The fix is a Metric Definition field and a join
+check, not a different kind of Gate —
+[DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject).
+
+**One commitment is not yet met by anything.** *"A parse failure on generated SQL
+must be treated as a rejection, never a pass"*. The spike refuses an unparseable
+statement and rejects a statement whose projections it never read — both by
+accident rather than by a rule, which the Sub-step 3.2 review measures. The Gate owes
+an explicit read-only and fail-closed rule.
+
+**What the measurement leaves untouched.** Three of the five checks — Access Profile
+predicate, bounded scan, read-only — are unexamined, and only projections are read
+for certified-metrics-only. Those boundaries are listed under
+[what this Step did not measure](../design/validation-feasibility.md#what-this-step-did-not-measure).
+
 ## Related
 
 - ADR-0001 — certified-metrics-only is decidable only because the Semantic Layer

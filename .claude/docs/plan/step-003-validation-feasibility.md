@@ -1,12 +1,19 @@
 # Step 003 — Prove the Validation Gate's parse-tree claim
 
-- **Status:** **active** — written 2026-08-15 and **approved by Amino the same
-  day**, together with every ruling in [Rulings](#rulings). Sub-step 3.1 may begin
-  once this plan is committed. **The Step has five Sub-steps rather than the four
+- **Status:** in review — every Sub-step is built. Written 2026-08-15 and
+  **approved by Amino the same day**, together with every ruling in
+  [Rulings](#rulings). Sub-steps 3.1 (`d840fa8`), 3.2 (`89fee55`), 3.3 (`23020e9`)
+  and 3.4 (`c20d601`) are **committed**; 3.5 is the fifth and last, **reviewed and
+  approved by Amino on 2026-08-20 and awaiting its commit**. **The Step is `done`
+  when 3.5 lands**, and nothing in it is outstanding besides that commit — the four
+  rulings 3.5 raised are approved and applied in
+  [validation-feasibility.md](../design/validation-feasibility.md#rulings).
+  **The Step has five Sub-steps rather than the four
   it was approved with**: [R3](#r3--an-exemption-names-the-file-as-well-as-the-symbol--approved-and-widened-by-amino-2026-08-15)
   was widened from the new script to *every* exemption, which is one commit of its
   own and lands first. [R5](#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15)
-  pre-agrees where the Step splits if it grows.
+  pre-agrees where the Step splits if it grows; **it did not fire, and the Step ran
+  as the five it was planned as.**
 - **Goal:** Answer, with a committed script run against the real schema and the
   real data, whether sqlglot can decide **from a parse tree alone** that a
   generated query computes a Certified Metric and nothing else — and record the
@@ -107,11 +114,11 @@ One rule landed first, then one new script grown one claim at a time, then the
 document that rules on it.
 
 ```
-.claude/scripts/     ← 3.1   scan exemptions scoped to the file they live in — R3 widened   ✅ approved 2026-08-15
-                     ← 3.2   certified-metrics-only: does a certified expression survive?   (claims 1 and 3)
-                     ← 3.3   Restricted Columns: can one hide behind SELECT * or an alias?   (claim 2)
-                     ← 3.4   dialect retargeting: where does DuckDB → BigQuery stop?         (claim 4)
-.claude/docs/design/ ← 3.5   validation-feasibility.md — the findings and the go/no-go
+.claude/scripts/     ← 3.1   scan exemptions scoped to the file they live in — R3 widened   ✅ committed d840fa8
+                     ← 3.2   certified-metrics-only: does a certified expression survive?   (claims 1 and 3)   ✅ committed 89fee55
+                     ← 3.3   Restricted Columns: can one hide behind SELECT * or an alias?   (claim 2)   ✅ committed 23020e9
+                     ← 3.4   dialect retargeting: where does DuckDB → BigQuery stop?         (claim 4)   ✅ committed c20d601
+.claude/docs/design/ ← 3.5   validation-feasibility.md — the findings and the go/no-go   ✅ approved, awaiting its commit
 ```
 
 Every one passes the sizing test with a conjunction-free commit subject, and every
@@ -234,6 +241,10 @@ Agreed in advance for
 [R6](step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)'s
 reason: the option should be on the table before the Step starts rather than
 offered at review, when it is already too late to have cost nothing.
+
+**It did not fire.** 3.1–3.3 grew in probe count rather than in Sub-step count — the
+growth [R6](#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19)
+governs — so 3.4 stayed in the Step and claim 4 is answered here rather than deferred.
 
 ### R6 — a probe that completes the set is kept, wherever it is found → **ruled by Amino 2026-08-19**
 

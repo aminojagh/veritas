@@ -1491,3 +1491,486 @@ failure: the exempt list still holds 15 entries. A SQL keyword shouted in a sent
 is not an abbreviation the Glossary owes a reader an expansion of, but it is also
 not worth buying a permanent exemption for — and the check reads code spans, so the
 backticks do not excuse it.
+
+---
+
+## Sub-step 3.5 — Record the go/no-go on ADR-0003's parse-tree claim
+
+**What changed**
+
+Five files, no code. `.claude/docs/design/validation-feasibility.md` is new;
+[ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) and
+[ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) each gain a
+dated status note and neither changes status; the Debt Ledger gains
+[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
+and a status note on
+[DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject);
+and Current State is made true. **No script, no schema, no pipeline behaviour, no
+`veritas/validation/` directory, no Glossary term.** This is the Sub-step that rules,
+and ruling is writing.
+
+- **The verdict is GO on ADR-0003**, and the document is built so that the go can be
+  read as conditional rather than as full marks: a verdict per claim, then the
+  findings, then a *what this Step did not measure* section written at the same
+  length as the findings, then six constraints, then the rulings, then the go.
+- **Claim 4 is qualified and is filed under the ADR it belongs to.** Every parse-tree
+  verdict survives the round trip to BigQuery; one type does not. That is ADR-0002's
+  claim, which is why it does not qualify the go on ADR-0003 and why ADR-0002 is the
+  ADR whose mitigation wording the finding lands on.
+- **Six constraints on the next Step, C1 to C6**, each stated as a *because*: publish
+  a form the Orchestrator pastes; carry the Join Path and the date predicate; ship
+  both parse-tree rules together; read the schema at run time; name the two rewrites
+  the Gate trusts; fail closed by a rule rather than by accident.
+- **One conditional Ledger entry, and it is not the one the plan described.** The
+  plan said *"if a transpile-and-compare test is strictly better than the name list
+  `check_seam` uses, that is a finding with a home — a Ledger entry against the
+  existing scan, opened in 3.5."* 3.4 measured that it is **not** strictly better, so
+  that condition is unmet. DEBT-015 is the entry the measurements actually produced:
+  the scan and ADR-0002's mitigation both name **functions**, and the one loss
+  measured was in a **cast**.
+- **The access-control limitation is stated, in DEBT-008's own drafted words**,
+  quoted rather than rewritten so the eventual `README.md` has something to copy. The
+  entry does not fire — this document is the internal working record — but claim 2
+  working is exactly the thing that makes overstating it easy.
+- **Current State's Resume-here stops repeating the findings.** The two long *what
+  3.2 found* / *what 3.3 found* bullets are replaced by one pointer at the new
+  document, which now holds them in one place. Nothing is lost: the reviews still
+  carry the run output, and the document carries the findings.
+
+**Verification**
+
+The plan's verification for 3.5 is the two framework checks. **All five check scripts
+were run**, on **2026-08-20**, offline, in the order shown, because this Sub-step
+puts the spike's figures into a permanent document and Non-Negotiable #4 says a
+figure in a document comes from a run, not from a previous message.
+
+```
+$ uv run python -m veritas.ingestion
+  mode: replay (offline)
+  snapshots: data/snapshots/ingestion
+  universe: 19 Instruments
+  simulator seed: 20260811
+  removed data/veritas.duckdb — rebuilding
+
+  · dim_account                  24 rows
+  · dim_client                   12 rows
+  · dim_instrument               19 rows
+  · fct_accounting_movement    4654 rows
+  · fct_balance_snapshot      15402 rows
+  · fct_cash_movement          5921 rows
+  · fct_fx_rate               11840 rows
+  · fct_instrument_price       9554 rows
+  · fct_position_snapshot     61907 rows
+  · fct_trade                  1670 rows
+
+PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 · fct_fx_rate holds 11840 FX Rates and every Market Price has one
+       the client side holds 12 Clients · 24 Accounts · 1670 Trades · every Position is markable and every amount is convertible
+exit=0
+```
+
+The spike in full, because every figure in `validation-feasibility.md` is read off
+this run rather than off 3.4's:
+
+```
+$ uv run python .claude/scripts/check_validation_feasibility.py
+  Warehouse: data/veritas.duckdb · 10 tables · 1670 Trades
+  Reporting Currency: EUR, stated in 21 conversion predicates and checked against every probe
+  certified expressions: 3, as Python literals in this script (R2)
+    Gross Revenue      SUM("fct_trade"."commission" * "fct_fx_rate"."fx_rate")
+    Net Revenue        SUM(("fct_trade"."commission" - "fct_trade"."rebate" - "fct_trade"."fee") * "fct_fx_rate"."fx_rate")
+    Traded Notional    SUM(CAST("fct_trade"."quantity" AS DECIMAL(38, 6)) * "fct_trade"."execution_price" * "fct_fx_rate"."fx_rate")
+  tracing rules: qualify · merge_subqueries (sqlglot's own optimize() runs 14)
+
+  claim 1 — does a certified expression survive the shapes a generator writes?
+    ALLOWED   bare                                 Gross Revenue
+    ALLOWED   aliased                              Gross Revenue
+    ALLOWED   derived table                        Gross Revenue
+    ALLOWED   common table expression              Gross Revenue
+    ALLOWED   net revenue                          Net Revenue
+    ALLOWED   net revenue by region                Net Revenue
+    ALLOWED   traded notional                      Traded Notional
+    REJECTED  commuted subtraction                 1 expression(s), none certified
+    REJECTED  commuted multiplication              1 expression(s), none certified
+    REJECTED  open-coded net revenue               1 expression(s), none certified
+    REJECTED  unconverted commission               1 expression(s), none certified
+    REJECTED  rebate silently dropped              1 expression(s), none certified
+    ALLOWED   notional through the wrong currency  Traded Notional
+    REJECTED  half-certified union                 Gross Revenue, plus 1 uncertified
+    REJECTED  unknown table                        1 expression(s), none certified
+    REFUSED   unparseable                          ParseError: Expecting ). Line 1, Col: 48.
+
+    7 certified · 2 form · 5 shadow · 1 blind spot · 1 refused
+
+  claim 2 — can a Restricted Column reach the projection unseen?
+    Restricted Columns: 1, as Python literals in this script (R2)
+      dim_client.client_name
+    verdict   text      claim 1   shape                                 in the projection
+    REJECTED  matched   traces    net revenue by client                 dim_client.client_name
+    REJECTED  missed    —         star over a join to dim_client        dim_client.client_name
+    REJECTED  matched   traces    aliased to a benign name              dim_client.client_name
+    REJECTED  matched   traces    hidden behind a derived table         dim_client.client_name
+    REJECTED  matched   traces    a union branch that names the Client  dim_client.client_name
+    ALLOWED   matched   traces    the name in a comment                 —
+    ALLOWED   matched   traces    the name in a string literal          —
+    ALLOWED   matched   traces    the name in a filter only             —
+    ALLOWED   matched   —         projected inside, aggregated away     —
+
+    text matching and the parse tree disagree on 5 of 9 shapes: 1 the text cannot see, 4 it would reject with no Restricted Column in the projection at all
+
+  claim 3 — what each shape actually returns, through the adapter
+    without the widening cast, Traded Notional does not compute: OutOfRangeException
+      Out of Range Error: Overflow in multiplication of DECIMAL(18) (1900000000 * 1258978124). You might want to add an explicit cast to a bigger decimal.
+    bare                                             195,260.14 EUR
+    aliased                                          195,260.14 EUR
+    derived table                                    195,260.14 EUR
+    common table expression                          195,260.14 EUR
+    net revenue                                      131,618.93 EUR
+    net revenue by region                            131,618.93 EUR over 3 rows
+    traded notional                              262,266,110.69 EUR
+    commuted subtraction                             131,618.93 EUR
+    commuted multiplication                          195,260.14 EUR
+    open-coded net revenue                           131,618.93 EUR
+    unconverted commission                         8,604,323.73 (mixed)
+    rebate silently dropped                          166,311.69 EUR
+    notional through the wrong currency        7,264,542,867.58 EUR
+    half-certified union                           not executed (shadow)
+    unknown table                                  not executed (shadow)
+    unparseable                                    not executed (refused)
+
+    == aliased and bare
+    == derived table and bare
+    == common table expression and bare
+    net revenue against bare: 131,618.93 against 195,260.14, 32.59% apart
+    == net revenue by region and net revenue
+    == commuted subtraction and net revenue
+    == commuted multiplication and bare
+    == open-coded net revenue and net revenue
+    open-coded net revenue against bare: 131,618.93 against 195,260.14, 32.59% apart
+    unconverted commission against bare: 8,604,323.73 against 195,260.14, 97.73% apart
+    rebate silently dropped against net revenue: 166,311.69 against 131,618.93, 20.86% apart
+    notional through the wrong currency against traded notional: 7,264,542,867.58 against 262,266,110.69, 96.39% apart
+
+  claim 4 — does either verdict move on the way to bigquery?
+    schema retargeted with the statements: 45 of 53 column types are spelled differently in bigquery
+    corpus retargeted to bigquery, which is what a Gate in front of that engine would hold:
+      Gross Revenue     SUM(`fct_trade`.`commission` * `fct_fx_rate`.`fx_rate`)
+      Net Revenue       SUM((`fct_trade`.`commission` - `fct_trade`.`rebate` - `fct_trade`.`fee`) * `fct_fx_rate`.`fx_rate`)
+      Traded Notional   SUM(CAST(`fct_trade`.`quantity` AS NUMERIC) * `fct_trade`.`execution_price` * `fct_fx_rate`.`fx_rate`)
+            shape                                 verdict at home                             retargeted
+    same    bare                                  ALLOWED · Gross Revenue
+    same    aliased                               ALLOWED · Gross Revenue
+    same    derived table                         ALLOWED · Gross Revenue
+    same    common table expression               ALLOWED · Gross Revenue
+    same    net revenue                           ALLOWED · Net Revenue
+    same    net revenue by region                 ALLOWED · Net Revenue
+    same    traded notional                       ALLOWED · Traded Notional
+    same    commuted subtraction                  REJECTED · nothing certified
+    same    commuted multiplication               REJECTED · nothing certified
+    same    open-coded net revenue                REJECTED · nothing certified
+    same    unconverted commission                REJECTED · nothing certified
+    same    rebate silently dropped               REJECTED · nothing certified
+    same    notional through the wrong currency   ALLOWED · Traded Notional
+    same    half-certified union                  REJECTED · Gross Revenue
+    same    unknown table                         REJECTED · nothing certified
+    same    unparseable                           refused by the tracer
+    same    net revenue by client                 ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    star over a join to dim_client        REJECTED · nothing certified · restricted: dim_client.client_name
+    same    aliased to a benign name              ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    hidden behind a derived table         ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    a union branch that names the Client  ALLOWED · Net Revenue · restricted: dim_client.client_name
+    same    the name in a comment                 ALLOWED · Net Revenue
+    same    the name in a string literal          ALLOWED · Net Revenue
+    same    the name in a filter only             ALLOWED · Net Revenue
+    same    projected inside, aggregated away     REJECTED · nothing certified
+
+    25 of 25 statements keep both parse-tree verdicts through the round trip
+
+  claim 4 — what the round trip preserves is not what it means
+    the cast is load-bearing: fct_trade.quantity is stored as DECIMAL(18,6), and Traded Notional's certified expression widens it
+      widened   SUM(CAST(fct_trade.quantity AS NUMERIC) * fct_trade.execution_price * fct_fx_rate.fx_rate)
+      unwidened SUM(CAST(fct_trade.quantity AS NUMERIC) * fct_trade.execution_price * fct_fx_rate.fx_rate)
+    both arrive in bigquery as the same statement — the width is erased, and claim 1 still traces because the corpus was erased with it
+
+  claim 4 — DEBT-009's question: is transpile-and-compare the better dialect scan?
+    name list   round trip  statement
+    clean       clean       SELECT count(*) FROM fct_trade
+    FLAGGED     FLAGGED     SELECT strftime(price_date, '%Y') FROM fct_instrument_price
+    FLAGGED     clean       SELECT list_aggregate(quantity, 'sum') FROM fct_trade
+    clean       FLAGGED     SELECT * FROM generate_series(1, 10)
+    clean       FLAGGED     SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade
+
+    the two disagree on 3 of 5 statements, and in both directions: 1 the name list catches alone, 2 the round trip catches alone
+    over every DuckDB-only name sqlglot knows: 51 names, 1 that parse at none of the argument counts tried
+      the name list catches all 51 by construction — it is that table
+      the round trip catches 11 and passes 39 through unchanged, because sqlglot emits a name it cannot translate as it found it
+
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+exit=0
+```
+
+**Every figure the document quotes is in that output**, and the operand pair in the
+overflow message is again a different one — `1900000000 * 1258978124` today against
+`776000000000 * 1365021` on 2026-08-19 and `11083000000 * 2616523200` on 2026-08-15,
+on the same expression against a Warehouse built from the same seed. The check
+asserts the refusal, not the operands, which is what
+[3.2's review](#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric)
+already said and what three different pairs now demonstrate.
+
+Nothing else moved, which the two data checks say rather than this Sub-step
+asserting it. `check_warehouse.py`'s table dump and constraint probe are unchanged
+from 3.4 and are not re-pasted; its two scans are the part that could have moved and
+did not:
+
+```
+$ uv run python .claude/scripts/check_warehouse.py
+  seam scan: 14 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+  dialect scan: sqlglot files 51 function names under DuckDB that standard SQL does not have
+    probe: clean
+    probe: STRFTIME
+    probe: LIST_AGGREGATE
+      4 SQL statements in veritas/ingestion/__main__.py
+      5 SQL statements in veritas/ingestion/simulator.py
+     28 SQL statements in .claude/scripts/check_validation_feasibility.py
+     49 SQL statements in .claude/scripts/check_warehouse.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit=0
+```
+
+The plan's own two commands, run last, after this review section was written — so the
+counts below include this file. The document count rises from 24 to 25 and the link
+count from 458 to 491:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  skill ok   closing-a-substep       652 words
+  skill ok   planning-a-step         564 words
+  skill ok   recording-debt          849 words
+  skill ok   registering-language    564 words
+  skill ok   writing-an-adr         1037 words
+  links      491 links, 291 anchors 25 documents
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+exit=0
+
+$ uv run python .claude/scripts/check_language.py
+  glossary: 89 registered terms
+  Target State components (9)
+    agreed        Warehouse
+    agreed        Semantic Layer
+    agreed        Ingestion
+    agreed        Retrieval
+    agreed        Orchestrator
+    agreed        Validation Gate
+    agreed        App
+    agreed        Observability
+    agreed        Evaluation
+  proposed terms: 0 · python files scanned: 14 · identifiers: 965
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+exit=0
+```
+
+**Both failed first, and both failures were real rather than cosmetic.**
+`verify_framework.py` named three dead anchors: the four ruling headings in the new
+document carry `→ **awaiting Amino**`, which is part of the anchor, and three links
+had been written without it. `check_language.py` named the SQL cast keyword shouted
+inside a code span in two documents — the same failure 3.2 and 3.4 hit, and the same
+fix, **reworded to prose rather than added to the exempt list**, which still holds 15
+entries.
+
+**Deliberately left undone**
+
+- **One new Ledger entry, and one deliberately not opened.** DEBT-015 is above. What
+  is **not** opened is an entry for the three Validation Gate checks this Step never
+  examined, or for the projections-only boundary in claim 1. Those are not shortcuts —
+  no code took the cheap path, because there is no code. They are the Step's *result*,
+  and a result belongs in the findings document, which is where they are.
+- **The Gate is still not built and no `veritas/validation/` directory exists**, which
+  is [Not in this Step](../plan/step-003-validation-feasibility.md#not-in-this-step)
+  and the reason the spike's answer is still falsifiable.
+- **`README.md` is untouched**, so
+  [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+  does not fire. Its drafted sentence is quoted in the new document so the eventual
+  README copies rather than composes.
+- **Step 004 is not planned.** *"Never plan more than one Step ahead."* The six
+  constraints are inputs to that plan, not the plan.
+- **[DEBT-001](../debt-ledger.md#debt-001--framework-rules-rely-on-discipline-not-enforcement)'s
+  second coverage gap is unpaid and is not made worse.** `verify_framework.py` still
+  reads links only in `.claude/docs/**/*.md` and `CLAUDE.md`; this Sub-step added no
+  link inside a Python docstring, so every link it wrote is checked by the run above.
+- **No pytest**, continuing the pattern
+  [R5 of Step 002](../plan/step-002-warehouse-and-ingestion.md#r5--evidence-from-check-scripts-no-pytest-this-step--approved)
+  established. Introducing it would have been a sixth Sub-step.
+
+**Look at this sceptically**
+
+1. **The verdict is mine, on measurements that are also mine, from a probe set that
+   grew twice during the Step.** That is the structural reason 3.4 and 3.5 are
+   separate Sub-steps — *"Amino can accept every measurement and reject the
+   conclusion drawn from it"* — and it is the thing to weigh hardest.
+   [R6](../plan/step-003-validation-feasibility.md#r6--a-probe-that-completes-the-set-is-kept-wherever-it-is-found--ruled-by-amino-2026-08-19)'s
+   planning half fired twice here: 3.2 shipped ten probes past its enumeration and
+   3.4 shipped five. A go resting on a probe set that was incomplete at planning time
+   twice is a go that should be read alongside the *what this Step did not measure*
+   list, which is why that list is written at the same length as the findings.
+2. **ADR-0002 was given a status note although the plan named only ADR-0003.** The
+   plan's 3.5 bullet says *"A dated status note on ADR-0003 either way"*. Claim 4 is
+   ADR-0002's claim and 3.4's fifth finding lands on ADR-0002's mitigation wording, so
+   leaving that ADR unannotated would have meant a measurement with no home in the
+   decision it measures. Recorded here rather than as a ruling because it adds a note
+   and changes no decision — but it is scope the plan did not name, and deleting the
+   note costs nothing if Amino disagrees.
+3. **C1's fork was decided in the document rather than put to Amino as an open
+   question.** Either the Semantic Layer publishes a form the Orchestrator pastes, or
+   the Gate normalises commuted operands before comparing. The document chooses the
+   first and argues it; it does **not** measure that the second is worse, because
+   nothing here implemented a normalising comparison. If Amino wants that measured
+   before it is foreclosed, C1 is the constraint to send back — it is
+   [R3](../design/validation-feasibility.md#r3--the-six-constraints-bind-step-004s-plan--approved-by-amino-2026-08-20).
+4. **Half the constraints are not about the Semantic Layer or the Orchestrator.** The
+   plan says *"any constraint the findings place on the Semantic Layer or the
+   Orchestrator is written here"*. C1 and C2 are that. C4, C5 and C6 are constraints on
+   the **Gate**, and C3 is a constraint on how a Step is scoped. They are in the
+   document because the Step that builds the Semantic Layer is the Step that will
+   build against them and dropping them would mean rediscovering them — but it is a
+   widening of the bullet and it is why the count is six rather than two.
+5. **"What would make this a no-go" is written after the result.** The plan did fix
+   what counts as an answer in advance, in its
+   [four-claims table](../plan/step-003-validation-feasibility.md#what-the-four-claims-mean-concretely),
+   and the document's no-go bar is consistent with it — but that specific sentence was
+   composed knowing the outcome, and a bar written after the fact is worth less than
+   one written before. Read it as a restatement, not as a pre-registration.
+6. **DEBT-015's classification is genuinely arguable and I chose debt.** The
+   consequence only lands on BigQuery, which is outside this project; what is wrong
+   now is a check claiming coverage it lacks, which is inside it. Both arguments are
+   in the entry and it is
+   [R2](../design/validation-feasibility.md#r2--debt-015-is-debt-rather-than-an-extension--approved-by-amino-2026-08-20).
+   Getting this wrong in the *debt* direction inflates the open-debt count with
+   something that cannot really be repaid here, which is the failure the Extension
+   Register exists to prevent.
+7. **DEBT-014 was widened after the fact.** Its status note reads the Trade Date /
+   Settlement Date gap as the same question as the join blind spot, which 3.2 asked
+   for — but widening an entry's scope is the same species of move as narrowing a
+   trigger, and it deserves the same visibility. It is
+   [R4](../design/validation-feasibility.md#r4--debt-014-is-amended-to-name-the-date-predicate--approved-by-amino-2026-08-20),
+   and the alternative was a sixteenth entry saying almost the same thing.
+8. **The ruling headings carry their status, so approving them breaks four anchors.**
+   That is the precedent both `data-availability.md` and the Step 003 plan set, and
+   `verify_framework.py` catches the breakage on the next run — but it means Amino's
+   approval is a heading edit plus a link edit, not just a word.
+9. **Two approved bullets were deleted from Current State's Resume-here.** The *what
+   3.2 found* and *what 3.3 found* blocks are gone, replaced by a pointer at the new
+   document. The reasoning is that a finding with two homes has one of them go stale,
+   and the Resume-here block is a pointer for a cold session rather than a second copy
+   of the findings. It is still a deletion of text Amino read and approved, and the
+   reviews and the new document are where it went.
+10. **This document carries figures inline, where the writing convention says evidence
+    lives in a review.** The argument is in its *Reproducing this check* section — the
+    verdicts are asserted by a committed script that fails when one moves, so they are
+    not the kind of figure that goes quietly stale, and the percentages are labelled
+    as dated evidence with the command. `data-availability.md` is the precedent for
+    the shape. Anyone who reads the convention more strictly should say so, because
+    the fix is to strip the percentages down to *"the run prints how far apart"*.
+11. **`◐` for claim 4 is borrowed from `data-availability.md`'s market-price row**,
+    where it meant *go, with a real caveat*. It means the same thing here. Reusing a
+    symbol across two documents without either of them defining it is a small bet on
+    the reader.
+
+**Language**
+
+No terms added, renamed, or proposed. Every domain noun in the new document is a
+registered term used as registered: `Validation Gate`, `Certified Metric`, `Shadow
+Metric`, `Restricted Column`, `Access Profile`, `Metric Definition`, `Semantic
+Layer`, `Semantic Entry`, `Join Path`, `Dimension Definition`, `Grounded Answer`,
+`Grounding`, `Orchestrator`, `Reporting Currency`, `Quotation Currency`,
+`Denomination Currency`, `Gross Revenue`, `Net Revenue`, `Traded Notional`,
+`Execution Price`, `Client`, `Warehouse Adapter`. `check_language.py` passes with the
+same 89 registered terms, 0 proposed terms in code, and 965 identifiers over the same
+14 Python files — unchanged, because this Sub-step wrote no code.
+
+The abbreviation check failed once on this Sub-step's own prose, on the SQL cast
+keyword written in upper case inside a code span in two documents. Both were
+**reworded to prose rather than added to the exempt list**, which is the precedent 3.2
+set and 3.4 followed; the exempt list still holds 15 entries.
+
+### Changes made on approval — 2026-08-20
+
+Amino reviewed the above, **approved it with no change asked for, and ruled on all
+four questions it raised**. Approving them is not a no-op edit, because three of the
+four leave a mark somewhere other than the ruling itself, and one of them — point 8
+above — warned that approval rewrites the anchors. What the approval changed:
+
+1. **The four ruling headings say who ruled and when.** `→ **awaiting Amino**` became
+   `→ **approved by Amino 2026-08-20**` on R1–R4 in
+   [validation-feasibility.md](../design/validation-feasibility.md#rulings), and each
+   gained a short paragraph saying what the ruling settled rather than only what was
+   asked. **Every link into them moved with them** — in the Ledger, in this review,
+   in Current State and inside the document itself. That is exactly the cost point 8
+   named, and `verify_framework.py` is what proves none was missed.
+2. **DEBT-015 is debt, and stays on the Ledger.** R2 is settled the way it was
+   written, so the entry keeps its Trigger — the first Metric Definition carrying a
+   cast — and the open-debt count is 9 rather than 8 with an extension beside it.
+3. **DEBT-014's amendment stands**, so one entry covers the Join Path and the date
+   predicate, and the Sub-step that pays it owes the probe that converts on Settlement
+   Date. That obligation is now written into the entry rather than only into R4.
+4. **Step 003 is closed out.** The [plan](../plan/step-003-validation-feasibility.md)
+   moved from `active` to `in review` with 3.1–3.4's hashes and the note that 3.5 is
+   approved and awaiting its commit; [the plan README](../plan/README.md) matches; and
+   both record that [R5](../plan/step-003-validation-feasibility.md#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15)'s
+   split point never fired. **The plan becomes `done` in the Step 004 planning
+   commit**, which is where 3.5's own hash gets written into Current State — the same
+   way `40d72d8` closed Step 002.
+5. **One staleness was found while closing, and fixed.** Current State's Glossary row
+   read **88 registered terms** and said the most recent change was an amendment. Both
+   stopped being true at Sub-step 3.3, which registered `Restricted Column`; nothing
+   caught it because no check reads a number written in prose. The row now reads 89,
+   names the registration, and says when the figure was wrong — which is the
+   [writing convention](../../../CLAUDE.md#writing-conventions)'s own reason for
+   naming the script beside a figure.
+
+**No document content was changed on the strength of a re-reading** — every finding,
+constraint and verdict in `validation-feasibility.md` is the text Amino approved.
+
+**Verification** — the plan's two commands, re-run after all of the above:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  skill ok   closing-a-substep       652 words
+  skill ok   planning-a-step         564 words
+  skill ok   recording-debt          849 words
+  skill ok   registering-language    564 words
+  skill ok   writing-an-adr         1037 words
+  links      508 links, 302 anchors 25 documents
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+exit=0
+
+$ uv run python .claude/scripts/check_language.py
+  glossary: 89 registered terms
+  Target State components (9)
+    agreed        Warehouse
+    agreed        Semantic Layer
+    agreed        Ingestion
+    agreed        Retrieval
+    agreed        Orchestrator
+    agreed        Validation Gate
+    agreed        App
+    agreed        Observability
+    agreed        Evaluation
+  proposed terms: 0 · python files scanned: 14 · identifiers: 965
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+exit=0
+```
+
+**The link count rose from 491 to 508 and the anchor count from 291 to 302**, which is
+this section, the ruling paragraphs and the closing edits above; the document count is
+unchanged at 25, because nothing new was written. **No code ran and none changed**, so
+`check_warehouse.py` and `check_validation_feasibility.py` are not re-run here — their
+2026-08-20 output is pasted above, from the same day and the same working tree.

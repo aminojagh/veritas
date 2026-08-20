@@ -4,58 +4,80 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-19 — **Step 002 is finished and committed in full**, the Step 003 plan and Sub-steps 3.1, 3.2 and 3.3 are committed, and **Sub-step 3.4 is written, verified and awaiting Amino's review and commit**. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has now answered all four of its claims — tracing, Restricted Columns, the Shadow Metric's numbers and dialect retargeting — leaving only the go/no-go document that rules on them.**
-**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`**. **Sub-step 3.4's hash is not recorded here because this file is part of its own commit** — 3.5 fills it in, which is how every hash above arrived.
+**Last updated:** 2026-08-20 — **Step 002 is finished and committed in full**, the Step 003 plan and Sub-steps 3.1 through 3.4 are committed, and **Sub-step 3.5 — the last of the Step — is written, verified, approved by Amino on 2026-08-20 and lands with this commit, which closes Step 003**. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has answered all four of its claims and the go/no-go is now recorded: `.claude/docs/design/validation-feasibility.md` exists and its verdict is GO on ADR-0003, with six constraints on the Step that builds the Semantic Layer.**
+**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`, Sub-step 3.4 in `c20d601`**. **Sub-step 3.5's hash is not recorded here because this file is part of its own commit** — the Step 004 planning commit fills it in and turns the Step 003 plan from `in review` to `done`, which is how every hash above arrived and how Step 002 was closed in `40d72d8`.
 
 ---
 
 ## Resume here
 
-- **Sub-step 3.4 is written, verified and awaiting Amino's review and commit.**
-  One file: `.claude/scripts/check_validation_feasibility.py` grows claim 4 — the
-  DuckDB → BigQuery round trip. No Ledger entry, no Glossary term, no schema change,
-  no pipeline behaviour, still no `veritas/validation/` directory. Every verification
-  command was run on 2026-08-19 against a Warehouse rebuilt the same day, and the
-  output is in the
-  [review](../reviews/step-003-validation-feasibility.md#sub-step-34--probe-duckdb--bigquery-retargeting-on-the-sql-veritas-will-generate),
-  including three new mutations and a re-run of all five recorded by 3.2 and 3.3.
-- **What 3.4 found, in five lines.** Claim 4 is **answered**, and the answer splits
-  in two: the verdicts survive and one expression's meaning does not.
-  1. **All 25 statements keep both parse-tree verdicts through the round trip.** A
-     Gate reading a retargeted statement reaches the same decision as one reading
-     the original — on the shapes that must trace, the Shadow Metrics that must
-     not, and the Restricted Column probes on both sides.
-  2. **`Traded Notional`'s widening cast is erased by retargeting.**
-     `DECIMAL(38, 6)` and `DECIMAL(18, 6)` — the width the metric needs and the
-     width `fct_trade.quantity` is stored at — both become the single word
-     `NUMERIC`, so the two arrive in BigQuery as **the same statement**.
-  3. **No certified-metrics-only check can notice that**, because the corpus is
-     retargeted by the same rewrite and collapses identically. Claim 1 still says
-     *traces*, correctly, about the question it was asked.
-  4. **DEBT-009's open question is answered: no.** Transpile-and-compare is not
-     strictly better than the name list `check_seam` uses — the two are blind to
-     disjoint classes. The round trip passes **39 of the 50 measurable DuckDB-only
-     names sqlglot knows** through unchanged, because sqlglot emits an
-     untranslatable name as it found it and the round trip reads its own failure as
-     portability. The name list misses `generate_series` and misses a cast by
-     construction.
-  5. **The loss in 2 is in a construct the existing scan cannot see**, and
-     ADR-0002's stated mitigation names *functions*. **That is 3.5's to rule on** —
-     the plan puts the Ledger entry there, so 3.4 opens none.
-- **Two defects were found in 3.4's own debt sweep and fixed rather than recorded.**
-  The retargeted run was reading the Warehouse's own schema with an argument for why
-  that was harmless; it now retargets the schema too. And `round_trip_rewrites`
-  compared parse trees by `repr()`, which reported three portable DuckDB names as
-  unportable — the BigQuery parser records a default argument the DuckDB parser
-  leaves absent. sqlglot's `==` is structural and is what the code uses now; the
-  population count in finding 4 moved from 13/37 to 11/39.
-- **The Step's split point was read as not having fired.**
-  [R5](../plan/step-003-validation-feasibility.md#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15)
-  offers 3.4 as Step 004 against *"review-driven growth"* past the five-Sub-step
-  ceiling. 3.2 and 3.3 each shipped probes past their own enumeration and neither
-  added a Sub-step, so the Step is still five and 3.4 is still the fourth. **This is
-  a reading, not a ruling** — it is the last item under *Look at this sceptically*
-  in 3.4's review, and Amino can still split the Step.
+- **Sub-step 3.5 is written, verified and approved by Amino on 2026-08-20 with no
+  change asked for. It lands with this commit, and it is the last Sub-step of Step
+  003.** Eight files: the new
+  [`validation-feasibility.md`](validation-feasibility.md), a dated status note on
+  each of [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) and
+  [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md), one new Ledger
+  entry plus a status note on an existing one, the
+  [Step Review](../reviews/step-003-validation-feasibility.md), and this file — plus
+  the two the approval itself moved, the [plan](../plan/step-003-validation-feasibility.md)
+  to `in review` with the four committed hashes and [its README](../plan/README.md)
+  to match. **No code changed** —
+  no script, no schema, no pipeline behaviour, still no `veritas/validation/`
+  directory, and no Glossary term added. The verification commands were run on
+  2026-08-20 against a Warehouse rebuilt the same day, and their output is in the
+  [review](../reviews/step-003-validation-feasibility.md#sub-step-35--record-the-gono-go-on-adr-0003s-parse-tree-claim).
+- **The verdict is GO on ADR-0003**, and the document says what the go costs.
+  1. **Claims 1, 2 and 3 hold.** A certified expression survives every rewrite a
+     generator performs for its own reasons; a Shadow Metric is rejected and returns
+     a number far from the right one; a Restricted Column is found in all five shapes
+     that put it in the answer and reported in none of the four that do not.
+  2. **Claim 4 is qualified, and it is ADR-0002's claim rather than ADR-0003's.**
+     Every verdict survives retargeting; one type does not.
+  3. **Six constraints are the price of the go**, written up as C1–C6 for the Step
+     that builds the Semantic Layer: publish a pasteable form, carry the Join Path
+     and the date predicate, ship both parse-tree rules together, read the schema at
+     run time, name the two rewrites the Gate trusts, and fail closed by a rule
+     rather than by accident.
+  4. **What would have made it a no-go is on the record**, so the bar is not written
+     after the result.
+- **One new Ledger entry and one amendment**, both put up for ruling rather than
+  applied silently, and **both ruled on 2026-08-20**. **The open-debt count is now 9.**
+  - **[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)** —
+    the dialect scan names functions and the loss 3.4 measured was in a cast, so a
+    check claims coverage it does not have. Trigger: the first Metric Definition
+    carrying a cast, which is `Traded Notional`'s and cannot be avoided. **Ruled
+    debt rather than an extension**, both arguments written out, in
+    [R2](validation-feasibility.md#r2--debt-015-is-debt-rather-than-an-extension--approved-by-amino-2026-08-20).
+  - **[DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+    gains a dated status note** reading the Trade Date / Settlement Date gap as the
+    same question as the join blind spot, per 3.2's request. **Approved** as
+    [R4](validation-feasibility.md#r4--debt-014-is-amended-to-name-the-date-predicate--approved-by-amino-2026-08-20):
+    one entry covers both halves, and the Sub-step that pays it owes a probe that
+    converts on Settlement Date, because that half is argued rather than measured.
+- **All four rulings were approved on 2026-08-20**, in
+  [Rulings](validation-feasibility.md#rulings): the go itself and its six
+  constraints (R1), DEBT-015's classification (R2), that the constraints bind
+  Step 004's plan and that C1's fork is settled as written (R3), and
+  DEBT-014's amendment (R4). **Their heading anchors carried `awaiting-amino`, so
+  approving them rewrote four headings and every link into them** — in this file,
+  the Ledger, the Step Review and the document itself. `verify_framework.py` is what
+  proves none was missed, and it is the same edit the plan's R1–R6 took.
+- **One standing figure in this file was wrong and is fixed.** The Glossary row read
+  **88 registered terms** and said the most recent change was an amendment; both
+  stopped being true at Sub-step 3.3, which registered `Restricted Column`. No check
+  reads a number written in prose, which is why nothing caught it for two Sub-steps.
+  The row now reads 89, names the registration and says when it was wrong — and the
+  figure that settles it is whatever `check_language.py` prints.
+- **Two things in the document were judgement rather than measurement, and both
+  stand.** The review says so at length: ADR-0002 was given a status note although
+  the plan named only ADR-0003, and C1's fork — publish a pasteable form versus let
+  the Gate normalise commuted operands — was decided in the document rather than put
+  to Amino as an open question. Approving the document approved both: the note stays,
+  and the fork is now settled by R3 rather than by the document alone.
+- **Sub-step 3.4 was committed unchanged in `c20d601`**, so its seven points under
+  *Look at this sceptically* stand as built with no ruling recorded against them —
+  including the reading that the Step's split point had not fired, which the commit
+  settles: 3.4 is the fourth Sub-step of Step 003 and not Step 004.
 - **Sub-step 3.3 was committed in `23020e9` after Amino's 2026-08-19 review**, which
   changed three things and approved the rest.
   1. **A union probe was added to claim 2** — Net Revenue by region in one branch
@@ -108,62 +130,24 @@ wrong and gets fixed immediately.
   review's prose and the review was reworded, rather than the list extended.
 - **Active Step:** 003 — Prove the Validation Gate's parse-tree claim
   ([plan](../plan/step-003-validation-feasibility.md)), **written and approved
-  2026-08-15, committed in `40d72d8`**. It is the sqlglot spike
+  2026-08-15, committed in `40d72d8`**, and **complete: every Sub-step is built and
+  approved, and the plan is `in review` until 3.5's commit makes it `done`**. All
+  five Sub-steps are written, four are committed, and the Step
+  ran as the five it was planned as — its
+  [split point](../plan/step-003-validation-feasibility.md#r5--34-is-a-pre-agreed-split-point--approved-by-amino-2026-08-15)
+  never fired. It is the sqlglot spike
   [R6](../plan/step-002-warehouse-and-ingestion.md#r6--the-sqlglot-spike-then-numbered-24-is-a-pre-agreed-split-point--approved)
   moved out of Step 002, whose approved 2026-08-05 wording is preserved verbatim
   under [Deferred to Step 003](../plan/step-002-warehouse-and-ingestion.md#deferred-to-step-003--prove-the-validation-gates-parse-tree-claim)
   and whose four questions the plan changes in no way.
-- **What 3.2 found, in six lines.** Claims 1 and 3 are **answered and both hold**,
-  and two of the findings are constraints on Step 004 rather than reassurance.
-  1. A certified expression survives table aliases, an output alias, a derived
-     table, a common table expression and a Dimension Definition applied to it.
-  2. **Two of sqlglot's fourteen optimizer rules are enough** — `qualify` and
-     `merge_subqueries`.
-  3. **Recognisable means the same *form*.** `commission - fee - rebate` does not
-     trace where `commission - rebate - fee` does, and both return exactly the
-     same number — so the Semantic Layer has to publish a form the Orchestrator
-     pastes rather than a formula it re-derives.
-  4. **The Shadow Metric is rejected and the rejection is worth having**: revenue
-     open-coded inline stands 32.59% from `Gross Revenue`'s certified expression.
-  5. **A certified expression does not pin down the join.** `Traded Notional`
-     converted through the wrong currency column has an identical projection, so
-     it is allowed, and is 96.39% wrong. **A Metric Definition must carry its Join
-     Path and the Gate must check the join, not only the projection.**
-  6. **`Traded Notional` cannot be computed as the Glossary defines it** — it
-     overflows — so its certified expression carries a widening cast, which the
-     script proves is required on every run.
-- **What 3.3 found, in five lines.** Claim 2 is **answered and holds** on all nine
-  shapes measured.
-  1. **The schema is what makes it hold.** `SELECT *` over a join reaching
-     `dim_client` projects a Client's name while the text `client_name` appears
-     nowhere in the query. Expanding the star against the real schema is the only
-     thing that finds it.
-  2. **ADR-0003's rejection of text matching is now measured, and it was
-     understated.** The two disagree on **5 of 9 shapes** — one the text cannot see,
-     and **four legitimate queries the text would reject**: a comment explaining why
-     the column was left out, a label carrying the name as data, a filter on a Client
-     with only a total returned, and a count of distinct Clients. A mutation makes the
-     detector *be* text matching and the run fails on all five at once.
-  3. **The two parse-tree claims are independent, and claim 2 is the only one
-     standing in four cases.** Four shapes compute Net Revenue's certified expression
-     exactly — claim 1 allows all four — and all four put a Client's name in the
-     answer. **A Gate implementing certified-metrics-only alone would ship the leak.**
-  4. **Reaching the answer is a different question from appearing in the statement.**
-     A Client name projected inside an unfoldable subquery and aggregated into
-     `count(*)` is in the statement and in nobody's answer. Reading every scope's
-     projections — which is what claim 1 needs — rejects it; walking each output
-     column's lineage does not.
-  5. **The union probe detects claim 1's hole as well as claim 2's.** Putting 3.2's
-     traversal back to the outermost scope now fails two probes rather than one.
-- **The filter-only shape is allowed by design and is not a hole.** A query filtered
-  to one Client returning only a total does leak by inference, and the Target State's
-  flow assigns that to a different check on the same list — *"Access Profile
-  predicate present"*. Claim 2 is the projection rule; the predicate rule is its
-  neighbour and this Step measures one of them.
-- **A hole in the tracer was found and closed inside 3.2**: reading the outermost
-  scope alone meant a union's second branch was never examined, so a statement with
-  a certified first branch and a Shadow Metric second branch was allowed. Measured
-  by mutation, not described.
+- **What the spike found is now in one place**, and this block no longer repeats it:
+  [validation-feasibility.md](validation-feasibility.md) carries a verdict per claim,
+  the findings behind each, what the Step did **not** measure, and the six
+  constraints on the next Step. The dated run output and the mutations that give each
+  probe teeth stay in the
+  [Step Review](../reviews/step-003-validation-feasibility.md), one Sub-step at a
+  time. Read the document first; read the review when you need the command that
+  produced a figure.
 - **What 3.1 did.**
   [R3](../plan/step-003-validation-feasibility.md#r3--an-exemption-names-the-file-as-well-as-the-symbol--approved-and-widened-by-amino-2026-08-15)
   landed in its one existing instance, before this Step added a file to a scanned
@@ -177,27 +161,24 @@ wrong and gets fixed immediately.
   hole is measured rather than asserted: the same mutation passes `HEAD`'s check
   and fails the narrowed one. **3.2 is the file that R3 was raised about, and it
   passes the dialect scan claiming no exemption at all.**
-- **Next: Sub-step 3.5** — the go/no-go document,
-  `.claude/docs/design/validation-feasibility.md`, in the shape of
-  [`data-availability.md`](data-availability.md): how to reproduce it, a verdict per
-  claim, the findings, the rulings, and an explicit **go** or **no-go** on
-  [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) with a dated
-  status note on it either way. It is the last Sub-step of the Step. Three things
-  are waiting for it specifically:
-  1. **ADR-0002 is owed a status note too**, not only ADR-0003 — claim 4 is its
-     claim, and 3.4's finding 5 lands on its mitigation wording.
-  2. **The one conditional Ledger entry**, per the plan: 3.4 measured that
-     transpile-and-compare is *not* strictly better, so the entry the plan
-     described is not the one to open. What wants a home is that the measured loss
-     sits in a construct the scan cannot see.
-  3. **The constraints on Step 004** already gathered by 3.2 and 3.4 — a Metric
-     Definition must carry its Join Path, the Semantic Layer must publish a form the
-     Orchestrator pastes rather than a formula it re-derives, and a retargeted
-     certified expression is not the same artefact as a hand-written one.
-  **No component row has moved off `✗ none` and none will in this Step** — a spike
-  moves what is known, not what is built. Any session resuming here runs
-  `uv run python -m veritas.ingestion` first, because the Warehouse is gitignored
-  and the spike's probes execute against real data.
+- **Next: plan Step 004**, as the first act of the session after this commit lands.
+  Step 003 ends here — all five Sub-steps are written and approved, four are
+  committed, and the fifth is this commit. **Step 004 is expected to be the Semantic
+  Layer**, which is
+  [R4](../plan/step-003-validation-feasibility.md#r4--step-003-is-the-spike-alone-the-semantic-layer-is-step-004--approved-by-amino-2026-08-15)'s
+  stated expectation and not a plan — planning it is `planning-a-step`'s job and it
+  has not been done. Whatever it turns out to be, **the six constraints in
+  [validation-feasibility.md](validation-feasibility.md#consequences-for-step-004)
+  are the input it starts from**, and
+  [R3](validation-feasibility.md#r3--the-six-constraints-bind-step-004s-plan--approved-by-amino-2026-08-20)
+  says they bind rather than merely inform. **That planning commit also closes Step
+  003 formally** — it writes 3.5's hash into the list above and turns the
+  [plan](../plan/step-003-validation-feasibility.md) from `in review` to `done`,
+  which is exactly how `40d72d8` closed Step 002.
+  **No component row moved off `✗ none` in this Step and none was going to** — a
+  spike moves what is known, not what is built. Any session resuming here runs
+  `uv run python -m veritas.ingestion` first, because the Warehouse is gitignored and
+  the spike's probes execute against real data.
 - **The plan's four questions were all approved on 2026-08-15**, recorded as
   [R1–R4](../plan/step-003-validation-feasibility.md#rulings): `Restricted Column`
   is a registered term as of Sub-step 3.3; the spike's certified expressions stay
@@ -209,8 +190,9 @@ wrong and gets fixed immediately.
   Sub-step 3.3's review: a probe that completes the set is kept wherever it is
   found, and the Sub-step that finds one owes the account of why the enumeration
   missed it.
-- **Do not plan Step 004** — the route to the Target State is discovered one Step
-  at a time.
+- **Step 004 is not planned, and not in this commit** — the route to the Target
+  State is discovered one Step at a time, so planning it is the next session's first
+  act rather than a paragraph appended to the Step it follows.
 - **Sub-step 2.6 was committed unchanged**, so the three points its review put up
   under *Look at this sceptically* stand as built, with no ruling recorded against
   them: `generate_series` is not standard SQL and the scan does not flag it,
@@ -350,12 +332,18 @@ Layer, no Retrieval, no application.
 **What has moved since is knowledge rather than machinery.** The design's largest
 unproven assumption — that sqlglot can decide from a parse tree alone whether a
 generated query computes a Certified Metric — is now measured on the real schema
-and the real data for two of its four claims. It holds, with two boundaries that
-constrain what a Metric Definition must carry: a certified expression is
-recognised **by form**, so a paraphrase of it is refused, and a certified
-expression **does not pin down the join**, so a query converting through the wrong
-currency column is allowed and is 96% wrong. Both are written up for Sub-step 3.5,
-which is the Sub-step that rules on them.
+and the real data, on all four of the claims Step 002 deferred, and the verdict is
+recorded: **GO on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md)**,
+in [validation-feasibility.md](validation-feasibility.md), which is the second design
+gate beside [data-availability.md](data-availability.md). The go carries six
+constraints on the Step that builds the Semantic Layer, two of them sharp enough to
+restate anywhere: a certified expression is recognised **by form**, so a paraphrase of
+it is refused and the Semantic Layer must publish a form the Orchestrator pastes; and
+a certified expression **does not pin down the join**, so a query converting through
+the wrong currency column is allowed and is 96% wrong, which is why a Metric
+Definition has to carry its Join Path and its date predicate. The fourth claim, which
+is ADR-0002's rather than ADR-0003's, is qualified: every parse-tree verdict survives
+retargeting to BigQuery and one type does not.
 
 ## What is built
 
@@ -365,7 +353,7 @@ which is the Sub-step that rules on them.
 | Development framework | ✅ working | `CLAUDE.md`, `.claude/docs/` tree, five skills in `.claude/skills/`. Non-Negotiable #4 gained a rule in 3.1: **an exemption is scoped to where it is needed** — a check that excuses something names the file as well as the symbol, never a symbol alone. |
 | Framework self-check | ✅ working | `.claude/scripts/verify_framework.py` — structure only (documents exist, links resolve, skills load, interpreter pinned), passes. **Links now include their `#anchor`** ([R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11), 2026-08-11): the fragment used to be split off and discarded, so a link to a renamed heading passed, and same-document `#anchor` links were not checked at all. It reports a `dead anchor` distinct from a `dead link` and prints how many links and anchors it checked. Verified by making it fail against a temporary document with two dead anchors, in the [Sub-step 2.4 changes-on-review section](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11-sub-step-24). Scope is `.claude/docs/**` plus `CLAUDE.md`; `README.md` is outside it. |
 | Language check | ✅ working | `.claude/scripts/check_language.py` — content rules: component names registered, no `proposed` term in code, abbreviations resolvable. Passes. Parses code with `ast` so it checks identifiers, not prose. Partial payment of [DEBT-001](../debt-ledger.md). |
-| Glossary | ✅ working | Process Language + Domain Language Sections A–E, all `agreed`, **88 registered terms** as counted by `check_language.py`. **The most recent change is an amendment rather than a registration, so the count is unchanged**: `FX Rate`, clarified 2026-08-11 under [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11), now says in its own words that a euro-side pair *is* a published ECB reference rate while a pair between two non-euro currencies is the ratio of that date's two published rates — both are FX Rates, and a rate of any other origin is not one. The most recent *addition* is not a Domain Language term but an abbreviation: **NYSE** — New York Stock Exchange — **approved 2026-08-11**, added when R18 moved the reasoning about NASDAQ Trader's second file out of a code comment and into the Step Review, where the abbreviation checker reads it. The same ruling rewrote the `Adjusted Close` / `Market Price` Section C row so its 95.5% divergence figure is dated evidence with the command that reproduces it rather than a standing claim. Sub-step 1.2 added `Market Price`, `Adjusted Close`, `Quotation Currency`; narrowed `Instrument`; renamed `dim_fx_rate` → `fct_fx_rate` and registered `fct_instrument_price`. Step 002 planning added `Execution Price` and its Section C row against `Market Price`. Sub-step 2.1 added `Instrument Symbol`, `Trade Side` and `Denomination Currency` (R7–R9), a Section C row for the last against `Quotation Currency`, and swept the `Dimension Definition` instrument-type values to match the narrowed `Instrument` row (R10); Amino's 2026-08-06 review added `Cost Basis` and its Section C row against `Execution Price`, and registered `Snapshot` (R11–R12). |
+| Glossary | ✅ working | Process Language + Domain Language Sections A–E, all `agreed`, **89 registered terms** as counted by `check_language.py`. **The most recent registration is `Restricted Column`**, added to Section A by Sub-step 3.3 under [R1](../plan/step-003-validation-feasibility.md#r1--term-proposal-restricted-column--approved-by-amino-2026-08-15) — the Sub-step that first gave it a code identifier — and its row says how *in the projection* is judged: on the parse tree once `SELECT *` has been expanded against the real schema, so the name in a comment, a string literal or a filter is not a projection of it. **This row read 88 until 2026-08-20**, when closing Step 003 caught that 3.3's registration had not been counted here; the figure is whatever `check_language.py` prints, which is why it names the script. The change before it was an amendment rather than a registration: `FX Rate`, clarified 2026-08-11 under [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11), now says in its own words that a euro-side pair *is* a published ECB reference rate while a pair between two non-euro currencies is the ratio of that date's two published rates — both are FX Rates, and a rate of any other origin is not one. The most recent *addition* is not a Domain Language term but an abbreviation: **NYSE** — New York Stock Exchange — **approved 2026-08-11**, added when R18 moved the reasoning about NASDAQ Trader's second file out of a code comment and into the Step Review, where the abbreviation checker reads it. The same ruling rewrote the `Adjusted Close` / `Market Price` Section C row so its 95.5% divergence figure is dated evidence with the command that reproduces it rather than a standing claim. Sub-step 1.2 added `Market Price`, `Adjusted Close`, `Quotation Currency`; narrowed `Instrument`; renamed `dim_fx_rate` → `fct_fx_rate` and registered `fct_instrument_price`. Step 002 planning added `Execution Price` and its Section C row against `Market Price`. Sub-step 2.1 added `Instrument Symbol`, `Trade Side` and `Denomination Currency` (R7–R9), a Section C row for the last against `Quotation Currency`, and swept the `Dimension Definition` instrument-type values to match the narrowed `Instrument` row (R10); Amino's 2026-08-06 review added `Cost Basis` and its Section C row against `Execution Price`, and registered `Snapshot` (R11–R12). |
 | Target State | ✅ working | **`agreed`** 2026-08-03. Terms agreed, data sources verified, rulings R1–R3 applied. One correction 2026-08-05: no date dimension in the Warehouse row. |
 | Product brief | ✅ working | `.claude/docs/design/product-brief.md` — the full system Veritas slices, captured so the job description can be removed. |
 | Data-availability check | ✅ working | `.claude/docs/design/data-availability.md` + `.claude/scripts/check_data_availability.py`. Verdict GO. Runs offline from `data/snapshots/` or live with `--refresh`; exits non-zero if a source dies, a wrong-number trap vanishes, or a distinction collapses. |
@@ -374,7 +362,8 @@ which is the Sub-step that rules on them.
 | Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, **all ten populated**. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). The two movement tables carry **opposite sign conventions** and the schema says so beside each column: cash is signed from the Account's side, accounting carries magnitudes so that Net Revenue = Σcommission − Σrebate − Σfee is literally true. |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is now checked rather than promised. `create_schema`, `tables`, `columns`, `row_count`, `execute`, `query`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. Hardcoded database path and no error handling, both licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
 | Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and **the adapter seam holds in both the halves [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) named** — no `duckdb` import outside `veritas/warehouse/`, and no DuckDB-specific function name in the SQL any module out there emits. The dialect half (2.6) reads every string literal sqlglot parses as a statement and names any function call standard SQL does not have; which names those are is subtracted out of sqlglot's own dialect tables rather than typed, so the list tracks the library. Three probes run every time — standard SQL clean, `strftime` named, `list_aggregate` named — and a probe reading wrong fails the run. Those probes are the scan's **one fixture exemption**, and since 3.1 it is scoped to the file it lives in: `FIXTURE_EXEMPTIONS` names `.claude/scripts/check_warehouse.py` as well as the symbol `DIALECT_PROBES`, so no other scanned file can claim it by choosing that name. Pointing the entry at a file that does not exist makes the run fail loudly, so a stale exemption cannot widen quietly. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. **`--distinctions` (2.5)** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument** (added on review, 2026-08-13, after a transfer moved a fraction of a share and nothing objected), every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both — together they only prove an empty table is empty. |
-| Validation feasibility spike | ✅ working | `.claude/scripts/check_validation_feasibility.py` (3.2, 3.3) — the sqlglot spike, answering claims 1, 2 and 3 of [Step 003](../plan/step-003-validation-feasibility.md). **Not the Validation Gate and not a thin version of one**: it creates no `veritas/validation/` directory and ships no component. A tracer — parse, resolve against the real schema read through `WarehouseAdapter.columns`, rename table aliases back to their base table, canonicalise every projection that aggregates — plus sixteen probes, each declaring the verdict this Sub-step measured for it. A statement is allowed when it computes at least one metric expression and **every** one traces to a certified expression. Three certified expressions live as Python literals ([R2](../plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15)), so the Semantic Layer's file format stays unfixed. Every executable probe is executed through the adapter and checked **against another probe's number** rather than against a figure written in the script. It exits non-zero if any verdict or any relation changes, in either direction — a spike's job is to hold its finding still. **Sub-step 3.3 added claim 2.** `resolve` now holds the rewriting settings both claims are judged under, and each claim reads the result its own way: `projected_expressions` walks every scope for claim 1, and `columns_reaching_the_answer` walks each output column's lineage for claim 2, so a column that never reaches the answer is not counted. Nine more probes, each judged three ways — from the parse tree, by searching the query's text (ADR-0003's rejected alternative), and by claim 1's tracer. Figures and the mutations are dated evidence in the [3.2](../reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric) and [3.3](../reviews/step-003-validation-feasibility.md#sub-step-33--probe-whether-a-restricted-column-can-hide-from-the-parse-tree) reviews. |
+| Validation feasibility spike | ✅ working | `.claude/scripts/check_validation_feasibility.py` (3.2, 3.3, 3.4) — the sqlglot spike, answering **all four claims** of [Step 003](../plan/step-003-validation-feasibility.md). **Not the Validation Gate and not a thin version of one**: it creates no `veritas/validation/` directory and ships no component. A tracer — parse, resolve against the real schema read through `WarehouseAdapter.columns`, rename table aliases back to their base table, canonicalise every projection that aggregates — plus 25 probe statements, each declaring the verdict this spike measured for it. A statement is allowed when it computes at least one metric expression and **every** one traces to a certified expression. Three certified expressions live as Python literals ([R2](../plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15)), so the Semantic Layer's file format stays unfixed. Every executable probe is executed through the adapter and checked **against another probe's number** rather than against a figure written in the script. It exits non-zero if any verdict, any relation or any detector reading changes, in either direction — a spike's job is to hold its finding still. **3.3 added claim 2**: `resolve` holds the rewriting settings both claims are judged under, `projected_expressions` walks every scope for claim 1, and `columns_reaching_the_answer` walks each output column's lineage for claim 2, so a column that never reaches the answer is not counted; nine shapes are judged three ways each — from the parse tree, by searching the query's text (ADR-0003's rejected alternative), and by claim 1's tracer. **3.4 added claim 4**: every one of the 25 statements is transpiled to BigQuery, re-parsed there and re-judged against a corpus and a schema retargeted the same way, plus two checks the round trip does not answer by surviving — what happened to the one certified expression carrying a cast, and whether transpile-and-compare would be a better dialect scan than `check_seam`'s name list. Figures and mutations are dated evidence in the [3.2](../reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric), [3.3](../reviews/step-003-validation-feasibility.md#sub-step-33--probe-whether-a-restricted-column-can-hide-from-the-parse-tree) and [3.4](../reviews/step-003-validation-feasibility.md#sub-step-34--probe-duckdb--bigquery-retargeting-on-the-sql-veritas-will-generate) reviews. |
+| Validation-feasibility gate | ✅ working | `.claude/docs/design/validation-feasibility.md` (3.5) — the go/no-go the spike exists to produce, in the shape of `data-availability.md` and beside it as the project's second design gate. **Verdict GO on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md)**, with a verdict per claim, what the Step did **not** measure, six constraints on the Step that builds the Semantic Layer, and **four rulings, all approved by Amino on 2026-08-20**. Both ADRs carry a dated status note pointing at it; neither status changed. |
 | Semantic Layer | ✗ none | — |
 | Ingestion | ✅ working | `veritas/ingestion/` — **both halves**: four real sources and the seeded simulator. `uv run python -m veritas.ingestion` builds all ten tables end-to-end from a clean clone with **no network**, and two consecutive runs produce byte-identical output. `--refresh` is the only mode that opens a socket; a refresh that fails part-way names the snapshots it had already rewritten, and one that succeeds reports how many it rewrote and how many were distinct — **failing the run if a source was fetched twice**. **Two phases, in an order that cannot be reversed:** dlt lands the real sources in `raw` and the adapter builds three star tables from them; then `simulator.py` *reads those three through the adapter*, generates the client side as a pure function of them and a seed, and a second dlt load plus seven more build scripts lands it. No two connections are ever open at once. The pipeline refuses to complete on four silent-shortness conditions, two of them added in 2.5: a Position with no Market Price on its own Snapshot date, and a monetary amount whose Denomination Currency has no FX Rate on its own date. |
 | Retrieval | ✗ none | — |
@@ -425,13 +414,14 @@ veritas/
     │   ├── verify_framework.py        # structure: docs, links, skills, interpreter
     │   ├── check_language.py          # content: Glossary + writing conventions
     │   ├── check_warehouse.py         # schema vs Glossary, constraints, adapter seam
-    │   ├── check_validation_feasibility.py  # the sqlglot spike — claims 1, 2 and 3
+    │   ├── check_validation_feasibility.py  # the sqlglot spike — all four claims
     │   └── check_data_availability.py
     └── docs/
         ├── glossary.md
         ├── debt-ledger.md
         ├── extension-register.md
-        ├── design/{target-state,current-state,product-brief,data-availability}.md
+        ├── design/{target-state,current-state,product-brief}.md
+        ├── design/{data-availability,validation-feasibility}.md   # the two design gates
         ├── adr/
         ├── plan/
         └── reviews/
@@ -456,16 +446,19 @@ measuring the Section C pairs.
 certified, or retrievable, and nothing turns a question into SQL. The arithmetic
 exists; the machine that chooses it does not.
 
-**Three of the spike's four claims are answered; one is not.** Sub-step 3.2
-measured tracing (claim 1) and the Shadow Metric (claim 3), and Sub-step 3.3 measured
-Restricted Columns (claim 2). **DuckDB → BigQuery retargeting (claim 4) is
-untouched**, and no verdict has been recorded on
-[ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) — that is Sub-step
-3.5's job, and `.claude/docs/design/validation-feasibility.md` does not exist yet. Of
-the Validation Gate's five checks the spike has now looked at two:
-certified-metrics-only and no restricted columns. The Access Profile predicate,
-bounded scan and read-only are unexamined; an `INSERT` is refused by the tracer, but
-incidentally rather than by a rule.
+**All four of the spike's claims are answered and the verdict is recorded**, in
+[validation-feasibility.md](validation-feasibility.md): tracing and the Shadow Metric
+in Sub-step 3.2, Restricted Columns in 3.3, DuckDB → BigQuery retargeting in 3.4, and
+the go on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) in 3.5.
+**What that does not mean is that the Gate is feasible in full.** Of the Validation
+Gate's five checks the spike looked at **two** — certified-metrics-only and no
+restricted columns. The Access Profile predicate, the bounded scan and read-only are
+unexamined; a statement that writes is refused by the tracer, but incidentally rather
+than by a rule, and ADR-0003's fail-closed commitment is met by nothing. Only
+projections are read for claim 1, so a metric expression that appears solely in a
+filter applied after grouping is invisible. The document's own
+[what this Step did not measure](validation-feasibility.md#what-this-step-did-not-measure)
+is the full list and is deliberately as long as the findings.
 
 **Two Section C pairs are real but small at book level**, and both are on the
 Ledger against the Gold Question Set rather than fixed in the data:
@@ -556,7 +549,7 @@ which is why 2.4 hit it nowhere.
 
 ## Open debt and extensions
 
-**8 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **3 paid**, 1
+**9 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **3 paid**, 1
 accepted permanently and 2 moved out. **8 open extensions** — see
 [extension-register.md](../extension-register.md).
 
@@ -622,7 +615,18 @@ life? Three Sub-step 1.3 entries failed that test and moved.
   currency column, because the tracer reads the projection and the two joins project
   identically. It is allowed to stay a passing measurement while no Validation Gate
   exists; the Sub-step that builds the Gate is not done until the Gate rejects that
-  query and the probe expects a rejection.
+  query and the probe expects a rejection. **Amended 2026-08-20** with a dated status
+  note reading the Trade Date / Settlement Date gap as the same question — the
+  repayment covers the Join Path **and** the date predicate, and no probe measures the
+  date half, so the Sub-step that pays it owes one.
+- **DEBT-015** — opened 2026-08-20 in Sub-step 3.5. `check_seam`'s dialect scan names
+  DuckDB-only **function** names, and so does ADR-0002's stated mitigation; the one
+  construct where Sub-step 3.4 measured meaning being lost on the way to BigQuery is a
+  **cast**, which neither reaches. A check claiming coverage it does not have is
+  DEBT-009's shape in the same file. Fires on the first Metric Definition carrying a
+  cast, which is `Traded Notional`'s and cannot be written any other way. **Ruled debt
+  rather than an extension on 2026-08-20**, both arguments on the record, in
+  [R2](validation-feasibility.md#r2--debt-015-is-debt-rather-than-an-extension--approved-by-amino-2026-08-20).
 - **EXT-006** — attributing a `Position Change` to its cause (Trade, transfer,
   corporate action). Opened 2026-08-06 against the `fct_position_snapshot` seam.
   The metric as registered promises the change, not the cause, so the slice is

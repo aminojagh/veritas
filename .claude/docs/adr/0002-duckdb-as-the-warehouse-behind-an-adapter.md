@@ -286,6 +286,43 @@ adapter module"* — but nothing ran it. Step 002's `check_warehouse.py` perform
 that scan, so the commitment is checked on every run rather than asserted in a
 review.
 
+### Status note, 2026-08-20 — the retargeting claim was measured, and the mitigation names the wrong unit
+
+Not a change of decision, and the status stays `accepted`. The fourth claim of
+[Step 003](../plan/step-003-validation-feasibility.md)'s spike belongs to this ADR
+rather than to ADR-0003, because it is this one that put sqlglot in charge of
+retargeting and conceded in the same breath that transpilation is *"good but not
+total"*. The full findings and the command that reproduces them are in
+[validation-feasibility.md](../design/validation-feasibility.md#4-dialect-retargeting---every-verdict-survives-one-type-does-not).
+
+**The verdicts survive completely.** All 25 statements the spike builds keep both
+parse-tree verdicts through a DuckDB → BigQuery round trip: a Gate reading a
+retargeted statement reaches the same decision as one reading the original.
+
+**One type does not.** `Traded Notional`'s widening cast to `DECIMAL(38, 6)` — proved
+necessary on every run, since the engine refuses the uncast expression — retargets to
+the single word `NUMERIC`, and so does `DECIMAL(18, 6)`, the width
+`fct_trade.quantity` is stored at. The two arrive in BigQuery as the same statement.
+Nothing here executes against BigQuery, so this is a statement about the SQL that
+would be sent and not about the number that would come back.
+
+**The mitigation above is written in the wrong unit.** The first accepted cost says
+to *"treat any DuckDB-only function in a Metric Definition as a review comment"*. The
+one construct where meaning was measurably lost is a **cast**, and a cast is not a
+function call — so neither that sentence nor `check_seam`'s name-based dialect scan
+reaches it. Opened as
+[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast),
+whose repayment is the name list **plus** a round-trip comparison over types: the same
+Sub-step measured that a round trip passes 39 of the 50 measurable DuckDB-only names
+straight through, so the two detectors are blind to disjoint classes and neither
+replaces the other. The wording here is left as written, with this note beside it,
+which is how the 2026-08-05 clarification above was handled.
+
+**A related question it also settles.**
+[DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
+left open in writing whether transpilation-level checking would be the better scan.
+**It would not** — not strictly better, for the reason in the paragraph above.
+
 ## Related
 
 - ADR-0003 — shares the sqlglot dependency, and inherits the missing

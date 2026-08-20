@@ -42,8 +42,9 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The price table is sparse, so the Snapshot calendar has holes | M | The first "as of" date chosen by anything but the Snapshot calendar | open |
 | [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
 | [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate | open |
+| [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast | open |
 
-**Open debt:** 8 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 9 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -1066,3 +1067,102 @@ about in a different component.
 The Sub-step that builds the Validation Gate. That Sub-step is not done until
 `notional through the wrong currency` is rejected by the Gate, and until this probe
 in the spike expects a rejection rather than an allowance.
+
+**Status note, Sub-step 3.5 (2026-08-20) — the date-column question is this entry's
+question, not a second one.** Sub-step 3.2's review asked that the two be treated as
+one: *"nothing here measures whether a Metric Definition's choice of date column is
+visible to the Gate. It is the same class of problem as finding 5 and 3.5 should
+treat it as one question, not two."* They are the same shape — two columns on
+`fct_trade`, a projection that cannot tell them apart, and a Glossary Section C pair
+that exists because the choice moves the number. So the repayment above is read as
+covering both: a Metric Definition carries its **Join Path and its date predicate**,
+and the Gate checks both. **No probe converts on Settlement Date**, so unlike the
+currency pair this half is argued rather than measured, and the Sub-step that pays
+this entry owes a probe for it. Raised as
+[R4](design/validation-feasibility.md#r4--debt-014-is-amended-to-name-the-date-predicate--approved-by-amino-2026-08-20)
+rather than applied silently, because widening an entry's scope after the fact is a
+thing to do in the open, and **approved by Amino on 2026-08-20**. The Trigger below
+is unchanged and now covers both halves.
+
+---
+
+### DEBT-015 — The dialect scan names functions, and the loss measured was in a cast
+
+- **Status:** open
+- **Opened:** Sub-step 3.5 (`.claude/docs/reviews/step-003-validation-feasibility.md`)
+- **Size:** S
+- **Location:** `.claude/scripts/check_warehouse.py` — `unportable_functions`, read
+  by `check_seam`; and the mitigation wording in
+  [ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md)'s first accepted
+  cost
+
+**What we did**
+
+Paid [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) with a
+scan whose unit is the **function call**, and wrote ADR-0002's mitigation in the same
+unit: *"treat any DuckDB-only function in a Metric Definition as a review comment"*.
+
+Sub-step 3.4 then measured the one construct in this project's own certified
+expressions where the trip to BigQuery loses meaning, and it is not a function call.
+`Traded Notional`'s widening cast to `DECIMAL(38, 6)` — which
+`check_validation_feasibility.py` proves is required, by running the uncast
+expression and printing the engine's refusal on every run — arrives in BigQuery as
+a cast to `NUMERIC`. So does `DECIMAL(18, 6)`, the width `fct_trade.quantity` is
+stored at. The two statements the cast exists to keep apart become one statement.
+The scan reads that statement as **clean**, because a cast is not a function call,
+and ADR-0002's mitigation produces no review comment for the same reason.
+
+**What we should have done**
+
+Scan for dialect-shaped **type** constructs as well as function names, and say
+*construct* where ADR-0002 says *function*.
+
+The instrument is measured and already in the repository. `round_trip_rewrites` in
+`check_validation_feasibility.py` compares the parse tree before and after
+retargeting, and it flags exactly the cast the name list reads as clean. It is **not**
+a replacement for the name list: the same Sub-step measured that the round trip
+passes 39 of the 50 measurable DuckDB-only names straight through, because sqlglot
+emits a name it cannot translate as it found it and a before-and-after comparison
+reads its own failure as portability. The two are blind to disjoint classes, so the
+repayment is the name list **plus** a round-trip comparison over types — the table in
+[validation-feasibility.md](design/validation-feasibility.md#debt-009s-open-question-answered-no)
+is which one covers what.
+
+**Why we deferred**
+
+The same reason DEBT-009 itself gave, one level up: **there is nothing to scan yet.**
+No Semantic Layer exists, so no Metric Definition exists, and the only cast outside
+`veritas/warehouse/` is a Python literal in a spike whose whole subject is that the
+scan cannot see it. Writing the wider scan now would mean writing it against the one
+example this spike happens to hold, which is how a check comes to pass vacuously.
+Sub-step 3.5 is also a document Sub-step — widening a check script in it would be a
+second commit.
+
+**Cost while unpaid**
+
+A reader of `check_warehouse.py`, or of ADR-0002's *"how this stops being a promise"*
+paragraph, can reasonably conclude the dialect commitment is mechanically checked. It
+is checked in the unit where nothing was lost, and not in the unit where something
+was. That is DEBT-009's cost sentence with one word changed, in the same file, which
+is the part worth wincing at.
+
+Concretely: `Traded Notional` cannot be given a Metric Definition without the
+widening cast, so the first Metric Definition Step 004 writes for it carries the exact
+construct nothing looks at, and the first person to read the scan's clean output will
+be entitled to draw the wrong conclusion from it.
+
+**Trigger**
+
+The first Metric Definition that carries a cast, or any other construct whose meaning
+is in a type rather than in a name. On the measurements above that is
+`Traded Notional`'s, in the Step that builds the Semantic Layer, and it cannot be
+avoided by writing the expression differently.
+
+**Debt rather than an extension, and the argument is on the record.** The Ledger's own
+test is whether the trigger fires inside this project's life, and this one fires in
+the next Step. The counter-argument — that the *consequence* can only land on
+BigQuery, which is [EXT-001](extension-register.md#ext-001--warehouse-native-security-and-concurrency)'s
+migration and outside this project — is real, and was
+[R2](design/validation-feasibility.md#r2--debt-015-is-debt-rather-than-an-extension--approved-by-amino-2026-08-20).
+**Amino settled it on 2026-08-20: it is debt and stays here.** What is wrong *now*,
+and what makes it debt as written, is a check claiming coverage it does not have.

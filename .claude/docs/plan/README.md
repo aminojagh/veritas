@@ -14,7 +14,7 @@ attempted versus what shipped, which is where the Step Review gets its honesty.
 | [000](step-000-framework-scaffolding.md) | Development framework scaffolding | 1 | done |
 | [001](step-001-target-state-design.md) | Design the Target State | 3 | done |
 | [002](step-002-warehouse-and-ingestion.md) | Build the Warehouse and fill it | 6 | done |
-| [003](step-003-validation-feasibility.md) | Prove the Validation Gate's parse-tree claim | 5 | active |
+| [003](step-003-validation-feasibility.md) | Prove the Validation Gate's parse-tree claim | 5 | in review |
 
 Statuses: `proposed` (written, not yet approved — no implementation may begin) ·
 `active` · `in review` · `done` · `abandoned` (with a note on why — an abandoned
