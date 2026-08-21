@@ -1,13 +1,14 @@
 # Step 003 — Prove the Validation Gate's parse-tree claim
 
-- **Status:** in review — every Sub-step is built. Written 2026-08-15 and
-  **approved by Amino the same day**, together with every ruling in
-  [Rulings](#rulings). Sub-steps 3.1 (`d840fa8`), 3.2 (`89fee55`), 3.3 (`23020e9`)
-  and 3.4 (`c20d601`) are **committed**; 3.5 is the fifth and last, **reviewed and
-  approved by Amino on 2026-08-20 and awaiting its commit**. **The Step is `done`
-  when 3.5 lands**, and nothing in it is outstanding besides that commit — the four
-  rulings 3.5 raised are approved and applied in
+- **Status:** done — every Sub-step is built, approved and **committed**. Written
+  2026-08-15 and **approved by Amino the same day**, together with every ruling in
+  [Rulings](#rulings). Sub-steps 3.1 (`d840fa8`), 3.2 (`89fee55`), 3.3 (`23020e9`),
+  3.4 (`c20d601`) and 3.5 (`fcf4b7d`) are all in. Nothing in the Step is
+  outstanding — the four rulings 3.5 raised are approved and applied in
   [validation-feasibility.md](../design/validation-feasibility.md#rulings).
+  **Closed by the Step 004 planning commit**, which is where 3.5's hash was written
+  into [Current State](../design/current-state.md) and this status turned from
+  `in review` to `done` — the same way `40d72d8` closed Step 002.
   **The Step has five Sub-steps rather than the four
   it was approved with**: [R3](#r3--an-exemption-names-the-file-as-well-as-the-symbol--approved-and-widened-by-amino-2026-08-15)
   was widened from the new script to *every* exemption, which is one commit of its

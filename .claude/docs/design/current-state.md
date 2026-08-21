@@ -4,16 +4,80 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-20 — **Step 002 is finished and committed in full**, the Step 003 plan and Sub-steps 3.1 through 3.4 are committed, and **Sub-step 3.5 — the last of the Step — is written, verified, approved by Amino on 2026-08-20 and lands with this commit, which closes Step 003**. **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has answered all four of its claims and the go/no-go is now recorded: `.claude/docs/design/validation-feasibility.md` exists and its verdict is GO on ADR-0003, with six constraints on the Step that builds the Semantic Layer.**
-**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`, Sub-step 3.4 in `c20d601`**. **Sub-step 3.5's hash is not recorded here because this file is part of its own commit** — the Step 004 planning commit fills it in and turns the Step 003 plan from `in review` to `done`, which is how every hash above arrived and how Step 002 was closed in `40d72d8`.
+**Last updated:** 2026-08-21 — **Step 003 is finished and committed in full**, all five Sub-steps, and this commit closes it formally. **Step 004 — Build the Semantic Layer — is planned, approved by Amino on 2026-08-21 with all seven of its rulings, and `active`. Nothing of it is built: Sub-step 4.1 is the next commit and this one is planning only.** **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has answered all four of its claims and the go/no-go is now recorded: `.claude/docs/design/validation-feasibility.md` exists and its verdict is GO on ADR-0003, with six constraints on the Step that builds the Semantic Layer.**
+**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`**. **This commit is the Step 004 planning commit**, which is what wrote 3.5's hash above and turned the [Step 003 plan](../plan/step-003-validation-feasibility.md) from `in review` to `done` — how every hash above arrived, and how `40d72d8` closed Step 002. Its own hash is not here for the same reason 3.5's was not: this file is part of it, and the Sub-step 4.1 commit fills it in.
 
 ---
 
 ## Resume here
 
-- **Sub-step 3.5 is written, verified and approved by Amino on 2026-08-20 with no
-  change asked for. It lands with this commit, and it is the last Sub-step of Step
-  003.** Eight files: the new
+- **Next: Sub-step 4.1 — publish the Semantic Entry format on one Metric Definition.**
+  The [Step 004 plan](../plan/step-004-semantic-layer.md#41--publish-the-semantic-entry-format-on-one-metric-definition)
+  is `active`, approved by Amino on 2026-08-21, so `planning-a-step`'s hard gate is
+  cleared and implementation may begin. 4.1 creates `semantic/metrics/gross_revenue.yaml`
+  and the one Join Path it carries, `veritas/semantic/` as the loader,
+  `.claude/scripts/check_semantic_layer.py`, and adds `pyyaml` — the Step's only new
+  dependency. **Nothing was built in this commit and no code changed** — four
+  documents moved: the new plan, [the plan README](../plan/README.md), the
+  [Step 003 plan](../plan/step-003-validation-feasibility.md) turned `done` with 3.5's
+  hash, and this file.
+- **All seven questions put with the plan were approved on 2026-08-21**, in
+  [Questions for Amino](../plan/step-004-semantic-layer.md#questions-for-amino). Four
+  as written; **R2, R4 and R7 were sent back once and approved on the second pass**,
+  which is why each of those three now argues from a worked example rather than in the
+  abstract.
+  - **[R1](../plan/step-004-semantic-layer.md#r1--cash-balance-becomes-a-certified-metric--approved-by-amino-2026-08-21)
+    — `Cash Balance` becomes a Certified Metric**, so **the Step authors nine Metric
+    Definitions rather than eight** and 4.2 carries the Glossary amendment with it. It
+    was found while planning: two of the five
+    [Ambiguous Terms](../glossary.md#d-ambiguous-terms) resolve to `Cash Balance`,
+    whose registered home was `fct_balance_snapshot` rather than `semantic/metrics/`,
+    so an Ambiguous Term would have disambiguated to something with no Metric
+    Definition to retrieve.
+  - **[R2](../plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)
+    — the Semantic Layer and `check_warehouse.py` stay independent**, and their
+    agreement is the check. The example that settles it: a `Gross Revenue` expression
+    written without its FX conversion. Independent, the two figures disagree and the
+    run fails; coupled, both sides compute the same wrong sum and the run passes,
+    having confirmed only that the expression agrees with itself.
+  - **[R3](../plan/step-004-semantic-layer.md#r3--restricted-columns-are-declared-in-the-access-profile-not-in-a-metric-definition--approved-by-amino-2026-08-21)
+    — Restricted Columns are declared in the Access Profile**, so Step 004 adds
+    nothing for them and the Gate Step inherits a decision rather than an omission.
+  - **[R4](../plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+    — the spike is pinned to the corpus, not re-pointed at it.** Its three
+    expressions stay Python literals so the dated measurement stays the measurement
+    that was taken, and 4.2 adds the assertion that they still match what
+    `semantic/metrics/` publishes. A re-pointed spike would silently re-bless an
+    expression that grew a filter after the go/no-go was decided.
+  - **[R5](../plan/step-004-semantic-layer.md#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21)
+    — 4.5 is the pre-agreed split point.** If the Step grows, Dimension Definitions
+    become Step 005's first Sub-step and this Step ships three of the four entry types,
+    with the Current State row naming the missing one.
+  - **[R6](../plan/step-004-semantic-layer.md#r6--no-new-adr-for-the-file-format--approved-by-amino-2026-08-21)
+    — no fifth ADR for the file format.** Every expensive part is already decided in
+    ADR-0001, C1, C2 and EXT-005; the plan's format section and the Step Review are
+    the record.
+  - **[R7](../plan/step-004-semantic-layer.md#r7--the-date-axis-defers-debt-012s-trigger-rather-than-avoiding-it--approved-by-amino-2026-08-21)
+    — the narrow date axis *defers* DEBT-012's trigger rather than avoiding it.** It
+    keeps unfired the one arm Step 004 could fire and leaves the other two live — a
+    gold question naming a date, and the App accepting one. Deferring is right because
+    [DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)'s
+    repayment is a **Warehouse** change of size M touching the schema, the build, the
+    Snapshot calendar and all seven simulated tables; the cost is that the Semantic
+    Layer cannot express *"Account Value at the end of Q2"*, and **4.5 writes the
+    deferral onto the entry** so the Step that pays it does not rediscover the
+    reasoning.
+- **One Ledger trigger fires inside Step 004 and is paid inside it.**
+  [DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
+  fires the moment `Traded Notional`'s Metric Definition is written in 4.2, because it
+  cannot be written without the widening cast, and 4.3 is its repayment. **The
+  open-debt count is 9 until then.**
+- **Any session resuming here runs `uv run python -m veritas.ingestion` first**,
+  because the Warehouse is gitignored and every check in the Step 004 plan executes
+  against real data.
+- **Sub-step 3.5 was committed unchanged in `fcf4b7d`**, the last Sub-step of Step
+  003, having been written, verified and approved by Amino on 2026-08-20 with no
+  change asked for. Eight files: the new
   [`validation-feasibility.md`](validation-feasibility.md), a dated status note on
   each of [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) and
   [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md), one new Ledger
@@ -161,24 +225,24 @@ wrong and gets fixed immediately.
   hole is measured rather than asserted: the same mutation passes `HEAD`'s check
   and fails the narrowed one. **3.2 is the file that R3 was raised about, and it
   passes the dialect scan claiming no exemption at all.**
-- **Next: plan Step 004**, as the first act of the session after this commit lands.
-  Step 003 ends here — all five Sub-steps are written and approved, four are
-  committed, and the fifth is this commit. **Step 004 is expected to be the Semantic
-  Layer**, which is
+- **Step 004 is now planned**, which was the first act of the session after 3.5
+  landed. Step 003 ended there — all five Sub-steps written, approved and committed.
+  **Step 004 is the Semantic Layer**, which was
   [R4](../plan/step-003-validation-feasibility.md#r4--step-003-is-the-spike-alone-the-semantic-layer-is-step-004--approved-by-amino-2026-08-15)'s
-  stated expectation and not a plan — planning it is `planning-a-step`'s job and it
-  has not been done. Whatever it turns out to be, **the six constraints in
+  stated expectation, and the plan confirms it rather than inherits it. **The six
+  constraints in
   [validation-feasibility.md](validation-feasibility.md#consequences-for-step-004)
-  are the input it starts from**, and
+  are the input it starts from**, as
   [R3](validation-feasibility.md#r3--the-six-constraints-bind-step-004s-plan--approved-by-amino-2026-08-20)
-  says they bind rather than merely inform. **That planning commit also closes Step
-  003 formally** — it writes 3.5's hash into the list above and turns the
+  requires — two of them, C1 and C2, bind what gets authored, and the other four bind
+  the Step after it and are recorded as **not foreclosed** rather than as silence.
+  **This planning commit also closes Step 003 formally** — it writes 3.5's hash into
+  the list above and turns the
   [plan](../plan/step-003-validation-feasibility.md) from `in review` to `done`,
   which is exactly how `40d72d8` closed Step 002.
-  **No component row moved off `✗ none` in this Step and none was going to** — a
-  spike moves what is known, not what is built. Any session resuming here runs
-  `uv run python -m veritas.ingestion` first, because the Warehouse is gitignored and
-  the spike's probes execute against real data.
+  **No component row moved off `✗ none` in Step 003 and none was going to** — a
+  spike moves what is known, not what is built. **`Semantic Layer` is the row Step
+  004 turns**, and it has not turned yet.
 - **The plan's four questions were all approved on 2026-08-15**, recorded as
   [R1–R4](../plan/step-003-validation-feasibility.md#rulings): `Restricted Column`
   is a registered term as of Sub-step 3.3; the spike's certified expressions stay
@@ -190,9 +254,10 @@ wrong and gets fixed immediately.
   Sub-step 3.3's review: a probe that completes the set is kept wherever it is
   found, and the Sub-step that finds one owes the account of why the enumeration
   missed it.
-- **Step 004 is not planned, and not in this commit** — the route to the Target
-  State is discovered one Step at a time, so planning it is the next session's first
-  act rather than a paragraph appended to the Step it follows.
+- **Step 004 was planned in its own commit rather than appended to the Step it
+  follows** — the route to the Target State is discovered one Step at a time, so
+  planning it was the next session's first act. **Step 005 is not planned**, and the
+  Validation Gate is its *expectation* rather than its plan.
 - **Sub-step 2.6 was committed unchanged**, so the three points its review put up
   under *Look at this sceptically* stand as built, with no ruling recorded against
   them: `generate_series` is not standard SQL and the scan does not flag it,
