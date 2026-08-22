@@ -1231,6 +1231,73 @@ def check_client_activity(warehouse: WarehouseAdapter) -> None:
             )
 
 
+def gross_revenue(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Gross Revenue in the Reporting Currency — over every Trade, or from a date on.
+
+    Σ(Commission) — *"before any Rebate or pass-through Fee is deducted"* — with each
+    Trade's Commission converted from the currency it was billed in on the date it
+    was billed.
+
+    **This exists to be the *other* number.**
+    `.claude/scripts/check_semantic_layer.py` executes the expression the Semantic
+    Layer publishes for `Gross Revenue` and compares its answer against this one, and
+    [R2 of Step 004](../docs/plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)
+    is why the two are written separately rather than one reading the other:
+
+        Coupled — `check_warehouse.py` reading `semantic/`: both sides compute the
+        same wrong sum, the two figures agree exactly, and **the run passes**. The
+        check has confirmed that the expression agrees with itself.
+
+    So nothing in this file reads `semantic/`, and the cost is the authoring tax R2
+    accepted in writing: editing the published expression means editing this SQL
+    too, or the two disagree and the run fails.
+
+    **`boundary` is the half that catches the other mistake, and it is filtered on
+    Trade Date because this file says so.** A period filter is the second half of
+    [C2](../docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate),
+    and a Metric Definition that named `settlement_date` instead would partition its
+    own figure just as neatly and total identically — so the mistake is invisible to
+    any check that only ever asks for the total. Asking both files for the same
+    window is what makes it visible, each answering from its own opinion of which
+    date a Trade's revenue falls on.
+
+    Written with table aliases, where the published expression is written with
+    qualified base tables. That is not decoration — it is the `aliased` shape the
+    Sub-step 3.2 spike traces, so the two texts are visibly different statements of
+    one piece of arithmetic rather than the same string typed twice. The two
+    statements below are likewise written out rather than one assembled from the
+    other: the arithmetic appears twice on purpose, for the reason
+    `CLIENT_ACTIVITY_TABLES` gives, which is that this script sits outside
+    `veritas/warehouse/` and building a statement out of its parts is the construct
+    ADR-0002 tells even the adapter to avoid.
+    """
+    if boundary is None:
+        rows = warehouse.query(
+            "SELECT sum(billed.commission * rate.fx_rate) "
+            "FROM fct_trade AS billed "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = ?",
+            [REPORTING_CURRENCY],
+        )
+    else:
+        rows = warehouse.query(
+            "SELECT sum(billed.commission * rate.fx_rate) "
+            "FROM fct_trade AS billed "
+            "JOIN fct_fx_rate AS rate "
+            "  ON rate.rate_date = billed.trade_date "
+            " AND rate.from_currency = billed.denomination_currency "
+            " AND rate.to_currency = ? "
+            "WHERE billed.trade_date >= ?",
+            [REPORTING_CURRENCY, boundary],
+        )
+    ((total,),) = rows
+    return total if total is not None else Decimal("0")
+
+
 def check_distinctions(warehouse: WarehouseAdapter) -> None:
     """Every Section C pair is two different numbers on the loaded data.
 
@@ -1342,6 +1409,24 @@ def check_distinctions(warehouse: WarehouseAdapter) -> None:
         counted[1] += 1
         by_client[client_id] = by_client.get(client_id, Decimal("0")) + (
             commission * billed
+        )
+
+    # The same Gross Revenue again, from `gross_revenue()`'s single SQL aggregate
+    # over the two tables the metric needs, rather than from this loop's row-level
+    # sum over a three-table join. The two must agree, because
+    # `check_semantic_layer.py` compares the published expression against
+    # `gross_revenue()` and a reader has to be able to take the figure printed just
+    # below as the one that comparison used. They can only disagree if a Trade is
+    # missing the Market Price the loop's join also requires — which the count check
+    # above already reports, in the words that explain what it means.
+    aggregated = gross_revenue(warehouse)
+    if aggregated != gross:
+        problems.append(
+            f"the two Gross Revenue figures in this file disagree: this check's "
+            f"row-level sum is {gross:,.2f} {REPORTING_CURRENCY} and "
+            f"gross_revenue()'s aggregate is {aggregated:,.2f} — the second is what "
+            f"check_semantic_layer.py compares the published expression against, so "
+            f"the figure printed below would not be the figure that was compared"
         )
 
     print()

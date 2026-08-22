@@ -43,8 +43,9 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
 | [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate | open |
 | [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast | open |
+| [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query | open |
 
-**Open debt:** 9 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 10 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -186,11 +187,20 @@ link that has rotted by then is invisible at the one moment it is being read. It
 recorded here rather than as an entry of its own because it is not a new species of
 problem — it is this one, in a place no mechanism reaches yet.
 
-**Still unpaid:** the hook layer, and the one-glob widening above. Nothing
-mechanically blocks a commit by Claude, a missing Ledger entry, or a review that
-skips a section, and nothing reads a link inside a `.py` file. The trigger having
-fired once, the next occurrence should buy the hooks rather than another
-document rule.
+**That second gap was paid in Sub-step 4.1, 2026-08-21.** `check_links` now reads
+every `.py` file under `veritas/` and `.claude/scripts/` alongside the documents, and
+resolves the same two halves — the file and the `#anchor` — reported as the same two
+problems. The decision the gap said was owed, about *what a link inside a `.py` file
+may point at*: **the same thing a link inside a document may point at, resolved the
+same way** — relative to the file that carries it, with its anchor required to exist.
+Nothing about a citation changes because it is sitting in a docstring, and a second
+rule for code would be a second thing to remember. The Sub-step that paid it was the
+one that added sixteen more such links, and the check found a dead one in its own
+explanatory docstring on its first run.
+
+**Still unpaid:** the hook layer. Nothing mechanically blocks a commit by Claude, a
+missing Ledger entry, or a review that skips a section. The trigger having fired once,
+the next occurrence should buy the hooks rather than another document rule.
 
 ---
 
@@ -1166,3 +1176,63 @@ migration and outside this project — is real, and was
 [R2](design/validation-feasibility.md#r2--debt-015-is-debt-rather-than-an-extension--approved-by-amino-2026-08-20).
 **Amino settled it on 2026-08-20: it is debt and stays here.** What is wrong *now*,
 and what makes it debt as written, is a check claiming coverage it does not have.
+
+### DEBT-016 — The Semantic Layer check cannot name the engine's error type
+
+- **Status:** open
+- **Opened:** Sub-step 4.1 (`.claude/docs/reviews/step-004-semantic-layer.md`)
+- **Size:** S
+- **Location:** `.claude/scripts/check_semantic_layer.py` — `rows_from`, the two
+  lines that execute a published expression
+
+**What we did**
+
+Wrapped the Warehouse Adapter's `query` in `except Exception`. Executing a published
+expression against the live schema is what makes a Metric Definition a metric rather
+than a claim, and the engine's refusal — a column that no longer exists, an overflow,
+a type it will not compare — is the finding. Catching it is what lets one broken
+entry name itself while the rest of the corpus still runs, instead of the first
+failure hiding the other eight.
+
+The catch is broad because this script may not name the class it wants.
+[ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) puts the engine's
+dialect inside the adapter, an engine's exception types are part of its dialect, and
+`check_warehouse.py`'s seam scan fails the run on a `duckdb` import anywhere else —
+correctly. So the only expressible catch is `Exception`.
+
+**What we should have done**
+
+Give the Warehouse Adapter an error type of its own — `WarehouseError`, raised from
+the engine's exception at the boundary that already owns the engine — and catch that
+here. One class and one `raise ... from` inside `veritas/warehouse/adapter.py`; every
+caller outside the adapter then handles query failure without naming DuckDB.
+
+**Why we deferred**
+
+Sub-step 4.1's subject is the Semantic Entry format, and this is a change to the
+Warehouse Adapter — a different component, and the seam ADR-0002 spent an ADR on. It
+also needs a decision this Sub-step has no reason to take: whether every adapter
+method wraps or only the two that execute caller-supplied SQL. ADR-0002 already
+licensed the adapter's first implementation to *"handle no errors at all"*, so
+nothing here is being written against that ADR — it is being left where the ADR put
+it.
+
+**Cost while unpaid**
+
+The check reports a defect in its own code as a defect in the corpus. A `TypeError`
+from a bad bound parameter, or an adapter that cannot open the Warehouse at all,
+prints as *"the engine refused the query below"* beside a metric's name — which sends
+a reader to a YAML file that is fine. The run still fails, so nothing passes that
+should not; what is wrong is the diagnosis, and it is wrong in the direction that
+costs someone else's afternoon.
+
+It is kept to the two lines that actually execute SQL, so a bug anywhere else in this
+script still surfaces as a traceback rather than as a false accusation.
+
+**Trigger**
+
+The first component outside `.claude/scripts/` that has to handle a failed query —
+the Orchestrator's execute step, which is where a Grounded Answer has to say *"the
+Validation Gate passed this and the engine still refused it"*. That component cannot
+catch `Exception` and stay honest, because it has to tell a user which of the two
+happened.

@@ -1,0 +1,314 @@
+"""Reads the Semantic Layer — the certified registry Veritas retrieves over.
+
+The Semantic Layer is **data**, so it lives at `semantic/` in the repository root
+rather than inside this package: Glossary Section A registers that directory as its
+home, and hand-written YAML is what
+[EXT-003](../../.claude/docs/extension-register.md#ext-003--metric-authoring-at-scale)
+calls *"not merely acceptable"* but *"better: inspectable, diffable, and reviewable
+in a pull request"* at this scale. This package is the code that reads it, named for
+the component the way `veritas/warehouse/` is named for the Warehouse it reaches.
+
+**Nothing here executes SQL, and that is a constraint rather than an omission.**
+[C1](../../.claude/docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
+says a Metric Definition *"publishes a form the Orchestrator pastes"* — so the
+expression is text this module hands over untouched, and assembling a query around
+it belongs to whatever pastes it. A loader that built the query would be re-deriving
+between what a reviewer reads in the file and what the engine runs, which is the one
+thing C1 exists to remove.
+
+**The dataclass field lists below are the file format.** There is no second copy of
+the field names anywhere: a key the format does not name fails to load instead of
+being silently ignored, and a key the format requires and a file omits fails by
+name. That is also the *only* thing pinning those key names down — no check reads
+YAML keys against the Glossary, which the Sub-step 4.1 review states plainly.
+"""
+
+import re
+from dataclasses import dataclass, fields
+from pathlib import Path
+
+import yaml
+
+SEMANTIC_PACKAGE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SEMANTIC_PACKAGE_DIR.parent.parent
+
+SEMANTIC_DIR = REPO_ROOT / "semantic"
+
+# The words that are `true` or `false` and no others.
+#
+# PyYAML implements YAML 1.1, where `on`, `off`, `yes`, `no`, `y` and `n` are all
+# booleans. A Join Path's join condition is written under the key `on` — SQL's own
+# word for it, and the one the format publishes — and YAML 1.1 reads that key as
+# the boolean True, so the field vanishes and an unnamed True appears beside it.
+# YAML 1.2, the current specification, removed those spellings for exactly this
+# reason; Go's yaml.v3 and JavaScript's js-yaml already read them as text, so this
+# makes the files *more* portable rather than less.
+#
+# Quoting the key in the file would fix that one key and nothing else. The values
+# are where this gets expensive later: a Dimension Definition's allowed values are
+# domain text, and YAML 1.1 reads `no`, `on`, `y` and `n` as booleans in any casing
+# — Norway's country code, Ontario's province code, and both halves of every yes/no
+# flag ever written. Silently turning one of those into False is a certified axis
+# that lies, which is the failure Sub-step 4.5's check exists to catch.
+YAML_12_BOOLEANS = re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$")
+
+
+class SemanticEntryLoader(yaml.SafeLoader):
+    """`yaml.SafeLoader` with YAML 1.2's booleans instead of YAML 1.1's."""
+
+
+SemanticEntryLoader.yaml_implicit_resolvers = {
+    first_character: [
+        (tag, pattern)
+        for tag, pattern in resolvers
+        if tag != "tag:yaml.org,2002:bool"
+    ]
+    for first_character, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+SemanticEntryLoader.add_implicit_resolver(
+    "tag:yaml.org,2002:bool", YAML_12_BOOLEANS, list("tTfF")
+)
+
+
+class SemanticEntryError(ValueError):
+    """A file under `semantic/` that cannot be read as the entry it claims to be.
+
+    Raised rather than collected, because every caller of this module wants the
+    same thing from a malformed entry: to stop. A Semantic Entry that half-loads is
+    worse than one that does not load, since retrieval would then serve it.
+    """
+
+
+@dataclass(frozen=True)
+class SemanticEntry:
+    """One retrievable document in the Semantic Layer.
+
+    The three fields every kind of entry carries. `version` is what Lineage
+    records, so an answer can name the version of each entry that produced it;
+    `kind` is what the file says it is, and is checked against the directory it was
+    found in so a Metric Definition cannot hide in `semantic/joins/`.
+    """
+
+    name: str
+    version: int
+    kind: str
+
+
+@dataclass(frozen=True)
+class MetricDefinition(SemanticEntry):
+    """A named, versioned, certified computation over the Warehouse.
+
+    The fields past `SemanticEntry`'s three are the Glossary's own definition —
+    *"its SQL expression, grain, filters, units, and the aliases people use for
+    it"* — plus the two
+    [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+    requires, because *"a certified expression pins down the arithmetic and not the
+    rows it is computed over"*:
+
+      `join_path`   the name of the Join Path entry the expression is computed
+                    across. A route this file does not name is a route the
+                    Orchestrator would have to invent.
+      `date_column` the column a period filter keys on. Trade Date and Settlement
+                    Date are a Glossary Section C pair precisely because choosing
+                    between them moves the number.
+
+    `expression` is the text an Orchestrator pastes verbatim, and `reporting_currency`
+    is the currency it comes back in — the conversion is *inside* the expression and
+    the Join Path, never applied afterwards by something that read this field.
+    """
+
+    description: str
+    expression: str
+    grain: str
+    unit: str
+    reporting_currency: str
+    join_path: str
+    date_column: str
+    aliases: tuple[str, ...]
+    derives_from: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class JoinPath(SemanticEntry):
+    """A certified route between two Warehouse tables, so the model never invents one.
+
+    `on` is the join condition as written, including any literal in it. It is not a
+    template with a placeholder for the Reporting Currency: C1 forbids a form
+    something else has to fill in, so a second Reporting Currency is a second file
+    rather than a substitution.
+    """
+
+    from_table: str
+    to_table: str
+    on: str
+
+
+# Directory -> the `kind` files in it must declare, and the type they load as. The
+# directory names are Glossary Section A's own homes: `semantic/metrics/`,
+# `semantic/joins/`. `semantic/ambiguous/` and `semantic/dimensions/` are the two
+# remaining entry types and are absent on purpose — a file in a directory this
+# mapping does not know fails to load rather than being skipped, so the Sub-step
+# that writes the first Ambiguous Term has to come here and say so.
+ENTRY_KINDS: dict[str, tuple[str, type[SemanticEntry]]] = {
+    "metrics": ("metric", MetricDefinition),
+    "joins": ("join_path", JoinPath),
+}
+
+# Fields whose value is a list of names rather than one string. Read off the
+# annotation would be tidier and is not worth the reflection: two names, in one
+# place, next to the dataclasses that declare them.
+NAME_LISTS = frozenset({"aliases", "derives_from"})
+
+
+@dataclass(frozen=True)
+class SemanticLayer:
+    """The certified registry, loaded.
+
+    Two of the four entry types are here. Dimension Definitions and Ambiguous Terms
+    are Sub-steps 4.4 and 4.5, and this class gains a mapping each time — which is
+    an addition rather than a change, because nothing keys off the absence.
+
+    Entries are held by their `name` and not by their filename, because `name` is
+    what every reference in the corpus uses: a Metric Definition names its Join Path
+    by name, and an Ambiguous Term will name the Certified Metrics it disambiguates
+    between the same way.
+    """
+
+    metrics: dict[str, MetricDefinition]
+    join_paths: dict[str, JoinPath]
+
+    def entries(self) -> list[SemanticEntry]:
+        """Every entry, whatever its kind, in the order the files were read."""
+        return [*self.metrics.values(), *self.join_paths.values()]
+
+
+def entry_files(root: Path = SEMANTIC_DIR) -> list[Path]:
+    """Every file under `semantic/`, alphabetically.
+
+    Deliberately not `*.yaml`: a file the tree holds and this loader does not
+    recognise is a finding, not something to walk past. The Semantic Layer is small
+    and hand-written, and a stray `gross_revenue.yml` that retrieval never sees is
+    exactly the kind of quiet hole this project keeps finding.
+    """
+    return sorted(path for path in root.rglob("*") if path.is_file())
+
+
+def read_entry(path: Path) -> SemanticEntry:
+    """Read one file as the Semantic Entry its directory says it is.
+
+    Every failure is raised with the file named, because the caller is a person
+    editing YAML and the useful message says which key in which file.
+    """
+    directory = path.parent.name
+    if path.suffix != ".yaml" or directory not in ENTRY_KINDS:
+        raise SemanticEntryError(
+            f"{_here(path)}: not a Semantic Entry — expected a .yaml file in one of "
+            f"{sorted(ENTRY_KINDS)}"
+        )
+    declared_kind, entry_type = ENTRY_KINDS[directory]
+
+    document = yaml.load(path.read_text(), Loader=SemanticEntryLoader)
+    if not isinstance(document, dict):
+        raise SemanticEntryError(
+            f"{_here(path)}: reads as {type(document).__name__}, not a mapping of "
+            f"fields"
+        )
+
+    expected = {entry_field.name for entry_field in fields(entry_type)}
+    missing = sorted(expected - set(document))
+    unknown = sorted(set(document) - expected)
+    if missing or unknown:
+        raise SemanticEntryError(
+            f"{_here(path)}: "
+            + " and ".join(
+                part for part in (
+                    f"missing required field(s) {missing}" if missing else "",
+                    f"has field(s) {unknown} that a {declared_kind} does not have"
+                    if unknown else "",
+                ) if part
+            )
+        )
+
+    if document["kind"] != declared_kind:
+        raise SemanticEntryError(
+            f"{_here(path)}: declares kind {document['kind']!r} but sits in "
+            f"{directory}/, where every entry is a {declared_kind!r}"
+        )
+    if not isinstance(document["version"], int):
+        raise SemanticEntryError(
+            f"{_here(path)}: version is {document['version']!r} — Lineage records a "
+            f"version number, so it must be an integer"
+        )
+
+    return entry_type(**{
+        key: _names(path, key, value) if key in NAME_LISTS else _text(path, key, value)
+        for key, value in document.items()
+    })
+
+
+def load_semantic_layer(root: Path = SEMANTIC_DIR) -> SemanticLayer:
+    """Read the whole tree, or raise on the first file that will not load.
+
+    Cross-entry coherence is not checked here — that a Metric Definition's
+    `join_path` names a Join Path that exists, that an Ambiguous Term names metrics
+    that exist. Those are claims about the corpus rather than about a file, they are
+    what `.claude/scripts/check_semantic_layer.py` is for, and one of them is
+    [EXT-005](../../.claude/docs/extension-register.md#ext-005--semantic-layer-coherence-checks)'s
+    fourth rule.
+    """
+    metrics: dict[str, MetricDefinition] = {}
+    join_paths: dict[str, JoinPath] = {}
+    seen: dict[str, Path] = {}
+
+    for path in entry_files(root):
+        entry = read_entry(path)
+        if entry.name in seen:
+            raise SemanticEntryError(
+                f"{_here(path)}: a second entry named {entry.name!r} — "
+                f"{_here(seen[entry.name])} already claims that name, and every "
+                f"reference in the corpus is by name"
+            )
+        seen[entry.name] = path
+        match entry:
+            case MetricDefinition():
+                metrics[entry.name] = entry
+            case JoinPath():
+                join_paths[entry.name] = entry
+
+    return SemanticLayer(metrics=metrics, join_paths=join_paths)
+
+
+def _here(path: Path) -> str:
+    """The path as a reader would type it, relative to the repository root."""
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
+def _text(path: Path, key: str, value: object) -> object:
+    """One scalar field, with the whitespace YAML's block styles add stripped off.
+
+    `version` passes through untouched: it is the one field that is not text.
+
+    Stripping the ends is normalisation and not re-derivation. A folded scalar —
+    the `>` that `description` and a Join Path's `on` are written with — always
+    ends in a newline, and nothing inside the string is touched, so the pasteable
+    form C1 requires survives exactly. `expression` is written as a quoted scalar
+    and has nothing to strip.
+    """
+    if key == "version":
+        return value
+    if not isinstance(value, str):
+        raise SemanticEntryError(
+            f"{_here(path)}: {key} is {value!r}, and every field but version and "
+            f"the name lists is text"
+        )
+    return value.strip()
+
+
+def _names(path: Path, key: str, value: object) -> tuple[str, ...]:
+    """One list-of-names field, as a tuple so a loaded entry stays frozen."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise SemanticEntryError(
+            f"{_here(path)}: {key} is {value!r} — it is a list of names, written "
+            f"`[]` when there are none"
+        )
+    return tuple(item.strip() for item in value)

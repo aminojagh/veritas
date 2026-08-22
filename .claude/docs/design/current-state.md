@@ -4,23 +4,60 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-21 — **Step 003 is finished and committed in full**, all five Sub-steps, and this commit closes it formally. **Step 004 — Build the Semantic Layer — is planned, approved by Amino on 2026-08-21 with all seven of its rulings, and `active`. Nothing of it is built: Sub-step 4.1 is the next commit and this one is planning only.** **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has answered all four of its claims and the go/no-go is now recorded: `.claude/docs/design/validation-feasibility.md` exists and its verdict is GO on ADR-0003, with six constraints on the Step that builds the Semantic Layer.**
-**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`**. **This commit is the Step 004 planning commit**, which is what wrote 3.5's hash above and turned the [Step 003 plan](../plan/step-003-validation-feasibility.md) from `in review` to `done` — how every hash above arrived, and how `40d72d8` closed Step 002. Its own hash is not here for the same reason 3.5's was not: this file is part of it, and the Sub-step 4.1 commit fills it in.
+**Last updated:** 2026-08-21 — **the Semantic Layer exists.** Sub-step 4.1 of Step 004 is written and verified: `semantic/` holds its first Metric Definition and the Join Path it carries, `veritas/semantic/` reads them, and `.claude/scripts/check_semantic_layer.py` executes the published expression against the real Warehouse and puts its answer beside one `check_warehouse.py` computes independently. **The third of nine components is under construction — one entry type of four, one Metric Definition of nine.** Step 004 is `active`, approved by Amino on 2026-08-21 with all seven of its rulings; **Sub-step 4.2 is the next commit.** **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in both the halves ADR-0002 named. The sqlglot spike has answered all four of its claims and the go/no-go is now recorded: `.claude/docs/design/validation-feasibility.md` exists and its verdict is GO on ADR-0003, with six constraints on the Step that builds the Semantic Layer.**
+**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`**. **Step 004 planning is committed in `5d95393`**, which is what wrote 3.5's hash above and turned the [Step 003 plan](../plan/step-003-validation-feasibility.md) from `in review` to `done` — how every hash above arrived, and how `40d72d8` closed Step 002. **This commit is Sub-step 4.1**, the first of Step 004 to build anything; its own hash is not here for the reason every Sub-step's is not, which is that this file is part of it, and the Sub-step 4.2 commit fills it in.
 
 ---
 
 ## Resume here
 
-- **Next: Sub-step 4.1 — publish the Semantic Entry format on one Metric Definition.**
-  The [Step 004 plan](../plan/step-004-semantic-layer.md#41--publish-the-semantic-entry-format-on-one-metric-definition)
-  is `active`, approved by Amino on 2026-08-21, so `planning-a-step`'s hard gate is
-  cleared and implementation may begin. 4.1 creates `semantic/metrics/gross_revenue.yaml`
-  and the one Join Path it carries, `veritas/semantic/` as the loader,
-  `.claude/scripts/check_semantic_layer.py`, and adds `pyyaml` — the Step's only new
-  dependency. **Nothing was built in this commit and no code changed** — four
-  documents moved: the new plan, [the plan README](../plan/README.md), the
-  [Step 003 plan](../plan/step-003-validation-feasibility.md) turned `done` with 3.5's
-  hash, and this file.
+- **Next: Sub-step 4.2 — write the remaining Metric Definitions.**
+  [The plan](../plan/step-004-semantic-layer.md#42--write-the-remaining-metric-definitions)
+  asks for eight more — `Net Revenue`, `Traded Notional`, `Trade Count`,
+  `Account Value`, `Position Change`, `Realised P&L`, `Unrealised P&L` and
+  `Cash Balance` — with the Join Paths they carry, the `Cash Balance` Glossary row
+  amended in the same commit ([R1](../plan/step-004-semantic-layer.md#r1--cash-balance-becomes-a-certified-metric--approved-by-amino-2026-08-21)),
+  and [R4](../plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)'s
+  pin asserting that the three expressions the spike measured are still exactly what
+  `semantic/metrics/` publishes.
+  **One question is open, and Amino ruled on 2026-08-22 that it is decided at the
+  start of 4.2 rather than before it** — so 4.2 opens by settling it, and the answer
+  is the first thing that Sub-step writes down. The
+  [4.1 review](../reviews/step-004-semantic-layer.md#sub-step-41--publish-the-semantic-entry-format-on-one-metric-definition)
+  puts it second under *look at this sceptically*: **`join_path` is a single name,
+  and `Account Value` needs two routes** — it is *"Cash Balance plus all Positions
+  marked to market"*, which reaches `fct_position_snapshot` → `fct_instrument_price`
+  → `fct_fx_rate` and `fct_balance_snapshot` → `fct_fx_rate`, and neither is one
+  `from_table`/`to_table` pair. Three ways out are named there — a list of Join Paths,
+  a Join Path naming more than two tables, or `Account Value` deriving from two
+  metrics through `derives_from` — and none was chosen, because 4.1's job was to
+  expose the shape on one file. Deciding it first is what keeps the cost at one file
+  to re-edit rather than eight.
+- **What Sub-step 4.1 built**, and what it deliberately did not. `semantic/` holds
+  `metrics/gross_revenue.yaml` and `joins/trade_to_fx_rate_on_trade_date.yaml`,
+  **byte-for-byte the two blocks in the plan's format section**, comments included.
+  `veritas/semantic/` reads them into frozen dataclasses and executes nothing —
+  [C1](validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
+  says the Semantic Layer publishes a form the Orchestrator pastes, so pasting
+  belongs to whatever pastes. `.claude/scripts/check_semantic_layer.py` runs the
+  plan's five checks and a sixth, `check_warehouse.py` gained the independent
+  `gross_revenue()` figure the published expression is compared against, and
+  `pyyaml` is the Step's only new dependency, as planned. **Nothing from a later
+  Sub-step was built**: no second Metric Definition, no Ambiguous Term, no Dimension
+  Definition, no `veritas/validation/`, no Glossary change.
+- **Two findings from 4.1 that the next Sub-steps inherit.**
+  1. **PyYAML reads `on:` as the boolean `True`**, because it implements YAML 1.1.
+     A Join Path publishes its join condition under that key, so the loader reads
+     booleans the YAML 1.2 way instead. This matters again in **4.5**: a Dimension
+     Definition's allowed values are domain text, and YAML 1.1 reads `no`, `on`, `y`
+     and `n` as booleans in any casing — Norway's country code, Ontario's province
+     code, and both halves of every yes/no flag. It is the first point under *look at
+     this sceptically* and a two-line revert if Amino would rather quote the key in
+     the file.
+  2. **A metric's `name` is now checked against Glossary Section B** — the sixth
+     check, beyond the plan's five. It mechanises R1: writing `Cash Balance`'s Metric
+     Definition in 4.2 **fails the run** until that Glossary row names
+     `semantic/metrics/`.
 - **All seven questions put with the plan were approved on 2026-08-21**, in
   [Questions for Amino](../plan/step-004-semantic-layer.md#questions-for-amino). Four
   as written; **R2, R4 and R7 were sent back once and approved on the second pass**,
@@ -70,8 +107,16 @@ wrong and gets fixed immediately.
 - **One Ledger trigger fires inside Step 004 and is paid inside it.**
   [DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
   fires the moment `Traded Notional`'s Metric Definition is written in 4.2, because it
-  cannot be written without the widening cast, and 4.3 is its repayment. **The
-  open-debt count is 9 until then.**
+  cannot be written without the widening cast, and 4.3 is its repayment.
+- **The open-debt count is 10.** 4.1 opened
+  [DEBT-016](../debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)
+  — `check_semantic_layer.py` catches `Exception` around the two lines that execute a
+  published expression, because ADR-0002 puts the engine's error classes inside the
+  adapter and the adapter has none of its own. It also **paid
+  [DEBT-001](../debt-ledger.md#debt-001--framework-rules-rely-on-discipline-not-enforcement)'s
+  second coverage gap**: `verify_framework.py` now resolves markdown links and their
+  anchors inside `.py` files as well as documents. DEBT-001 itself stays open — its
+  subject is the hook layer — and the count returns to 9 when 4.3 pays DEBT-015.
 - **Any session resuming here runs `uv run python -m veritas.ingestion` first**,
   because the Warehouse is gitignored and every check in the Step 004 plan executes
   against real data.
@@ -391,8 +436,16 @@ byte-identical.**
 pair in Glossary Section C is two measurably different numbers on the loaded data.
 The row counts, windows and Section C figures are dated evidence in the
 [Step Review](../reviews/step-002-warehouse-and-ingestion.md#sub-step-25--generate-seeded-synthetic-client-activity),
-because a `--refresh` moves them. Nothing above Ingestion is built: no Semantic
-Layer, no Retrieval, no application.
+because a `--refresh` moves them.
+
+**The Semantic Layer has started.** Sub-step 4.1 published one Metric Definition and
+the Join Path it carries, in the format the Step 004 plan proposed and Amino approved,
+and proved the arrangement end-to-end: the expression the file publishes is pasted
+verbatim into a query built from the entry's own Join Path and date column, executed
+through the Warehouse Adapter, and returns the same figure `check_warehouse.py`
+computes from SQL that never reads `semantic/`. One entry type of four and one Metric
+Definition of nine exist. Nothing above the Semantic Layer is built: no Retrieval, no
+Orchestrator, no application, and nothing yet turns a question into SQL.
 
 **What has moved since is knowledge rather than machinery.** The design's largest
 unproven assumption — that sqlglot can decide from a parse tree alone whether a
@@ -414,9 +467,9 @@ retargeting to BigQuery and one type does not.
 
 | Component | State | Notes |
 |---|---|---|
-| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **Three declared dependencies**: `duckdb` (2.1), `dlt` (2.2) and `sqlglot` (2.6). dlt brings roughly forty transitive packages, sqlglot among them — 2.6 promoted it to a declared dependency because `check_warehouse.py` now imports it, and a transitive dependency is one someone else's release notes can remove. `uv add sqlglot` installed nothing: the locked version did not move. **Sub-step 3.2 added a fifth check script and no dependency, and Sub-step 3.3 added neither.** The three stdlib-only check scripts — `verify_framework.py`, `check_language.py`, `check_data_availability.py` — are still stdlib-only; `check_warehouse.py` and `check_validation_feasibility.py` are the two that import third-party code, and both import the same two libraries the project already declares. |
+| Python environment | ✅ working | `uv`-managed, CPython 3.14.4, `.venv/`. `pyproject.toml` + `uv.lock` + `.python-version` all pinned. **Four declared dependencies**: `duckdb` (2.1), `dlt` (2.2), `sqlglot` (2.6) and `pyyaml` (4.1). dlt brings roughly forty transitive packages, sqlglot among them — 2.6 promoted it to a declared dependency because `check_warehouse.py` now imports it, and a transitive dependency is one someone else's release notes can remove. `uv add sqlglot` installed nothing: the locked version did not move. **Sub-step 3.2 added a fifth check script and no dependency, and Sub-step 3.3 added neither. Sub-step 4.1 added a sixth check script and `pyyaml`, which the Step 004 plan named as its only new dependency** — the Semantic Layer is YAML, and nothing in the standard library reads it. The three stdlib-only check scripts — `verify_framework.py`, `check_language.py`, `check_data_availability.py` — are still stdlib-only; `check_warehouse.py` and `check_validation_feasibility.py` are the two that import third-party code, and both import the same two libraries the project already declares. |
 | Development framework | ✅ working | `CLAUDE.md`, `.claude/docs/` tree, five skills in `.claude/skills/`. Non-Negotiable #4 gained a rule in 3.1: **an exemption is scoped to where it is needed** — a check that excuses something names the file as well as the symbol, never a symbol alone. |
-| Framework self-check | ✅ working | `.claude/scripts/verify_framework.py` — structure only (documents exist, links resolve, skills load, interpreter pinned), passes. **Links now include their `#anchor`** ([R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11), 2026-08-11): the fragment used to be split off and discarded, so a link to a renamed heading passed, and same-document `#anchor` links were not checked at all. It reports a `dead anchor` distinct from a `dead link` and prints how many links and anchors it checked. Verified by making it fail against a temporary document with two dead anchors, in the [Sub-step 2.4 changes-on-review section](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11-sub-step-24). Scope is `.claude/docs/**` plus `CLAUDE.md`; `README.md` is outside it. |
+| Framework self-check | ✅ working | `.claude/scripts/verify_framework.py` — structure only (documents exist, links resolve, skills load, interpreter pinned), passes. **Links now include their `#anchor`** ([R20](../plan/step-002-warehouse-and-ingestion.md#r20--verify_frameworkpy-checks-anchors-not-just-files--approved-by-amino-2026-08-11), 2026-08-11): the fragment used to be split off and discarded, so a link to a renamed heading passed, and same-document `#anchor` links were not checked at all. It reports a `dead anchor` distinct from a `dead link` and prints how many links and anchors it checked. Verified by making it fail against a temporary document with two dead anchors, in the [Sub-step 2.4 changes-on-review section](../reviews/step-002-warehouse-and-ingestion.md#changes-made-on-review--2026-08-11-sub-step-24). **Scope widened in 4.1 to include code**: every `.py` file under `veritas/` and `.claude/scripts/` is read for markdown links too, because docstrings cite ADRs and Ledger entries in exactly the same syntax and nothing had ever followed one. That pays [DEBT-001](../debt-ledger.md#debt-001--framework-rules-rely-on-discipline-not-enforcement)'s second coverage gap, and settles the decision that gap left open: a link inside a `.py` file may point at the same things a link inside a document may, resolved the same way, anchor required. `README.md` is still outside the scope. |
 | Language check | ✅ working | `.claude/scripts/check_language.py` — content rules: component names registered, no `proposed` term in code, abbreviations resolvable. Passes. Parses code with `ast` so it checks identifiers, not prose. Partial payment of [DEBT-001](../debt-ledger.md). |
 | Glossary | ✅ working | Process Language + Domain Language Sections A–E, all `agreed`, **89 registered terms** as counted by `check_language.py`. **The most recent registration is `Restricted Column`**, added to Section A by Sub-step 3.3 under [R1](../plan/step-003-validation-feasibility.md#r1--term-proposal-restricted-column--approved-by-amino-2026-08-15) — the Sub-step that first gave it a code identifier — and its row says how *in the projection* is judged: on the parse tree once `SELECT *` has been expanded against the real schema, so the name in a comment, a string literal or a filter is not a projection of it. **This row read 88 until 2026-08-20**, when closing Step 003 caught that 3.3's registration had not been counted here; the figure is whatever `check_language.py` prints, which is why it names the script. The change before it was an amendment rather than a registration: `FX Rate`, clarified 2026-08-11 under [R19](../plan/step-002-warehouse-and-ingestion.md#r19--an-fx-rate-includes-the-derived-cross-rate--approved-by-amino-2026-08-11), now says in its own words that a euro-side pair *is* a published ECB reference rate while a pair between two non-euro currencies is the ratio of that date's two published rates — both are FX Rates, and a rate of any other origin is not one. The most recent *addition* is not a Domain Language term but an abbreviation: **NYSE** — New York Stock Exchange — **approved 2026-08-11**, added when R18 moved the reasoning about NASDAQ Trader's second file out of a code comment and into the Step Review, where the abbreviation checker reads it. The same ruling rewrote the `Adjusted Close` / `Market Price` Section C row so its 95.5% divergence figure is dated evidence with the command that reproduces it rather than a standing claim. Sub-step 1.2 added `Market Price`, `Adjusted Close`, `Quotation Currency`; narrowed `Instrument`; renamed `dim_fx_rate` → `fct_fx_rate` and registered `fct_instrument_price`. Step 002 planning added `Execution Price` and its Section C row against `Market Price`. Sub-step 2.1 added `Instrument Symbol`, `Trade Side` and `Denomination Currency` (R7–R9), a Section C row for the last against `Quotation Currency`, and swept the `Dimension Definition` instrument-type values to match the narrowed `Instrument` row (R10); Amino's 2026-08-06 review added `Cost Basis` and its Section C row against `Execution Price`, and registered `Snapshot` (R11–R12). |
 | Target State | ✅ working | **`agreed`** 2026-08-03. Terms agreed, data sources verified, rulings R1–R3 applied. One correction 2026-08-05: no date dimension in the Warehouse row. |
@@ -426,10 +479,12 @@ retargeting to BigQuery and one type does not.
 | Founding ADRs | ✅ working | Four ADRs in `.claude/docs/adr/`, all **`accepted`**. The first three on 2026-08-03: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code. The fourth — snapshot-and-replay, and where dlt stops — was deferred to the ingestion Step ([DEBT-002](../debt-ledger.md)), written in Sub-step 2.2 and **accepted 2026-08-11** (R17). Every cost in each is classified *accepted* / *debt* / *extension*. ADR-0002 carries a dated clarification (2026-08-05) on what its sqlglot commitment forbids; its status stays `accepted`. |
 | Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of Glossary Section B, **all ten populated**. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date` (R2). The two movement tables carry **opposite sign conventions** and the schema says so beside each column: cash is signed from the Account's side, accounting carries magnitudes so that Net Revenue = Σcommission − Σrebate − Σfee is literally true. |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is now checked rather than promised. `create_schema`, `tables`, `columns`, `row_count`, `execute`, `query`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. Hardcoded database path and no error handling, both licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
-| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and **the adapter seam holds in both the halves [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) named** — no `duckdb` import outside `veritas/warehouse/`, and no DuckDB-specific function name in the SQL any module out there emits. The dialect half (2.6) reads every string literal sqlglot parses as a statement and names any function call standard SQL does not have; which names those are is subtracted out of sqlglot's own dialect tables rather than typed, so the list tracks the library. Three probes run every time — standard SQL clean, `strftime` named, `list_aggregate` named — and a probe reading wrong fails the run. Those probes are the scan's **one fixture exemption**, and since 3.1 it is scoped to the file it lives in: `FIXTURE_EXEMPTIONS` names `.claude/scripts/check_warehouse.py` as well as the symbol `DIALECT_PROBES`, so no other scanned file can claim it by choosing that name. Pointing the entry at a file that does not exist makes the run fail loudly, so a stale exemption cannot widen quietly. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. **`--distinctions` (2.5)** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument** (added on review, 2026-08-13, after a transfer moved a fraction of a share and nothing objected), every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both — together they only prove an empty table is empty. |
+| Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus `--sources`: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and **the adapter seam holds in both the halves [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) named** — no `duckdb` import outside `veritas/warehouse/`, and no DuckDB-specific function name in the SQL any module out there emits. The dialect half (2.6) reads every string literal sqlglot parses as a statement and names any function call standard SQL does not have; which names those are is subtracted out of sqlglot's own dialect tables rather than typed, so the list tracks the library. Three probes run every time — standard SQL clean, `strftime` named, `list_aggregate` named — and a probe reading wrong fails the run. Those probes are the scan's **one fixture exemption**, and since 3.1 it is scoped to the file it lives in: `FIXTURE_EXEMPTIONS` names `.claude/scripts/check_warehouse.py` as well as the symbol `DIALECT_PROBES`, so no other scanned file can claim it by choosing that name. Pointing the entry at a file that does not exist makes the run fail loudly, so a stale exemption cannot widen quietly. `--rebuild` recreates the database; `--sources` checks the loaded data, one function per star table. For `dim_instrument` (2.2): normalisation, the declared universe, every raw table non-empty, and a **richness** assertion that the universe is thick enough for 2.5. For `fct_instrument_price` (2.3): every price is **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, three named wrong readings are shown to change real rows, and no day-over-day move exceeds 1.5. For `fct_fx_rate` (2.4): every rate is re-derived the same way, two named wrong readings are shown to change real rows, **every Market Price has a rate in its own Quotation Currency on its own date**, and a currency converted through another and back is unchanged within the rounding its stored scale forces. **`--distinctions` (2.5)** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument** (added on review, 2026-08-13, after a transfer moved a fraction of a share and nothing objected), every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both — together they only prove an empty table is empty. **4.1 added `gross_revenue()`**, the independent figure `check_semantic_layer.py` compares the published expression against, over the whole Warehouse or from a date on. It is written in this file, in its own SQL, and **reads nothing from `semantic/`** — [R2](../plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21) is why, and the price is that editing a published expression means editing this SQL too or the run fails. `--distinctions` now also fails if its own row-level Gross Revenue and that figure disagree. |
 | Validation feasibility spike | ✅ working | `.claude/scripts/check_validation_feasibility.py` (3.2, 3.3, 3.4) — the sqlglot spike, answering **all four claims** of [Step 003](../plan/step-003-validation-feasibility.md). **Not the Validation Gate and not a thin version of one**: it creates no `veritas/validation/` directory and ships no component. A tracer — parse, resolve against the real schema read through `WarehouseAdapter.columns`, rename table aliases back to their base table, canonicalise every projection that aggregates — plus 25 probe statements, each declaring the verdict this spike measured for it. A statement is allowed when it computes at least one metric expression and **every** one traces to a certified expression. Three certified expressions live as Python literals ([R2](../plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15)), so the Semantic Layer's file format stays unfixed. Every executable probe is executed through the adapter and checked **against another probe's number** rather than against a figure written in the script. It exits non-zero if any verdict, any relation or any detector reading changes, in either direction — a spike's job is to hold its finding still. **3.3 added claim 2**: `resolve` holds the rewriting settings both claims are judged under, `projected_expressions` walks every scope for claim 1, and `columns_reaching_the_answer` walks each output column's lineage for claim 2, so a column that never reaches the answer is not counted; nine shapes are judged three ways each — from the parse tree, by searching the query's text (ADR-0003's rejected alternative), and by claim 1's tracer. **3.4 added claim 4**: every one of the 25 statements is transpiled to BigQuery, re-parsed there and re-judged against a corpus and a schema retargeted the same way, plus two checks the round trip does not answer by surviving — what happened to the one certified expression carrying a cast, and whether transpile-and-compare would be a better dialect scan than `check_seam`'s name list. Figures and mutations are dated evidence in the [3.2](../reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric), [3.3](../reviews/step-003-validation-feasibility.md#sub-step-33--probe-whether-a-restricted-column-can-hide-from-the-parse-tree) and [3.4](../reviews/step-003-validation-feasibility.md#sub-step-34--probe-duckdb--bigquery-retargeting-on-the-sql-veritas-will-generate) reviews. |
 | Validation-feasibility gate | ✅ working | `.claude/docs/design/validation-feasibility.md` (3.5) — the go/no-go the spike exists to produce, in the shape of `data-availability.md` and beside it as the project's second design gate. **Verdict GO on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md)**, with a verdict per claim, what the Step did **not** measure, six constraints on the Step that builds the Semantic Layer, and **four rulings, all approved by Amino on 2026-08-20**. Both ADRs carry a dated status note pointing at it; neither status changed. |
-| Semantic Layer | ✗ none | — |
+| Semantic Layer | ◐ partly built | `semantic/` — **one entry type of four, one Metric Definition of nine**, from Sub-step 4.1. `metrics/gross_revenue.yaml` and `joins/trade_to_fx_rate_on_trade_date.yaml` are byte-for-byte the two blocks in the [Step 004 plan](../plan/step-004-semantic-layer.md#the-format-this-step-proposes)'s format section. A Metric Definition carries its `expression` as the text an Orchestrator pastes verbatim ([C1](validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)) plus the two fields [C2](validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate) requires, `join_path` and `date_column`; a Join Path carries `from_table`, `to_table` and the join condition as written, Reporting Currency literal included, because C1 forbids a template something else fills in. No Ambiguous Term, no Dimension Definition, and eight of the nine Metric Definitions are 4.2's. |
+| Semantic Layer loader | ✅ working | `veritas/semantic/` — `loader.py` behind an `__init__.py` that re-exports it, laid out like `veritas/warehouse/`. Reads the tree into frozen dataclasses whose field lists **are** the file format, so there is no second copy of a field name to drift; refuses a file it cannot read as the kind its directory declares, a duplicate entry name, or a field the format does not name. **Executes no SQL and assembles no query** — C1 puts pasting on the consumer's side. Reads booleans the **YAML 1.2** way rather than PyYAML's YAML 1.1, because a Join Path publishes its condition under the key `on`, which YAML 1.1 reads as the boolean `True`; the same rule keeps `no`, `on`, `y` and `n` as text in any casing, which is what 4.5 needs when it writes a Dimension Definition's allowed values — a country code, a province code, and both halves of a yes/no flag are all domain values that YAML 1.1 would silently turn into booleans. |
+| Semantic Layer check | ✅ working | `.claude/scripts/check_semantic_layer.py` (4.1) — the plan's five checks and a sixth. Every file loads with every required field; **every Metric Definition's `name` is a Glossary Section B term whose *Lives in* cell says `semantic/metrics/`**, read from the Glossary rather than listed in the script; the expression is **pasted verbatim** into a query built from the entry's own Join Path and date column, executed through the Warehouse Adapter, and must return a number; that number must equal what `check_warehouse.py` computes from its own SQL — **twice, once over the whole Warehouse and once over one period**, because the arithmetic and the date predicate are separate mistakes and the second is invisible to a total; the declared Reporting Currency must appear as a string literal in the named Join Path's parse tree; and an expression that does not parse **fails the run**, with two probes exercising the refusal on every run. A metric with no independent counterpart figure gets the weaker claim — *it executes and returns a number* — and the run says which it got. Needs a filled Warehouse. Eight mutations, and the figures they produced, are dated evidence in the [Sub-step 4.1 review](../reviews/step-004-semantic-layer.md#sub-step-41--publish-the-semantic-entry-format-on-one-metric-definition). |
 | Ingestion | ✅ working | `veritas/ingestion/` — **both halves**: four real sources and the seeded simulator. `uv run python -m veritas.ingestion` builds all ten tables end-to-end from a clean clone with **no network**, and two consecutive runs produce byte-identical output. `--refresh` is the only mode that opens a socket; a refresh that fails part-way names the snapshots it had already rewritten, and one that succeeds reports how many it rewrote and how many were distinct — **failing the run if a source was fetched twice**. **Two phases, in an order that cannot be reversed:** dlt lands the real sources in `raw` and the adapter builds three star tables from them; then `simulator.py` *reads those three through the adapter*, generates the client side as a pure function of them and a seed, and a second dlt load plus seven more build scripts lands it. No two connections are ever open at once. The pipeline refuses to complete on four silent-shortness conditions, two of them added in 2.5: a Position with no Market Price on its own Snapshot date, and a monetary amount whose Denomination Currency has no FX Rate on its own date. |
 | Retrieval | ✗ none | — |
 | Orchestrator | ✗ none | — |
@@ -451,7 +506,15 @@ veritas/
 │   │   └── ingestion/         # ingestion's own snapshots — one per source, one
 │   │                          # per traded Instrument; only --refresh writes here
 │   └── veritas.duckdb         # the Warehouse — gitignored, rebuilt by ingestion
+├── semantic/                  # the Semantic Layer — the certified registry, as data
+│   ├── metrics/
+│   │   └── gross_revenue.yaml            # one Metric Definition of nine (4.2 writes the rest)
+│   └── joins/
+│       └── trade_to_fx_rate_on_trade_date.yaml
 ├── veritas/
+│   ├── semantic/
+│   │   ├── __init__.py        # re-exports the loader, like veritas/warehouse/
+│   │   └── loader.py          # reads semantic/ into frozen entries; executes nothing
 │   ├── warehouse/
 │   │   ├── adapter.py         # the Warehouse Adapter — the only duckdb importer
 │   │   ├── schema.sql         # the ten-table star schema, hand-authored
@@ -479,6 +542,7 @@ veritas/
     │   ├── verify_framework.py        # structure: docs, links, skills, interpreter
     │   ├── check_language.py          # content: Glossary + writing conventions
     │   ├── check_warehouse.py         # schema vs Glossary, constraints, adapter seam
+    │   ├── check_semantic_layer.py    # every published expression executes, and agrees
     │   ├── check_validation_feasibility.py  # the sqlglot spike — all four claims
     │   └── check_data_availability.py
     └── docs/
@@ -507,9 +571,19 @@ existed. 2.5 closed the last gap: all eight are computable, and
 measuring the Section C pairs.
 
 **What that does not mean.** A metric returning a number is not a metric being
-*asked for* — there is no Semantic Layer, so no Metric Definition is written down,
-certified, or retrievable, and nothing turns a question into SQL. The arithmetic
-exists; the machine that chooses it does not.
+*asked for*. Sub-step 4.1 changed one word of this paragraph and not the rest: **one**
+Metric Definition is now written down and certified, and the other eight are not.
+Nothing is retrievable — there is no Retrieval — and nothing turns a question into
+SQL. The arithmetic exists and one metric now says in a file which arithmetic it is;
+the machine that chooses between them does not exist.
+
+**The Semantic Layer is one entry type of four.** `semantic/metrics/` and
+`semantic/joins/` hold one file each. There is no Ambiguous Term, so nothing in the
+repository yet carries the claim ADR-0001 rejected schema retrieval for — that
+*"revenue"* has two certified meanings — and no Dimension Definition, so no metric can
+be sliced. Both are Sub-steps 4.4 and 4.5. Four things the format carries are
+published and unchecked: `derives_from`, `description`, `grain` and `aliases`, the
+last three being what Retrieval will match on when Retrieval exists.
 
 **All four of the spike's claims are answered and the verdict is recorded**, in
 [validation-feasibility.md](validation-feasibility.md): tracing and the Shadow Metric
@@ -614,7 +688,7 @@ which is why 2.4 hit it nowhere.
 
 ## Open debt and extensions
 
-**9 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **3 paid**, 1
+**10 open debt** — see [debt-ledger.md](../debt-ledger.md) — plus **3 paid**, 1
 accepted permanently and 2 moved out. **8 open extensions** — see
 [extension-register.md](../extension-register.md).
 
@@ -623,10 +697,13 @@ cheaply*; an extension means it is *right for this scope* and the full system
 needs more. The test that settles it: does the trigger fire inside this project's
 life? Three Sub-step 1.3 entries failed that test and moved.
 
-- **DEBT-001** — framework rules rely on discipline, not enforcement. Since
-  Sub-step 3.2 it also carries the second coverage gap: `verify_framework.py` reads
-  links only in `.claude/docs/**/*.md` and `CLAUDE.md`, so a document link written
-  inside `.claude/scripts/*.py` is checked by hand or not at all.
+- **DEBT-001** — framework rules rely on discipline, not enforcement. **Its second
+  coverage gap was paid in Sub-step 4.1**: `verify_framework.py` now resolves
+  markdown links and their anchors inside every `.py` file under `veritas/` and
+  `.claude/scripts/`, so a document link written in a docstring is checked the same
+  way one written in a document is. The entry stays open on its main subject, the
+  hook layer — nothing mechanically blocks a commit by Claude, a missing Ledger
+  entry, or a review that skips a section.
 - **DEBT-002** — **paid 2026-08-10** in Sub-step 2.3, under its first trigger. The
   market-price pipeline was written and the snapshot was already behind it, so a
   clean clone builds the whole Warehouse with the network off. The dependency is
@@ -684,6 +761,15 @@ life? Three Sub-step 1.3 entries failed that test and moved.
   note reading the Trade Date / Settlement Date gap as the same question — the
   repayment covers the Join Path **and** the date predicate, and no probe measures the
   date half, so the Sub-step that pays it owes one.
+- **DEBT-016** — opened 2026-08-21 in Sub-step 4.1. `check_semantic_layer.py` catches
+  `Exception` around the two lines that execute a published expression, because
+  ADR-0002 puts the engine's dialect — and therefore its exception classes — inside
+  the Warehouse Adapter, and the adapter raises nothing of its own. The run still
+  fails when the engine refuses; what is wrong is the diagnosis, which reports a bug
+  in the script as a defect in the corpus. Repayment is a `WarehouseError` on the
+  adapter, and the trigger is the first component outside `.claude/scripts/` that has
+  to handle a failed query — the Orchestrator's execute step, which cannot catch
+  `Exception` and still tell a user whether the Gate or the engine refused.
 - **DEBT-015** — opened 2026-08-20 in Sub-step 3.5. `check_seam`'s dialect scan names
   DuckDB-only **function** names, and so does ADR-0002's stated mitigation; the one
   construct where Sub-step 3.4 measured meaning being lost on the way to BigQuery is a
@@ -713,8 +799,9 @@ life? Three Sub-step 1.3 entries failed that test and moved.
 
 [DEBT-001](../debt-ledger.md#debt-001--framework-rules-rely-on-discipline-not-enforcement)'s
 trigger **fired** in Sub-step 1.3 — a framework rule agreed in 1.2 was broken in 1.3.
-Partially paid by `check_language.py` and by new rules in `CLAUDE.md`. **Unpaid: the
-hook layer, and the one-glob widening of `check_links` to read `.claude/scripts/*.py`**
-— the second recorded on 2026-08-18, to be paid before the final documentation pass,
-because that pass swaps internal document links for user-facing ones and works from
-the set a checker can enumerate.
+Partially paid by `check_language.py` and by new rules in `CLAUDE.md`, and again in
+Sub-step 4.1 by the widening of `check_links` to read `.py` files — the gap recorded
+on 2026-08-18, paid before the final documentation pass as it required, because that
+pass swaps internal document links for user-facing ones and works from the set a
+checker can enumerate. **Unpaid: the hook layer.** Nothing mechanically blocks a
+commit by Claude, a missing Ledger entry, or a review that skips a section.

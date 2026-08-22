@@ -1,0 +1,9 @@
+name: trade_to_fx_rate_on_trade_date
+version: 1
+kind: join_path
+from_table: fct_trade
+to_table: fct_fx_rate
+on: >
+  fct_fx_rate.rate_date = fct_trade.trade_date
+  AND fct_fx_rate.from_currency = fct_trade.denomination_currency
+  AND fct_fx_rate.to_currency = 'EUR'

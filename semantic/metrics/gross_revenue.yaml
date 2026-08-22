@@ -1,0 +1,13 @@
+name: Gross Revenue          # the Glossary term, spelled exactly as registered
+version: 1                   # what Lineage records; bumped when the expression moves
+kind: metric
+description: >
+  Sum of Commission before any Rebate or pass-through Fee is deducted.
+expression: "sum(fct_trade.commission * fct_fx_rate.fx_rate)"
+grain: one row per Trade
+unit: money
+reporting_currency: EUR
+join_path: trade_to_fx_rate_on_trade_date
+date_column: fct_trade.trade_date
+aliases: ["gross commission", "revenue before rebates", "commission income"]
+derives_from: []

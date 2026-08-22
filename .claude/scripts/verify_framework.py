@@ -26,6 +26,13 @@ SKILLS = CLAUDE_DIR / "skills"
 DOCS = CLAUDE_DIR / "docs"
 CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
 
+# Code cites documents too, as markdown links inside docstrings and comments, so
+# that a later documentation pass can move a document and find every reference to
+# it. Nothing read those links until Sub-step 4.1, which is DEBT-001's second
+# coverage gap and its repayment. The same two roots `check_warehouse.py` scans for
+# the adapter seam.
+CODE_ROOTS = [REPO_ROOT / "veritas", CLAUDE_DIR / "scripts"]
+
 problems: list[str] = []
 
 
@@ -117,19 +124,30 @@ def heading_anchors(text: str) -> set[str]:
 
 
 def check_links() -> None:
-    """Relative markdown links in our own documents must resolve — file *and* anchor.
+    """Relative markdown links in our own files must resolve — file *and* anchor.
 
     The `#anchor` half used to be split off and thrown away, so a link could point
     at a heading that had been renamed or never existed and still pass. A dead
     anchor lands the reader at the top of the right document, which reads as the
     citation being vague rather than broken — the failure Non-Negotiable #4's
     "citations quote" rule is trying to prevent.
+
+    **Code is read here as well as documents**, because the docstrings cite ADRs,
+    Ledger entries and constraints in exactly the same markdown, and a link a
+    reader cannot follow is no better for sitting inside a comment. It costs one
+    line and it is precise rather than approximate: a bracketed label immediately
+    followed by a parenthesised path is not otherwise Python, so every match in a
+    `.py` file is a citation. The count this run read is printed below.
     """
-    docs = sorted(DOCS.rglob("*.md")) + [CLAUDE_MD]
+    sources = (
+        sorted(DOCS.rglob("*.md"))
+        + [CLAUDE_MD]
+        + sorted(path for root in CODE_ROOTS for path in root.rglob("*.py"))
+    )
     anchors: dict[Path, set[str]] = {}
     links = anchored = 0
 
-    for doc in docs:
+    for doc in sources:
         for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", doc.read_text()):
             if target.startswith(("http://", "https://", "mailto:")):
                 continue
@@ -147,7 +165,8 @@ def check_links() -> None:
             if fragment not in anchors[path]:
                 problems.append(f"{doc.relative_to(REPO_ROOT)}: dead anchor -> {target}")
 
-    print(f"  links      {f'{links} links, {anchored} anchors':22} {len(docs)} documents")
+    print(f"  links      {f'{links} links, {anchored} anchors':22} "
+          f"{len(sources)} documents and python files")
 
 
 def check_interpreter() -> None:
