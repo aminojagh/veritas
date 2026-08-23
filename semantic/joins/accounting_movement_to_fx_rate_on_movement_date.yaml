@@ -1,0 +1,13 @@
+# Keyed on the Accounting Movement's own date — the date value was *earned*. The
+# Cash Movement table records when it was collected, and the two are a Section C
+# pair, so a route that reached the rate through the other table would be a
+# different metric wearing this one's name.
+name: accounting_movement_to_fx_rate_on_movement_date
+version: 1
+kind: join_path
+from_table: fct_accounting_movement
+to_table: fct_fx_rate
+on: >
+  fct_fx_rate.rate_date = fct_accounting_movement.movement_date
+  AND fct_fx_rate.from_currency = fct_accounting_movement.denomination_currency
+  AND fct_fx_rate.to_currency = 'EUR'

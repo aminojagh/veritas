@@ -45,8 +45,9 @@ reason) · `superseded`.
 | [EXT-006](#ext-006--position-change-attribution) | Position Change attribution | `fct_position_snapshot` · the `Position Change` Metric Definition | M | open |
 | [EXT-007](#ext-007--corporate-actions) | Corporate actions | `fct_instrument_price` · `fct_position_snapshot` · the P&L Metric Definitions | M | open |
 | [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration) | The data checks run in continuous integration | `check_warehouse.py` · `check_data_availability.py` · the one-command bring-up | M | open |
+| [EXT-009](#ext-009--the-join-path-entry-type-at-warehouse-scale) | The Join Path entry type at Warehouse scale | `semantic/joins/` file format · a Metric Definition's `join_paths` | M | open |
 
-**Open:** 8 · **Built:** 0 · **Dropped:** 0
+**Open:** 9 · **Built:** 0 · **Dropped:** 0
 
 ### Target State extension path, mapped
 
@@ -320,6 +321,33 @@ normalisation, not a description-logic problem.
 few fixed edge types, or a semantic layer orders of magnitude larger than
 assumed. Either would earn a property graph, and would then deserve its own ADR.
 
+**`derives_from` was taken for a different edge — amended 2026-08-22 (Sub-step 4.2)**
+
+Rule 2 above needs an edge meaning *"`Net Revenue` is `Gross Revenue` minus Rebate
+and Fee"* — a **declared identity**, checked so that nothing lets the two drift
+apart. Sub-step 4.2 needed an edge meaning *"`Account Value` is `Cash Balance`
+**added to** this metric's own expression"* — a **composition**, which the check
+that executes a Metric Definition actually assembles a query from. Both are
+relationships between two Certified Metrics and they are not the same
+relationship: one is read to compare, the other is read to compute, and a metric
+declaring the first under the field that means the second would be assembled into
+arithmetic nobody wrote.
+
+`derives_from` now carries the composition, decided in
+[R8](plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
+and enforced by `check_semantic_layer.py`. **So this entry's rule 2 needs a second
+edge type when it is built** — under its own name, in the same YAML, alongside
+`derives_from` and `disambiguates`. Recorded here rather than left to be
+rediscovered, because the cost of discovering it later is a corpus in which one
+field means two things and only one of them is checked.
+
+Two further limits the composition carries, both stated because they are what a
+coherence check would otherwise assume: it adds and never subtracts, and it walks
+**one** level rather than a chain. Neither is a shortcut behind a seam that this
+project owes repayment on — the corpus has one composed metric, it adds, and its
+part composes nothing — but a rule-2 edge type arriving into a corpus that has
+grown either of those is arriving into a different problem.
+
 **Readiness**
 
 When the Semantic Layer has enough entries for a human to stop holding the whole
@@ -546,3 +574,75 @@ Any one of:
    stops being the enforcement mechanism.
 3. The Warehouse is pointed at real sources, which is when the checks' subject
    changes and their content has to be re-decided anyway.
+---
+
+### EXT-009 — The Join Path entry type at Warehouse scale
+
+- **Status:** open
+- **Seam it lands against:** the `semantic/joins/` file format · a Metric Definition's
+  `join_paths` list
+- **Size:** M
+- **Motivated by:**
+  [R9's fourth ruling](plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23),
+  which answers the [Sub-step 4.2 review](reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)'s
+  observation that most published Join Paths have exactly one user
+
+**What the full system needs**
+
+A Join Path is registered as a **shared** route — a way between two tables, written once
+and named so that any metric needing that way can say its name instead of re-deriving
+the join. At Warehouse scale that is what the entry type buys: dozens of fact tables mean
+routes multiply, the same route is wanted by many metrics, and a library of named routes
+is the difference between one reviewed join condition and forty copies of it. What the
+full system needs on top of what exists here is the machinery that only matters once
+routes are genuinely shared:
+
+- **a naming rule for the directory**, so a route's name says what separates it from its
+  neighbours by construction rather than per file. Sub-step 4.2 renamed two routes onto
+  the currency axis and left a third on the date axis, each locally correct and the set
+  mixed — which is what a rule would prevent;
+- **reuse as a checkable property.** A route with no second user is not wrong, but at
+  scale it is the signal that a metric author wrote a private join and gave it a public
+  name, which is the copy-paste the entry type exists to prevent;
+- **composition beyond a flat list.** `join_paths` is an ordered list a route walks
+  once. A Warehouse with real branching wants routes that share prefixes, and this format
+  makes each metric restate the whole walk.
+
+**What the slice does instead, and why that is correct here**
+
+It publishes flat, ordered lists of named routes and checks them structurally: every
+named Join Path exists, starts at a table the route has reached, arrives somewhere new,
+and reaches back only to tables already joined. `check_semantic_layer.py` prints every
+metric's full route on every run, so how much reuse there actually is can be counted from
+its output rather than asserted here; the count as measured on 2026-08-22 is in the
+Sub-step 4.2 review. The honest reading of that count is that **this Warehouse has few
+tables and few ways between them** — ten tables in
+[Glossary Section B](glossary.md#b-the-warehouse) — so most routes having one user is a
+fact about the Warehouse, not a flaw in the entry type.
+
+**Why this is an extension and not debt**
+
+Nothing here is wrong, cheaply. Each Join Path file is a correct, reviewed join
+condition, and a metric naming a route it alone uses still gets the thing the seam is
+for: the join is written where a reviewer reads it, once, beside the expression it
+serves, instead of inside a query nobody sees. The trigger test settles it — *"most
+routes have more than one user"* cannot fire inside this project's life, because the
+number of tables is fixed by the Warehouse and the number of metrics is fixed at nine by
+Glossary Section B. Acting now would be tuning a design against a corpus too small to
+show whether the tuning helps, which is
+[R9](plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23)'s
+*"premature optimizing"* precisely.
+
+**Readiness**
+
+Any one of:
+
+1. The Warehouse gains fact tables beyond Glossary Section B's ten, so routes start
+   having genuine alternatives and the naming rule has something to rule on.
+2. Metric authoring moves out of hand-written YAML — this is
+   [EXT-003](#ext-003--metric-authoring-at-scale)'s subject, and a generator needs the
+   naming rule as input rather than as review commentary.
+3. A Join Path is wanted that this format cannot express: a branching route, a shared
+   prefix, or a route from a table to itself — the shape
+   [`Position Change`](reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)
+   already needs and reaches with a correlated subquery instead.

@@ -7,7 +7,9 @@ expression: "sum(fct_trade.commission * fct_fx_rate.fx_rate)"
 grain: one row per Trade
 unit: money
 reporting_currency: EUR
-join_path: trade_to_fx_rate_on_trade_date
+from_table: fct_trade
+join_paths: [trade_to_fx_rate_on_denomination_currency]
+filters: []
 date_column: fct_trade.trade_date
 aliases: ["gross commission", "revenue before rebates", "commission income"]
 derives_from: []

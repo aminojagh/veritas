@@ -1,0 +1,15 @@
+# The Snapshot-side twin of instrument_to_fx_rate_on_quotation_currency — the same
+# Quotation Currency conversion, keyed on the Snapshot date rather than the Trade
+# Date. Both routes convert the Quotation Currency, so the date is what names this
+# one apart from that one; that one is named for the currency because what it sits
+# beside is the Denomination Currency route. It names fct_position_snapshot for the
+# date, so it is only usable in a route that has already joined it.
+name: instrument_to_fx_rate_on_snapshot_date
+version: 1
+kind: join_path
+from_table: dim_instrument
+to_table: fct_fx_rate
+on: >
+  fct_fx_rate.rate_date = fct_position_snapshot.snapshot_date
+  AND fct_fx_rate.from_currency = dim_instrument.quotation_currency
+  AND fct_fx_rate.to_currency = 'EUR'

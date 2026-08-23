@@ -1,0 +1,24 @@
+# Measured against the stored Cost Basis, never against the last Execution Price:
+# an Execution Price is what one Trade filled at, a Cost Basis is what the whole
+# holding cost, and the two are a Section C pair that differ by a quantity as well
+# as by a price. Cost Basis is signed with the quantity, so one expression covers a
+# long and a short alike.
+name: Unrealised P&L
+version: 1
+kind: metric
+description: >
+  Profit or loss on a Position still held, marked at that date's Market Price
+  against what the holding cost. Moves with the market; nothing has been banked.
+expression: >
+  sum((CAST(fct_position_snapshot.quantity AS DECIMAL(38, 6))
+  * fct_instrument_price.market_price - fct_position_snapshot.cost_basis)
+  * fct_fx_rate.fx_rate)
+grain: one row per Position per Snapshot date
+unit: money
+reporting_currency: EUR
+from_table: fct_position_snapshot
+join_paths: [position_snapshot_to_instrument, position_snapshot_to_price_on_snapshot_date, instrument_to_fx_rate_on_snapshot_date]
+filters: []
+date_column: fct_position_snapshot.snapshot_date
+aliases: ["unrealized P&L", "paper profit and loss", "mark-to-market profit and loss"]
+derives_from: []

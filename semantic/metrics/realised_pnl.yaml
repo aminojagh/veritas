@@ -1,0 +1,21 @@
+# The only metric in the corpus with a filter, and the filter is the whole
+# difference between it and the three other movement types in the same table.
+# `realised P&L` appears in fct_accounting_movement and deliberately not in
+# fct_cash_movement: no cash moves when a Position closes, so it is a ledger entry
+# only — which is the Section C pair made structural rather than remembered.
+name: Realised P&L
+version: 1
+kind: metric
+description: >
+  Profit or loss locked in by closing a Position, recognised on the date it was
+  earned and converted to the Reporting Currency. Banked, unlike Unrealised P&L.
+expression: "sum(CAST(fct_accounting_movement.amount AS DECIMAL(38, 6)) * fct_fx_rate.fx_rate)"
+grain: one row per Accounting Movement
+unit: money
+reporting_currency: EUR
+from_table: fct_accounting_movement
+join_paths: [accounting_movement_to_fx_rate_on_movement_date]
+filters: ["fct_accounting_movement.movement_type = 'realised P&L'"]
+date_column: fct_accounting_movement.movement_date
+aliases: ["realized P&L", "booked profit and loss", "locked-in profit and loss"]
+derives_from: []

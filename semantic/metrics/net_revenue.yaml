@@ -1,0 +1,15 @@
+name: Net Revenue
+version: 1
+kind: metric
+description: >
+  Gross Revenue less Rebate and pass-through Fee — what the broker actually keeps.
+expression: "sum((fct_trade.commission - fct_trade.rebate - fct_trade.fee) * fct_fx_rate.fx_rate)"
+grain: one row per Trade
+unit: money
+reporting_currency: EUR
+from_table: fct_trade
+join_paths: [trade_to_fx_rate_on_denomination_currency]
+filters: []
+date_column: fct_trade.trade_date
+aliases: ["net commission", "revenue after rebates", "what the broker keeps"]
+derives_from: []

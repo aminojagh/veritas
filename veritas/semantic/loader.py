@@ -24,7 +24,7 @@ YAML keys against the Glossary, which the Sub-step 4.1 review states plainly.
 """
 
 import re
-from dataclasses import dataclass, fields
+from dataclasses import MISSING, dataclass, fields
 from pathlib import Path
 
 import yaml
@@ -105,27 +105,51 @@ class MetricDefinition(SemanticEntry):
     requires, because *"a certified expression pins down the arithmetic and not the
     rows it is computed over"*:
 
-      `join_path`   the name of the Join Path entry the expression is computed
-                    across. A route this file does not name is a route the
-                    Orchestrator would have to invent.
+      `from_table`  the table the query starts at. `Trade Count` joins nothing, so
+                    nothing else in the entry would name a table.
+      `join_paths`  the Join Path entries the expression is computed across, in the
+                    order they are joined. A route this file does not name is a
+                    route the Orchestrator would have to invent.
+      `filters`     the certified predicates, ANDed into the WHERE. `Realised P&L`
+                    shares a table with three other movement types and the filter
+                    is the whole difference between them.
       `date_column` the column a period filter keys on. Trade Date and Settlement
                     Date are a Glossary Section C pair precisely because choosing
                     between them moves the number.
 
     `expression` is the text an Orchestrator pastes verbatim, and `reporting_currency`
     is the currency it comes back in — the conversion is *inside* the expression and
-    the Join Path, never applied afterwards by something that read this field.
+    the Join Path, never applied afterwards by something that read this field. It is
+    the one field a file may omit, and omitting it is a claim: `Reporting Currency` is
+    registered as something *"every **monetary** metric must state"*, so a count and a
+    quantity must not state one. `.claude/scripts/check_semantic_layer.py` checks that
+    biconditional against `unit`; nothing here can, because a loader reads one file and
+    this is a rule about what a file says about itself.
+
+    **`derives_from` names the Certified Metrics whose value is added to this
+    metric's own expression**, which is how `Account Value` is *"Cash Balance plus
+    all Positions marked to market"* without restating the certified Cash Balance
+    expression. It is narrower than the word suggests — see
+    [R8](../../.claude/docs/plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22).
+
+    The shape of the four fields above is R8's, decided in Sub-step 4.2 after reading
+    all nine metrics against the shape Sub-step 4.1 published.
     """
 
     description: str
     expression: str
     grain: str
     unit: str
-    reporting_currency: str
-    join_path: str
+    from_table: str
+    join_paths: tuple[str, ...]
+    filters: tuple[str, ...]
     date_column: str
     aliases: tuple[str, ...]
     derives_from: tuple[str, ...]
+    # Last because a dataclass field with a default must follow every field without
+    # one. The file writes it where the format writes it, next to `unit`, since a
+    # mapping has no order a reader is obliged to honour.
+    reporting_currency: str = ""
 
 
 @dataclass(frozen=True)
@@ -154,10 +178,10 @@ ENTRY_KINDS: dict[str, tuple[str, type[SemanticEntry]]] = {
     "joins": ("join_path", JoinPath),
 }
 
-# Fields whose value is a list of names rather than one string. Read off the
-# annotation would be tidier and is not worth the reflection: two names, in one
+# Fields whose value is a list of strings rather than one string. Read off the
+# annotation would be tidier and is not worth the reflection: four names, in one
 # place, next to the dataclasses that declare them.
-NAME_LISTS = frozenset({"aliases", "derives_from"})
+STRING_LISTS = frozenset({"aliases", "derives_from", "join_paths", "filters"})
 
 
 @dataclass(frozen=True)
@@ -215,7 +239,15 @@ def read_entry(path: Path) -> SemanticEntry:
         )
 
     expected = {entry_field.name for entry_field in fields(entry_type)}
-    missing = sorted(expected - set(document))
+    # A field carrying a default is one the format lets a file leave out, and
+    # `reporting_currency` is the only one. Everything else missing is an error
+    # named after the key, which is what a person editing YAML needs to read.
+    optional = {
+        entry_field.name
+        for entry_field in fields(entry_type)
+        if entry_field.default is not MISSING
+    }
+    missing = sorted(expected - optional - set(document))
     unknown = sorted(set(document) - expected)
     if missing or unknown:
         raise SemanticEntryError(
@@ -241,7 +273,10 @@ def read_entry(path: Path) -> SemanticEntry:
         )
 
     return entry_type(**{
-        key: _names(path, key, value) if key in NAME_LISTS else _text(path, key, value)
+        key: (
+            _strings(path, key, value) if key in STRING_LISTS
+            else _text(path, key, value)
+        )
         for key, value in document.items()
     })
 
@@ -299,16 +334,22 @@ def _text(path: Path, key: str, value: object) -> object:
     if not isinstance(value, str):
         raise SemanticEntryError(
             f"{_here(path)}: {key} is {value!r}, and every field but version and "
-            f"the name lists is text"
+            f"the list fields is text"
         )
     return value.strip()
 
 
-def _names(path: Path, key: str, value: object) -> tuple[str, ...]:
-    """One list-of-names field, as a tuple so a loaded entry stays frozen."""
+def _strings(path: Path, key: str, value: object) -> tuple[str, ...]:
+    """One list-valued field, as a tuple so a loaded entry stays frozen.
+
+    Two of the four hold names — `join_paths`, `derives_from` — and two hold text a
+    person wrote, `aliases` and `filters`. Whether the names resolve to entries that
+    exist is a claim about the corpus rather than about this file, and is checked
+    where the other cross-entry claims are.
+    """
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise SemanticEntryError(
-            f"{_here(path)}: {key} is {value!r} — it is a list of names, written "
-            f"`[]` when there are none"
+            f"{_here(path)}: {key} is {value!r} — it is a list, written `[]` when "
+            f"it is empty"
         )
     return tuple(item.strip() for item in value)

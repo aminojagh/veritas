@@ -5,11 +5,17 @@ Run with:  uv run python .claude/scripts/check_semantic_layer.py
 Needs a filled Warehouse — `uv run python -m veritas.ingestion` first — because a
 published expression that has never been executed is a claim rather than a metric.
 
-A corpus cannot be proved by running it, only by running what it claims. Six checks
-do that. Five are the ones
+A corpus cannot be proved by running it, only by running what it claims. Eleven
+checks do that. Five are the ones
 [Sub-step 4.1](../docs/plan/step-004-semantic-layer.md#41--publish-the-semantic-entry-format-on-one-metric-definition)
 names; the sixth is Non-Negotiable #1 applied to the one place this corpus can coin
-a domain noun by accident.
+a domain noun by accident. Checks 7 to 11 arrived with
+[Sub-step 4.2](../docs/plan/step-004-semantic-layer.md#42--write-the-remaining-metric-definitions),
+which is where the corpus stopped being one entry: two are that Sub-step's own
+bullets, two are what the shape
+[R8](../docs/plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
+decided has to be checked for, and the eleventh is what keeps a claim in that ruling
+reproducible.
 
   1. Every file under `semantic/` loads, and every field the format names is
      present. The loader is what enforces this — its dataclasses *are* the field
@@ -27,8 +33,8 @@ a domain noun by accident.
      until the Glossary row is amended.
 
   3. The published expression is **pasted verbatim** into a query built from the
-     entry's own Join Path and date column, executed through the Warehouse Adapter,
-     and returns a number. Pasted rather than rebuilt: a check that re-derives the
+     entry's own route, certified filters and date column, executed through the
+     Warehouse Adapter, and returns a number. Pasted rather than rebuilt: a check that re-derives the
      expression proves the rebuild, not the file
      ([C1](../docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)).
      The date column is what makes this more than "the SQL runs": the same metric is
@@ -45,17 +51,42 @@ a domain noun by accident.
      *it executes and returns a number* — and is printed as such rather than sharing
      a word with the metrics that were actually compared.
 
-  5. The declared Reporting Currency appears in the Join Path the entry names, as a
-     string literal in the join condition's parse tree. It is written in two places
-     on purpose: C1 forbids a template the loader fills in, so the currency is
-     inside the Join Path text where a reviewer reads it, and this check is what
-     makes the duplication safe.
+  5. The declared Reporting Currency appears in one of the Join Paths the entry
+     names, as a string literal in the join condition's parse tree. It is written in
+     two places on purpose: C1 forbids a template the loader fills in, so the
+     currency is inside the Join Path text where a reviewer reads it, and this check
+     is what makes the duplication safe. The rule runs the other way too — a metric
+     whose unit is not money must state no currency at all.
 
   6. An expression that does not parse **fails the run**, rather than being skipped —
      [C6](../docs/design/validation-feasibility.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)'s
      echo in a Step that builds no Gate. Two probes give the rule teeth on every
      run, because a rule that has only ever seen valid input reads the same whether
-     it works or does nothing.
+     it works or does nothing, and they run against a composed metric as well as a
+     plain one because a composition is a second reader path.
+
+  7. Every [Glossary Section C](../docs/glossary.md#c-distinctions-we-must-not-blur)
+     pair whose both sides are Certified Metrics returns **two different numbers from
+     the published expressions**. `check_warehouse.py --distinctions` proves the data
+     separates them; this proves the Semantic Layer does, which is a different claim.
+
+  8. A metric's route is a route: every Join Path it names exists, starts at a table
+     the route has already reached, arrives somewhere new, and has a condition that
+     never reaches forward to a table nobody joined.
+
+  9. The three expressions the Sub-step 3.2 spike measured are **exactly** what
+     `semantic/metrics/` publishes, which is
+     [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)'s
+     pin: the spike stays pointed at its own literals so its dated verdict keeps its
+     inputs, and this assertion is what stops that verdict quietly becoming about
+     expressions the project no longer uses.
+
+ 10. A metric that derives from another adds up metrics that exist, are not itself,
+     do not derive further, and carry the same unit and currency.
+
+ 11. Every widening cast in the corpus is load-bearing, shown by executing the
+     expression without it and expecting the engine to refuse. A cast nobody can see
+     the need for is a cast somebody eventually removes.
 
 Exits non-zero if any check fails.
 """
@@ -78,7 +109,6 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 
 from veritas.semantic import (  # noqa: E402
-    JoinPath,
     MetricDefinition,
     SemanticEntryError,
     SemanticLayer,
@@ -90,30 +120,92 @@ from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
 # anywhere. The comment marks those specific lines as deliberate and suppresses
 # nothing else — the same note `check_validation_feasibility.py` carries.
 
-from check_warehouse import REPORTING_CURRENCY, gross_revenue  # noqa: E402
-# The other half of check 4. `gross_revenue` is imported rather than reimplemented
+from check_warehouse import (  # noqa: E402
+    METRIC_HOME,
+    REPORTING_CURRENCY,
+    account_value,
+    cash_balance,
+    gross_revenue,
+    net_revenue,
+    position_change,
+    realised_pnl,
+    trade_count,
+    traded_notional,
+    unrealised_pnl,
+)
+# The other half of check 4. Every figure is imported rather than reimplemented
 # for the reason the spike imports `unportable_functions`: a second copy would
 # answer the question about the copy, and would go on answering it after the
 # original changed. What must not happen is the arrow pointing the other way —
 # `check_warehouse.py` reading `semantic/` would make both sides compute the same
 # wrong number and agree, which is R2's whole subject.
 
-# Every Certified Metric this file can put a second, independently written figure
-# next to, and the function that produces it. A metric absent from here still has
-# to execute and return a number; it just has nothing to be checked against, and
-# check 4 says which it got rather than letting one word cover both.
+from check_validation_feasibility import CERTIFIED_EXPRESSIONS  # noqa: E402
+# The three expressions the Sub-step 3.2 spike measured, as Python literals. Check 9
+# pins them to the corpus rather than re-pointing the spike at it, which is
+# [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21).
+
+# Every Certified Metric and the function that produces its second, independently
+# written figure. Sub-step 4.2 filled this table out to all nine: a metric absent
+# from here would still have to execute and return a number, but nothing would be
+# checking that the number is the right one, and check 4 says which it got rather
+# than letting one word cover both.
 INDEPENDENT_FIGURES = {
     "Gross Revenue": gross_revenue,
+    "Net Revenue": net_revenue,
+    "Traded Notional": traded_notional,
+    "Trade Count": trade_count,
+    "Cash Balance": cash_balance,
+    "Account Value": account_value,
+    "Unrealised P&L": unrealised_pnl,
+    "Realised P&L": realised_pnl,
+    "Position Change": position_change,
 }
+
+# The `unit` value that makes a metric monetary, and therefore the one value that
+# obliges it to state a Reporting Currency — registered as something *"every
+# monetary metric must state"*. `count` and `quantity` are the other two in the
+# corpus and neither has a currency to state.
+MONEY = "money"
+
+# The Glossary Section C pairs whose **both** sides are Certified Metrics, with the
+# Glossary's own words for why each matters. `check_warehouse.py --distinctions`
+# proves the *data* separates these; check 7 proves the published expressions do,
+# which is a different claim and the one that matters for a corpus whose whole
+# purpose is keeping them apart.
+#
+# The other Section C rows are absent because they are not pairs of metrics: Trade
+# Date against Settlement Date is one metric under two date predicates, Client
+# against Account is a grouping, and the rest are columns.
+SECTION_C_PAIRS = (
+    ("Gross Revenue", "Net Revenue",
+     "reporting gross as net overstates what the business keeps"),
+    ("Cash Balance", "Account Value",
+     "a Client with no cash and equities has a Cash Balance of zero"),
+    ("Realised P&L", "Unrealised P&L",
+     "one is banked, one is a market opinion"),
+    ("Traded Notional", "Trade Count",
+     "one large trade and a thousand small ones are opposite answers"),
+)
+
+# How far apart two sides of a Section C pair must be before "a different number"
+# means anything to a reader. The same value as `check_warehouse.py`'s
+# MIN_DISTINCTION_GAP and deliberately not the same rule — that one is the floor
+# for the loaded data separating a pair, this one is the floor for the published
+# expressions separating it. They are free to move apart, and neither reads the
+# other. It applies only where both sides carry the same unit: a money figure and
+# a count are different numbers by construction, and a percentage between them
+# would be arithmetic with no meaning.
+MIN_DISTINCTION_GAP = Decimal("0.005")
 
 # The engine the queries are read in. The same one they are executed in, because a
 # statement checked in one dialect and run in another is two statements.
 DIALECT = "duckdb"
 
-# Where Glossary Section B says a Certified Metric lives, and the cell position the
-# "Lives in" column sits at once a leading pipe has made cells[0] the empty string.
-# Both match `check_warehouse.py`'s reader of the same table.
-METRIC_HOME = "semantic/metrics/"
+# The cell position the "Lives in" column sits at once a leading pipe has made
+# cells[0] the empty string. `METRIC_HOME` — where Section B says a Certified Metric
+# lives — is imported above rather than spelled again, because two readers of one
+# Glossary column agreeing by coincidence is how they stop agreeing.
 LIVES_IN_COLUMN = 3
 
 # The two halves the period split asks for. SQL operators rather than anything read
@@ -121,6 +213,14 @@ LIVES_IN_COLUMN = 3
 # compared is this file's own.
 BEFORE = "<"
 FROM_THEN = ">="
+
+# The widening cast four published expressions carry, and the pattern that takes it
+# back out again. Check 11 executes the uncast expression and expects the engine to
+# refuse it, which is what keeps the cast a **measurement** rather than a habit: a
+# reader who thinks it is tidiness can see, on every run, what removing it costs.
+# The same shape `check_validation_feasibility.py` uses for `Traded Notional`, which
+# is the one metric DEBT-015 predicted and the only one it named.
+WIDENING_CAST = re.compile(r"CAST\((.+?) AS DECIMAL\(38, 6\)\)")
 
 # The teeth of check 6, run on every run against expressions written here rather
 # than against whatever the corpus happens to contain. Each is pasted into the real
@@ -147,9 +247,10 @@ def certified_metric_terms() -> set[str]:
     rather than the file: they are not metrics, and accepting them as metric names
     would widen the check into meaninglessness.
 
-    Only one direction is checked here. *Every Section B metric has a Metric
-    Definition* is the bar Sub-step 4.2 sets for itself, and asserting it now would
-    fail on the eight metrics 4.2 is for.
+    Both directions are checked, by `check_entries` below. Sub-step 4.1 could only
+    check one — the other would have failed on the eight metrics 4.2 was for — and
+    4.2 is the Sub-step whose own bar is that *every* Section B metric has a Metric
+    Definition that returns a number.
     """
     text = GLOSSARY.read_text()
     section = re.search(r"^### B\. The warehouse\n(.*?)^### ", text, re.S | re.M)
@@ -169,30 +270,127 @@ def certified_metric_terms() -> set[str]:
     return terms
 
 
-def source(join: JoinPath) -> str:
-    """The `FROM ... JOIN ... ON ...` the Join Path certifies, as written."""
-    return f"FROM {join.from_table} JOIN {join.to_table} ON {join.on}"
+def source(metric: MetricDefinition, layer: SemanticLayer) -> str:
+    """The `FROM ... JOIN ... ON ...` a metric's route certifies, as written.
+
+    The route starts at the table the entry names and joins each Join Path in the
+    order the entry lists them. `Trade Count` lists none, so its route is one table
+    and no join at all — which is why a Metric Definition carries `from_table`
+    rather than reading the first table off its first Join Path.
+    """
+    sql = f"FROM {metric.from_table}"
+    for name in metric.join_paths:
+        join = layer.join_paths[name]
+        sql += f" JOIN {join.to_table} ON {join.on}"
+    return sql
+
+
+def query_parts(
+    metric: MetricDefinition, layer: SemanticLayer, comparison: str | None = None
+) -> list[str]:
+    """One statement per part of a metric — its own, then each it derives from.
+
+    A metric that derives from nothing has one part and that part is the whole
+    query. `Account Value` has two, because *"Cash Balance plus all Positions
+    marked to market"* is rooted at two Snapshot tables that join on nothing
+    without multiplying rows.
+
+    **The period filter is applied to every part**, which is the reason the
+    composition happens here rather than inside an expression. A scalar subquery
+    written into `Account Value`'s own expression would not be reached by a `WHERE`
+    on the outer query, so each half of a date range would carry the whole of the
+    marked Positions and the two halves would add up to more than the total.
+    """
+    parts = []
+    for part in [metric, *(layer.metrics[name] for name in metric.derives_from)]:
+        predicates = list(part.filters)
+        if comparison:
+            predicates.append(f"{part.date_column} {comparison} ?")
+        where = f" WHERE {' AND '.join(predicates)}" if predicates else ""
+        parts.append(f"SELECT {part.expression} {source(part, layer)}{where}")
+    return parts
 
 
 def executable_query(
-    metric: MetricDefinition, join: JoinPath, comparison: str | None = None
+    metric: MetricDefinition, layer: SemanticLayer, comparison: str | None = None
 ) -> str:
     """One Metric Definition, as the statement that computes it.
 
     The expression goes in **verbatim**. Everything around it comes from the entry's
-    own two C2 fields — the Join Path it names and, when a half is asked for, the
-    date column a period filter keys on, compared against a bound parameter.
+    own fields — the table it starts at, the Join Paths it names, the certified
+    predicates it carries and, when a half is asked for, the date column a period
+    filter keys on, compared against a bound parameter.
 
     What this assembles for `Gross Revenue` is the shape the Sub-step 3.2 spike's
     `bare` probe writes out by hand — the spike had to, because no Semantic Layer
-    existed yet to publish one. Whether the two are still the *same text* is not
-    asserted here: that is
-    [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)'s
-    pin, which lands in Sub-step 4.2 once all three of the expressions the spike
-    measured are published.
+    existed yet to publish one. That the two are still the same *text* is check 9.
     """
-    period = f" WHERE {metric.date_column} {comparison} ?" if comparison else ""
-    return f"SELECT {metric.expression} {source(join)}{period}"
+    parts = query_parts(metric, layer, comparison)
+    if len(parts) == 1:
+        return parts[0]
+    return "SELECT " + " + ".join(f"({part})" for part in parts)
+
+
+def bindings(metric: MetricDefinition) -> int:
+    """How many bound parameters a period-filtered query for this metric takes.
+
+    One per part, because every part carries its own `WHERE`.
+    """
+    return 1 + len(metric.derives_from)
+
+
+def tables_named_in(condition: str) -> set[str]:
+    """Every table a join condition qualifies a column with.
+
+    A Join Path is a route between two tables and its condition may still name a
+    third: the rate that converts a Traded Notional is keyed on the Instrument's
+    Quotation Currency and on the *Trade's* date. That is legal SQL in a route
+    that has already joined the Trade, and nonsense in one that has not, which is
+    the difference `check_route` below exists to enforce.
+    """
+    parsed = sqlglot.parse_one(condition, dialect=DIALECT)
+    return {column.table for column in parsed.find_all(exp.Column) if column.table}
+
+
+def units(metric: MetricDefinition) -> str:
+    """What a figure from this metric is denominated in, for printing beside it.
+
+    The Reporting Currency where there is one, the `unit` where there is not: a
+    count of Trades reads as `1,670 count` rather than as `1,670 EUR`, and the
+    metrics that have no currency are exactly the ones where saying so matters.
+    """
+    return metric.reporting_currency or metric.unit
+
+
+def route_as_read(metric: MetricDefinition, layer: SemanticLayer) -> str:
+    """A metric's route as a reader would follow it, table to table.
+
+    Printed rather than the Join Path names alone, because the names are the
+    corpus's vocabulary and the tables are what a reviewer checks against the
+    Glossary Section B row. A route with no joins prints its one table and says so.
+    """
+    tables = [metric.from_table]
+    for name in metric.join_paths:
+        tables.append(layer.join_paths[name].to_table)
+    route = " → ".join(tables)
+    if not metric.join_paths:
+        return f"{route} — no join"
+    return f"{route}  ({', '.join(metric.join_paths)})"
+
+
+def every_part_reads_as_a_query(
+    metric: MetricDefinition, layer: SemanticLayer
+) -> bool:
+    """Whether every part of a composed metric parses, not just the sum of them.
+
+    The distinction is the whole of C6 for a composed metric. `SELECT (SELECT )
+    + (SELECT sum(...) ...)` has a projection — the addition — so a rule that read
+    only the assembled statement would find one and pass a query with an empty
+    metric inside it. Each part is judged on its own.
+    """
+    return all(
+        reads_as_a_query(part) for part in query_parts(metric, layer)
+    )
 
 
 def reads_as_a_query(sql: str) -> bool:
@@ -272,10 +470,22 @@ def one_number(
 
 
 def check_entries(layer: SemanticLayer) -> None:
-    """Checks 2 and 5, plus the one cross-reference check 3 cannot run without."""
+    """Checks 2, 5, 8 and 10 — everything decidable without executing anything."""
     certified = certified_metric_terms()
     print(f"  Glossary Section B names {len(certified)} terms living in "
           f"{METRIC_HOME}")
+
+    # Both directions, where Sub-step 4.1 could only check one. The bar Sub-step
+    # 4.2 sets for itself is that *every* Section B metric has a Metric Definition
+    # — the same bar Step 002 set for the Warehouse's ten tables — so an
+    # unwritten metric has to fail the run rather than be noticed by a reader.
+    unwritten = sorted(certified - set(layer.metrics))
+    if unwritten:
+        problems.append(
+            f"Glossary Section B registers {unwritten} as living in {METRIC_HOME} "
+            f"and no file there publishes them — a Certified Metric with no Metric "
+            f"Definition is a name Retrieval can match and nothing can compute"
+        )
 
     for metric in layer.metrics.values():
         if metric.name not in certified:
@@ -284,31 +494,184 @@ def check_entries(layer: SemanticLayer) -> None:
                 f"whose 'Lives in' cell says {METRIC_HOME} — register the term, or "
                 f"amend its row, before certifying a computation under that name"
             )
+        broken_route = route_problem(metric, layer)
+        if broken_route:
+            problems.append(broken_route)
+        else:
+            check_reporting_currency(metric, layer)
+        check_derivation(metric, layer)
 
-        join = layer.join_paths.get(metric.join_path)
+
+def route_problem(metric: MetricDefinition, layer: SemanticLayer) -> str | None:
+    """Check 8 — a metric's route is a route: it starts somewhere and stays joined.
+
+    Three ways a list of Join Paths can be incoherent, and all three produce SQL
+    the engine would refuse or, worse, answer wrongly:
+
+      * a named Join Path no file publishes, so the route is one the corpus does
+        not certify;
+      * a Join Path that starts at a table the route has not reached yet, which is
+        a join to nothing;
+      * a Join Path whose condition names a table the route has not reached, which
+        is the same fault one level down — and the reason this is checked at all is
+        that a legitimate Join Path *does* name a third table:
+        `instrument_to_fx_rate_on_quotation_currency` keys the rate on
+        `fct_trade`'s date.
+
+    **Returns the problem rather than reporting it**, and `check_entries` is the one
+    caller that reports. Everything else downstream — the execution, the period
+    split, the parse probes — has to know whether a metric assembles at all, and a
+    predicate that appended as it answered would report one broken route once per
+    caller. That is not hypothetical: it is what the mutation for this check
+    produced before this function was split in two.
+    """
+    joined = [metric.from_table]
+    for name in metric.join_paths:
+        join = layer.join_paths.get(name)
         if join is None:
-            problems.append(
-                f"Metric Definition {metric.name!r} names Join Path "
-                f"{metric.join_path!r}, which no file under semantic/joins/ "
-                f"publishes — so the route the expression is computed over is one "
-                f"the corpus does not certify"
+            return (
+                f"Metric Definition {metric.name!r} names Join Path {name!r}, which "
+                f"no file under semantic/joins/ publishes — so the route the "
+                f"expression is computed over is one the corpus does not certify"
             )
-            continue
+        if join.from_table not in joined:
+            return (
+                f"Metric Definition {metric.name!r} joins {name!r}, which starts at "
+                f"{join.from_table!r}, but its route has only reached {joined} — a "
+                f"Join Path can only extend a route that has already arrived at the "
+                f"table it starts from"
+            )
+        if join.to_table in joined:
+            return (
+                f"Metric Definition {metric.name!r} joins {name!r}, which arrives at "
+                f"{join.to_table!r} — already in the route. A table joined twice "
+                f"under one name makes every column that names it ambiguous"
+            )
+        reachable = [*joined, join.to_table]
+        unreached = sorted(tables_named_in(join.on) - set(reachable))
+        if unreached:
+            return (
+                f"Metric Definition {metric.name!r} joins {name!r}, whose condition "
+                f"names {unreached} — tables its route has not joined. A join "
+                f"condition may reach back to a table already in the route and "
+                f"never forward to one that is not"
+            )
+        joined = reachable
+    return None
 
-        literals = {
-            literal.this
-            for literal in sqlglot.parse_one(join.on, dialect=DIALECT).find_all(
-                exp.Literal
+
+def missing_parts(metric: MetricDefinition, layer: SemanticLayer) -> list[str]:
+    """The metrics this one derives from that no file publishes."""
+    return [name for name in metric.derives_from if name not in layer.metrics]
+
+
+def assembles(metric: MetricDefinition, layer: SemanticLayer) -> bool:
+    """Whether a query can be built for this metric at all.
+
+    A route that does not hold and a part that does not exist are both reported by
+    `check_entries`; this is what stops every later check reporting them again, or
+    walking into the missing entry and raising instead of failing.
+    """
+    return route_problem(metric, layer) is None and not missing_parts(metric, layer)
+
+
+def check_reporting_currency(metric: MetricDefinition, layer: SemanticLayer) -> None:
+    """Check 5 — the declared Reporting Currency, and the metrics that have none.
+
+    [`Reporting Currency`](../docs/glossary.md#a-the-system) is registered as *"the
+    single currency a Grounded Answer is expressed in. Every **monetary** metric
+    must state one"* — so the rule has two directions and this check takes both. A
+    money metric with no currency is an answer whose units nobody knows; a count
+    or a quantity *with* one is a fact invented by a field that had to be filled
+    in.
+
+    For a monetary metric the currency must also appear as a string literal in one
+    of the Join Paths its route names. It is written in two places on purpose: C1
+    forbids a template the loader fills in, so the currency is inside the Join Path
+    text where a reviewer reads it, and this check is what makes the duplication
+    safe.
+    """
+    monetary = metric.unit == MONEY
+    if monetary and not metric.reporting_currency:
+        problems.append(
+            f"Metric Definition {metric.name!r} has unit {metric.unit!r} and states "
+            f"no reporting_currency — a monetary metric that does not say which "
+            f"currency it comes back in is a number with no units"
+        )
+        return
+    if not monetary:
+        if metric.reporting_currency:
+            problems.append(
+                f"Metric Definition {metric.name!r} has unit {metric.unit!r} and "
+                f"states reporting_currency {metric.reporting_currency!r} — only a "
+                f"monetary metric has one, and a count expressed in a currency is a "
+                f"fact the field invented"
             )
+        return
+
+    literals: set[str] = set()
+    for name in metric.join_paths:
+        parsed = sqlglot.parse_one(layer.join_paths[name].on, dialect=DIALECT)
+        literals |= {
+            literal.this for literal in parsed.find_all(exp.Literal)
             if literal.is_string
         }
-        if metric.reporting_currency not in literals:
+    if metric.reporting_currency not in literals:
+        problems.append(
+            f"Metric Definition {metric.name!r} declares reporting_currency "
+            f"{metric.reporting_currency!r}, and the Join Paths on its route "
+            f"convert to {sorted(literals) or 'nothing'} — the currency is written "
+            f"in both places because C1 forbids a template, and the two have "
+            f"drifted apart"
+        )
+
+
+def check_derivation(metric: MetricDefinition, layer: SemanticLayer) -> None:
+    """Check 10 — a composed metric adds up metrics that exist and are commensurable.
+
+    `derives_from` names the Certified Metrics whose value is **added** to this
+    metric's own expression, which is how `Account Value` is *"Cash Balance plus all
+    Positions marked to market"* without restating the certified Cash Balance
+    expression. Four ways that can be a lie, and the fourth is the quiet one:
+
+      * a part no file publishes — the metric cannot be computed at all;
+      * a metric deriving from itself, which is an assembly that never terminates;
+      * a part that itself derives, which this assembly does not walk. One level is
+        what the corpus has, so one level is what is claimed and what is enforced;
+      * a part in a different unit or a different currency. Adding a count to a
+        money figure, or euros to dollars, produces a number rather than an error,
+        and it is the failure a corpus about not blurring quantities can least
+        afford to commit itself.
+    """
+    for name in metric.derives_from:
+        part = layer.metrics.get(name)
+        if part is None:
             problems.append(
-                f"Metric Definition {metric.name!r} declares reporting_currency "
-                f"{metric.reporting_currency!r}, and Join Path {join.name!r} "
-                f"converts to {sorted(literals) or 'nothing'} — the currency is "
-                f"written in both places because C1 forbids a template, and the two "
-                f"have drifted apart"
+                f"Metric Definition {metric.name!r} derives from {name!r}, which no "
+                f"file under {METRIC_HOME} publishes — so the metric names a value "
+                f"the corpus cannot produce"
+            )
+        elif part.name == metric.name:
+            problems.append(
+                f"Metric Definition {metric.name!r} derives from itself"
+            )
+        elif part.derives_from:
+            problems.append(
+                f"Metric Definition {metric.name!r} derives from {name!r}, which "
+                f"itself derives from {list(part.derives_from)} — this assembly adds "
+                f"one level and does not walk a chain, so the second level would be "
+                f"silently dropped"
+            )
+        elif (part.unit, part.reporting_currency) != (
+            metric.unit, metric.reporting_currency
+        ):
+            problems.append(
+                f"Metric Definition {metric.name!r} is {metric.unit!r} in "
+                f"{metric.reporting_currency or 'no currency'} and derives from "
+                f"{name!r}, which is {part.unit!r} in "
+                f"{part.reporting_currency or 'no currency'} — the two are added "
+                f"together, and adding them would produce a number rather than an "
+                f"error"
             )
 
 
@@ -322,21 +685,26 @@ def check_expressions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None
         )
         return
 
+    returned: dict[str, Decimal | int] = {}
     for metric in layer.metrics.values():
-        join = layer.join_paths.get(metric.join_path)
-        if join is None:
+        if not assembles(metric, layer):
             continue  # already reported by check_entries
 
         print()
-        print(f"  {metric.name}  v{metric.version}  ·  {metric.unit} in "
-              f"{metric.reporting_currency}  ·  {metric.grain}")
+        print(f"  {metric.name}  v{metric.version}  ·  {metric.unit}"
+              f"{' in ' + metric.reporting_currency if metric.reporting_currency else ''}"
+              f"  ·  {metric.grain}")
         print(f"      expression   {metric.expression}")
-        print(f"      join path    {join.name} — {join.from_table} → {join.to_table}")
+        print(f"      route        {route_as_read(metric, layer)}")
+        for predicate in metric.filters:
+            print(f"      filter       {predicate}")
+        for name in metric.derives_from:
+            print(f"      plus         {name}, added to this expression")
         print(f"      date column  {metric.date_column}")
 
-        whole = executable_query(metric, join)
+        whole = executable_query(metric, layer)
         print(f"      query        {whole}")
-        if not reads_as_a_query(whole):
+        if not every_part_reads_as_a_query(metric, layer):
             problems.append(
                 f"{metric.name!r}: the query its published expression assembles into "
                 f"does not parse, so nothing below was executed. A parse failure is "
@@ -347,14 +715,15 @@ def check_expressions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None
         total = one_number(warehouse, whole)
         if total is None:
             continue
-        print(f"      returns      {total:,.2f} {metric.reporting_currency}")
+        returned[metric.name] = total
+        print(f"      returns      {total:,.2f} {units(metric)}")
 
         independently = INDEPENDENT_FIGURES.get(metric.name)
         if independently is None:
             print(f"      compared     nothing — check_warehouse.py computes no "
                   f"independent figure for this metric, so all that is claimed here "
                   f"is that the expression executes and returns a number")
-        elif metric.reporting_currency != REPORTING_CURRENCY:
+        elif metric.unit == MONEY and metric.reporting_currency != REPORTING_CURRENCY:
             problems.append(
                 f"{metric.name!r} declares reporting_currency "
                 f"{metric.reporting_currency!r} and check_warehouse.py computes its "
@@ -371,7 +740,7 @@ def check_expressions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None
             if theirs != total:
                 problems.append(
                     f"{metric.name!r}: the published expression returns "
-                    f"{total:,.2f} {metric.reporting_currency} and "
+                    f"{total:,.2f} {units(metric)} and "
                     f"check_warehouse.py's independent SQL returns {theirs:,.2f}. "
                     f"One of the two is wrong, and neither file is entitled to "
                     f"assume it is the other one"
@@ -382,13 +751,16 @@ def check_expressions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None
                 # heading that names the wrong cause.
                 independently = None
 
-        check_period_split(warehouse, metric, join, total, independently)
+        check_period_split(warehouse, metric, layer, total, independently)
+
+    check_distinction_pairs(layer, returned)
+    check_widening_cast(warehouse, layer)
 
 
 def check_period_split(
     warehouse: WarehouseAdapter,
     metric: MetricDefinition,
-    join: JoinPath,
+    layer: SemanticLayer,
     total: Decimal | int,
     independently: Callable[..., Decimal] | None,
 ) -> None:
@@ -419,7 +791,7 @@ def check_period_split(
     dates = rows_from(
         warehouse,
         f"SELECT min({metric.date_column}), max({metric.date_column}) "
-        f"{source(join)}",
+        f"{source(metric, layer)}",
     )
     if dates is None:
         return
@@ -429,7 +801,9 @@ def check_period_split(
     halves: list[Decimal | int] = []
     for comparison in (BEFORE, FROM_THEN):
         half = one_number(
-            warehouse, executable_query(metric, join, comparison), [boundary]
+            warehouse,
+            executable_query(metric, layer, comparison),
+            [boundary] * bindings(metric),
         )
         if half is None:
             return
@@ -473,27 +847,176 @@ def check_parse_rule(layer: SemanticLayer) -> None:
     """Check 6: the fail-closed rule, shown to have both of its answers.
 
     The positive control is the corpus itself — every expression above parsed, or
-    the run has already failed. What is probed here is the other branch, on the real
-    entry with its expression replaced, through the same assembly.
+    the run has already failed. What is probed here is the other branch, on real
+    entries with their expressions replaced, through the same assembly.
+
+    **Two entries rather than one**, where Sub-step 4.1 needed only one. A composed
+    metric assembles a second reader path, and it is the path where a rule that
+    looked at the finished statement instead of at each part would pass an empty
+    expression — so the probe runs on a metric that derives from nothing and on one
+    that derives, and says which is which.
     """
     print()
     print("  parse rule — an expression that does not parse fails the run")
-    for metric in layer.metrics.values():
-        join = layer.join_paths.get(metric.join_path)
-        if join is None:
+    for composed in (False, True):
+        probed = next(
+            (metric for metric in layer.metrics.values()
+             if bool(metric.derives_from) == composed
+             and assembles(metric, layer)),
+            None,
+        )
+        if probed is None:
             continue
+        shape = "composed of two metrics" if composed else "one expression"
+        print(f"    in {probed.name!r} — {shape}")
         for description, expression, expected in PARSE_PROBES:
-            broken = replace(metric, expression=expression)
-            verdict = reads_as_a_query(executable_query(broken, join))
-            print(f"    {'reads' if verdict else 'refuses'}  {description}: "
+            broken = replace(probed, expression=expression)
+            verdict = every_part_reads_as_a_query(broken, layer)
+            print(f"      {'reads' if verdict else 'refuses'}  {description}: "
                   f"{expression!r}")
             if verdict != expected:
                 problems.append(
                     f"the parse rule {'accepted' if verdict else 'refused'} "
-                    f"{description} ({expression!r}), pasted into {metric.name!r}'s "
+                    f"{description} ({expression!r}), pasted into {probed.name!r}'s "
                     f"query — so it is not the rule this check reports it to be"
                 )
-        return  # one entry is enough: the rule is about the reader, not the corpus
+
+
+def check_distinction_pairs(
+    layer: SemanticLayer, returned: dict[str, Decimal | int]
+) -> None:
+    """Check 7: every Section C pair of Certified Metrics is two different numbers.
+
+    `check_warehouse.py --distinctions` already proves the **data** separates these
+    pairs. This proves the **published expressions** do, which is a different claim:
+    a corpus whose whole purpose is keeping *"a correct program computing the wrong
+    number"* from happening can separate them in the Warehouse and blur them in the
+    Semantic Layer, and only this check would see it.
+
+    Where the two sides share a unit the bar is a visible gap rather than
+    inequality, because two figures differing in the sixth decimal place are
+    distinct and tell a reader nothing. Where they do not — Traded Notional is money
+    and Trade Count is a count — a percentage between them would be arithmetic with
+    no meaning, so the bar is that they are different numbers at all, which is the
+    most the pair can honestly claim.
+    """
+    print()
+    print("  Section C — every pair of Certified Metrics, from the published "
+          "expressions")
+    for left_name, right_name, why in SECTION_C_PAIRS:
+        if left_name not in returned or right_name not in returned:
+            problems.append(
+                f"Section C pair {left_name!r} / {right_name!r}: one side returned "
+                f"no figure above, so the pair could not be compared — a pair the "
+                f"corpus cannot compute is a distinction it cannot keep"
+            )
+            continue
+        left, right = returned[left_name], returned[right_name]
+        left_unit = layer.metrics[left_name].unit
+        right_unit = layer.metrics[right_name].unit
+        print(f"    {left_name} / {right_name} — \"{why}\"")
+        print(f"      {left_name}: {left:,.2f} {units(layer.metrics[left_name])}")
+        print(f"      {right_name}: {right:,.2f} {units(layer.metrics[right_name])}")
+        if left_unit != right_unit:
+            print(f"      different units, so the claim is only that they differ")
+            if left == right:
+                problems.append(
+                    f"Section C pair {left_name!r} / {right_name!r} returned the "
+                    f"same figure {left:,.2f} from two published expressions"
+                )
+            continue
+        apart = (
+            abs(left - right) / max(abs(left), abs(right))
+            if max(abs(left), abs(right)) else Decimal("0")
+        )
+        print(f"      {apart:.2%} apart")
+        if apart < MIN_DISTINCTION_GAP:
+            problems.append(
+                f"Section C pair {left_name!r} / {right_name!r} has collapsed in the "
+                f"Semantic Layer: the published expressions return {left:,.2f} and "
+                f"{right:,.2f}, {apart:.4%} apart against a "
+                f"{MIN_DISTINCTION_GAP:.2%} floor. Two Certified Metrics a question "
+                f"cannot tell apart are one metric under two names"
+            )
+
+
+def check_widening_cast(
+    warehouse: WarehouseAdapter, layer: SemanticLayer
+) -> None:
+    """Check 11: every widening cast in the corpus is shown to be load-bearing.
+
+    Four of the nine published expressions carry `CAST(... AS DECIMAL(38, 6))`.
+    Without it the engine computes the product in DECIMAL(18) and raises on
+    overflow, so the cast is what makes the metric computable at all — and
+    [DEBT-015](../docs/debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
+    is the Ledger entry about a dialect scan that cannot see it.
+
+    A cast nobody can see the need for is a cast somebody eventually removes. So
+    this runs the expression with the cast taken back out, on every run, and expects
+    a refusal. **A cast whose removal changes nothing is the finding**, not the
+    silence: it would mean the corpus carries an engine-specific width for no
+    reason, which is a different and smaller problem than the one DEBT-015 names.
+    """
+    print()
+    print("  widening cast — the expressions that do not run without one")
+    for metric in layer.metrics.values():
+        if not WIDENING_CAST.search(metric.expression) or not assembles(metric, layer):
+            continue
+        uncast = replace(
+            metric, expression=WIDENING_CAST.sub(r"\1", metric.expression)
+        )
+        rows = None
+        try:
+            rows = warehouse.query(executable_query(uncast, layer))
+        except Exception as refusal:  # noqa: BLE001 — see DEBT-016 above
+            first_line = str(refusal).splitlines()[0]
+            print(f"    refused  {metric.name}: {type(refusal).__name__}: "
+                  f"{first_line}")
+        if rows is not None:
+            problems.append(
+                f"{metric.name!r} carries a widening cast and the engine computes "
+                f"its expression without one, returning {rows!r} — so the cast is a "
+                f"width this corpus states for no reason a run can show"
+            )
+
+
+def check_spike_pin(layer: SemanticLayer) -> None:
+    """Check 9: the three expressions the spike measured are what the corpus publishes.
+
+    [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+    keeps `check_validation_feasibility.py`'s certified expressions as Python
+    literals rather than re-pointing the spike at `semantic/`, because
+    `validation-feasibility.md` carries output from one dated run and *"evidence
+    whose inputs move is not evidence"*. Pinning alone has the mirror-image failure —
+    the go/no-go could end up being about expressions the project no longer uses —
+    and this is the assertion that closes it.
+
+    A divergence forces a decision rather than passing unnoticed in either
+    direction: re-run the spike and update the verdict, or put the Metric Definition
+    back.
+    """
+    print()
+    print("  spike pin — the expressions the Sub-step 3.2 spike measured")
+    for name, measured in sorted(CERTIFIED_EXPRESSIONS.items()):
+        metric = layer.metrics.get(name)
+        if metric is None:
+            problems.append(
+                f"the spike measured {name!r} and no file under {METRIC_HOME} "
+                f"publishes it, so validation-feasibility.md's verdict is about an "
+                f"expression the corpus does not have"
+            )
+            continue
+        if metric.expression != measured:
+            problems.append(
+                f"{name!r}: the spike measured one expression and the Semantic Layer "
+                f"publishes another, so the GO recorded in validation-feasibility.md "
+                f"is about a statement this project no longer uses. Re-run the spike "
+                f"and update the verdict, or put the Metric Definition back\n"
+                f"      spike     {measured}\n"
+                f"      published {metric.expression}"
+            )
+            continue
+        print(f"    pinned   {name}")
 
 
 def main() -> int:
@@ -514,6 +1037,7 @@ def main() -> int:
         check_expressions(warehouse, layer)
 
     check_parse_rule(layer)
+    check_spike_pin(layer)
 
     print()
     if problems:

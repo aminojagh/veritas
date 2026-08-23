@@ -67,6 +67,7 @@ import datetime as dt
 import json
 import logging
 import re
+import decimal
 import sys
 from decimal import Decimal
 from pathlib import Path
@@ -89,6 +90,17 @@ from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
 # the repository, most of which are English, so that warning is the expected
 # outcome for almost all of them rather than news.
 logging.getLogger("sqlglot").setLevel(logging.CRITICAL)
+
+# Wide enough that no monetary fold below is ever rounded, and set here because
+# `decimal`'s default is 28 significant digits, which the figures in this file sit
+# just under rather than comfortably below. The widest product a Certified Metric
+# takes is a quantity times a Market Price times an FX Rate — DECIMAL(18, 6) twice
+# and DECIMAL(18, 8) once, so up to fourteen decimal places — and the totals run to
+# eleven digits ahead of the point. The margin is three digits, and a Warehouse
+# holding one more year of Snapshots would eat it silently: a rounded fold and an
+# exact engine sum would then differ, and the failure would read as a wrong
+# expression rather than as a rounded comparison.
+decimal.getcontext().prec = 50
 
 # The one directory licensed to know the engine. ADR-0002: the Warehouse Adapter
 # "holds the connection and the engine's dialect; nothing DuckDB-specific exists
@@ -178,6 +190,15 @@ problems: list[str] = []
 # because a leading pipe makes cells[0] the empty string before the first column.
 LIVES_IN_COLUMN = 3
 
+# The one home in a Section B "Lives in" cell that is not a Warehouse table. A
+# Certified Metric lives in a directory, and `Cash Balance` lives in **both**: it is
+# a column on fct_balance_snapshot and, since R1 of Step 004 was approved on
+# 2026-08-21, a Metric Definition as well. Named here so the residue rule below can
+# tell a home it understands from one nobody has taught it, and imported by
+# `check_semantic_layer.py` rather than spelled a second time — two readers of one
+# column agreeing by coincidence is how they stop agreeing.
+METRIC_HOME = "semantic/metrics/"
+
 TABLE_NAME = re.compile(r"(?:dim|fct)_[a-z_]+")
 
 
@@ -216,11 +237,12 @@ def glossary_tables() -> set[str]:
             continue
         tables.update(named)
 
-        # Whatever is left once the table names, backticks, commas and whitespace
-        # are removed is something this parser did not understand. Reporting it
+        # Whatever is left once the table names, the one non-table home, backticks,
+        # commas and whitespace are removed is something this parser did not
+        # understand — a second separator, a directory nobody registered. Reporting it
         # is the point: half-reading a cell would shrink the expected set without
         # anyone noticing, which is the failure this function just had.
-        residue = TABLE_NAME.sub("", cell).strip(" `,\t")
+        residue = TABLE_NAME.sub("", cell).replace(METRIC_HOME, "").strip(" `,\t")
         if residue:
             problems.append(
                 f"glossary.md Section B: only partly understood the 'Lives in' cell "
@@ -1297,6 +1319,267 @@ def gross_revenue(
     ((total,),) = rows
     return total if total is not None else Decimal("0")
 
+
+
+# ---------------------------------------------------------------------------
+# The other numbers — one independently written figure per Certified Metric
+# ---------------------------------------------------------------------------
+#
+# Eight more of what `gross_revenue()` above is: a figure this file computes for
+# itself, so that `check_semantic_layer.py` has something to put beside the answer
+# a published expression returns.
+# [R2 of Step 004](../docs/plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)
+# is why they are written separately rather than one reading the other, and the
+# cost is the authoring tax that ruling accepted in writing: editing a published
+# expression means editing the SQL here too, or the run fails.
+#
+# **They are independent in method as well as in text.** `gross_revenue()` states
+# the arithmetic as a second SQL aggregate; every function below fetches the
+# component columns and folds them in Python. That is not a stylistic choice. A
+# DECIMAL(18, 6) amount times a DECIMAL(18, 8) rate needs 36 digits, DuckDB
+# computes it in DECIMAL(18) and raises on overflow, and the published expressions
+# carry an explicit widening cast for exactly that reason — so an independent
+# figure written as an aggregate here would need the same cast, which is an
+# engine-specific width in a script that sits outside `veritas/warehouse/`. Python's
+# Decimal has no width to overflow. `check_distinctions` already folds the Snapshot
+# side this way and says so.
+#
+# Each takes the same optional `boundary`: the figure over every row, or over the
+# rows from that date on. The period half is what catches a Metric Definition
+# naming the wrong date column, which a total can never see.
+
+
+def net_revenue(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Net Revenue in the Reporting Currency — Commission less Rebate and Fee.
+
+    All three charges are in the Trade's Denomination Currency and all three are
+    stored positive, so the Glossary's formula is literally true as written:
+    *"Gross Revenue - Rebate - pass-through Fee"*.
+    """
+    rows = warehouse.query(
+        "SELECT billed.trade_date, billed.commission, billed.rebate, billed.fee, "
+        "       rate.fx_rate "
+        "FROM fct_trade AS billed "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = billed.trade_date "
+        " AND rate.from_currency = billed.denomination_currency "
+        " AND rate.to_currency = ?",
+        [REPORTING_CURRENCY],
+    )
+    return sum(
+        ((commission - rebate - fee) * rate
+         for when, commission, rebate, fee, rate in rows
+         if boundary is None or when >= boundary),
+        Decimal("0"),
+    )
+
+
+def traded_notional(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Traded Notional in the Reporting Currency.
+
+    Converted out of the Instrument's **Quotation Currency**, not the Trade's
+    Denomination Currency: `quantity * execution_price` is quoted in the currency
+    the exchange quotes in, and a broker does not necessarily bill in it. The two
+    are a Section C pair, they sit on the same row, and taking the wrong one
+    projects identically to taking the right one.
+    """
+    rows = warehouse.query(
+        "SELECT billed.trade_date, billed.quantity, billed.execution_price, "
+        "       rate.fx_rate "
+        "FROM fct_trade AS billed "
+        "JOIN dim_instrument AS instrument "
+        "  ON instrument.instrument_id = billed.instrument_id "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = billed.trade_date "
+        " AND rate.from_currency = instrument.quotation_currency "
+        " AND rate.to_currency = ?",
+        [REPORTING_CURRENCY],
+    )
+    return sum(
+        (quantity * execution_price * rate
+         for when, quantity, execution_price, rate in rows
+         if boundary is None or when >= boundary),
+        Decimal("0"),
+    )
+
+
+def trade_count(warehouse: WarehouseAdapter, boundary: dt.date | None = None) -> int:
+    """Trade Count — how many Trades, with no conversion and no join.
+
+    Counted off `fct_trade` alone, which is also the whole of the published
+    expression's route. Joining the FX Rate table to count rows would drop any
+    Trade whose rate is missing, and a count that silently loses rows is the
+    failure this project exists to prevent.
+    """
+    rows = warehouse.query("SELECT trade.trade_date FROM fct_trade AS trade")
+    return sum(1 for (when,) in rows if boundary is None or when >= boundary)
+
+
+def cash_balance(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Cash Balance in the Reporting Currency, over every Snapshot date.
+
+    Summed across dates, which is nothing anybody would ask for and is not what
+    this figure is for: it is the comparison for a published expression executed
+    the same way. An "as of" question puts a date on it, and the date comes from
+    the question rather than from the Metric Definition.
+    """
+    rows = warehouse.query(
+        "SELECT balance.snapshot_date, balance.cash_balance, rate.fx_rate "
+        "FROM fct_balance_snapshot AS balance "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = balance.snapshot_date "
+        " AND rate.from_currency = balance.denomination_currency "
+        " AND rate.to_currency = ?",
+        [REPORTING_CURRENCY],
+    )
+    return sum(
+        (held * rate for when, held, rate in rows
+         if boundary is None or when >= boundary),
+        Decimal("0"),
+    )
+
+
+def marked_positions(warehouse: WarehouseAdapter) -> list[tuple[object, ...]]:
+    """Every Position with what it is worth and what it cost, ready to fold.
+
+    One statement behind the two Position metrics below, because they differ in
+    the fold and not in the rows: Account Value marks the holding, Unrealised P&L
+    marks it against the stored Cost Basis. Writing the join twice would not make
+    them more independent of each other — they are both independent of
+    `semantic/`, which is the independence R2 is about.
+
+    An inner join throughout, so a Position with no Market Price on its own
+    Snapshot date disappears rather than counting as zero. `check_snapshots` is
+    what asserts there are none.
+    """
+    return warehouse.query(
+        "SELECT position.snapshot_date, position.quantity, position.cost_basis, "
+        "       price.market_price, rate.fx_rate "
+        "FROM fct_position_snapshot AS position "
+        "JOIN dim_instrument AS instrument "
+        "  ON instrument.instrument_id = position.instrument_id "
+        "JOIN fct_instrument_price AS price "
+        "  ON price.price_date = position.snapshot_date "
+        " AND price.instrument_id = position.instrument_id "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = position.snapshot_date "
+        " AND rate.from_currency = instrument.quotation_currency "
+        " AND rate.to_currency = ?",
+        [REPORTING_CURRENCY],
+    )
+
+
+def account_value(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Account Value in the Reporting Currency — cash plus Positions marked.
+
+    The Glossary's own sentence, added up in this file: *"Cash Balance plus all
+    Positions marked to market"*. The published Metric Definition reaches the cash
+    half through `derives_from` rather than restating it; this figure reaches it by
+    calling `cash_balance()` above, which is the same relationship written in the
+    other language.
+    """
+    marked = sum(
+        (quantity * market_price * rate
+         for when, quantity, _, market_price, rate in marked_positions(warehouse)
+         if boundary is None or when >= boundary),
+        Decimal("0"),
+    )
+    return marked + cash_balance(warehouse, boundary)
+
+
+def unrealised_pnl(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Unrealised P&L in the Reporting Currency — marked against Cost Basis.
+
+    Against the **stored** Cost Basis, never against the last Execution Price: one
+    is what the whole holding cost and the other is what one Trade filled at, and
+    they are a Section C pair that differ by a quantity as well as by a price. The
+    Cost Basis is signed with the quantity, so this expression covers a long and a
+    short without a special case.
+    """
+    return sum(
+        ((quantity * market_price - cost_basis) * rate
+         for when, quantity, cost_basis, market_price, rate
+         in marked_positions(warehouse)
+         if boundary is None or when >= boundary),
+        Decimal("0"),
+    )
+
+
+def realised_pnl(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Realised P&L in the Reporting Currency — profit banked by closing.
+
+    Read off `fct_accounting_movement`, which is where a closed Position's profit
+    is recognised, and deliberately not off `fct_cash_movement`: no cash moves when
+    a Position closes, so `realised P&L` is not one of that table's movement types
+    at all. The filter is the whole difference between this metric and the three
+    other movement types sharing the table, which is why the Metric Definition
+    publishes it as a certified predicate rather than leaving it to be remembered.
+    """
+    rows = warehouse.query(
+        "SELECT movement.movement_date, movement.amount, rate.fx_rate "
+        "FROM fct_accounting_movement AS movement "
+        "JOIN fct_fx_rate AS rate "
+        "  ON rate.rate_date = movement.movement_date "
+        " AND rate.from_currency = movement.denomination_currency "
+        " AND rate.to_currency = ? "
+        "WHERE movement.movement_type = 'realised P&L'",
+        [REPORTING_CURRENCY],
+    )
+    return sum(
+        (amount * rate for when, amount, rate in rows
+         if boundary is None or when >= boundary),
+        Decimal("0"),
+    )
+
+
+def position_change(
+    warehouse: WarehouseAdapter, boundary: dt.date | None = None
+) -> Decimal:
+    """Position Change — every move of every Position, from any cause.
+
+    Folded here as a walk over the Snapshots in date order, holding the previous
+    quantity of each Position; the published expression reaches the previous
+    Snapshot with a correlated subquery instead. Same delta, two entirely
+    different statements of it.
+
+    A Position's **first** Snapshot counts its whole quantity as a change, because
+    it was zero before it existed. That is what makes the fold telescope: over
+    every date it comes to the quantity held on the last Snapshot date. Dropping
+    those rows instead — which is what an inner self-join would do — would silently
+    lose the day every holding was opened.
+
+    `boundary` filters which deltas are counted, not which rows are walked. The
+    delta at the boundary is against the Snapshot before it, so the two halves of a
+    date range still add up to the whole, and each half is the real change over its
+    own window.
+    """
+    rows = warehouse.query(
+        "SELECT position.snapshot_date, position.account_id, "
+        "       position.instrument_id, position.quantity "
+        "FROM fct_position_snapshot AS position "
+        "ORDER BY position.account_id, position.instrument_id, "
+        "         position.snapshot_date"
+    )
+    previous: dict[tuple[int, int], Decimal] = {}
+    moved = Decimal("0")
+    for when, account_id, instrument_id, quantity in rows:
+        held = (account_id, instrument_id)
+        if boundary is None or when >= boundary:
+            moved += quantity - previous.get(held, Decimal("0"))
+        previous[held] = quantity
+    return moved
 
 def check_distinctions(warehouse: WarehouseAdapter) -> None:
     """Every Section C pair is two different numbers on the loaded data.

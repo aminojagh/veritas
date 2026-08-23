@@ -1,0 +1,17 @@
+# The Quotation Currency route, and the Section C trap it exists to keep shut: a
+# Trade's Commission is billed in its Denomination Currency, while quantity times
+# Execution Price is in the Instrument's Quotation Currency. Converting one through
+# the other's rate projects identically and is wrong by a currency pair.
+#
+# The condition names fct_trade as well as this route's own two tables, because the
+# date the rate is taken on belongs to the Trade. That is legal in a route that has
+# already joined fct_trade, and check_semantic_layer.py refuses it in one that has not.
+name: instrument_to_fx_rate_on_quotation_currency
+version: 1
+kind: join_path
+from_table: dim_instrument
+to_table: fct_fx_rate
+on: >
+  fct_fx_rate.rate_date = fct_trade.trade_date
+  AND fct_fx_rate.from_currency = dim_instrument.quotation_currency
+  AND fct_fx_rate.to_currency = 'EUR'

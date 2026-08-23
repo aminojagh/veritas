@@ -1,0 +1,17 @@
+name: Cash Balance
+version: 1
+kind: metric
+description: >
+  Money held in an Account in one currency at a point in time, converted to the
+  Reporting Currency. Cash only — a Client with no cash and two million in equities
+  has a Cash Balance of zero.
+expression: "sum(CAST(fct_balance_snapshot.cash_balance AS DECIMAL(38, 6)) * fct_fx_rate.fx_rate)"
+grain: one row per Account per Denomination Currency per Snapshot date
+unit: money
+reporting_currency: EUR
+from_table: fct_balance_snapshot
+join_paths: [balance_snapshot_to_fx_rate_on_snapshot_date]
+filters: []
+date_column: fct_balance_snapshot.snapshot_date
+aliases: ["cash", "cash on hand", "uninvested cash"]
+derives_from: []

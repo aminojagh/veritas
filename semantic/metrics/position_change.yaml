@@ -1,0 +1,31 @@
+# A delta between two Snapshot dates, which is the metric exactly as registered —
+# "from any cause: a Trade, a transfer, or a corporate action". Folding it out of
+# fct_trade instead would lose every transfer, which is the Section C pair this
+# metric is one half of.
+#
+# The previous Snapshot is reached from inside the expression rather than through a
+# Join Path, because a Join Path is a route between two *different* tables and this
+# one would be fct_position_snapshot to itself. coalesce is what keeps a Position's
+# first appearance in the metric: an inner join would silently drop the day every
+# holding was opened.
+name: Position Change
+version: 1
+kind: metric
+description: >
+  Change in a Position between two points in time, from any cause — a Trade, a
+  transfer, or a corporate action. Promises the change, not the cause.
+expression: >
+  sum(fct_position_snapshot.quantity - coalesce((SELECT previous_snapshot.quantity
+  FROM fct_position_snapshot AS previous_snapshot
+  WHERE previous_snapshot.account_id = fct_position_snapshot.account_id
+  AND previous_snapshot.instrument_id = fct_position_snapshot.instrument_id
+  AND previous_snapshot.snapshot_date < fct_position_snapshot.snapshot_date
+  ORDER BY previous_snapshot.snapshot_date DESC LIMIT 1), 0))
+grain: one row per Position per Snapshot date
+unit: quantity
+from_table: fct_position_snapshot
+join_paths: []
+filters: []
+date_column: fct_position_snapshot.snapshot_date
+aliases: ["change in position", "position delta", "quantity moved"]
+derives_from: []

@@ -198,9 +198,25 @@ rule for code would be a second thing to remember. The Sub-step that paid it was
 one that added sixteen more such links, and the check found a dead one in its own
 explanatory docstring on its first run.
 
+**Third occurrence — Sub-step 4.2, 2026-08-23, and it is the cheapest possible kind.**
+While closing the Sub-step, Claude ran a bare `python3` heredoc to edit a file, and then
+did it a second time, against `CLAUDE.md`'s *"Always `uv run python …` — never bare
+`python`/`python3`, not even for a throwaway one-liner in a shell pipeline."* **Nothing
+downstream is wrong** — both were text substitutions that produce the same bytes under
+either interpreter, and the checks that ran afterwards ran under `uv run python` and
+passed. That is the entry's point rather than a mitigation of it: the breach is invisible
+in the diff, no mechanism noticed, and it is on this Ledger only because the party that
+broke the rule chose to report it. It is also the single framework rule that a
+`PreToolUse` hook on `Bash` matches with a regular expression and no judgement at all.
+
 **Still unpaid:** the hook layer. Nothing mechanically blocks a commit by Claude, a
-missing Ledger entry, or a review that skips a section. The trigger having fired once,
-the next occurrence should buy the hooks rather than another document rule.
+missing Ledger entry, or a review that skips a section. **The entry's own escalation is
+now due**: after the first occurrence it said *"the next occurrence should buy the hooks
+rather than another document rule"*, and the next occurrence has happened. Sub-step 4.2
+did **not** buy them — the Sub-step was already closing when the breach was reported, and
+adding a hook layer to a commit is a Sub-step of its own rather than a line in this one.
+That is Amino's call to schedule, and it is recorded here so the decision is a decision
+rather than a drift.
 
 ---
 
@@ -1167,6 +1183,21 @@ The first Metric Definition that carries a cast, or any other construct whose me
 is in a type rather than in a name. On the measurements above that is
 `Traded Notional`'s, in the Step that builds the Semantic Layer, and it cannot be
 avoided by writing the expression differently.
+
+**Fired 2026-08-22, in Sub-step 4.2 — and wider than this entry says.** The trigger
+reads *"the first Metric Definition that carries a cast"* and sizes the repayment
+against one. Writing the corpus found that the widening cast is carried by **every**
+published expression whose product overflows `DECIMAL(18)`, which is every monetary
+metric on the Snapshot side plus the accounting ledger, not `Traded Notional` alone.
+`check_semantic_layer.py` executes each of them with its cast taken back out and
+prints the engine's refusal, so how many there are is a reading rather than a
+sentence here, and the block is quoted in the
+[4.2 review](reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions).
+
+The **repayment does not change** — it is the same name list plus round-trip
+comparison, and a scan that reads types finds all of them at once. What changes is the
+cost sentence above: the construct nothing looks at is not one expression's, it is
+most of the corpus's.
 
 **Debt rather than an extension, and the argument is on the record.** The Ledger's own
 test is whether the trigger fires inside this project's life, and this one fires in

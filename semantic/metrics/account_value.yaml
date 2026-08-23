@@ -1,0 +1,23 @@
+# The one composed metric in the corpus. Its own expression marks the Positions to
+# market; the cash half is the certified Cash Balance expression, reached through
+# derives_from rather than restated here, so the two can never drift apart.
+#
+# The two halves are rooted at two Snapshot tables that join on nothing without
+# multiplying rows — one is per Account per currency, the other per Account per
+# Instrument — so this cannot be one query over one route.
+name: Account Value
+version: 1
+kind: metric
+description: >
+  Cash Balance plus all Positions marked to market, in the Reporting Currency. The
+  answer to "how much does this Client have" that Cash Balance is not.
+expression: "sum(CAST(fct_position_snapshot.quantity AS DECIMAL(38, 6)) * fct_instrument_price.market_price * fct_fx_rate.fx_rate)"
+grain: one row per Account per Snapshot date
+unit: money
+reporting_currency: EUR
+from_table: fct_position_snapshot
+join_paths: [position_snapshot_to_instrument, position_snapshot_to_price_on_snapshot_date, instrument_to_fx_rate_on_snapshot_date]
+filters: []
+date_column: fct_position_snapshot.snapshot_date
+aliases: ["portfolio value", "total account value", "cash plus holdings"]
+derives_from: ["Cash Balance"]

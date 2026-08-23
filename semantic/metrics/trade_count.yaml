@@ -1,0 +1,20 @@
+# The only metric in the corpus that joins nothing, and the reason a Metric
+# Definition names the table it starts from rather than reading it off the first
+# Join Path. Joining the FX Rate table anyway would be worse than redundant: an
+# inner join drops a Trade whose rate is missing, and a count that silently loses
+# rows is the failure this project exists to prevent.
+name: Trade Count
+version: 1
+kind: metric
+description: >
+  Number of Trades. Deliberately separate from Traded Notional — one large Trade
+  and a thousand small ones are opposite answers to "was this a busy month".
+expression: "count(fct_trade.trade_id)"
+grain: one row per Trade
+unit: count
+from_table: fct_trade
+join_paths: []
+filters: []
+date_column: fct_trade.trade_date
+aliases: ["number of trades", "how many trades", "deal count"]
+derives_from: []

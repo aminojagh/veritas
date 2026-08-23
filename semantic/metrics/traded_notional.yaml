@@ -1,0 +1,20 @@
+# The widening cast is what makes this expression run at all, not tidiness: the
+# engine computes quantity times Execution Price times FX Rate in DECIMAL(18) and a
+# JPY notional does not fit. check_validation_feasibility.py runs the uncast form on
+# every run and prints the refusal.
+name: Traded Notional
+version: 1
+kind: metric
+description: >
+  Sum of quantity times Execution Price, converted to the Reporting Currency — the
+  monetary size of trading activity.
+expression: "sum(CAST(fct_trade.quantity AS DECIMAL(38, 6)) * fct_trade.execution_price * fct_fx_rate.fx_rate)"
+grain: one row per Trade
+unit: money
+reporting_currency: EUR
+from_table: fct_trade
+join_paths: [trade_to_instrument, instrument_to_fx_rate_on_quotation_currency]
+filters: []
+date_column: fct_trade.trade_date
+aliases: ["notional", "traded value", "turnover"]
+derives_from: []

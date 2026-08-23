@@ -1,0 +1,11 @@
+# Equality on the Snapshot's own date, never a most-recent-price-at-or-before
+# lookup: a Snapshot is registered as the state "as of the close of" a date, and it
+# is written on the dates a Market Price exists for, so the price is there.
+name: position_snapshot_to_price_on_snapshot_date
+version: 1
+kind: join_path
+from_table: fct_position_snapshot
+to_table: fct_instrument_price
+on: >
+  fct_instrument_price.price_date = fct_position_snapshot.snapshot_date
+  AND fct_instrument_price.instrument_id = fct_position_snapshot.instrument_id

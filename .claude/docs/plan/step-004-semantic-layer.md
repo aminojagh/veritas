@@ -94,6 +94,17 @@ calls the file format *"a seam three Extension Register entries land against"* a
 seam is a contour line — the thing `CLAUDE.md` says to get right now because moving
 it later is a repaint. Approving this plan approves this shape.
 
+> **Amended by [R8](#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)**,
+> which was delegated to Sub-step 4.2 by Amino's ruling of 2026-08-22. The
+> Metric Definition block below is the shape 4.1 published and 4.2 amends in five
+> named ways; the Join Path block below is still the format, and the only thing in it
+> that moved is the **name** —
+> [R9](#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23) renamed it to
+> `trade_to_fx_rate_on_denomination_currency` in Sub-step 4.2, and no field changed.
+> Read R8 for what a Metric Definition carries now, R9 for the rename, and the four
+> bullets under this section for why each field is here at all — those arguments
+> survive both amendments.
+
 `semantic/metrics/gross_revenue.yaml`:
 
 ```yaml
@@ -372,7 +383,11 @@ The seam, drawn thin: the format, the loader, and the check, proved end-to-end o
 `Gross Revenue` before the shape is repeated eight times.
 
 - `semantic/metrics/gross_revenue.yaml` and
-  `semantic/joins/trade_to_fx_rate_on_trade_date.yaml`, exactly as shown above.
+  `semantic/joins/trade_to_fx_rate_on_trade_date.yaml`, exactly as shown above. Both
+  files are still there and both have since been amended by a later Sub-step: the
+  Metric Definition by [R8](#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22),
+  the Join Path by [R9](#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23),
+  which renamed it `trade_to_fx_rate_on_denomination_currency`.
 - `veritas/semantic/` — the loader. Named for the component the way
   `veritas/warehouse/`, `veritas/validation/` and `veritas/evaluation/` are; it reads
   the `semantic/` tree, which is the data. The echo between the two names is
@@ -555,6 +570,198 @@ costs, and the fact that arms 1 and 2 stay live — so the Step that does pay it
 from the reasoning instead of rediscovering it. The alternative is to write the
 calendar-boundary axis in 4.5 and pay DEBT-012 here, which is a Warehouse Step wearing
 a Semantic Layer Step's name and would deserve to be its own Step if chosen.
+
+---
+
+### R8 — the route a Metric Definition carries → **decided in Sub-step 4.2, under Amino's ruling of 2026-08-22**
+
+The [4.1 review](../reviews/step-004-semantic-layer.md#sub-step-41--publish-the-semantic-entry-format-on-one-metric-definition)
+left one question open — *"`join_path` is a single name, and `Account Value` is going
+to want two"* — and named three ways out without picking one, because *"deciding it
+before 4.2 starts costs one file to re-edit; deciding it during 4.2 costs eight."*
+Amino ruled on 2026-08-22 that it is settled **at the start of 4.2** rather than
+before it. This is that settlement, written before any of the eight files.
+
+**The question is larger than `Account Value`.** Reading all nine metrics against the
+approved format before writing any of them turns one exception into a table, and the
+table is what decides the shape:
+
+| Certified Metric | The route its expression is computed over | What the approved format cannot say |
+|---|---|---|
+| Gross Revenue | `fct_trade` → `fct_fx_rate` | — |
+| Net Revenue | `fct_trade` → `fct_fx_rate` | — |
+| Traded Notional | `fct_trade` → `dim_instrument` → `fct_fx_rate` | **two** joins under one `join_path` |
+| Trade Count | `fct_trade` | **no** join at all — and then nothing names the table the query starts at |
+| Cash Balance | `fct_balance_snapshot` → `fct_fx_rate` | — |
+| Account Value | `fct_position_snapshot` → `dim_instrument` → `fct_instrument_price` → `fct_fx_rate`, **and** `fct_balance_snapshot` → `fct_fx_rate` | three joins, and **two routes that never meet** |
+| Unrealised P&L | `fct_position_snapshot` → `dim_instrument` → `fct_instrument_price` → `fct_fx_rate` | three joins |
+| Realised P&L | `fct_accounting_movement` → `fct_fx_rate` | the row filter that selects `realised P&L` movements |
+| Position Change | `fct_position_snapshot` | no join, and the previous Snapshot is reached from **inside** the expression |
+
+Two more things the table does not show. `Trade Count` and `Position Change` have no
+Reporting Currency at all — one is a count and one is a quantity, and
+[`Reporting Currency`](../glossary.md#a-the-system) is registered as something *"every
+**monetary** metric must state"*, so a non-monetary metric stating one would be
+inventing a fact. And the widening cast
+[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
+is about turns out to be carried by every expression whose product overflows
+`DECIMAL(18)` rather than by the one metric the Ledger predicted —
+`check_semantic_layer.py` executes each of them without its cast on every run and
+prints the engine's refusal, so how many there are is a reading rather than a
+sentence here.
+
+**So the three ways out are not alternatives.** `Traded Notional` forces a multi-hop
+route whatever happens to `Account Value`, and `Account Value` forces a composition
+whatever happens to `Traded Notional`. Picking one of the three would have left the
+other hole open — which is the finding that repays reading nine metrics before
+writing one.
+
+**Decided — five changes to the Metric Definition, none to the Join Path.**
+
+1. **`join_path` becomes `join_paths`, a list**, applied in the order written.
+   `Join Path` stays exactly what
+   [the Glossary](../glossary.md#a-the-system) registers — *"a certified route between
+   **two** warehouse tables"* — and a metric composes several. This is the way out
+   that costs no Glossary amendment; the alternative the review named, *a Join Path
+   that names more than two tables*, buys nothing extra and contests a registered
+   definition to get it. The name goes plural because a field holding a list and
+   named in the singular is a small lie in the one file format this project retrieves
+   over.
+2. **`from_table` is added to the Metric Definition** — the table the query starts at,
+   spelled the way the Join Path already spells it. `Trade Count` is what forces it:
+   with no join, nothing else in the entry names a table. It is checked against
+   `join_paths[0]` rather than trusted.
+3. **`filters` is added** — the certified predicates, ANDed into the `WHERE`. This is
+   not a new field so much as an unimplemented one: the
+   [`Metric Definition`](../glossary.md#a-the-system) row has always said a Metric
+   Definition carries *"its SQL expression, grain, **filters**, units, and the aliases
+   people use for it"*, and `Gross Revenue` simply had none. `Realised P&L` has one,
+   and it is the whole difference between that metric and the three other movement
+   types in the same table.
+   **Why not a `CASE` inside the expression.** It would work and it would need no
+   field. It is rejected because the shape a generator writes for *"Realised P&L in
+   2025"* is a `WHERE`, and
+   [C1](../design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
+   says the certified form is *the* form — so publishing the filter as a predicate is
+   publishing what the Gate will actually have to find.
+4. **`reporting_currency` becomes optional**, present exactly when `unit` is `money`.
+   The biconditional is checked, so the field cannot go missing from a monetary metric
+   and cannot appear on a count.
+5. **`derives_from` becomes load-bearing**: the Certified Metrics whose value is
+   **added** to this metric's own expression. `Account Value` is *"Cash Balance plus
+   all Positions marked to market"*, so its own expression marks the Positions and it
+   derives the cash from `Cash Balance` — which means the certified `Cash Balance`
+   expression is **reused rather than restated**, and the two can never drift apart.
+
+**Why `Account Value` cannot be one query, demonstrated rather than asserted.** Its
+two routes are rooted at two Snapshot tables that join on nothing without multiplying
+rows — one is per Account per currency, the other per Account per Instrument. The near
+miss is worth recording because it looks right: put the second route in a scalar
+subquery inside the expression, and the whole metric is one pasteable string over one
+route. It fails the period split. The subquery is not reached by a `WHERE` the
+assembler puts on the outer query, so the two halves of any date range each carry the
+**whole** of the marked Positions and add up to more than the unfiltered total. A
+period filter has to reach both halves of a composite metric, which is exactly what
+composing at the query level does and what composing inside the expression cannot.
+
+**What this does not change.** The Join Path file format is untouched, so
+`semantic/joins/` is still what the plan approved. `expression` is still pasted
+verbatim and is still the whole of C1's pasteable form — a composed metric assembles
+*around* two published expressions and re-derives neither. No new domain noun is
+coined: `from_table` is the Join Path's own field name, `filters` is the
+`Metric Definition` row's own word, and `join_paths` is the plural of a registered
+term. And the re-edit lands where the ruling meant it to — **one file**,
+`semantic/metrics/gross_revenue.yaml`, three lines.
+
+**What it costs.** `derives_from` now means *added to*, which is narrower than the
+word suggests and is not the relationship
+[EXT-005](../extension-register.md#ext-005--semantic-layer-coherence-checks) had in
+mind for its second rule — *"`Net Revenue` is `Gross Revenue` minus Rebate and Fee"*
+is a declared identity, not a composition, and the two cannot share one field. That
+entry is amended in this Sub-step to say so, so the Step that builds the coherence
+checks inherits the distinction instead of discovering it. A metric that had to
+**subtract** another would need a field this format does not have; none of the nine
+does.
+
+---
+
+### R9 — Amino's four rulings on the 4.2 review → **decided 2026-08-23**
+
+The [4.2 review](../reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)
+put six things up sceptically. Amino ruled on four of them on 2026-08-23 and accepted
+the other two — the `aliases` decision and the Snapshot-date period split — as written.
+The rulings are recorded here rather than only in the review because a review is read
+once, by the person who commits it, and a plan is read by every Sub-step that follows.
+
+**1. `derives_from` keeps the narrow meaning R8 gave it — *added to*.** The second field
+beside it is not bought now: *"the `derives_from` usage is fine for now. we'll make a
+decision about it if in the future we need it to mean a more general meaning."* Nothing
+is lost by waiting, because
+[EXT-005](../extension-register.md#ext-005--semantic-layer-coherence-checks) already
+holds the distinction the full MVP inherits — a declared identity is not a composition,
+and the two cannot share one field. The decision arrives when a metric needs the word to
+mean something this format cannot say, and none of the nine does.
+
+**2. `Position Change`'s expression is examined when the Validation Gate is built, not
+here.** The review's point stands unchanged. Every expression
+[the spike traced](../reviews/step-003-validation-feasibility.md#sub-step-32--probe-whether-a-generated-query-traces-to-a-certified-metric)
+is *"a flat arithmetic expression over joined columns"*; `Position Change` carries a
+correlated scalar subquery with an `ORDER BY` and a `LIMIT` inside an aggregate, which is
+a shape the spike never measured, and whether the Gate can trace a generated query back
+to it is **not known**. Amino ruled it a question for the
+Sub-step that builds the Gate: *"it'll be examined for needing more rules when we'll
+build the gate."* That Sub-step inherits it as a **named place to look first**, not as an
+open defect: nothing in this Step is wrong because of it, and measuring it needs the Gate
+that does not exist yet. If it turns out to need a third rewrite rule, that is a
+[C5](../design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
+amendment — C5 allows the Gate two rules and no more — and therefore a decision, not a
+quiet addition.
+
+**3. The two Trade-date FX routes are renamed onto the currency axis, in Sub-step 4.2.**
+The review's point was that `trade_to_fx_rate_on_trade_date` and
+`instrument_to_fx_rate_on_trade_date` are *"named on different axes"*: both suffixes name
+the date, both dates are the same date, and what actually separates them is the
+[Section C](../glossary.md#c-distinctions-we-must-not-blur) currency pair the whole
+`Traded Notional` trap turns on. Amino ruled the rename in, and 4.2 does it:
+
+| Was | Is |
+|---|---|
+| `trade_to_fx_rate_on_trade_date` | `trade_to_fx_rate_on_denomination_currency` |
+| `instrument_to_fx_rate_on_trade_date` | `instrument_to_fx_rate_on_quotation_currency` |
+
+**The prefix was not part of the rename, and that is a decision rather than an
+oversight.** The review wrote the second name as `..._on_quotation_currency` with the
+prefix elided, which reads two ways: `trade_to_…`, pairing both names under one
+from-table, or `instrument_to_…`, keeping each name its own. It is `instrument_to_…`,
+because **every name in `semantic/joins/` begins with its own `from_table`**, and
+`route_problem` in `check_semantic_layer.py` prints the name and the `from_table` in one
+sentence. Under the other reading its route error would read *"joins
+'trade_to_fx_rate_on_quotation_currency', which starts at 'dim_instrument'"* — a message
+that contradicts itself in the one line a reader has to trust. The review's own sentence
+points the same way: the from-cue is *"true and is a weaker cue than the one that
+matters"*, so what needed replacing was the weak cue, which is the suffix. If Amino meant
+the other reading, it is one more file rename and one `from_table` field.
+
+**What the rename does not fix, stated because renaming did not remove it.**
+`instrument_to_fx_rate_on_snapshot_date` converts the Quotation Currency too, so
+`semantic/joins/` now names three FX routes on two axes: the Trade-date pair by currency,
+the Snapshot route by date. Every name is still unique on what separates it from its
+nearest neighbour — currency inside the Trade-date pair, date between the two
+`instrument_to_fx_rate_*` routes — but a reader who assumes one axis across the directory
+will read the Snapshot route as a *different* currency, so both files now say so in a
+comment. A naming rule for the directory as a whole is EXT-009's business.
+
+**4. Nine metrics over eight Join Paths is a full-MVP question, not a slice one.** The
+review observed that six of the eight Join Paths serve exactly one metric each and asked
+whether the Join Path entry type is carrying less than its name suggests. Amino ruled the
+concern **real** and acting on it now **premature**: *"spending time on it would be
+premature optimizing and revising of the current design … this revision or optimization
+belongs to the full MVP rather than the current project's slice."* That is `CLAUDE.md`'s
+extension test applied exactly — the current design is *right for this scope*, and what
+is missing cannot even be measured until a Warehouse has more tables than this one's ten.
+Filed as
+[EXT-009](../extension-register.md#ext-009--the-join-path-entry-type-at-warehouse-scale),
+against the `semantic/joins/` file format as its seam.
 
 ---
 
