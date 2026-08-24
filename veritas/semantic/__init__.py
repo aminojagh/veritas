@@ -7,6 +7,7 @@ are YAML under `semantic/`; this package reads them.
 
 from veritas.semantic.loader import (
     SEMANTIC_DIR,
+    SQL_FIELDS,
     JoinPath,
     MetricDefinition,
     SemanticEntry,
@@ -15,10 +16,12 @@ from veritas.semantic.loader import (
     entry_files,
     load_semantic_layer,
     read_entry,
+    sql_fields,
 )
 
 __all__ = [
     "SEMANTIC_DIR",
+    "SQL_FIELDS",
     "JoinPath",
     "MetricDefinition",
     "SemanticEntry",
@@ -27,4 +30,5 @@ __all__ = [
     "entry_files",
     "load_semantic_layer",
     "read_entry",
+    "sql_fields",
 ]

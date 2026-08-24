@@ -118,33 +118,32 @@ from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
 # The comment tells the linter that specific line is deliberate, and suppresses nothing else.
 
 from check_warehouse import (  # noqa: E402
+    DIALECT,
     DIALECT_PROBES,
     DUCKDB_FUNCTIONS,
+    TARGET_DIALECT,
+    retarget,
+    round_trip_rewrites,
     unportable_functions,
 )
 # Claim 4 asks whether a transpile-and-compare test would be a better dialect scan
 # than the one `check_seam` runs. The honest way to ask that is to run **the scan
-# itself**, so `unportable_functions` and the name table it reads are imported
-# rather than reimplemented here: a second copy would answer the question about the
-# copy, and would go on answering it after the original changed.
+# itself**, so both detectors and the name table they read are imported rather than
+# reimplemented here: a second copy would answer the question about the copy, and
+# would go on answering it after the original changed.
+#
+# `retarget` and `round_trip_rewrites` were written here, by Sub-step 3.4, and moved
+# to `check_warehouse.py` by Sub-step 4.3 — the Sub-step that made the round trip
+# part of the scan rather than a measurement of one. They are imported back so this
+# file's dated verdict and the check that runs on every commit are the same trip.
 #
 # `DIALECT_PROBES` is imported for a second reason, and it is the reason this file
-# still claims no exemption from that scan. Three of the statements claim 4 needs
-# are DuckDB-specific by construction — they exist to be caught — and SQL literals
-# in this file are read by the dialect scan, which would fail on them. Those three
-# statements already exist, as `check_warehouse.py`'s own exempt fixture, in the
-# file that owns the exemption. Importing them is what keeps `FIXTURE_EXEMPTIONS`
-# at one entry instead of two.
-
-# The engine the probes are written against. Every statement is read in the
-# dialect it would actually run in.
-DIALECT = "duckdb"
-
-# The engine claim 4 retargets to. Not an arbitrary second dialect: ADR-0002
-# rejected it for the slice while calling it *"the real target engine"* and *"the
-# actual target"*, and the extension path it names goes here. A round trip to a
-# dialect nobody intends to use would measure sqlglot rather than the migration.
-TARGET_DIALECT = "bigquery"
+# still claims no exemption from that scan. Two of the statements claim 4 needs name
+# a DuckDB-only function and a third carries the widening cast — all three exist to
+# be caught — and SQL literals in this file are read by the dialect scan, which would
+# report them. All three already exist, as `check_warehouse.py`'s own exempt fixture,
+# in the file that owns the exemption. Importing them is what keeps
+# `FIXTURE_EXEMPTIONS` at one entry instead of two.
 
 # The Reporting Currency every monetary figure below is expressed in, matching
 # `check_warehouse.py --distinctions` so the two scripts' numbers are comparable.
@@ -815,30 +814,6 @@ def warehouse_schema(warehouse: WarehouseAdapter) -> dict[str, dict[str, str]]:
         table_name: dict(warehouse.columns(table_name))
         for table_name in warehouse.tables()
     }
-
-
-def retarget(sql: str, dialect: str = TARGET_DIALECT) -> str:
-    """One statement, rewritten from the Warehouse's dialect into another engine's.
-
-    This is the whole of what ADR-0002 means by the engine swap being *"an adapter
-    implementation plus a sqlglot dialect parameter"*. `transpile` parses in the
-    read dialect and writes in the write dialect, so what comes back is text an
-    engine that has never heard of DuckDB is expected to accept.
-
-    Handed the Warehouse's own dialect it returns the statement untouched, so
-    nothing at home pays for a round trip it does not take.
-
-    Raises `TracerRefused` for the same reason the tracer does: a statement sqlglot
-    cannot parse cannot be transpiled either, and the two failures have one cause.
-    A retargeting that silently returned the original would be the worst answer
-    available — it reads as "portable" and is the opposite.
-    """
-    if dialect == DIALECT:
-        return sql
-    try:
-        return sqlglot.transpile(sql, read=DIALECT, write=dialect)[0]
-    except sqlglot.errors.SqlglotError as failure:
-        raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
 
 
 def canonical(expression: exp.Expression, dialect: str = DIALECT) -> str:
@@ -1588,8 +1563,16 @@ def check_retargeting(
             away_verdict = both_verdicts(
                 retarget(sql), away_schema, away, TARGET_DIALECT
             )
-        except TracerRefused:
+        except (TracerRefused, sqlglot.errors.SqlglotError):
             away_verdict = REFUSED_BY_THE_TRACER
+            # Two refusals with one cause, and they are named separately because
+            # they are raised in different files. `TracerRefused` is this file's,
+            # for a statement the tracer cannot read; `SqlglotError` is what
+            # `retarget` lets through for a statement sqlglot cannot transpile,
+            # since Sub-step 4.3 moved it into `check_warehouse.py` where a
+            # transpiler refusal is a finding about the seam rather than about a
+            # tracer. Claim 4 asks whether a verdict *moves*, and a statement that
+            # never arrives has no verdict either way.
 
         same = home_verdict == away_verdict
         moved += not same
@@ -1681,26 +1664,31 @@ class DetectorProbe(NamedTuple):
     why: str
 
 
-# The three statements the existing scan catches are `check_warehouse.py`'s own
-# probes, unpacked in the order that file lists them. Unpacked rather than indexed
-# so that a probe added or removed there fails this file loudly instead of silently
-# measuring a different statement, and each one's recorded scan verdict is checked
-# against `DIALECT_PROBES` in `check_dialect_detectors` rather than restated here.
+# Four of the five statements below are `check_warehouse.py`'s own probes, unpacked
+# in the order that file lists them. Unpacked rather than indexed so that a probe
+# added or removed there fails this file loudly instead of silently measuring a
+# different statement, and each one's recorded verdicts are checked against
+# `DIALECT_PROBES` in `check_dialect_detectors` rather than restated here.
 #
-# They are borrowed rather than copied because they are DuckDB-specific by
-# construction — they exist to be caught — and an SQL literal in this file is read
-# by that same scan. Copying them here would need a second `FIXTURE_EXEMPTIONS`
-# entry; borrowing them needs none, and this file goes on claiming no exemption.
-PORTABLE, TRANSLATABLE, UNTRANSLATABLE = DIALECT_PROBES
+# They are borrowed rather than copied because an SQL literal in this file is read
+# by the scan they belong to, and three of the four would be reported: `TRANSLATABLE`
+# and `UNTRANSLATABLE` name a DuckDB-only function, and `WIDENING` carries the
+# widening cast. `WIDENING` was a literal here until Sub-step 4.3 gave `check_seam` a
+# type half that reads it; borrowing it instead is what keeps `FIXTURE_EXEMPTIONS` at
+# one entry, and this file goes on claiming no exemption. `PORTABLE` is the control
+# and would be reported by nothing, but it comes from the same tuple. `PORTABLE_CAST`
+# is the type half's control and claim 4 has no use for it, which is why five probes
+# are unpacked and four are measured.
+PORTABLE, TRANSLATABLE, UNTRANSLATABLE, WIDENING, PORTABLE_CAST = DIALECT_PROBES
 
-# The two statements the existing scan misses are written here, and they can be,
-# because the scan reads them as clean — which is the finding rather than a
-# convenience. Neither contains a function name sqlglot files under DuckDB: one is
-# a name it files as belonging to no dialect in particular, and the other is not a
-# function call at all.
+# The two statements the **name** half misses. Neither contains a function name
+# sqlglot files under DuckDB: `generate_series` is a name it files as belonging to
+# no dialect in particular, and the widening cast is not a function call at all.
+# One of them is still written here, and it can be, because both halves of the scan
+# read it as clean — which is the finding rather than a convenience.
 DETECTOR_PROBES = (
     DetectorProbe(
-        sql=PORTABLE[0],
+        sql=PORTABLE.sql,
         named_by_the_scan=False,
         rewritten_by_the_round_trip=False,
         why="the control — standard SQL, and neither detector has anything to say "
@@ -1708,7 +1696,7 @@ DETECTOR_PROBES = (
             "would read the same as this one",
     ),
     DetectorProbe(
-        sql=TRANSLATABLE[0],
+        sql=TRANSLATABLE.sql,
         named_by_the_scan=True,
         rewritten_by_the_round_trip=True,
         why="a DuckDB name that BigQuery spells differently and sqlglot knows how "
@@ -1716,7 +1704,7 @@ DETECTOR_PROBES = (
             "one neither is chosen on",
     ),
     DetectorProbe(
-        sql=UNTRANSLATABLE[0],
+        sql=UNTRANSLATABLE.sql,
         named_by_the_scan=True,
         rewritten_by_the_round_trip=False,
         why="a DuckDB name sqlglot has no translation for, so it is emitted "
@@ -1733,7 +1721,7 @@ DETECTOR_PROBES = (
             "reaches it through UNNEST(GENERATE_ARRAY(...)) instead",
     ),
     DetectorProbe(
-        sql="SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade",
+        sql=WIDENING.sql,
         named_by_the_scan=False,
         rewritten_by_the_round_trip=True,
         why="Traded Notional's widening cast, which is not a function call at all. "
@@ -1747,32 +1735,6 @@ DETECTOR_PROBES = (
 # arguments, so a name is retried until one parses and reported as unmeasurable if
 # none does — which is a fourth outcome rather than a silent absence.
 PROBE_ARITIES = (0, 1, 2, 3)
-
-
-def round_trip_rewrites(sql: str) -> bool:
-    """Did retargeting have to restructure the statement, or only respell it?
-
-    Compared as parse trees rather than as text, and this is the whole of what
-    makes the comparison mean anything. Every statement's text changes on the way
-    through a generator — keywords are upper-cased, `x::INT` becomes `CAST(x AS
-    INT)` — and a detector that read a changed string as a dialect problem would
-    fire on all of them. DuckDB's `SELECT * EXCLUDE (c)` and BigQuery's
-    `SELECT * EXCEPT (c)` are the same tree spelled two ways, and that is portable.
-
-    What is not portable is a tree the target dialect cannot hold in the shape the
-    source wrote it: a different function, a different structure, a narrower type.
-
-    The comparison is sqlglot's own `==` on two nodes, and the alternative that
-    looks equivalent is not. Writing each tree out with `repr` and comparing the
-    text overcounts: a parser is free to record a default argument its opposite
-    number leaves absent, and three of the DuckDB-only names below come back from
-    the BigQuery parser carrying `null_propagation=False` on a node the DuckDB
-    parser built without it. Same node, same children, same meaning — and two
-    different strings. `==` reads them as the one tree they are.
-    """
-    home = sqlglot.parse_one(sql, dialect=DIALECT)
-    away = sqlglot.parse_one(retarget(sql), dialect=TARGET_DIALECT)
-    return home != away
 
 
 def check_dialect_detectors() -> None:
@@ -1792,14 +1754,18 @@ def check_dialect_detectors() -> None:
     at run time because the set is sqlglot's and changes with it — there is no
     version of this measurement that can be written as literals.
     """
-    for probe, (sql, expected) in zip(DETECTOR_PROBES, DIALECT_PROBES):
-        if probe.sql is sql and probe.named_by_the_scan != bool(expected):
-            problems.append(
-                f"probe {sql!r} is borrowed from check_warehouse.py, which records "
-                f"it as {'flagged' if expected else 'clean'}, and this file records "
-                f"it as {'flagged' if probe.named_by_the_scan else 'clean'} — the "
-                f"two files disagree about the scan they are both describing"
-            )
+    borrowed = {scan_probe.sql: scan_probe for scan_probe in DIALECT_PROBES}
+    for probe in DETECTOR_PROBES:
+        scan_probe = borrowed.get(probe.sql)
+        if scan_probe is None or probe.named_by_the_scan == bool(scan_probe.names):
+            continue
+        problems.append(
+            f"probe {probe.sql!r} is borrowed from check_warehouse.py, which "
+            f"records it as {'flagged' if scan_probe.names else 'clean'}, and this "
+            f"file records it as "
+            f"{'flagged' if probe.named_by_the_scan else 'clean'} — the two files "
+            f"disagree about the scan they are both describing"
+        )
 
     print(f"    {'name list':<12}{'round trip':<12}statement")
     scan_alone = round_trip_alone = 0

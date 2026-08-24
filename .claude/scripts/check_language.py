@@ -81,9 +81,13 @@ KNOWN_NON_ABBREVIATIONS = {
     "ACT",
     # Vocabulary of query languages we do *not* write, quoted in the ADRs that
     # rejected them or in prose about SQL in general. The keywords of the SQL we do
-    # write are not here — `warehouse_sql_keywords()` derives those, for the reason
-    # given there.
+    # write are not here — `warehouse_sql_keywords()` and
+    # `published_sql_keywords()` derive those, for the reason given there. NULLS,
+    # LAST and STRING are BigQuery's, and BigQuery is a dialect this project
+    # retargets *to* and never writes: they appear where the dialect scan's type
+    # reading is explained, which is prose about what the other engine says back.
     "DECIMAL", "OWL", "RDF", "SPARQL", "DAG", "CTE", "LIMIT", "ABS",
+    "NULLS", "LAST", "STRING",
     # Document and tooling shorthand. HEAD is git's name for the current commit —
     # an ordinary word shouted by convention, not something a reader looks up, and
     # any review that compares its work against the committed version says it.
@@ -170,8 +174,45 @@ def warehouse_sql_keywords() -> set[str]:
     return keywords
 
 
+def published_sql_keywords() -> set[str]:
+    """Shouted keywords of the SQL the Semantic Layer publishes.
+
+    The second body of hand-authored SQL this project holds, and it arrived with
+    Step 004. `warehouse_sql_keywords` above derives the first one for a stated
+    reason — *"a list re-derived from one file is one file behind"* — and a Metric
+    Definition's expression is SQL a person wrote in exactly the same sense.
+    `Traded Notional` widens with `CAST(... AS DECIMAL(38, 6))` and nothing under
+    `veritas/warehouse/` says CAST, so without this the first review that explains
+    that expression has to add a keyword to a remembered list.
+
+    Which fields hold SQL is `veritas.semantic.sql_fields`'s answer rather than a
+    second copy of it: the loader's dataclasses are the file format, and a reader
+    that decided for itself would go on deciding after the format changed. **This
+    is what stopped this script being stdlib-only** — the loader reads YAML, so
+    `pyyaml` comes with it. That is a real cost and the cheaper ways out were worse:
+    listing CAST by hand is the remembered list the docstring above argues against,
+    and scanning the corpus files as raw text would exempt every shouted domain
+    value in them, which is the one thing the other function refuses to do.
+
+    Quoted literals are stripped for the reason the other one strips them: a
+    certified filter names domain values — `'realised P&L'`, `'EUR'` — and those
+    are registered Glossary vocabulary this function has no business exempting.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from veritas.semantic import entry_files, read_entry, sql_fields
+
+    keywords: set[str] = set()
+    for path in entry_files():
+        for _, sql in sql_fields(read_entry(path)):
+            keywords.update(
+                re.findall(r"\b[A-Z]{2,6}\b", re.sub(r"'[^']*'", " ", sql))
+            )
+    return keywords
+
+
 KNOWN_NON_ABBREVIATIONS |= traded_universe_tokens()
 KNOWN_NON_ABBREVIATIONS |= warehouse_sql_keywords()
+KNOWN_NON_ABBREVIATIONS |= published_sql_keywords()
 
 problems: list[str] = []
 

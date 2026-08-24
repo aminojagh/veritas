@@ -114,7 +114,10 @@ today, while there is nothing on either side of it.
   adapter contains the *connection*, not the dialect risk.
   → **Accepted.** Unavoidable given the engine choice, and the mitigation is
   discipline: prefer portable constructs in generated SQL, and treat any
-  DuckDB-only function in a Metric Definition as a review comment.
+  DuckDB-only **construct** in a Metric Definition as a review comment — a
+  function name, a type, or anything else whose meaning does not survive the trip
+  to the target engine. *Construct* rather than *function* since 2026-08-23; the
+  note below says what was measured and what changed the word.
 
 - **The Validation Gate's cost check is much weaker than the real system's, and
   the gap is worth being precise about.** In BigQuery, the check that matters is
@@ -315,13 +318,50 @@ reaches it. Opened as
 whose repayment is the name list **plus** a round-trip comparison over types: the same
 Sub-step measured that a round trip passes 39 of the 50 measurable DuckDB-only names
 straight through, so the two detectors are blind to disjoint classes and neither
-replaces the other. The wording here is left as written, with this note beside it,
-which is how the 2026-08-05 clarification above was handled.
+replaces the other. The wording above is left as written for now, with this note
+beside it, which is how the 2026-08-05 clarification above was handled — **and was
+changed on 2026-08-23, when the debt was paid; see the note below.**
 
 **A related question it also settles.**
 [DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
 left open in writing whether transpilation-level checking would be the better scan.
 **It would not** — not strictly better, for the reason in the paragraph above.
+
+### Status note, 2026-08-23 — the mitigation now says *construct*, and a run performs it
+
+Not a change of decision, and the status stays `accepted`. The note above recorded
+that the first accepted cost's mitigation named the wrong unit and left the sentence
+as written, because there was nothing to scan: the Semantic Layer did not exist, so
+no Metric Definition existed, and the only cast outside `veritas/warehouse/` was a
+Python literal in the spike that measured it. Sub-step 4.2 wrote the corpus, and
+Sub-step 4.3 paid
+[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast).
+
+**Two things changed, and the second is what makes the first more than a word.**
+
+The mitigation says **construct** where it said *function*, so the sentence covers a
+cast — the one construct the spike measured meaning being lost in.
+
+And `check_seam` performs it rather than asking a reviewer to. It reads the SQL every
+Semantic Layer entry publishes as well as the SQL a module emits, and reads all of it
+twice: **by name**, as before, and **by type**, retargeting each statement to
+BigQuery and reporting every type construct that arrives there saying less than it
+says at home. The two readings are blind to disjoint classes and neither replaces the
+other, which is the note above's finding and is why the repayment was *the name list
+plus a round trip* rather than a swap.
+
+**The two readings end differently, deliberately.** A DuckDB-only function name
+outside the adapter fails the run; a lossy type is printed as a **review comment**,
+which is the word this mitigation has used since the ADR was written. The reason is
+that this corpus carries a lossy type it cannot do without: the published expressions
+whose product overflows `DECIMAL(18)` widen the cast to `DECIMAL(38, 6)`, and
+`check_semantic_layer.py` runs each of them uncast on every run and prints the
+engine's refusal. A check that failed on a construct the engine requires could only be
+satisfied by publishing an expression that does not execute.
+
+What the review comment names on the current corpus, and the mutations that show both
+readings have teeth, are in the
+[Sub-step 4.3 review](../reviews/step-004-semantic-layer.md#sub-step-43--pay-debt-015-the-dialect-scan-reads-type-constructs).
 
 ## Related
 

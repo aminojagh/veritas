@@ -214,12 +214,14 @@ LIVES_IN_COLUMN = 3
 BEFORE = "<"
 FROM_THEN = ">="
 
-# The widening cast four published expressions carry, and the pattern that takes it
-# back out again. Check 11 executes the uncast expression and expects the engine to
-# refuse it, which is what keeps the cast a **measurement** rather than a habit: a
-# reader who thinks it is tidiness can see, on every run, what removing it costs.
-# The same shape `check_validation_feasibility.py` uses for `Traded Notional`, which
-# is the one metric DEBT-015 predicted and the only one it named.
+# The widening cast, and the pattern that takes it back out again. Check 11 executes
+# the uncast expression and expects the engine to refuse it, which is what keeps the
+# cast a **measurement** rather than a habit: a reader who thinks it is tidiness can
+# see, on every run, what removing it costs. The same shape
+# `check_validation_feasibility.py` uses for `Traded Notional`, which is the one
+# metric DEBT-015 predicted and the only one it named. How many expressions carry
+# it is a reading rather than a number written here — check 11 prints one line per
+# expression, and `check_warehouse.py`'s dialect scan names them again.
 WIDENING_CAST = re.compile(r"CAST\((.+?) AS DECIMAL\(38, 6\)\)")
 
 # The teeth of check 6, run on every run against expressions written here rather
@@ -945,9 +947,11 @@ def check_widening_cast(
 ) -> None:
     """Check 11: every widening cast in the corpus is shown to be load-bearing.
 
-    Four of the nine published expressions carry `CAST(... AS DECIMAL(38, 6))`.
-    Without it the engine computes the product in DECIMAL(18) and raises on
-    overflow, so the cast is what makes the metric computable at all — and
+    Every published expression whose product overflows `DECIMAL(18)` carries
+    `CAST(... AS DECIMAL(38, 6))`, and the run below prints one line per expression
+    rather than this docstring counting them. Without the cast the engine computes
+    the product in DECIMAL(18) and raises on overflow, so the cast is what makes
+    the metric computable at all — and
     [DEBT-015](../docs/debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
     is the Ledger entry about a dialect scan that cannot see it.
 

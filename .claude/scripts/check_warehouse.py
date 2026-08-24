@@ -25,15 +25,26 @@ an ADR and two are promises made by comments in the schema.
   4. The seam holds, in both the halves ADR-0002 names. That ADR commits that all
      warehouse access goes through the adapter, and names the signal that it has
      stopped as "a `duckdb` import **or a DuckDB-specific function name** anywhere
-     outside the adapter module". Both halves parse rather than grep: a `duckdb`
+     outside the adapter module". Every half parses rather than greps: a `duckdb`
      in a docstring is prose, and this file is full of it.
 
        * The import half reads each module's import statements.
-       * The dialect half reads each module's SQL — every string literal sqlglot
-         parses as a statement — and reports any function name in it that standard
-         SQL does not have. Which names those are is derived from sqlglot rather
-         than typed here, so the list tracks the library instead of someone's
-         memory. Added by Sub-step 2.6, paying DEBT-009.
+       * The dialect half reads the SQL that leaves the adapter — every string
+         literal sqlglot parses as a statement, and since Sub-step 4.3 every SQL
+         field the Semantic Layer publishes — and reads it twice, because the two
+         readings are blind to disjoint classes.
+
+         **By name**, reporting any function call standard SQL does not have.
+         Which names those are is derived from sqlglot rather than typed here, so
+         the list tracks the library instead of someone's memory. Added by
+         Sub-step 2.6, paying DEBT-009.
+
+         **By type**, retargeting each statement to the engine ADR-0002 calls the
+         real target and reporting every type construct that arrives there saying
+         less than it says here. Added by Sub-step 4.3, paying DEBT-015 — a cast
+         is not a function call, and a cast is where the one measured loss is.
+         These print as review comments rather than failing the run, because the
+         corpus carries a widening cast the engine will not compute without.
 
   5. `--sources` only — what ingestion loaded is what the sources said. Added by
      Sub-step 2.2 and grown by every source since. For `dim_instrument`: no minor
@@ -70,7 +81,9 @@ import re
 import decimal
 import sys
 from decimal import Decimal
+from itertools import zip_longest
 from pathlib import Path
+from typing import NamedTuple
 
 import sqlglot
 from sqlglot import exp
@@ -83,6 +96,13 @@ GLOSSARY = CLAUDE_DIR / "docs" / "glossary.md"
 
 sys.path.insert(0, str(REPO_ROOT))
 
+from veritas.semantic import (  # noqa: E402
+    SEMANTIC_DIR,
+    SemanticEntryError,
+    entry_files,
+    read_entry,
+    sql_fields,
+)
 from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
 
 # sqlglot logs a warning whenever it cannot parse a string and falls back to a
@@ -121,17 +141,67 @@ SQL_STATEMENTS = (
     exp.Subquery,
 )
 
+# The engine every statement in this repository is read in. The Warehouse's own
+# dialect, so a statement is parsed the way the engine that runs it would read it.
+DIALECT = "duckdb"
+
+# The engine the type half of the dialect scan retargets to. Not an arbitrary
+# second dialect: ADR-0002 rejected BigQuery for the slice while calling it *"the
+# real target engine"* and *"the actual target"*, and the extension path it names
+# goes here. A round trip to a dialect nobody intends to use would measure sqlglot
+# rather than the migration.
+TARGET_DIALECT = "bigquery"
+
+
+class DialectProbe(NamedTuple):
+    """One statement, and what each half of the dialect scan has to say about it.
+
+    `names` is the name half's verdict — the function names in the statement that
+    standard SQL does not have. `types` is the type half's — the type constructs
+    that arrive in `TARGET_DIALECT` saying less than they say here, as written at
+    home.
+    """
+
+    sql: str
+    names: tuple[str, ...]
+    types: tuple[str, ...]
+
+
 # The teeth of the dialect scan, checked on every run against SQL written here
 # rather than against whatever the repository happens to contain. Without them a
 # clean scan proves nothing: it reads the same either way whether the code is
-# portable or the name list is empty. Each probe exercises one verdict — a
-# standard query is left alone, a name sqlglot files under DuckDB is named, and so
-# is a name sqlglot has never heard of. `strftime` and `list_aggregate` are not
-# arbitrary: they are the two examples DEBT-009 itself used.
+# portable or the detector is empty. Each probe exercises one verdict, and each
+# half needs its own control or a detector that fired on everything would read
+# like a detector that was right.
+#
+# The first three are the name half's — a standard query is left alone, a name
+# sqlglot files under DuckDB is named, and so is a name sqlglot has never heard
+# of. `strftime` and `list_aggregate` are not arbitrary: they are the two examples
+# DEBT-009 itself used.
+#
+# The last two are the type half's, added by Sub-step 4.3 paying DEBT-015. The
+# widening cast is the construct Sub-step 3.4 measured the loss in and the one the
+# name half reads as clean by construction; the `VARCHAR` cast is its control, a
+# cast that survives the trip intact, so a detector that flagged every cast would
+# fail here rather than look vigilant.
 DIALECT_PROBES = (
-    ("SELECT count(*) FROM fct_trade", ()),
-    ("SELECT strftime(price_date, '%Y') FROM fct_instrument_price", ("STRFTIME",)),
-    ("SELECT list_aggregate(quantity, 'sum') FROM fct_trade", ("LIST_AGGREGATE",)),
+    DialectProbe("SELECT count(*) FROM fct_trade", (), ()),
+    DialectProbe(
+        "SELECT strftime(price_date, '%Y') FROM fct_instrument_price",
+        ("STRFTIME",),
+        (),
+    ),
+    DialectProbe(
+        "SELECT list_aggregate(quantity, 'sum') FROM fct_trade",
+        ("LIST_AGGREGATE",),
+        (),
+    ),
+    DialectProbe(
+        "SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade",
+        (),
+        ("DECIMAL(38, 6)",),
+    ),
+    DialectProbe("SELECT CAST(client_name AS VARCHAR) FROM dim_client", (), ()),
 )
 
 # Where the dialect scan's one fixture exemption applies, as (file, symbol) rather
@@ -2299,7 +2369,7 @@ def sql_statements(path: Path) -> list[tuple[int, str]]:
         if id(node) in documentation or id(node) in fixtures:
             continue
         try:
-            parsed = sqlglot.parse_one(node.value, dialect="duckdb")
+            parsed = sqlglot.parse_one(node.value, dialect=DIALECT)
         except sqlglot.errors.SqlglotError:
             continue
         if isinstance(parsed, SQL_STATEMENTS):
@@ -2327,12 +2397,231 @@ def unportable_functions(sql: str) -> list[tuple[str, bool]]:
     return [(name, name in DUCKDB_FUNCTIONS) for name in names]
 
 
+def retarget(sql: str, dialect: str = TARGET_DIALECT) -> str:
+    """One statement, rewritten from the Warehouse's dialect into another engine's.
+
+    This is the whole of what ADR-0002 means by the engine swap being *"an adapter
+    implementation plus a sqlglot dialect parameter"*. `transpile` parses in the
+    read dialect and writes in the write dialect, so what comes back is text an
+    engine that has never heard of DuckDB is expected to accept.
+
+    Handed the Warehouse's own dialect it returns the statement untouched, so
+    nothing at home pays for a round trip it does not take.
+
+    A statement sqlglot cannot transpile raises `sqlglot.errors.SqlglotError`
+    rather than coming back unchanged, because coming back unchanged is the worst
+    answer available: it reads as "portable" and is the opposite. Every caller
+    below turns that refusal into a named problem, since a statement outside the
+    adapter that sqlglot cannot write in the target engine's words is the seam
+    having stopped holding in the most direct way there is.
+
+    Lives here rather than in `check_validation_feasibility.py`, where Sub-step 3.4
+    wrote it, because Sub-step 4.3 made the round trip part of the scan this file
+    owns. The spike imports it back, so the measurement it dated and the check that
+    runs on every commit are the same trip and cannot drift apart.
+    """
+    if dialect == DIALECT:
+        return sql
+    return sqlglot.transpile(sql, read=DIALECT, write=dialect)[0]
+
+
+def round_trip(sql: str) -> tuple[exp.Expression, exp.Expression]:
+    """One statement, parsed at home and parsed again after retargeting.
+
+    The shared instrument under both readings below. `round_trip_rewrites` asks
+    whether the two trees differ at all; `unportable_types` asks the narrower
+    question of what happened to the types inside them. One trip, so the two can
+    never be measuring different journeys.
+    """
+    return (
+        sqlglot.parse_one(sql, dialect=DIALECT),
+        sqlglot.parse_one(retarget(sql), dialect=TARGET_DIALECT),
+    )
+
+
+def round_trip_rewrites(sql: str) -> bool:
+    """Did retargeting have to restructure the statement, or only respell it?
+
+    Compared as parse trees rather than as text, and this is the whole of what
+    makes the comparison mean anything. Every statement's text changes on the way
+    through a generator — keywords are upper-cased, `x::INT` becomes `CAST(x AS
+    INT)` — and a detector that read a changed string as a dialect problem would
+    fire on all of them. DuckDB's `SELECT * EXCLUDE (c)` and BigQuery's
+    `SELECT * EXCEPT (c)` are the same tree spelled two ways, and that is portable.
+
+    What is not portable is a tree the target dialect cannot hold in the shape the
+    source wrote it: a different function, a different structure, a narrower type.
+
+    The comparison is sqlglot's own `==` on two nodes, and the alternative that
+    looks equivalent is not. Writing each tree out with `repr` and comparing the
+    text overcounts: a parser is free to record a default argument its opposite
+    number leaves absent, and three of the DuckDB-only names come back from the
+    BigQuery parser carrying `null_propagation=False` on a node the DuckDB parser
+    built without it. Same node, same children, same meaning — and two different
+    strings. `==` reads them as the one tree they are.
+
+    **This whole-tree reading is not what `check_seam` scans with**, and Sub-step
+    3.4 is why: it fires on `GROUP BY` written against an alias and on BigQuery's
+    explicit `NULLS LAST`, which are sqlglot succeeding rather than a dialect
+    assumption escaping. `check_validation_feasibility.py` imports it to answer
+    DEBT-009's *"would transpile-and-compare be the better scan"* — the answer was
+    no — and `unportable_types` below is the narrower reading DEBT-015 asked for.
+    """
+    home, away = round_trip(sql)
+    return home != away
+
+
+class TypeLoss(NamedTuple):
+    """One type construct that says less after the round trip than before it.
+
+    `written` is the type as the statement writes it here, `arrived` is what the
+    retargeted statement says instead, and `alone` is what that same type becomes
+    when it is retargeted on its own rather than inside a statement. `alone` is the
+    comparison and not decoration: it is what makes this a report of something
+    **lost** rather than a report of a type being spelled the other engine's way.
+    """
+
+    written: str
+    arrived: str
+    alone: str
+
+
+def unportable_types(sql: str) -> list[TypeLoss]:
+    """The type constructs in `sql` that do not survive retargeting intact.
+
+    DEBT-015's repayment, and the half of ADR-0002's dialect commitment that was
+    missing: the scan's other half reads **function names**, and the one construct
+    Sub-step 3.4 measured meaning being lost in is a **cast**, which is not a
+    function call at all.
+
+    The rule is a comparison between two trips the same type can take:
+
+      * retargeted **inside the statement**, which is the trip the SQL actually
+        makes — `CAST(quantity AS DECIMAL(38, 6))` arrives in BigQuery as
+        `CAST(quantity AS NUMERIC)`, precision and scale gone;
+      * retargeted **on its own**, which is the trip `retarget_schema` makes for
+        every column type in the catalogue — `DECIMAL(38, 6)` arrives as
+        `NUMERIC(38, 6)`, precision and scale intact.
+
+    Where the two disagree, the statement's trip lost something the type itself did
+    not, and that is the finding. Where they agree the type is portable however
+    differently it is spelled: `VARCHAR` arriving as `STRING` is the same type in
+    the other engine's words, and a rule that fired on it would report the
+    translation working.
+
+    Pairing is by walk order, which holds because retargeting rewrites a statement
+    rather than reordering it, and `zip_longest` is what stops an unmatched type
+    being dropped by a shorter loop. Both unmatched directions are real — a type
+    the trip erased outright, and a type the target engine needed and the source
+    never wrote — and either one shifts every pairing after it, so the *n*th type
+    away is no longer the *n*th type at home.
+
+    **A shift misattributes; it does not hide.** `zip_longest` runs to the longer
+    side, so unequal counts always leave a `None` in the tail; a `None` reads as
+    *nothing at all*, and the type's own trip never does. Any statement whose type
+    counts differ therefore comes back with at least one loss. What the shift gets
+    wrong is **which** construct is named: home `A, B, C` against away `A, C`
+    blames `B` for arriving as `C`'s translation and `C` for arriving as nothing at
+    all, when `B` is what the trip erased. Both sentences are wrong about the
+    construct and right about the statement, and the statement is what the reader
+    of a review comment has in front of them. The one shape that could hide a loss
+    is an erasure and an insertion in the same statement, putting the counts back
+    in step.
+
+    No statement in this repository does any of it — every review comment the run
+    prints names a real type on both sides — so both directions are reasoning about
+    the instrument rather than a measured case.
+
+    Raises `sqlglot.errors.SqlglotError` if the statement cannot make the trip:
+    `retarget` refusing it, or the target dialect refusing to parse what came back.
+    DuckDB's `UTINYINT` is the shape of that case — a type BigQuery has no word for
+    — and `check_seam` files it as a problem rather than as a review comment.
+    """
+    nothing = "nothing at all"
+    home, away = round_trip(sql)
+    losses: list[TypeLoss] = []
+    for written, arrived in zip_longest(
+        home.find_all(exp.DataType), away.find_all(exp.DataType)
+    ):
+        written_as = nothing if written is None else written.sql(DIALECT)
+        alone = nothing if written is None else exp.DataType.build(
+            written_as, dialect=DIALECT
+        ).sql(TARGET_DIALECT)
+        arrived_as = nothing if arrived is None else arrived.sql(TARGET_DIALECT)
+        if arrived_as != alone:
+            losses.append(TypeLoss(written_as, arrived_as, alone))
+    return losses
+
+
+def published_sql() -> list[tuple[str, str]]:
+    """Every piece of SQL the Semantic Layer publishes, and where it is written.
+
+    The half of the dialect scan Sub-step 4.3 added, and the reason DEBT-015 could
+    not be paid before Step 004: `sql_statements` reads the SQL a *module* writes
+    down, and a Metric Definition is a YAML file no module contains. ADR-0002's
+    mitigation is written about *"a Metric Definition"* specifically, so until one
+    existed the commitment named a document the scan could not open.
+
+    Every SQL-bearing field of every entry, not the expression alone. A Join Path's
+    condition and a certified filter are pasted into the same query the expression
+    is ([C1](../docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)),
+    so a dialect assumption in one of them reaches the engine exactly as far. Which
+    fields those are is `veritas.semantic.sql_fields`'s answer, because the loader's
+    dataclasses are the file format and a scan that decided for itself would be a
+    second copy of it.
+
+    Each entry is read with `read_entry` rather than through `load_semantic_layer`,
+    because this scan wants the **path** each piece of SQL is written at and the
+    layer is keyed by name. Whether the corpus is coherent is
+    `check_semantic_layer.py`'s question, not this one's.
+    """
+    found: list[tuple[str, str]] = []
+    for path in entry_files():
+        here = path.relative_to(REPO_ROOT).as_posix()
+        try:
+            entry = read_entry(path)
+        except SemanticEntryError as refusal:
+            problems.append(
+                f"{here} does not load, so the dialect scan cannot read the SQL it "
+                f"publishes: {refusal}"
+            )
+            continue
+        found.extend((f"{here} · {label}", sql) for label, sql in sql_fields(entry))
+    return found
+
+
+
 def check_seam() -> None:
     """No module outside veritas/warehouse/ reaches for the engine.
 
-    Two halves, because ADR-0002 names two signals and Sub-step 2.1 shipped one of
-    them ([DEBT-009](../docs/debt-ledger.md)): a `duckdb` import, and a
-    DuckDB-specific function name in the SQL a module emits.
+    Three readings. ADR-0002 names two signals, Sub-step 2.1 shipped one of them
+    ([DEBT-009](../docs/debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)),
+    and Sub-step 3.4 measured that the second was written in the wrong unit
+    ([DEBT-015](../docs/debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)):
+    a `duckdb` import, a DuckDB-specific function **name**, and — since Sub-step
+    4.3 — a **type construct** that does not survive the trip to the target engine.
+
+    **The two dialect readings are blind to disjoint classes, so neither replaces
+    the other.** Sub-step 3.4 measured both over the same statements: sqlglot emits
+    a DuckDB-only name it has no translation for exactly as it found it, so a
+    before-and-after comparison reads its own failure as portability; and a cast is
+    not a function call, so no name list can see one. The full measurement is in
+    [validation-feasibility.md](../docs/design/validation-feasibility.md#debt-009s-open-question-answered-no).
+
+    **The two readings also end differently, and the difference is not an
+    oversight.** A DuckDB-only function name outside the adapter fails the run,
+    because no certified expression needs one. A lossy type is printed as a review
+    comment, which is the word ADR-0002's mitigation itself uses, because this
+    corpus has one it cannot do without: five published expressions widen to
+    `DECIMAL(38, 6)` and the engine refuses them uncast, which
+    `check_semantic_layer.py` shows by running each of them without it on every
+    run. A check that failed on a construct the engine requires could only be
+    satisfied by writing an expression that does not execute.
+
+    What keeps the review comment from being a check that does nothing is
+    `DIALECT_PROBES`: both readings are asserted against written-down statements on
+    every run, so a type half that stopped seeing the widening cast fails here
+    rather than going quiet.
     """
     importers = duckdb_importers()
     scanned = sum(len(list(root.rglob("*.py"))) for root in CODE_ROOTS if root.exists())
@@ -2355,18 +2644,65 @@ def check_seam() -> None:
         )
 
     print(f"  dialect scan: sqlglot files {len(DUCKDB_FUNCTIONS)} function names "
-          f"under DuckDB that standard SQL does not have")
+          f"under DuckDB that standard SQL does not have, and every type construct "
+          f"makes a {DIALECT} → {TARGET_DIALECT} round trip")
 
-    for probe, expected in DIALECT_PROBES:
-        found = tuple(name for name, _ in unportable_functions(probe))
-        verdict = ", ".join(found) if found else "clean"
-        print(f"    probe: {verdict}")
-        if found != expected:
+    for probe in DIALECT_PROBES:
+        names = tuple(name for name, _ in unportable_functions(probe.sql))
+        types = tuple(loss.written for loss in unportable_types(probe.sql))
+        print(f"    probe: names {', '.join(names) or 'clean':<16} "
+              f"types {', '.join(types) or 'clean'}")
+        if names != probe.names:
             problems.append(
-                f"the dialect scan reads {probe!r} as {found or 'clean'} and it has "
-                f"to read it as {expected or 'clean'} — the scan cannot be trusted "
-                f"about the repository when it is wrong about SQL written to test it"
+                f"the name half of the dialect scan reads {probe.sql!r} as "
+                f"{names or 'clean'} and it has to read it as "
+                f"{probe.names or 'clean'} — the scan cannot be trusted about the "
+                f"repository when it is wrong about SQL written to test it"
             )
+        if types != probe.types:
+            problems.append(
+                f"the type half of the dialect scan reads {probe.sql!r} as "
+                f"{types or 'clean'} and it has to read it as "
+                f"{probe.types or 'clean'} — the scan cannot be trusted about the "
+                f"repository when it is wrong about SQL written to test it"
+            )
+
+    reviewed: list[str] = []
+
+    def scan(where: str, sql: str) -> None:
+        """Both dialect readings over one piece of SQL, from wherever it is written.
+
+        The name half appends a problem, the type half a review comment, and a
+        statement the round trip refuses outright appends a problem — see the
+        docstring above for why those three endings differ.
+        """
+        for name, duckdb_owns_it in unportable_functions(sql):
+            whose = (
+                "sqlglot knows as DuckDB's and not as standard SQL's"
+                if duckdb_owns_it
+                else "sqlglot knows in no dialect, so it cannot transpile it"
+            )
+            problems.append(
+                f"{where} emits SQL calling {name}(), which {whose} — ADR-0002 "
+                f"names a DuckDB-specific function name outside the adapter as the "
+                f"signal that the seam has stopped holding"
+            )
+        try:
+            losses = unportable_types(sql)
+        except sqlglot.errors.SqlglotError as refusal:
+            problems.append(
+                f"{where} emits SQL that sqlglot cannot write in {TARGET_DIALECT} "
+                f"at all ({type(refusal).__name__}: {refusal}) — ADR-0002 calls the "
+                f"engine swap an adapter implementation plus a dialect parameter, "
+                f"and this is a statement outside the adapter that the dialect "
+                f"parameter does not reach"
+            )
+            return
+        reviewed.extend(
+            f"{where}: {loss.written} arrives as {loss.arrived}, where the same "
+            f"type retargeted on its own arrives as {loss.alone}"
+            for loss in losses
+        )
 
     # Python modules only. A `.sql` file is read nowhere: inside the adapter it is
     # licensed to be DuckDB-specific, and outside it none exists — one appearing
@@ -2382,24 +2718,33 @@ def check_seam() -> None:
             statements += len(emitted)
             print(f"    {len(emitted):3} SQL statements in {path.relative_to(REPO_ROOT)}")
             for line, sql in emitted:
-                for name, duckdb_owns_it in unportable_functions(sql):
-                    whose = (
-                        "sqlglot knows as DuckDB's and not as standard SQL's"
-                        if duckdb_owns_it
-                        else "sqlglot knows in no dialect, so it cannot transpile it"
-                    )
-                    problems.append(
-                        f"{path.relative_to(REPO_ROOT)}:{line} emits SQL calling "
-                        f"{name}(), which {whose} — ADR-0002 names a DuckDB-specific "
-                        f"function name outside the adapter as the signal that the "
-                        f"seam has stopped holding"
-                    )
+                scan(f"{path.relative_to(REPO_ROOT)}:{line}", sql)
 
     if not statements:
         problems.append(
             "no module outside veritas/warehouse/ emits SQL at all — there is "
             "nothing for the dialect scan to read, so it is passing vacuously"
         )
+
+    published = published_sql()
+    print(f"    {len(published):3} SQL expressions in "
+          f"{SEMANTIC_DIR.relative_to(REPO_ROOT).as_posix()}/")
+    for where, sql in published:
+        scan(where, sql)
+
+    if not published:
+        problems.append(
+            f"{SEMANTIC_DIR.relative_to(REPO_ROOT).as_posix()}/ publishes no SQL "
+            f"at all — "
+            f"ADR-0002's mitigation is written about a Metric Definition, so the "
+            f"half of the dialect scan that reads one is passing vacuously"
+        )
+
+    if reviewed:
+        print(f"  review comments — type constructs that reach {TARGET_DIALECT} "
+              f"saying less than they say here:")
+        for comment in reviewed:
+            print(f"    {comment}")
 
 
 def main() -> int:

@@ -1128,3 +1128,374 @@ functions are Glossary terms in code spelling: `net_revenue`, `traded_notional`,
 `trade_count`, `cash_balance`, `account_value`, `unrealised_pnl`, `realised_pnl`,
 `position_change`, plus `marked_positions`, which names the rows they fold rather than
 a metric, and `METRIC_HOME`.
+
+---
+
+## Sub-step 4.3 — Pay DEBT-015: the dialect scan reads type constructs
+
+**What changed**
+
+`check_seam` now reads the SQL the Semantic Layer publishes as well as the SQL a
+module emits, and reads all of it **twice** — by function name, as before, and by
+**type**, retargeting each statement to BigQuery and reporting every type construct
+that arrives there saying less than it says at home.
+[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
+is **paid**, and
+[ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#status-note-2026-08-23--the-mitigation-now-says-construct-and-a-run-performs-it)'s
+mitigation says *construct* where it said *function*, with a dated note and no change
+of status.
+
+**The scan reads every SQL field of every entry, not the expression alone.** The plan
+asks for *"Metric Definition expressions"*; what shipped also reads a Metric
+Definition's certified `filters` and a Join Path's `on` condition. The reason is
+[C1](../design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes):
+the orchestrator pastes all of them into **one** query, so they arrive at the engine
+as a single piece of SQL and a dialect assumption anywhere in it travels exactly as
+far. `Realised P&L` is that query — line breaks added here, the orchestrator builds
+it on one:
+
+```sql
+SELECT sum(CAST(fct_accounting_movement.amount AS DECIMAL(38, 6)) * fct_fx_rate.fx_rate)
+FROM fct_accounting_movement
+JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_accounting_movement.movement_date
+                AND fct_fx_rate.from_currency = fct_accounting_movement.denomination_currency
+                AND fct_fx_rate.to_currency = 'EUR'
+WHERE fct_accounting_movement.movement_type = 'realised P&L'
+```
+
+Three of the entry's fields are in there verbatim — `expression` after `SELECT`, the
+Join Path's `on` after `ON`, `filters[0]` after `WHERE` — and only the keywords and
+table names between them are the orchestrator's. So a scan reading `expression` alone
+would have read the `DECIMAL(38, 6)` cast on the first line and skipped a string
+literal and a three-predicate join condition that DuckDB receives in the same
+statement: a seam drawn at a field boundary the SQL does not have. Neither skipped
+field is a hypothetical — the filter above is the corpus's only one, and that `on` is
+one of eight. The run counts what it read, *"18 SQL expressions in `semantic/`"*:
+nine expressions, one filter, eight join conditions.
+
+Which fields hold SQL is `veritas.semantic.sql_fields`, new in this Sub-step and
+living beside the dataclasses that **are** the file format, because a scan that
+decided for itself would be a second copy of the format — still reading three fields
+after the format grew a fourth.
+
+**The type reading is a comparison between two trips, not a diff of two trees.** The
+`round_trip_rewrites` instrument DEBT-015 pointed at compares whole parse trees, and
+Sub-step 3.4 measured why that is the wrong reading for a scan: over this repository's
+own SQL it fires on `GROUP BY` written against an alias and on BigQuery's explicit
+`NULLS LAST`, which are sqlglot succeeding rather than a dialect assumption escaping
+the adapter. So `unportable_types` asks the narrower question the entry actually
+specifies — *a round-trip comparison over types* — by putting each type construct
+through two trips and comparing them:
+
+| The type | Retargeted **inside the statement** | Retargeted **on its own** | Verdict |
+|---|---|---|---|
+| `DECIMAL(38, 6)` | `NUMERIC` | `NUMERIC(38, 6)` | **lost** — the statement's trip erased what the type's did not |
+| `VARCHAR` | `STRING` | `STRING` | portable — the same type in the other engine's words |
+
+The on-its-own trip is not invented for this check: it is the trip `retarget_schema`
+already makes for every column type in the catalogue, and the difference between the
+two is the finding
+[ADR-0002's 2026-08-20 note](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#status-note-2026-08-20--the-retargeting-claim-was-measured-and-the-mitigation-names-the-wrong-unit)
+records. A rule that fired on any spelling change would report the translation
+working.
+
+**The two readings end differently, and that is a decision rather than an oversight.**
+A DuckDB-only function name outside the adapter **fails the run**; a lossy type is
+printed as a **review comment**, which is the word ADR-0002's mitigation has used
+since it was written. The reason is that this corpus carries a lossy type it cannot do
+without: the expressions whose product overflows `DECIMAL(18)` widen the cast to
+`DECIMAL(38, 6)`, and `check_semantic_layer.py` runs each of them uncast on every run
+and prints the engine's refusal. Mutation 3 below is that pair of facts in one place —
+taking the cast out silences the review comment and makes `check_semantic_layer.py`
+fail, because the query no longer executes. A check that failed on the cast could only
+be satisfied by publishing an expression that does not run.
+
+There is one ending that does fail, and it is the one with no legitimate case: a
+statement sqlglot cannot write in BigQuery **at all**. Mutation 2 is that case.
+
+**`retarget` and `round_trip_rewrites` moved into `check_warehouse.py`**, and
+`check_validation_feasibility.py` imports them back. The dependency already ran that
+way — the spike imports `unportable_functions` and the name table, because *"a second
+copy would answer the question about the copy"* — and Sub-step 4.3 is what made the
+round trip part of the scan rather than a measurement of one. One consequence is
+visible in the spike: `retarget` no longer raises `TracerRefused`, because a
+transpiler refusal in `check_warehouse.py` is a finding about the seam and not about a
+tracer, so `check_retargeting` catches `sqlglot.errors.SqlglotError` beside it. The
+spike's numbers are unchanged, which is what R4's pin exists to make checkable.
+
+**`DIALECT_PROBES` grew from three probes to five, and gained a second column.** Each
+probe now records what **both** halves must say about it. The two new statements are
+the type half's teeth and its control:
+
+- `SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade` — the construct the name
+  half reads as clean by construction, and the one Sub-step 3.4 measured the loss in.
+  It was a literal in `check_validation_feasibility.py` until this Sub-step; the type
+  half reads it, so it moved into the fixture the exemption already covers rather than
+  earning a second `FIXTURE_EXEMPTIONS` entry. **The exemption stays at one entry.**
+- `SELECT CAST(client_name AS VARCHAR) FROM dim_client` — a cast that survives the
+  trip. Without it, a detector that flagged every cast would pass every probe and look
+  vigilant.
+
+**Verification**
+
+```bash
+uv run python .claude/scripts/check_warehouse.py
+```
+
+```
+  seam scan: 17 Python files · 1 import duckdb
+    ADAPTER  veritas/warehouse/adapter.py
+  dialect scan: sqlglot files 51 function names under DuckDB that standard SQL does not have, and every type construct makes a duckdb → bigquery round trip
+    probe: names clean            types clean
+    probe: names STRFTIME         types clean
+    probe: names LIST_AGGREGATE   types clean
+    probe: names clean            types DECIMAL(38, 6)
+    probe: names clean            types clean
+      4 SQL statements in veritas/ingestion/__main__.py
+      5 SQL statements in veritas/ingestion/simulator.py
+      2 SQL statements in .claude/scripts/check_semantic_layer.py
+     27 SQL statements in .claude/scripts/check_validation_feasibility.py
+     58 SQL statements in .claude/scripts/check_warehouse.py
+     18 SQL expressions in semantic/
+  review comments — type constructs that reach bigquery saying less than they say here:
+    .claude/scripts/check_validation_feasibility.py:386: DECIMAL(38, 6) arrives as NUMERIC, where the same type retargeted on its own arrives as NUMERIC(38, 6)
+    .claude/scripts/check_validation_feasibility.py:480: DECIMAL(38, 6) arrives as NUMERIC, where the same type retargeted on its own arrives as NUMERIC(38, 6)
+    semantic/metrics/account_value.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, where the same type retargeted on its own arrives as NUMERIC(38, 6)
+    semantic/metrics/cash_balance.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, where the same type retargeted on its own arrives as NUMERIC(38, 6)
+    semantic/metrics/realised_pnl.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, where the same type retargeted on its own arrives as NUMERIC(38, 6)
+    semantic/metrics/traded_notional.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, where the same type retargeted on its own arrives as NUMERIC(38, 6)
+    semantic/metrics/unrealised_pnl.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, where the same type retargeted on its own arrives as NUMERIC(38, 6)
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+```
+
+**The plan's own bar was that the run must name `Traded Notional`'s cast where `HEAD`
+says nothing** — *"a scan that flags nothing after this change has not been paid, it
+has been re-promised."* `HEAD` was run from a working copy of the last commit, so the
+comparison is between two runs rather than between a run and a memory:
+
+```bash
+git archive HEAD | tar -x -C "$CLAUDE_JOB_DIR/tmp/head"
+uv run python "$CLAUDE_JOB_DIR/tmp/head/.claude/scripts/check_warehouse.py"
+```
+
+```
+  dialect scan: sqlglot files 51 function names under DuckDB that standard SQL does not have
+    probe: clean
+    probe: STRFTIME
+    probe: LIST_AGGREGATE
+      4 SQL statements in veritas/ingestion/__main__.py
+      5 SQL statements in veritas/ingestion/simulator.py
+      2 SQL statements in .claude/scripts/check_semantic_layer.py
+     28 SQL statements in .claude/scripts/check_validation_feasibility.py
+     58 SQL statements in .claude/scripts/check_warehouse.py
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+```
+
+`HEAD` reads nothing out of `semantic/` and says nothing about any cast, and passes.
+That is the cost sentence DEBT-015 wrote about: *"the first person to read the scan's
+clean output will be entitled to draw the wrong conclusion from it."*
+
+**Read the review-comment block: it is seven sites, and the Ledger predicted one.**
+Five are Metric Definitions — the widening cast is carried by every published
+expression whose product overflows `DECIMAL(18)`, which is what Sub-step 4.2 found and
+what the Ledger's *"Fired 2026-08-22, and wider than this entry says"* paragraph
+records. The other two are the spike's own probe statements, which carry
+`Traded Notional`'s expression as Python literals under
+[R4](../plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)'s
+pin. Those two are honest findings rather than fixture noise: they are SQL written
+outside the adapter that carries a construct the trip to BigQuery erases, and they say
+so at the line they are written on.
+
+**The other three checks still pass, unchanged:**
+
+```bash
+uv run python .claude/scripts/check_semantic_layer.py      # exit 0
+uv run python .claude/scripts/check_validation_feasibility.py  # exit 0
+uv run python .claude/scripts/verify_framework.py          # exit 0
+```
+
+The spike's dated readings are the same ones it recorded: *the two disagree on 3 of 5
+statements*, *51 names, 1 that parse at none of the argument counts tried*, *the round
+trip catches 11 and passes 39 through unchanged*. That is what R4's pin is for — the
+instrument moved files and the measurement did not move with it.
+
+**The checks were made to have teeth, by four mutations**
+
+Each was applied, run, and reverted, and every file was compared with `cmp` against
+its pre-mutation copy afterwards — output at the end.
+
+**Mutation 1 — a DuckDB-only function name in a Metric Definition.**
+`trade_count.yaml`'s expression becomes `list_aggregate(fct_trade.trade_id, 'count')`.
+This is the half of the scan that already existed, now pointed at a file it could not
+open before:
+
+```
+FAIL — 1 problem(s)
+  - semantic/metrics/trade_count.yaml · expression emits SQL calling LIST_AGGREGATE(), which sqlglot knows in no dialect, so it cannot transpile it — ADR-0002 names a DuckDB-specific function name outside the adapter as the signal that the seam has stopped holding
+exit=1
+```
+
+**Mutation 2 — a type the target engine has no word for.** `Traded Notional`'s cast
+becomes `CAST(fct_trade.quantity AS UTINYINT)`. This is the type reading's one failing
+ending, and it is failing rather than commenting because no certified expression needs
+a type BigQuery cannot hold:
+
+```
+FAIL — 1 problem(s)
+  - semantic/metrics/traded_notional.yaml · expression emits SQL that sqlglot cannot write in bigquery at all (ParseError: Expected TYPE after CAST. Line 1, Col: 39.
+exit=1
+```
+
+**Mutation 3 — the cast comes out of `Traded Notional` altogether.** The point of this
+one is what happens in *both* scripts, because it is the argument for the review
+comment not being a failure. `check_warehouse.py` still passes and the metric's line
+is gone from the review-comment block:
+
+```
+  review comments — type constructs that reach bigquery saying less than they say here:
+    .claude/scripts/check_validation_feasibility.py:386: DECIMAL(38, 6) arrives as NUMERIC, ...
+    .claude/scripts/check_validation_feasibility.py:480: DECIMAL(38, 6) arrives as NUMERIC, ...
+    semantic/metrics/account_value.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, ...
+    semantic/metrics/cash_balance.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, ...
+    semantic/metrics/realised_pnl.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, ...
+    semantic/metrics/unrealised_pnl.yaml · expression: DECIMAL(38, 6) arrives as NUMERIC, ...
+
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+exit=0
+```
+
+So the type reading is reading the file rather than restating a constant. And the same
+corpus fails `check_semantic_layer.py`, because the expression no longer executes:
+
+```
+FAIL — 3 problem(s)
+  - the engine refused the query below — OutOfRangeException: Out of Range Error: Overflow in multiplication of DECIMAL(18) (1900000000 * 1258978124). You might want to add an explicit cast to a bigger decimal.
+      SELECT sum(fct_trade.quantity * fct_trade.execution_price * fct_fx_rate.fx_rate) FROM fct_trade JOIN dim_instrument ON ...
+  - Section C pair 'Traded Notional' / 'Trade Count': one side returned no figure above, so the pair could not be compared — a pair the corpus cannot compute is a distinction it cannot keep
+  - 'Traded Notional': the spike measured one expression and the Semantic Layer publishes another, so the GO recorded in validation-feasibility.md is about a statement this project no longer uses. ...
+exit=1
+```
+
+**Mutation 4 — the type probe's expectation is blunted to `clean`.** This is what
+stops the review comment being a check that does nothing: the readings are asserted
+against written-down statements on every run, so a type half that stopped seeing the
+widening cast fails here rather than going quiet.
+
+```
+FAIL — 1 problem(s)
+  - the type half of the dialect scan reads 'SELECT CAST(quantity AS DECIMAL(38, 6)) FROM fct_trade' as ('DECIMAL(38, 6)',) and it has to read it as clean — the scan cannot be trusted about the repository when it is wrong about SQL written to test it
+exit=1
+```
+
+**Every mutation reverted:**
+
+```
+$ cmp semantic/metrics/trade_count.yaml <pre-mutation copy>
+cmp trade_count.yaml: identical
+$ cmp semantic/metrics/traded_notional.yaml <pre-mutation copy>
+cmp traded_notional.yaml: identical
+$ cmp .claude/scripts/check_warehouse.py <pre-mutation copy>
+cmp check_warehouse.py: identical
+```
+
+**More than the plan asked for**
+
+**A false sentence was found and fixed in `check_semantic_layer.py`.** Two places
+said the widening cast is carried by *"four"* published expressions, and the run
+refuses **five**. The 4.2 review already recorded five — *"Read the widening-cast
+block: it is five metrics, not the one the Ledger predicted"* — so the docstring had
+been false since the corpus was written and nothing failed, which is exactly the
+failure mode the writing conventions were written for. Fixed the way the convention
+says rather than by changing the digit: the rule is stated (*every expression whose
+product overflows `DECIMAL(18)` carries the cast*) and the count is left to the run,
+which prints one line per expression. It is in this commit because this Sub-step's
+whole subject is that cast and leaving a known-false sentence beside it would be
+worse than the one-file widening.
+
+**`check_language.py` stopped being stdlib-only, and that is the cost of not
+remembering a keyword.** Writing this review made the run fail on four shouted tokens:
+`NULLS`, `LAST` and `STRING` are BigQuery's, and went into the list of *"vocabulary of
+query languages we do not write"* where `LIMIT` and `CTE` already sit. `CAST` did not
+belong there — this project writes it, in five Metric Definitions — and
+`warehouse_sql_keywords()` derives the keywords of hand-authored SQL for a reason it
+states outright: *"a list re-derived from one file is one file behind."* Step 004 gave
+the project a **second** body of hand-authored SQL, so `published_sql_keywords()`
+derives from it the same way. Reading the corpus means reading YAML, so the script now
+imports `veritas.semantic` and is no longer stdlib-only. No dependency was added —
+`pyyaml` has been declared since 4.1 — but the property stated in Current State
+changed, and it is updated rather than quietly left. The two cheaper routes were
+worse: listing `CAST` by hand is the remembered list that function argues against, and
+scanning the corpus files as raw text would exempt every shouted **domain value** in
+them, which is the one thing `warehouse_sql_keywords()` explicitly refuses to do.
+
+**Deliberately left undone**
+
+**No vacuity guard on the type reading finding something.** There is one on the
+corpus being read at all — `semantic/` publishing no SQL fails the run, the same
+bargain the existing guard makes for modules emitting no SQL — but nothing fails if
+the type reading comes back empty across the whole repository. That would be a guard
+against the corpus legitimately becoming portable, and the probes already fire the
+detector on every run. Mutation 4 is the evidence that the guard is not what makes it
+work.
+
+**No Ledger entry opened.** One was paid.
+
+**Look at this sceptically**
+
+1. **The `alone` trip is this project's own definition of "the same type in the other
+   engine's words", not sqlglot's.** `exp.DataType.build(...).sql(target)` is what
+   `retarget_schema` uses, so the comparison is consistent with how the spike
+   retargets a catalogue — but it is a choice. A different definition would draw the
+   line elsewhere, and the class it currently reads as portable is *any type sqlglot
+   spells differently but records identically*.
+2. **Types are paired by walk order, and a shift misattributes rather than hides.**
+   Retargeting rewrites a statement rather than reordering it, so the *n*th type at
+   home is the *n*th type away — until a trip erases one, or the target engine needs
+   one the source never wrote, and then every type past the gap pairs against its
+   neighbour. That case does not go quiet. `zip_longest` runs to the longer side, so
+   an unequal count always leaves a `None` in the tail, and a `None` reads as
+   *nothing at all* while the type's own trip never does: the statement always comes
+   back with at least one loss. What shifts is **which** construct gets named — home
+   `A, B, C` against away `A, C` blames `B` for arriving as `C`'s translation and
+   `C` for arriving as nothing at all, when `B` is what was erased. Both sentences
+   are wrong about the construct and right about the statement, which is what a
+   reader of a review comment has in front of them. The one reading that could hide
+   a loss is an erasure and an insertion inside the same statement, realigning the
+   counts. Today's run is the evidence that no statement here does any of this:
+   every review comment above names a real type on both sides and none says *nothing
+   at all*, so both directions remain reasoning about the instrument rather than a
+   measured case.
+3. **The review comment is the weaker ending, and it is the one the corpus's real
+   finding lands in.** Everything that is genuinely wrong here prints and passes. The
+   argument for that is above and rests on the engine refusing the uncast expressions;
+   if Amino wants the run to fail on a lossy type, the corpus cannot satisfy it and
+   the honest alternative is a declared exemption — which would be an exemption
+   claimable by a magic name, and the reason Non-Negotiable #4 exists.
+4. **The spike's `except (TracerRefused, sqlglot.errors.SqlglotError)` widened.**
+   `retarget` used to convert a transpiler refusal into `TracerRefused` at the point
+   of raising; now the two are caught together at the point of use. Claim 4's output
+   is unchanged, and the one statement that exercises this is the deliberately
+   unparseable probe.
+
+**Language**
+
+**No term added, proposed, or contested.** New identifiers in `check_warehouse.py` —
+`DIALECT`, `TARGET_DIALECT`, `DialectProbe`, `TypeLoss`, `retarget`, `round_trip`,
+`round_trip_rewrites`, `unportable_types`, `published_sql` — name what the code does
+rather than a domain concept, and four of them are moved rather than coined:
+`TARGET_DIALECT`, `retarget` and `round_trip_rewrites` are Sub-step 3.4's and `DIALECT`
+is Sub-step 3.2's (`89fee55`). `DIALECT_PROBES` keeps its name and gains two fields,
+`names` and `types`, which are the two halves of the scan the file already describes
+in those words. In `veritas/semantic/loader.py`, `SQL_FIELDS` and `sql_fields` name a
+property of the file format — which fields hold SQL — using the format's own field
+names; in `check_language.py`, `published_sql_keywords` is `warehouse_sql_keywords`'s
+name with the source swapped, which is what it is.
+
+Four shouted tokens became known to the abbreviation scan and the two routes are not
+the same. `NULLS`, `LAST` and `STRING` are **listed**, in the group for query
+languages this project does not write — they are BigQuery's, and they appear here only
+in prose about what the other engine says back. `CAST` is **derived**, from the corpus
+that writes it. Listing a keyword this project writes would have been the remembered
+list one Metric Definition behind.

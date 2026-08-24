@@ -42,10 +42,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The price table is sparse, so the Snapshot calendar has holes | M | The first "as of" date chosen by anything but the Snapshot calendar | open |
 | [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
 | [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate | open |
-| [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast | open |
+| [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast — **🔴 fired** | **paid** (Sub-step 4.3) |
 | [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query | open |
 
-**Open debt:** 10 · **Paid:** 3 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 9 · **Paid:** 4 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -687,10 +687,13 @@ tracks the library rather than someone's memory of DuckDB's manual. `sqlglot` wa
 promoted from a transitive dependency of dlt to a declared one in the same
 Sub-step, because a check that imports it is a direct dependant of it.
 
-**It was proved rather than asserted, twice over.** Three probes run on every run —
+**It was proved rather than asserted, twice over.** Three probes ran on every run —
 standard SQL comes back clean, `strftime` is named as DuckDB's, `list_aggregate` is
 named as one sqlglot knows nowhere — and the run fails if any probe reads wrong, so
-the scan cannot quietly lose its teeth. On top of that, both real modules were
+the scan cannot quietly lose its teeth. (**Five since 2026-08-23**, each recording
+what both readings of the scan must say about it, when
+[DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
+was paid and the scan gained a second reading. What this entry paid is unchanged.) On top of that, both real modules were
 mutated with a dialect name and the run was made to fail on each, then restored and
 compared byte-for-byte. Output in the
 [Step Review](reviews/step-002-warehouse-and-ingestion.md#sub-step-26--scan-for-duckdb-specific-function-names-outside-the-adapter).
@@ -1114,7 +1117,8 @@ is unchanged and now covers both halves.
 
 ### DEBT-015 — The dialect scan names functions, and the loss measured was in a cast
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 4.3, 2026-08-23, under the trigger that fired in
+  Sub-step 4.2
 - **Opened:** Sub-step 3.5 (`.claude/docs/reviews/step-003-validation-feasibility.md`)
 - **Size:** S
 - **Location:** `.claude/scripts/check_warehouse.py` — `unportable_functions`, read
@@ -1198,6 +1202,39 @@ The **repayment does not change** — it is the same name list plus round-trip
 comparison, and a scan that reads types finds all of them at once. What changes is the
 cost sentence above: the construct nothing looks at is not one expression's, it is
 most of the corpus's.
+
+**Paid 2026-08-23, in Sub-step 4.3.** Both halves of the repayment shipped, and the
+[Sub-step 4.3 review](reviews/step-004-semantic-layer.md#sub-step-43--pay-debt-015-the-dialect-scan-reads-type-constructs)
+carries the run, what it names, and the four mutations that show it has teeth.
+
+- `check_seam` reads **every SQL field the Semantic Layer publishes** — a Metric
+  Definition's expression and its certified filters, a Join Path's condition — as
+  well as the SQL a module emits. That is what makes ADR-0002's mitigation, which is
+  written about *a Metric Definition*, a sentence a run can perform.
+- It reads all of it **twice**. The name list is unchanged. The type reading
+  retargets each statement to BigQuery and compares each type construct against the
+  same type retargeted **on its own** — the trip `retarget_schema` makes for every
+  column in the catalogue. `DECIMAL(38, 6)` arrives inside a statement as `NUMERIC`
+  and on its own as `NUMERIC(38, 6)`, so the statement's trip lost what the type's
+  did not; `VARCHAR` arriving as `STRING` is the same type in the other engine's
+  words and is not a finding.
+- `retarget` and `round_trip_rewrites` **moved** from `check_validation_feasibility.py`
+  into `check_warehouse.py`, and the spike imports them back. The instrument this
+  entry pointed at is now the scan's own, so the dated measurement and the check that
+  runs on every commit cannot drift apart.
+- ADR-0002's mitigation says **construct** where it said *function*, with a dated
+  [status note](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#status-note-2026-08-23--the-mitigation-now-says-construct-and-a-run-performs-it)
+  and no change of status.
+
+**What paying it did not buy, stated because the entry's cost sentence turns on it.**
+A lossy type prints as a **review comment** and does not fail the run, where a
+DuckDB-only function name does. The corpus carries a lossy type it cannot do without —
+the engine refuses the uncast expressions, which `check_semantic_layer.py` shows on
+every run — so a check that failed on it could only be satisfied by publishing an
+expression that does not execute. What stops that being a check that does nothing is
+`DIALECT_PROBES`: both readings are asserted against written-down statements on every
+run, and the review's fourth mutation is that assertion failing when the type reading
+is blunted.
 
 **Debt rather than an extension, and the argument is on the record.** The Ledger's own
 test is whether the trigger fires inside this project's life, and this one fires in

@@ -183,6 +183,18 @@ ENTRY_KINDS: dict[str, tuple[str, type[SemanticEntry]]] = {
 # place, next to the dataclasses that declare them.
 STRING_LISTS = frozenset({"aliases", "derives_from", "join_paths", "filters"})
 
+# Fields whose value is SQL — text pasted into a query and therefore text that
+# reaches the engine. Here rather than in whatever happens to need it, for the
+# reason the dataclasses above are the file format: a reader that decides for
+# itself which fields hold SQL is a second copy of the format, and the two go on
+# disagreeing after one of them is updated. Two readers already ask —
+# `check_warehouse.py`'s dialect scan and `check_language.py`'s keyword
+# derivation — and the Orchestrator that assembles a query will be the third.
+SQL_FIELDS: dict[type[SemanticEntry], tuple[str, ...]] = {
+    MetricDefinition: ("expression", "filters"),
+    JoinPath: ("on",),
+}
+
 
 @dataclass(frozen=True)
 class SemanticLayer:
@@ -311,6 +323,31 @@ def load_semantic_layer(root: Path = SEMANTIC_DIR) -> SemanticLayer:
                 join_paths[entry.name] = entry
 
     return SemanticLayer(metrics=metrics, join_paths=join_paths)
+
+
+def sql_fields(entry: SemanticEntry) -> list[tuple[str, str]]:
+    """Every piece of SQL one entry publishes, as (which field, the SQL).
+
+    The label is the field name, and the certified filters are numbered from one
+    because a Metric Definition may carry several and *which* one a reader is being
+    told about is the whole use of the label.
+
+    An entry type absent from `SQL_FIELDS` publishes no SQL and returns nothing,
+    which is how Ambiguous Terms and Dimension Definitions will arrive: an Ambiguous
+    Term names Certified Metrics and a Dimension Definition names columns and
+    values, and neither is text a query pastes.
+    """
+    published: list[tuple[str, str]] = []
+    for field in SQL_FIELDS.get(type(entry), ()):
+        value = getattr(entry, field)
+        if isinstance(value, str):
+            published.append((field, value))
+            continue
+        published.extend(
+            (f"{field.removesuffix('s')} {position}", sql)
+            for position, sql in enumerate(value, start=1)
+        )
+    return published
 
 
 def _here(path: Path) -> str:
