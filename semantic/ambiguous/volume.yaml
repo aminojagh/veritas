@@ -1,0 +1,15 @@
+# Section C registers Traded Notional against Trade Count as a distinction we must
+# not blur; this is the word that blurs it.
+name: volume
+version: 1
+kind: ambiguous_term
+description: >
+  Traded Notional is how much money changed hands; Trade Count is how many Trades
+  there were. The Glossary's own words for why the difference matters: "one large
+  trade and a thousand small ones are opposite answers to 'was this a busy
+  month'". They are not even the same unit, so no downstream check catches the
+  substitution either.
+disambiguates: [Traded Notional, Trade Count]
+resolution: >
+  Ask. Neither is the default: "volume" means notional to a trading desk and count
+  to an operations team, and Veritas serves both.

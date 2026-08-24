@@ -167,21 +167,61 @@ class JoinPath(SemanticEntry):
     on: str
 
 
+@dataclass(frozen=True)
+class AmbiguousTerm(SemanticEntry):
+    """A word users genuinely say that resolves to more than one Certified Metric.
+
+    [Glossary Section D](../../.claude/docs/glossary.md#d-ambiguous-terms) is the
+    registry of these — *"words users genuinely say that are **not** metrics"*,
+    which Veritas *"must resolve ... before generating SQL — never guess silently"*.
+    This entry type is that sentence made retrievable, and it is the one
+    [ADR-0001](../../.claude/docs/adr/0001-semantic-layer-as-the-retrieval-corpus.md)
+    rejected schema retrieval over: a table listing cannot represent *"the one fact
+    that matters: that 'revenue' has two certified meanings"*.
+
+      `disambiguates` the Certified Metrics the word could mean, by `name` — the
+                      field [EXT-005](../../.claude/docs/extension-register.md#ext-005--semantic-layer-coherence-checks)
+                      chose for this edge. Two or more, because a word with one
+                      meaning is not ambiguous.
+      `resolution`    what Veritas does about it, from Section D's own third
+                      column. Four of the five rows say *"Ask"* and one says
+                      *"Ask, unless the question names one"*, and the difference is
+                      a rule the Orchestrator acts on rather than a note.
+
+    **It publishes no SQL, and that is the point.** An Ambiguous Term is a claim
+    about *language* — it can be wrong while every expression in the corpus is
+    right, and its fix is in the Glossary rather than in a query. `SQL_FIELDS` below
+    therefore has no row for it, and the two readers that ask get nothing back.
+
+    There is no `aliases` field, and that is a deferral rather than an omission —
+    see the Sub-step 4.4 review.
+    """
+
+    description: str
+    disambiguates: tuple[str, ...]
+    resolution: str
+
+
 # Directory -> the `kind` files in it must declare, and the type they load as. The
 # directory names are Glossary Section A's own homes: `semantic/metrics/`,
-# `semantic/joins/`. `semantic/ambiguous/` and `semantic/dimensions/` are the two
-# remaining entry types and are absent on purpose — a file in a directory this
-# mapping does not know fails to load rather than being skipped, so the Sub-step
-# that writes the first Ambiguous Term has to come here and say so.
+# `semantic/joins/`, `semantic/ambiguous/`. This mapping is deliberately not a scan
+# of the tree — a file in a directory it does not know fails to load rather than
+# being skipped, which is why Sub-step 4.4 had to come here and add its row rather
+# than dropping five files into a new directory and having them silently ignored.
+# `semantic/dimensions/` is the one remaining entry type and stays absent on the
+# same terms, so Sub-step 4.5 comes here too.
 ENTRY_KINDS: dict[str, tuple[str, type[SemanticEntry]]] = {
     "metrics": ("metric", MetricDefinition),
     "joins": ("join_path", JoinPath),
+    "ambiguous": ("ambiguous_term", AmbiguousTerm),
 }
 
 # Fields whose value is a list of strings rather than one string. Read off the
-# annotation would be tidier and is not worth the reflection: four names, in one
+# annotation would be tidier and is not worth the reflection: five names, in one
 # place, next to the dataclasses that declare them.
-STRING_LISTS = frozenset({"aliases", "derives_from", "join_paths", "filters"})
+STRING_LISTS = frozenset({
+    "aliases", "derives_from", "join_paths", "filters", "disambiguates"
+})
 
 # Fields whose value is SQL — text pasted into a query and therefore text that
 # reaches the engine. Here rather than in whatever happens to need it, for the
@@ -200,22 +240,33 @@ SQL_FIELDS: dict[type[SemanticEntry], tuple[str, ...]] = {
 class SemanticLayer:
     """The certified registry, loaded.
 
-    Two of the four entry types are here. Dimension Definitions and Ambiguous Terms
-    are Sub-steps 4.4 and 4.5, and this class gains a mapping each time — which is
-    an addition rather than a change, because nothing keys off the absence.
+    Three of the four entry types are here. Dimension Definitions are Sub-step 4.5,
+    and this class gains a mapping each time — which is an addition rather than a
+    change, because nothing keys off the absence. Sub-step 4.4 adding
+    `ambiguous_terms` is that prediction holding: no existing field moved and no
+    caller of the other two noticed.
 
     Entries are held by their `name` and not by their filename, because `name` is
     what every reference in the corpus uses: a Metric Definition names its Join Path
-    by name, and an Ambiguous Term will name the Certified Metrics it disambiguates
-    between the same way.
+    by name, and an Ambiguous Term names the Certified Metrics it disambiguates
+    between the same way. One `name` may be claimed once across the **whole** tree
+    rather than once per kind, which is what makes an Ambiguous Term named after a
+    Certified Metric fail to load — Section D's words are *"words users genuinely
+    say that are **not** metrics"*, and the corpus enforces that by construction
+    instead of by a check.
     """
 
     metrics: dict[str, MetricDefinition]
     join_paths: dict[str, JoinPath]
+    ambiguous_terms: dict[str, AmbiguousTerm]
 
     def entries(self) -> list[SemanticEntry]:
         """Every entry, whatever its kind, in the order the files were read."""
-        return [*self.metrics.values(), *self.join_paths.values()]
+        return [
+            *self.metrics.values(),
+            *self.join_paths.values(),
+            *self.ambiguous_terms.values(),
+        ]
 
 
 def entry_files(root: Path = SEMANTIC_DIR) -> list[Path]:
@@ -301,10 +352,14 @@ def load_semantic_layer(root: Path = SEMANTIC_DIR) -> SemanticLayer:
     that exist. Those are claims about the corpus rather than about a file, they are
     what `.claude/scripts/check_semantic_layer.py` is for, and one of them is
     [EXT-005](../../.claude/docs/extension-register.md#ext-005--semantic-layer-coherence-checks)'s
-    fourth rule.
+    fourth rule, built in Sub-step 4.4.
+
+    The one cross-entry rule that *is* here is name uniqueness, because it is what
+    makes `name` usable as the key of the three mappings below at all.
     """
     metrics: dict[str, MetricDefinition] = {}
     join_paths: dict[str, JoinPath] = {}
+    ambiguous_terms: dict[str, AmbiguousTerm] = {}
     seen: dict[str, Path] = {}
 
     for path in entry_files(root):
@@ -321,8 +376,12 @@ def load_semantic_layer(root: Path = SEMANTIC_DIR) -> SemanticLayer:
                 metrics[entry.name] = entry
             case JoinPath():
                 join_paths[entry.name] = entry
+            case AmbiguousTerm():
+                ambiguous_terms[entry.name] = entry
 
-    return SemanticLayer(metrics=metrics, join_paths=join_paths)
+    return SemanticLayer(
+        metrics=metrics, join_paths=join_paths, ambiguous_terms=ambiguous_terms
+    )
 
 
 def sql_fields(entry: SemanticEntry) -> list[tuple[str, str]]:
@@ -332,10 +391,11 @@ def sql_fields(entry: SemanticEntry) -> list[tuple[str, str]]:
     because a Metric Definition may carry several and *which* one a reader is being
     told about is the whole use of the label.
 
-    An entry type absent from `SQL_FIELDS` publishes no SQL and returns nothing,
-    which is how Ambiguous Terms and Dimension Definitions will arrive: an Ambiguous
-    Term names Certified Metrics and a Dimension Definition names columns and
-    values, and neither is text a query pastes.
+    An entry type absent from `SQL_FIELDS` publishes no SQL and returns nothing.
+    That is how Ambiguous Terms arrived in Sub-step 4.4 — one names Certified
+    Metrics, which is a claim about language rather than text a query pastes — and
+    it is why adding the type cost the two readers nothing: they ask this function
+    and get an empty list. Dimension Definitions arrive on the same terms.
     """
     published: list[tuple[str, str]] = []
     for field in SQL_FIELDS.get(type(entry), ()):
@@ -379,10 +439,10 @@ def _text(path: Path, key: str, value: object) -> object:
 def _strings(path: Path, key: str, value: object) -> tuple[str, ...]:
     """One list-valued field, as a tuple so a loaded entry stays frozen.
 
-    Two of the four hold names — `join_paths`, `derives_from` — and two hold text a
-    person wrote, `aliases` and `filters`. Whether the names resolve to entries that
-    exist is a claim about the corpus rather than about this file, and is checked
-    where the other cross-entry claims are.
+    Three of the five hold names — `join_paths`, `derives_from`, `disambiguates` —
+    and two hold text a person wrote, `aliases` and `filters`. Whether the names
+    resolve to entries that exist is a claim about the corpus rather than about this
+    file, and is checked where the other cross-entry claims are.
     """
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise SemanticEntryError(

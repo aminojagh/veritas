@@ -1,0 +1,14 @@
+# Cash Balance became a Certified Metric under R1 of the Step 004 plan, ruled
+# 2026-08-21 — before this file could name it, which is why R1 was ruled first.
+name: balance
+version: 1
+kind: ambiguous_term
+description: >
+  Cash Balance is uninvested cash only; Account Value is that cash plus every
+  Position marked to market. On a funded Account holding Instruments the two are
+  different by the entire portfolio, and a client asking "what is my balance"
+  means the second at least as often as the first.
+disambiguates: [Cash Balance, Account Value]
+resolution: >
+  Ask. "Cash balance" names the first, but "balance" alone does not, and the
+  larger of the two answers is the one a wrong guess understates.

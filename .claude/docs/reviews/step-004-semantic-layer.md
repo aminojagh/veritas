@@ -1052,6 +1052,11 @@ starts at 'dim_instrument'"*, which contradicts itself in the one line a reader 
 trust. [R9.3](../plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23) argues it at length. If the other reading was meant, it is one more
 rename and one `from_table` field.
 
+> **Ruled 2026-08-24 — closed, and nothing follows from it:** *"what you did was right.
+> it's ok now … close the question."* `instrument_to_fx_rate_on_quotation_currency` is
+> the decided name, so no file is renamed and no `from_table` field changes. Recorded as
+> [R10.0](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24).
+
 Second, **the rename does not reach the third FX route.**
 `instrument_to_fx_rate_on_snapshot_date` converts the Quotation Currency too, so
 `semantic/joins/` now names three FX routes on two axes: the Trade-date pair by currency,
@@ -1499,3 +1504,383 @@ languages this project does not write — they are BigQuery's, and they appear h
 in prose about what the other engine says back. `CAST` is **derived**, from the corpus
 that writes it. Listing a keyword this project writes would have been the remembered
 list one Metric Definition behind.
+
+---
+
+## Sub-step 4.4 — Write the Ambiguous Terms
+
+**What changed**
+
+**The project's central claim is now a file rather than a sentence.**
+[ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md) rejected schema
+retrieval because *"it cannot represent the one fact that matters: that 'revenue' has
+two certified meanings"*. `semantic/ambiguous/` represents it — five entries, one per
+row of [Glossary Section D](../glossary.md#d-ambiguous-terms) — and
+`check_semantic_layer.py` says the representation is true.
+
+Four things, in the order they were written:
+
+1. **`veritas/semantic/loader.py` gained the third entry type.** `AmbiguousTerm`
+   carries `description`, `disambiguates` and `resolution` past the three fields every
+   entry has. `ENTRY_KINDS` gained its row — which is the thing that had to happen
+   *first*, because the comment there said `semantic/ambiguous/` was *"absent on
+   purpose — a file in a directory this mapping does not know fails to load rather
+   than being skipped, so the Sub-step that writes the first Ambiguous Term has to
+   come here and say so."* That prediction was load-bearing in both directions: five
+   files dropped into an unregistered directory would have failed the run, and
+   `check_language.py` — which reads every entry to derive the shouted SQL keywords —
+   would have failed with them.
+2. **The five entries.** `revenue`, `volume`, `balance`, `P&L` and
+   `how much does X have`, each naming the Certified Metrics it disambiguates between
+   through `disambiguates`, the field
+   [EXT-005](../extension-register.md#ext-005--semantic-layer-coherence-checks) chose.
+   `semantic/metrics/` and `semantic/joins/` were **not touched** — `git status` on
+   both is empty.
+3. **Three checks, numbered 12 to 14.** They are the only ones in the file that
+   execute nothing, which is the 4.3/4.4 split the plan predicted: *"an Ambiguous Term
+   is a claim about **language** … it can be wrong while every expression is right."*
+   Check 12 is EXT-005's fourth rule; check 13 is check 2 pointed at Section D; check
+   14 is the `aliases` decision Sub-step 4.2 took and nothing enforced.
+4. **One Glossary amendment, which the check found on its first run** — below.
+
+**The Glossary was wrong, and check 13 is what said so.** Section D's "P&L" row read
+`Realised · Unrealised · both`. Section B registers `Realised P&L` and
+`Unrealised P&L`, so the row spelled *neither* of its own two meanings as registered —
+the near-collision `registering-language` exists to catch, sitting in the Glossary
+itself. It had been resolvable by a reader and by nothing else since Section D was
+written. The row now reads `Realised P&L · Unrealised P&L · both`, with a dated
+amendment note beneath the table. **This is the change in this Sub-step most worth
+rejecting if Amino disagrees**, and it is one line plus a note to revert.
+
+`both` stays as written. It is a third *answer* — either metric, or the two reported
+separately — and not a third Certified Metric, since no file publishes a summed P&L.
+The check therefore cannot resolve it, and **prints it rather than ignoring it**:
+
+```
+    'P&L' → Realised P&L · Unrealised P&L
+        Section D also says ['both'] — not Certified Metrics, and left as prose
+```
+
+A check that silently dropped whatever it could not resolve would drop a misspelled
+metric name exactly as quietly, which is how the row got into this state.
+
+**Verification**
+
+```bash
+uv run python .claude/scripts/check_semantic_layer.py
+```
+
+The new block, and the run's last line (the nine metric reports between them are
+unchanged from 4.3 and elided here):
+
+```
+  Semantic Layer: semantic/ — 9 Metric Definition(s), 8 Join Path(s), 5 Ambiguous Term(s)
+  Glossary Section B names 9 terms living in semantic/metrics/
+
+  ambiguous terms — the words Section D says must be asked about
+    Glossary Section D registers 5 term(s); semantic/ambiguous/ publishes 5
+    'balance' → Cash Balance · Account Value
+    'how much does X have' → Cash Balance · Account Value
+    'P&L' → Realised P&L · Unrealised P&L
+        Section D also says ['both'] — not Certified Metrics, and left as prose
+    'revenue' → Gross Revenue · Net Revenue
+    'volume' → Traded Notional · Trade Count
+    aliases: 27 across 9 metrics · 0 claimed by two metrics · 0 that are a registered Ambiguous Term
+    probes — run against 'balance', which is a real entry
+      refuses  a meaning no file publishes: ['Cash Balance', 'Gross Margin']
+      refuses  one meaning, which is not an ambiguity: ['Cash Balance']
+      refuses  the same meaning twice: ['Cash Balance', 'Cash Balance']
+  Warehouse: data/veritas.duckdb
+
+[... the nine Metric Definition reports, the Section C pairs, the widening casts,
+     the parse rule and the spike pin, all unchanged ...]
+
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, and every registered ambiguity resolves to metrics that exist
+exit=0
+```
+
+The other four committed checks were run on the same tree and pass unchanged:
+
+```
+$ uv run python .claude/scripts/check_language.py                → exit=0
+$ uv run python .claude/scripts/verify_framework.py              → exit=0
+$ uv run python .claude/scripts/check_warehouse.py               → exit=0
+$ uv run python .claude/scripts/check_validation_feasibility.py  → exit=0
+```
+
+`check_language.py` and `check_warehouse.py` both read every file under `semantic/`
+through `read_entry` and ask `sql_fields` what SQL it publishes. An Ambiguous Term
+publishes none, so both got an empty list and neither needed a line changed — which
+is the `SQL_FIELDS` seam from 4.3 doing what it was built for, one Sub-step later.
+
+**The checks were made to have teeth, by six mutations**
+
+Each was applied, run, and reverted, and every file was compared with `cmp` against
+its pre-mutation copy afterwards — output at the end. Mutation 1 is the one
+[the plan names](../plan/step-004-semantic-layer.md#44--write-the-ambiguous-terms);
+the other five are one per rule this Sub-step added, because a rule with no failing
+run behind it is a rule nobody has seen work. **The sixth found a defect in the check
+itself**, which is what a mutation is for.
+
+**Mutation 1 — an Ambiguous Term points at a metric that does not exist.**
+`revenue.yaml`'s `disambiguates` becomes `[Gross Revenue, Gross Margin]`. This is
+EXT-005's fourth rule, and the run names it three ways because the mutation is three
+mistakes at once — it breaks the rule, and it makes the entry disagree with Section D
+in both directions:
+
+```
+FAIL — 3 problem(s)
+  - Ambiguous Term 'revenue' disambiguates to ['Gross Margin'], which no file under semantic/metrics/ publishes — so Veritas would ask the user to choose a meaning it cannot then compute
+  - Glossary Section D says 'revenue' could mean ['Net Revenue'], and the entry does not name them — the Glossary and the corpus disagree about what the word means
+  - Ambiguous Term 'revenue' names ['Gross Margin'], which Glossary Section D's 'Could mean' cell does not — a meaning certified in the corpus and registered nowhere
+exit=1
+```
+
+**Mutation 2 — a registered Ambiguous Term claimed as a metric alias.**
+`cash_balance.yaml`'s `aliases` becomes `["cash", "balance", "uninvested cash"]`. This
+is the decision Sub-step 4.2 took and could not enforce:
+
+```
+FAIL — 1 problem(s)
+  - Certified Metric(s) ['Cash Balance'] claim 'balance' as an alias, and 'balance' is a registered Ambiguous Term — Section D says that word must be asked about, and an alias is exactly what resolves it silently instead
+exit=1
+```
+
+**Mutation 3 — one alias claimed by two metrics, registered nowhere.**
+`trade_count.yaml` claims `"turnover"`, which `traded_notional.yaml` already claims.
+This is Section D's own failure happening *outside* Section D, where nothing can ask
+the user about it:
+
+```
+FAIL — 1 problem(s)
+  - ['Trade Count', 'Traded Notional'] both claim the alias 'turnover' — an ambiguity nobody registered. Either register the word in Glossary Section D and drop it from both metrics, or narrow one of the two aliases
+exit=1
+```
+
+**Mutation 4 — the entry and the Glossary disagree about what a word means.**
+`volume.yaml`'s `disambiguates` becomes `[Traded Notional, Gross Revenue]`. Every name
+in it exists, so check 12 is satisfied and only check 13 fires — which is the point of
+having both:
+
+```
+FAIL — 2 problem(s)
+  - Glossary Section D says 'volume' could mean ['Trade Count'], and the entry does not name them — the Glossary and the corpus disagree about what the word means
+  - Ambiguous Term 'volume' names ['Gross Revenue'], which Glossary Section D's 'Could mean' cell does not — a meaning certified in the corpus and registered nowhere
+exit=1
+```
+
+**Mutation 5 — a Section D row with no entry to retrieve.** `volume.yaml` is removed
+from the tree. This is the direction Sub-step 4.2 set as its own bar, applied to
+Section D:
+
+```
+FAIL — 1 problem(s)
+  - Glossary Section D registers ['volume'] and no file under semantic/ambiguous/ publishes them — an ambiguity the corpus cannot retrieve is one Veritas resolves by guessing
+exit=1
+```
+
+**Mutation 6 — an entry that names no meaning at all. This one found a defect in the
+check rather than in the corpus.** `balance.yaml`'s `disambiguates` becomes `[]`.
+Check 12 reports it correctly, but the run then **crashed** building a probe out of
+that entry — `first, *_ = term.disambiguates` on an empty tuple — so a named problem
+came back as a traceback, which is the exact thing check 1 exists to prevent:
+*"this script's job is to turn a refusal into a named problem instead of a
+traceback."* The fix is that the probe is built from the first entry that names at
+least one meaning rather than simply the first. After it:
+
+```
+FAIL — 2 problem(s)
+  - Ambiguous Term 'balance' disambiguates between [] — a word with fewer than two meanings is not ambiguous, and registering it stops Veritas to ask a question that has one answer
+  - Glossary Section D says 'balance' could mean ['Account Value', 'Cash Balance'], and the entry does not name them — the Glossary and the corpus disagree about what the word means
+exit=1
+```
+
+**Every mutation reverted:**
+
+```
+$ cmp semantic/ambiguous/balance.yaml <pre-mutation copy>
+cmp balance.yaml: identical
+$ cmp semantic/ambiguous/revenue.yaml <pre-mutation copy>
+cmp revenue.yaml: identical
+$ cmp semantic/ambiguous/volume.yaml <pre-mutation copy>
+cmp volume.yaml: identical
+$ cmp semantic/metrics/cash_balance.yaml <pre-mutation copy>
+cmp cash_balance.yaml: identical
+$ cmp semantic/metrics/trade_count.yaml <pre-mutation copy>
+cmp trade_count.yaml: identical
+$ git status --short semantic/metrics/ semantic/joins/
+(no output)
+```
+
+Check 12 also carries three probes that run on **every** run, not only under mutation
+— the pattern check 6 established, for its reason: *"a rule that has only ever seen
+valid input reads the same whether it works or does nothing."* They are built from the
+entry under test rather than written as literals, so they keep working when the corpus
+is edited. `Gross Margin` is the one literal, and it is one deliberately: it has to be
+a name no file publishes, and it reads exactly like a metric this project might have.
+
+**Deliberately left undone**
+
+- **No new Debt Ledger entry, and the open count stays 9.** The two candidates were
+  weighed and neither is debt under `CLAUDE.md`'s test, which asks whether the current
+  code is *wrong, cheaply*:
+- **`resolution` is unvalidated free text**, and nothing reads it. It joins
+  `description`, `grain`, `unit` and `aliases`, which the
+  [4.1 review](#sub-step-41--publish-the-semantic-entry-format-on-one-metric-definition)
+  recorded in the same words and did not put on the Ledger: *"they are what Retrieval
+  will match on, and this Step builds no Retrieval. The claim made today is that they
+  are carried, not that they are right."* Section D's own Resolution column is prose
+  too, so a structured field here would be the corpus saying something the Glossary
+  does not.
+- **An Ambiguous Term carries no `aliases` field.** Section D registers five words and
+  the corpus publishes those five; a sixth phrasing would be content the Glossary does
+  not have. See the second sceptical point — this is a question handed to the
+  Retrieval Step, and the reasoning for why it is neither debt nor an extension is
+  there.
+- **The other three EXT-005 rules.** Synonym detection, undeclared derivation and
+  orphaned dependencies stay extensions, as
+  [the plan's scope boundary](../plan/step-004-semantic-layer.md#not-in-this-step)
+  says: *"4.4 takes one of EXT-005's four rules because it is a single loop."* The
+  register's own Readiness is *"around 50 entries"* and this corpus is twenty-two.
+- **Dimension Definitions**, which are Sub-step 4.5. `ENTRY_KINDS` still refuses
+  `semantic/dimensions/` on the same terms it refused `semantic/ambiguous/`, and the
+  comment there now says so in the second person: 4.5 comes here too.
+
+**Look at this sceptically**
+
+**1. The Glossary amendment is the change to reject first.** Section D's "P&L" row was
+edited to spell `Realised P&L · Unrealised P&L` where it said `Realised · Unrealised`,
+because check 13 reads that column and could resolve neither. Two things a reviewer
+could reasonably say against it. First, **the check was written and then the Glossary
+was bent to fit it** — the ordering is real, and the defence is that the row was
+already wrong by Non-Negotiable #1's own rule (*"use it, spelled exactly as
+registered"*) and the check is what made a standing violation visible rather than what
+created it. Second, **a Glossary edit is Amino's call**, and `registering-language`
+says a Term Proposal is raised and *waited on*. This was treated as the skill's other
+branch — *"when you notice a collision, flag it and resolve it in that Sub-step"* —
+because no new word is admitted and no agreed term is renamed: two registered terms
+are spelled in full where they had been abbreviated. If that reading is wrong, the
+revert is one row and one note, and check 13's Glossary half then has to be dropped or
+narrowed.
+
+> **Ruled 2026-08-24 — the amendment stands:** *"it's fine."* Section D's "P&L" row keeps
+> `Realised P&L · Unrealised P&L · both`, so check 13 keeps both halves and the row is
+> agreed rather than provisional. [R10.1](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24).
+
+**2. Nothing stops Retrieval resolving an Ambiguous Term silently by matching a metric
+alias, and this Sub-step does not fix it.** `Unrealised P&L` claims the alias
+*"paper profit and loss"* and `Realised P&L` claims *"booked profit and loss"*. A user
+who types **"profit and loss"** matches neither Ambiguous Term by name — the entry is
+called `P&L` — and is a short hop from either metric. That is the exact failure Section
+D exists to prevent, arriving through the door check 14 does not cover, because check
+14 compares whole strings and this is a partial match.
+
+**It is filed as neither debt nor an extension, and that is a judgement worth
+contesting.** Not debt, because nothing in the corpus is *wrong*: the five entries are
+the five registered words, and inventing a sixth phrasing today would be the corpus
+asserting language the Glossary has not agreed. Not an extension, because
+`CLAUDE.md`'s test is *"does the trigger fire inside this project's life?"* and it
+does — Retrieval is the fourth of nine components. So it is the third thing:
+**a named question the Retrieval Step inherits**, in the shape
+[R9's second ruling](../plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23)
+gave the `Position Change` expression — *"a named place to look first, not an open
+defect"*. The two candidate fixes are an `aliases` field on the entry, or a Retrieval
+rule that an Ambiguous Term outranks a metric it disambiguates to; choosing between
+them without Retrieval to measure is the speculation `CLAUDE.md` forbids. **If Amino
+wants it on a register rather than in a review, the Ledger is the right one** — the
+review is read once and Step 005 is unplanned.
+
+> **Ruled 2026-08-24 — a named question, not a register entry:** *"it's correct to
+> register it as a named question for the retrieval component, same as [R9's second
+> ruling] added to validation gate."* It takes R9.2's shape exactly — a named place to
+> look first — and it is carried in the plan as [R10.2](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24) rather than in this
+> review, because a review is read once and Step 005 is unplanned.
+
+**3. Check 13 reads a Markdown table cell, and its unresolvable half is a printed
+comment rather than a failure.** `both` is legitimately not a metric, so the check
+cannot demand that every `·`-separated part resolve. What it demands instead is
+narrower: every part that *is* a registered Certified Metric must be in the entry, and
+every metric in the entry must be a part. A **misspelled** metric name in that cell
+resolves to nothing, so it lands in the printed prose list beside `both` and does not
+fail the run — and the likely misspelling is not a typo but the American spelling,
+`Realized P&L`, which `realised_pnl.yaml` already carries as an alias precisely
+because people write it. That is the same shape as 4.3's review comments and
+carries the same weakness: it is only caught by a person reading the output. The
+alternative was an ignore-list naming `both`, which is a hole any later row could walk
+through, and `CLAUDE.md` is explicit that an exemption claimable by writing a magic
+name is worse than the cost it removes. The mitigation is that the list is short and
+printed on every run.
+
+> **Ruled 2026-08-24 — accepted with its cost:** *"fine for now."* The unresolvable half
+> stays a printed comment, the ignore-list stays rejected, and a misspelled metric name in
+> a "Could mean" cell is still caught only by a person reading the output.
+> [R10.3](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24).
+
+**4. `certified_metric_terms()` is now read once and passed to two checks, which
+changed a signature.** `check_entries` takes the Section B set instead of reading it.
+The reason is real — check 13 needs the same set to tell which words in a "Could mean"
+cell are metrics, and reading the Glossary twice would report a missing Section B
+twice for one cause — but it does mean check 13's verdict now depends on Section B
+parsing correctly, which is check 2's territory. On a run where Section B cannot be
+found, both report, and check 13's report is the less useful of the two.
+
+> **Ruled 2026-08-24 — accepted:** *"fine."* The set is read once and passed to two
+> checks, and the duplicate report on a missing Section B is the accepted price.
+> [R10.4](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24).
+
+**5. The five entries' `description` fields are the strongest prose in the corpus and
+nothing checks a word of them.** They are what Retrieval will embed, and they were
+written to argue *why* each ambiguity is dangerous rather than to restate the pair —
+`"one large trade and a thousand small ones are opposite answers to 'was this a busy
+month'"` is quoted from Section C, and `balance`'s description says the wrong guess
+*understates* by the whole portfolio. If they are good, that is authorship and not
+verification; if they are wrong, the run stays green.
+
+> **Ruled 2026-08-24 — improved where they can be measured, not here:** Amino ruled that
+> improving them belongs *"where we can actually measure the retrieval performance."* The
+> finding stands as written and the five entries stay as authored; the rewrite is the
+> **second named question the Retrieval Step inherits**, because prose written to be
+> embedded is tuned against a retrieval measurement or not at all. [R10.5](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24).
+
+**Language**
+
+**No term added or contested. One flagged, and one Glossary row amended.**
+
+**Flagged — `resolution` is a field name with no Glossary row.** It is Section D's own
+third column header, which is the strongest pedigree short of a registered term, and
+it names what Veritas does about the word rather than a quantity in the domain — so
+getting it wrong does not produce a correct program computing the wrong thing, which
+is `registering-language`'s test. It is raised here rather than assumed settled: if
+Amino wants it registered, it is a row in Section A beside `Ambiguous Term`.
+**Still open at 2026-08-24**, when the five sceptical points above and R9.3's prefix
+question were ruled — it is the one thing this Sub-step still owes an answer on, and it
+blocks nothing: no file changes either way, and 4.5 adds no field by this name.
+
+**Amended — Glossary Section D's "P&L" row**, `Realised · Unrealised` →
+`Realised P&L · Unrealised P&L`, with a dated note beneath the table. Sceptical point
+1 is the argument.
+
+Everything else is a registered term or a plain description of code. `AmbiguousTerm`,
+`ambiguous_terms` and the `semantic/ambiguous/` directory are the Section A term
+`Ambiguous Term` in the three casings the code needs, and the directory is now
+**checked** against Section A's *Lives in* cell rather than merely matching it —
+`ambiguous_term_home()` reads the row, and check 13 fails if the loader reads a
+different directory. `disambiguates` is EXT-005's own field name, quoted in that
+entry's *"typed relationships declared in the existing YAML — `derives_from`,
+`disambiguates`"*. `disambiguation_problem` is `route_problem`'s name with the subject
+swapped, which is what it is; `ambiguity_probes`, `check_alias_collisions`,
+`USER_SAYS_COLUMN`, `COULD_MEAN_COLUMN`, `COULD_MEAN_SEPARATOR` and
+`UNREGISTERED_METRIC` name what the code does. `COULD_MEAN_SEPARATOR` is the
+Glossary's own `·`, which is why check 13 can read that column at all instead of
+taking the entry's word for it.
+
+**No new abbreviation, and `check_language.py` is what settled that.** `P&L` was
+already registered, and this Sub-step's entry file is named `pnl.yaml` rather than
+`p_and_l.yaml` — a filename is not an identifier, and the `name:` field inside it
+carries the registered spelling, which is what every reference in the corpus uses.
+**Writing this review is what made the check fail**, the way writing 4.3's did: an
+earlier draft of sceptical point 3 illustrated a misspelling by writing `Realised P&L`
+with the ampersand dropped, which is a two-letter shout the Glossary does not register
+as an abbreviation — and the check reads this review. The example is now
+`Realized P&L` — the American spelling, which is a better example anyway, since
+`realised_pnl.yaml` already carries it as an alias precisely because people write it.

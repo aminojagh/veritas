@@ -348,12 +348,33 @@ project owes repayment on — the corpus has one composed metric, it adds, and i
 part composes nothing — but a rule-2 edge type arriving into a corpus that has
 grown either of those is arriving into a different problem.
 
+**Rule 4 was built early, in Sub-step 4.4 — this entry stays open on the other three**
+
+*"Ambiguous Term completeness"* above is now a loop in `check_semantic_layer.py`:
+every Certified Metric an Ambiguous Term names must exist as a Metric Definition,
+and there must be at least two distinct ones. It was taken out of the extension
+rather than with it because it costs one pass over five entries and because the
+Sub-step that wrote the first Ambiguous Term could not honestly publish one without
+it — an entry that asks the user to choose between two meanings and can compute
+only one has spent the user's turn to arrive nowhere. The
+[Step 004 plan's scope boundary](plan/step-004-semantic-layer.md#not-in-this-step)
+says so in those terms: *"4.4 takes one of EXT-005's four rules because it is a
+single loop."*
+
+**Nothing about the other three changed.** Synonym detection, the rule-2 edge type
+this entry gained on 2026-08-22, and orphaned dependencies all still need the parse
+step and the in-memory graph, and none of them is a single loop. What rule 4's early
+build does establish is the shape the rest inherit: the relationship is declared in
+the YAML, the check reads it against the rest of the corpus, and the failure names
+the entry and the missing thing rather than reporting a count.
+
 **Readiness**
 
 When the Semantic Layer has enough entries for a human to stop holding the whole
 set in their head — in practice the same threshold as
 [EXT-003](#ext-003--metric-authoring-at-scale), around 50 entries — or as soon as
 a second author can add entries. Build with EXT-002; they share the parse step.
+Rule 4 above is already built and does not wait for this.
 
 ---
 

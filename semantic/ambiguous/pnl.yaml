@@ -1,0 +1,17 @@
+# Section C: "one is banked, one is a market opinion. Summing them without saying
+# so mixes fact with mark-to-market."
+name: P&L
+version: 1
+kind: ambiguous_term
+description: >
+  Realised P&L is profit or loss locked in by closing a Position; Unrealised P&L
+  is profit or loss on a Position still held, which moves with the market and has
+  not been banked. Their sum is a third answer and a legitimate one — but it is
+  legitimate only when the question asked for it, because presenting a
+  mark-to-market figure as booked profit is the failure Section C registers this
+  pair to prevent.
+disambiguates: [Realised P&L, Unrealised P&L]
+resolution: >
+  Ask. Three answers rather than two: either metric, or both summed with the
+  split stated. There is no Certified Metric for the sum, so "both" is a question
+  answered with two figures and not with one.

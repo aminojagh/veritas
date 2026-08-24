@@ -742,6 +742,12 @@ points the same way: the from-cue is *"true and is a weaker cue than the one tha
 matters"*, so what needed replacing was the weak cue, which is the suffix. If Amino meant
 the other reading, it is one more file rename and one `from_table` field.
 
+> **Closed 2026-08-24 — the resolution stands, and no rename follows:** *"what you did
+> was right. it's ok now … close the question."* `instrument_to_…` is the decided
+> reading, so every name under `semantic/joins/` begins with its own `from_table` and no
+> `from_table` field changes. Recorded with the 4.4 rulings as
+> [R10](#r10--aminos-rulings-on-the-44-review--decided-2026-08-24).
+
 **What the rename does not fix, stated because renaming did not remove it.**
 `instrument_to_fx_rate_on_snapshot_date` converts the Quotation Currency too, so
 `semantic/joins/` now names three FX routes on two axes: the Trade-date pair by currency,
@@ -762,6 +768,85 @@ is missing cannot even be measured until a Warehouse has more tables than this o
 Filed as
 [EXT-009](../extension-register.md#ext-009--the-join-path-entry-type-at-warehouse-scale),
 against the `semantic/joins/` file format as its seam.
+
+---
+
+### R10 — Amino's rulings on the 4.4 review → **decided 2026-08-24**
+
+The [4.4 review](../reviews/step-004-semantic-layer.md#sub-step-44--write-the-ambiguous-terms)
+put five things up sceptically. Amino ruled on all five on 2026-08-24 and, in the same
+pass, closed the prefix question [R9](#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23)'s
+third ruling had left open. They are recorded here for R9's reason: a review is read
+once, by the person who commits it, and a plan is read by every Sub-step that follows.
+**Two of them are questions the Retrieval Step inherits, and neither is a defect in this
+Step.**
+
+**0. R9.3's prefix question is closed.** R9 wrote the second renamed Join Path as
+`..._on_quotation_currency` with its prefix elided; 4.2 resolved it to
+`instrument_to_fx_rate_on_quotation_currency`, so that every name under `semantic/joins/`
+begins with its own `from_table` and `route_problem` cannot print a sentence that
+contradicts itself. Amino: *"what you did was right. it's ok now … close the question."*
+The elision was a shorthand, not the other reading — nothing is renamed and no
+`from_table` field changes. What the rename never fixed is unchanged and still stated
+where it lives: three FX routes on two axes, each name unique against its nearest
+neighbour, both files carrying the comment that says so, and a naming rule for the
+directory as a whole left to
+[EXT-009](../extension-register.md#ext-009--the-join-path-entry-type-at-warehouse-scale).
+
+**1. The Glossary amendment stands, so check 13 keeps both halves.**
+[Section D](../glossary.md#d-ambiguous-terms)'s "P&L" row now reads
+`Realised P&L · Unrealised P&L · both` where it read `Realised · Unrealised · both`,
+spelling the two Section B terms as registered. Amino ruled it *"fine"*. The amendment is
+agreed rather than provisional, which is what check 13 needed: it reads that column, so
+rejecting the row would have meant dropping or narrowing the Glossary half of the check.
+The review's own two objections — that the check was written first, and that a Glossary
+edit is Amino's call — are answered by the ruling rather than by argument.
+
+**2. The alias partial-match is a named question the Retrieval Step inherits.**
+`Unrealised P&L` claims the alias *"paper profit and loss"* and `Realised P&L` claims
+*"booked profit and loss"*, so a user who types **"profit and loss"** is a short hop from
+either metric while matching the `P&L` Ambiguous Term by no name at all — Section D's own
+failure, arriving through the door check 14 does not cover, because check 14 compares
+whole strings. Amino: *"it's correct to register it as a named question for the retrieval
+component, same as [R9's second ruling] added to validation gate."* So it takes exactly
+R9.2's shape — **a named place to look first, not an open defect** — and it is on neither
+register by the same test the review applied: the Ledger would call the corpus wrong when
+the five entries are the five registered words, and the Register would claim a trigger
+that cannot fire inside this project's life when Retrieval is the fourth of nine
+components. The two candidate fixes stay unchosen — an `aliases` field on the Ambiguous
+Term entry, or a Retrieval rule that an Ambiguous Term outranks a metric it disambiguates
+to — because choosing between them without Retrieval to measure is the speculation
+`CLAUDE.md` forbids.
+
+**3. Check 13's unresolvable half stays a printed comment rather than a failure.**
+`both` is legitimately not a metric, so the check cannot demand that every `·`-separated
+part resolve; what it demands is that every part which *is* a registered Certified Metric
+be in the entry, and every metric in the entry be a part. Amino: *"fine for now."* The
+cost is accepted rather than removed, and it is the one the review stated: a **misspelled**
+metric name in a "Could mean" cell — most plausibly `Realized P&L`, the American spelling
+`realised_pnl.yaml` already carries as an alias — resolves to nothing, lands in the
+printed list beside `both`, and is caught only by a person reading the output. The
+alternative stays rejected for the reason it was rejected: an ignore-list naming `both` is
+an exemption claimable by writing a magic name, which is a hole any later row could walk
+through.
+
+**4. `certified_metric_terms()` stays read once and passed to two checks.** Amino:
+*"fine."* The signature change to `check_entries` is accepted with its consequence
+visible: check 13's verdict now depends on Section B parsing, which is check 2's
+territory, so a run where Section B cannot be found gets two reports for one cause and
+check 13's is the less useful of them. Reading the Glossary twice would have traded that
+for the same duplication in the other direction.
+
+**5. The five `description` fields are tuned where retrieval performance can be
+measured, and not before.** They are the strongest prose in the corpus, they are what
+Retrieval will embed, and nothing checks a word of them. Amino ruled that improving them
+belongs *"where we can actually measure the retrieval performance"*. That is the **second
+named question the Retrieval Step inherits**, and it is a ruling about *when* rather than
+about the prose: text written to be embedded is tuned against a retrieval measurement or
+not at all, because rewriting it earlier moves the corpus with nothing able to say whether
+the move helped. Until that measurement exists the five entries stay as authored, and the
+review's finding stands as written — if they are good, that is authorship and not
+verification.
 
 ---
 

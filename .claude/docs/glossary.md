@@ -270,8 +270,17 @@ before generating SQL — never guess silently.
 | "revenue" | Gross Revenue · Net Revenue | Ask, unless the question names one |
 | "volume" | Traded Notional · Trade Count | Ask |
 | "balance" | Cash Balance · Account Value | Ask |
-| "P&L" | Realised · Unrealised · both | Ask |
+| "P&L" | Realised P&L · Unrealised P&L · both | Ask |
 | "how much does X have" | Cash Balance · Account Value | Ask |
+
+**Amended 2026-08-24 (Sub-step 4.4).** The "P&L" row's *Could mean* cell read
+`Realised · Unrealised`, which is neither Section B term spelled as registered.
+`semantic/ambiguous/` publishes these five rows as Ambiguous Term entries and
+`check_semantic_layer.py` reads this column back against them, so the shortened
+names left the row's two meanings resolvable by a reader and by nothing else — the
+check named it on its first run. `both` stays as written: it is a third *answer*,
+not a third Certified Metric, and the check prints it as prose rather than
+resolving it.
 
 ### E. System measures
 

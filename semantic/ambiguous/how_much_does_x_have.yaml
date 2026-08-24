@@ -1,0 +1,15 @@
+# The one Section D row that is a phrase rather than a word. It resolves to the
+# same pair as "balance" and is registered separately because a user who says it
+# has not said "balance" — and Retrieval matches what was said.
+name: how much does X have
+version: 1
+kind: ambiguous_term
+description: >
+  The question a person asks instead of naming a metric. It resolves to the same
+  pair "balance" does — Cash Balance, or Account Value — and carries even less of
+  a cue, since it names no quantity at all. Registered so that the phrasing most
+  likely to arrive from a non-specialist is the phrasing the corpus can match.
+disambiguates: [Cash Balance, Account Value]
+resolution: >
+  Ask. Nothing in the phrasing distinguishes cash from the whole holding, so there
+  is no unless clause here of the kind "revenue" has.

@@ -5,7 +5,7 @@ Run with:  uv run python .claude/scripts/check_semantic_layer.py
 Needs a filled Warehouse — `uv run python -m veritas.ingestion` first — because a
 published expression that has never been executed is a claim rather than a metric.
 
-A corpus cannot be proved by running it, only by running what it claims. Eleven
+A corpus cannot be proved by running it, only by running what it claims. Fourteen
 checks do that. Five are the ones
 [Sub-step 4.1](../docs/plan/step-004-semantic-layer.md#41--publish-the-semantic-entry-format-on-one-metric-definition)
 names; the sixth is Non-Negotiable #1 applied to the one place this corpus can coin
@@ -15,7 +15,11 @@ which is where the corpus stopped being one entry: two are that Sub-step's own
 bullets, two are what the shape
 [R8](../docs/plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
 decided has to be checked for, and the eleventh is what keeps a claim in that ruling
-reproducible.
+reproducible. Checks 12 to 14 arrived with
+[Sub-step 4.4](../docs/plan/step-004-semantic-layer.md#44--write-the-ambiguous-terms)
+and are the only ones in this file that execute nothing: they are claims about
+**language** rather than about arithmetic, so they fail when a word is wrong while
+every number is right.
 
   1. Every file under `semantic/` loads, and every field the format names is
      present. The loader is what enforces this — its dataclasses *are* the field
@@ -88,6 +92,25 @@ reproducible.
      expression without it and expecting the engine to refuse. A cast nobody can see
      the need for is a cast somebody eventually removes.
 
+ 12. Every Certified Metric an Ambiguous Term claims to disambiguate between exists,
+     and there are at least two distinct ones —
+     [EXT-005](../docs/extension-register.md#ext-005--semantic-layer-coherence-checks)'s
+     fourth rule, which is one loop here rather than the extension itself. Three
+     probes give it teeth on every run, for check 6's reason.
+
+ 13. Glossary [Section D](../docs/glossary.md#d-ambiguous-terms) and
+     `semantic/ambiguous/` register the same five words, and each row's *Could mean*
+     cell names the same Certified Metrics its entry does. Check 2 for Ambiguous
+     Terms, and read out of the Glossary for the same reason. Words in that cell
+     that are not Certified Metrics — "both", on the P&L row — are **printed** rather
+     than ignored, because a check that silently drops what it cannot resolve drops a
+     misspelling just as silently.
+
+ 14. No Certified Metric's alias is a registered Ambiguous Term, and no alias is
+     claimed by two metrics. Sub-step 4.2 took the first as a decision and the 4.2
+     review recorded that nothing enforced it; the second is the same failure
+     happening outside Section D, where nothing can ask the user about it.
+
 Exits non-zero if any check fails.
 """
 
@@ -109,6 +132,8 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 
 from veritas.semantic import (  # noqa: E402
+    ENTRY_KINDS,
+    AmbiguousTerm,
     MetricDefinition,
     SemanticEntryError,
     SemanticLayer,
@@ -235,6 +260,25 @@ PARSE_PROBES = (
     ("nothing at all", "", False),
 )
 
+# The cell positions in Glossary Section D's table, once a leading pipe has made
+# cells[0] the empty string. Section D's own three columns in Section D's own
+# order: what a user says, what it could mean, what Veritas does about it. The
+# third is not read — `resolution` is prose in both places and comparing two pieces
+# of prose would fail on a comma.
+USER_SAYS_COLUMN = 1
+COULD_MEAN_COLUMN = 2
+
+# What separates one meaning from the next inside Section D's "Could mean" cell.
+# The Glossary's own separator rather than a convention invented here, which is why
+# check 13 can read that column at all instead of taking the entry's word for it.
+COULD_MEAN_SEPARATOR = "\u00b7"
+
+# The name check 12's first probe points at, chosen because it is *not* a Certified
+# Metric and reads exactly like one — a plausible brokerage metric the Glossary has
+# never registered. A probe naming obvious nonsense would pass a rule that only
+# rejected obvious nonsense.
+UNREGISTERED_METRIC = "Gross Margin"
+
 problems: list[str] = []
 
 
@@ -270,6 +314,72 @@ def certified_metric_terms() -> set[str]:
             continue
         terms.add(cells[1].strip().strip("*").strip())
     return terms
+
+
+def ambiguous_terms_in_glossary() -> dict[str, str]:
+    """Glossary Section D, as {what a user says: what the Glossary says it could mean}.
+
+    Section D is the registry of *"words users genuinely say that are **not**
+    metrics"*, and `semantic/ambiguous/` is those rows made retrievable. Read out of
+    the Glossary for the reason `certified_metric_terms` above reads Section B: a
+    list of five terms typed into this script would prove that this script and the
+    corpus agree, which is not the claim — the claim is that the **corpus** and the
+    **Glossary** agree.
+
+    The "User says" cell is quoted in the Glossary — `"revenue"` — because it is
+    reported speech. The quotes are Markdown presentation and not part of the term,
+    so they come off here; the entry's `name` is the word itself.
+    """
+    text = GLOSSARY.read_text()
+    section = re.search(r"^### D\. Ambiguous Terms\n(.*?)^### ", text, re.S | re.M)
+    if not section:
+        problems.append(
+            "glossary.md: could not find the `### D. Ambiguous Terms` section, so "
+            "nothing here knows which words are registered as ambiguous"
+        )
+        return {}
+
+    registered: dict[str, str] = {}
+    for line in section.group(1).splitlines():
+        cells = line.split("|")
+        if len(cells) <= COULD_MEAN_COLUMN:
+            continue
+        said = cells[USER_SAYS_COLUMN].strip().strip('"').strip()
+        # The header row and the `|---|` rule beneath it are table furniture.
+        if not said or said == "User says" or set(said) <= set("-: "):
+            continue
+        registered[said] = cells[COULD_MEAN_COLUMN].strip()
+    return registered
+
+
+def ambiguous_term_home() -> str:
+    """Where Glossary Section A says an Ambiguous Term lives.
+
+    Section A registers the directory, the loader's `ENTRY_KINDS` reads it, and
+    check 13 puts the two in one sentence. Without this the directory name
+    `ambiguous` would be pinned by nothing but the fact that files happen to sit
+    there — and a domain noun pinned by nothing is what Non-Negotiable #1 is about.
+    """
+    text = GLOSSARY.read_text()
+    section = re.search(r"^### A\. The system\n(.*?)^### ", text, re.S | re.M)
+    if not section:
+        problems.append(
+            "glossary.md: could not find the `### A. The system` section, so nothing "
+            "here knows where an Ambiguous Term is registered to live"
+        )
+        return ""
+
+    for line in section.group(1).splitlines():
+        cells = line.split("|")
+        if len(cells) <= LIVES_IN_COLUMN:
+            continue
+        if cells[1].strip().strip("*").strip() == "Ambiguous Term":
+            return cells[LIVES_IN_COLUMN].strip().strip("`").strip()
+    problems.append(
+        "glossary.md: Section A has no `Ambiguous Term` row, so the entry type "
+        "being written under semantic/ambiguous/ is registered nowhere"
+    )
+    return ""
 
 
 def source(metric: MetricDefinition, layer: SemanticLayer) -> str:
@@ -471,9 +581,14 @@ def one_number(
             return None
 
 
-def check_entries(layer: SemanticLayer) -> None:
-    """Checks 2, 5, 8 and 10 — everything decidable without executing anything."""
-    certified = certified_metric_terms()
+def check_entries(layer: SemanticLayer, certified: set[str]) -> None:
+    """Checks 2, 5, 8 and 10 — everything decidable without executing anything.
+
+    `certified` is passed in rather than read here because check 13 needs the same
+    set — it is what tells Section D's "Could mean" cell which of its words are
+    Certified Metrics — and reading the Glossary twice would report a missing
+    Section B twice for one cause.
+    """
     print(f"  Glossary Section B names {len(certified)} terms living in "
           f"{METRIC_HOME}")
 
@@ -675,6 +790,237 @@ def check_derivation(metric: MetricDefinition, layer: SemanticLayer) -> None:
                 f"together, and adding them would produce a number rather than an "
                 f"error"
             )
+
+
+def disambiguation_problem(
+    term: AmbiguousTerm, layer: SemanticLayer
+) -> str | None:
+    """Check 12 —
+    [EXT-005](../docs/extension-register.md#ext-005--semantic-layer-coherence-checks)'s
+    fourth rule: an Ambiguous Term resolves to Certified Metrics that exist.
+
+    Separated from its caller so `check_ambiguous_terms` can point it at entries the
+    corpus does not contain, which is the only way a passing run says anything about
+    the rule rather than about the corpus.
+
+    Three ways the claim can be false, and the first is the one the rule is named
+    after:
+
+      * a meaning no file publishes. Then Veritas asks the user to choose between
+        two things and can compute only one of them, which is a worse failure than
+        not asking — it has spent the user's turn to arrive nowhere. This is the
+        check that would have failed had
+        [R1](../docs/plan/step-004-semantic-layer.md#r1--cash-balance-becomes-a-certified-metric--approved-by-amino-2026-08-21)
+        gone the other way, since `Cash Balance` was a Warehouse column before it was
+        a Certified Metric and two of these five terms resolve to it;
+      * fewer than two meanings, which is not an ambiguity. A one-meaning entry
+        would make Veritas stop and ask a question with one answer;
+      * the same meaning twice, which is a two-meaning entry that is really a
+        one-meaning entry — the shape a copy-paste produces and the shape a reader
+        skims past.
+    """
+    if len(term.disambiguates) < 2:
+        return (
+            f"Ambiguous Term {term.name!r} disambiguates between "
+            f"{list(term.disambiguates)} — a word with fewer than two meanings is "
+            f"not ambiguous, and registering it stops Veritas to ask a question "
+            f"that has one answer"
+        )
+    if len(set(term.disambiguates)) != len(term.disambiguates):
+        return (
+            f"Ambiguous Term {term.name!r} names {list(term.disambiguates)}, which "
+            f"repeats a meaning — the entry claims an ambiguity it does not have"
+        )
+    unpublished = sorted(set(term.disambiguates) - set(layer.metrics))
+    if unpublished:
+        return (
+            f"Ambiguous Term {term.name!r} disambiguates to {unpublished}, which no "
+            f"file under {METRIC_HOME} publishes — so Veritas would ask the user to "
+            f"choose a meaning it cannot then compute"
+        )
+    return None
+
+
+def ambiguity_probes(term: AmbiguousTerm) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """The teeth of check 12: three claims that must all be refused.
+
+    Built from the entry under test rather than written as literals, so the probes
+    keep working when the corpus is edited — the same reason `check_parse_rule`
+    pastes its probes into a real metric. Only `UNREGISTERED_METRIC` is a literal,
+    and it is one on purpose: it has to be a name no file publishes.
+    """
+    first, *_ = term.disambiguates
+    return (
+        ("a meaning no file publishes", (first, UNREGISTERED_METRIC)),
+        ("one meaning, which is not an ambiguity", (first,)),
+        ("the same meaning twice", (first, first)),
+    )
+
+
+def check_ambiguous_terms(layer: SemanticLayer, certified: set[str]) -> None:
+    """Checks 12, 13 and 14 — the corpus's claim about *language*.
+
+    Everything else in this script is a claim about arithmetic, and fails when a
+    number is wrong. These three fail when a **word** is wrong, which is why they
+    execute nothing: an Ambiguous Term can be false while every expression in the
+    corpus is right, and its fix is in the Glossary rather than in SQL.
+
+    This is where
+    [ADR-0001](../docs/adr/0001-semantic-layer-as-the-retrieval-corpus.md)'s central
+    claim becomes checkable. Schema retrieval was rejected because *"it cannot
+    represent the one fact that matters: that 'revenue' has two certified
+    meanings"* — so the corpus represents it, and this says the representation is
+    true.
+    """
+    print()
+    print("  ambiguous terms — the words Section D says must be asked about")
+
+    registered = ambiguous_terms_in_glossary()
+    directory = next(
+        f"semantic/{name}/" for name, (_, entry_type) in ENTRY_KINDS.items()
+        if entry_type is AmbiguousTerm
+    )
+    home = ambiguous_term_home()
+    if home and home != directory:
+        problems.append(
+            f"Glossary Section A registers the Ambiguous Term as living in {home!r} "
+            f"and the loader reads {directory!r} — one of the two is describing a "
+            f"directory nothing writes to"
+        )
+    print(f"    Glossary Section D registers {len(registered)} term(s); {directory} "
+          f"publishes {len(layer.ambiguous_terms)}")
+
+    # Both directions, the way check 2 does it for metrics. The bar this Sub-step
+    # sets for itself is that *every* Section D row is retrievable — a registered
+    # ambiguity with no entry is a word Veritas resolves silently, which is the one
+    # thing Section D exists to forbid.
+    unwritten = sorted(set(registered) - set(layer.ambiguous_terms))
+    if unwritten:
+        problems.append(
+            f"Glossary Section D registers {unwritten} and no file under "
+            f"{directory} publishes them — an ambiguity the corpus cannot retrieve "
+            f"is one Veritas resolves by guessing"
+        )
+
+    for term in layer.ambiguous_terms.values():
+        broken = disambiguation_problem(term, layer)
+        if broken:
+            problems.append(broken)
+        if term.name not in registered:
+            problems.append(
+                f"Ambiguous Term {term.name!r} is not a Glossary Section D row — "
+                f"register the word before certifying that Veritas must stop and ask "
+                f"about it"
+            )
+            continue
+
+        # Check 13. The Glossary's own cell, split on the Glossary's own separator.
+        # Parts that are not Certified Metrics are reported rather than ignored:
+        # "both" on the P&L row is a third *answer* and not a third metric, and a
+        # check that silently dropped whatever it could not resolve would drop a
+        # misspelled metric name just as quietly.
+        parts = [
+            part.strip() for part in registered[term.name].split(COULD_MEAN_SEPARATOR)
+        ]
+        named = {part for part in parts if part in certified}
+        prose = [part for part in parts if part not in certified]
+        print(f"    {term.name!r} → {' · '.join(term.disambiguates)}")
+        if prose:
+            print(f"        Section D also says {prose} — not Certified Metrics, and "
+                  f"left as prose")
+
+        dropped = sorted(named - set(term.disambiguates))
+        added = sorted(set(term.disambiguates) - set(parts))
+        if dropped:
+            problems.append(
+                f"Glossary Section D says {term.name!r} could mean {dropped}, and "
+                f"the entry does not name them — the Glossary and the corpus "
+                f"disagree about what the word means"
+            )
+        if added:
+            problems.append(
+                f"Ambiguous Term {term.name!r} names {added}, which Glossary Section "
+                f"D's 'Could mean' cell does not — a meaning certified in the corpus "
+                f"and registered nowhere"
+            )
+
+    check_alias_collisions(layer)
+
+    # The first entry that names at least one meaning, rather than simply the first.
+    # An entry with an empty `disambiguates` has already been reported by check 12
+    # above, and building a probe out of it would raise here instead — turning a
+    # named problem back into the traceback check 1 exists to prevent.
+    probed = next(
+        (term for term in layer.ambiguous_terms.values() if term.disambiguates), None
+    )
+    if probed is not None:
+        print(f"    probes — run against {probed.name!r}, which is a real entry")
+        for description, meanings in ambiguity_probes(probed):
+            verdict = disambiguation_problem(replace(probed, disambiguates=meanings), layer)
+            print(f"      {'refuses' if verdict else 'ACCEPTS'}  {description}: "
+                  f"{list(meanings)}")
+            if verdict is None:
+                problems.append(
+                    f"the disambiguation rule accepted {description} "
+                    f"({list(meanings)}), pasted into {probed.name!r} — so it is not "
+                    f"the rule this check reports it to be"
+                )
+
+
+def check_alias_collisions(layer: SemanticLayer) -> None:
+    """Check 14 — an alias resolves to exactly one metric, and never to a Section D word.
+
+    Sub-step 4.2 decided that no metric's `aliases` would contain an Ambiguous Term,
+    and the [4.2 review](../docs/reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)
+    recorded that the decision was *"invisible in the files, and nothing checks
+    it"*, naming this Sub-step as where the check belongs. This is it, and it is one
+    rule read in both directions:
+
+      * **an alias that is a registered Ambiguous Term** resolves silently what
+        Section D says must be asked about. A metric claiming "balance" would let
+        Retrieval answer with cash when the user meant the whole holding, and the
+        user would never learn a choice was made;
+      * **an alias two metrics both claim** is an ambiguity nobody registered —
+        Section D's own failure happening outside Section D, where nothing can ask
+        about it.
+
+    The two are not independent, and that is the point. Registering a shared alias
+    in Section D does not satisfy the second rule, because the first then forbids it
+    as an alias at all: the resolution is to drop the word from both metrics and let
+    the Ambiguous Term carry it.
+
+    Compared case-folded. `aliases` are lower-case phrases a person types and the
+    Section D words are written as spoken, so `P&L` and `p&l` are the same word
+    reaching Retrieval, and a rule that missed one of them would be a rule about
+    capitalisation.
+    """
+    claimed: dict[str, list[str]] = {}
+    for metric in layer.metrics.values():
+        for alias in metric.aliases:
+            claimed.setdefault(alias.casefold(), []).append(metric.name)
+    said = {name.casefold(): name for name in layer.ambiguous_terms}
+
+    shared = sorted(alias for alias, owners in claimed.items() if len(owners) > 1)
+    collides = sorted(alias for alias in claimed if alias in said)
+    print(f"    aliases: {sum(len(o) for o in claimed.values())} across "
+          f"{len(layer.metrics)} metrics · {len(shared)} claimed by two metrics · "
+          f"{len(collides)} that are a registered Ambiguous Term")
+
+    for alias in collides:
+        problems.append(
+            f"Certified Metric(s) {sorted(claimed[alias])} claim {alias!r} as an "
+            f"alias, and {said[alias]!r} is a registered Ambiguous Term — Section D "
+            f"says that word must be asked about, and an alias is exactly what "
+            f"resolves it silently instead"
+        )
+    for alias in shared:
+        if alias in said:
+            continue
+        problems.append(
+            f"{sorted(claimed[alias])} both claim the alias {alias!r} — an ambiguity "
+            f"nobody registered. Either register the word in Glossary Section D and "
+            f"drop it from both metrics, or narrow one of the two aliases"
+        )
 
 
 def check_expressions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None:
@@ -1033,8 +1379,11 @@ def main() -> int:
         return 1
 
     print(f"  Semantic Layer: semantic/ — {len(layer.metrics)} Metric Definition(s), "
-          f"{len(layer.join_paths)} Join Path(s)")
-    check_entries(layer)
+          f"{len(layer.join_paths)} Join Path(s), "
+          f"{len(layer.ambiguous_terms)} Ambiguous Term(s)")
+    certified = certified_metric_terms()
+    check_entries(layer, certified)
+    check_ambiguous_terms(layer, certified)
 
     with WarehouseAdapter() as warehouse:
         print(f"  Warehouse: {DATABASE_PATH.relative_to(REPO_ROOT)}")
@@ -1049,8 +1398,9 @@ def main() -> int:
         for problem in problems:
             print(f"  - {problem}")
         return 1
-    print("PASS — every published expression executes against the Warehouse, and "
-          "every figure with a second opinion agrees with it")
+    print("PASS — every published expression executes against the Warehouse, every "
+          "figure with a second opinion agrees with it, and every registered "
+          "ambiguity resolves to metrics that exist")
     return 0
 
 
