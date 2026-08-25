@@ -1,13 +1,16 @@
 # Step 004 — Build the Semantic Layer
 
-- **Status:** **in review** — all five Sub-steps are written, verified and approved;
-  4.1 (`6c15736`), 4.2 (`333d6fc`), 4.3 (`ae75f0e`) and 4.4 (`71ce677`) are committed,
-  and **4.5 was reviewed and approved by Amino on 2026-08-25** —
-  [R11](#r11--aminos-rulings-on-the-45-review--decided-2026-08-25), *"all approved"* —
-  and is the commit this line is part of. It stays `in review` rather than `done` for
-  the reason every Step's plan does: `done` is written by the **next** Step's first
-  commit, which is the first one able to carry this Sub-step's hash — the way
-  `6c15736` closed Step 003 and `40d72d8` closed Step 002. The Step **did not grow**, so
+- **Status:** **done** — every Sub-step is built, approved and **committed**:
+  4.1 (`6c15736`), 4.2 (`333d6fc`), 4.3 (`ae75f0e`), 4.4 (`71ce677`) and
+  **4.5 (`7ddd96c`)**, which was reviewed and approved by Amino on 2026-08-25 —
+  [R11](#r11--aminos-rulings-on-the-45-review--decided-2026-08-25), *"all approved"*.
+  **Closed by the Step 005 planning commit**, which is where 4.5's hash was written
+  into [Current State](../design/current-state.md) and this status turned from
+  `in review` to `done` — the same way `6c15736` closed Step 003 and `40d72d8` closed
+  Step 002. **One question outlives the Step and blocks nothing**: whether the
+  `resolution` field name wants a Glossary row, flagged in the 4.4 review, left open
+  by [R10](#r10--aminos-rulings-on-the-44-review--decided-2026-08-24) and untouched by
+  R11. The Step **did not grow**, so
   [R5](#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21)'s split point
   was never used and Dimension Definitions shipped here rather than becoming Step
   005's first Sub-step. Written 2026-08-21 and **approved by Amino the same day**,

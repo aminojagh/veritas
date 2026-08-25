@@ -4,41 +4,101 @@
 intent, never plans. If this file and the repository disagree, this file is
 wrong and gets fixed immediately.
 
-**Last updated:** 2026-08-25 — **the Semantic Layer is complete and approved.** Sub-step 4.5 of Step 004 is written and verified: `semantic/dimensions/` publishes the five certified axes a metric can be sliced along — `by trade date`, `by snapshot date`, `by accounting movement date`, `by region`, `by instrument type` — and with them the corpus holds **all four entry types [Glossary Section A](../glossary.md#a-the-system) registers**: nine Metric Definitions, eight Join Paths, five Ambiguous Terms and five Dimension Definitions, **twenty-seven entries**. `check_semantic_layer.py` went from fourteen checks to **eighteen**, and the four new ones read the **Warehouse** rather than the rest of the corpus, because a Dimension Definition is the only entry type that is a **leaf** — nothing names an axis, so nothing above one would notice if it were wrong. **The single date axis became three**: an axis at `fct_trade.trade_date` cannot be applied to the five Snapshot-and-movement metrics whose routes never reach that column, so the corpus publishes the three date senses the Warehouse actually keys on, each named for its registered term. That is one **Glossary amendment**, ruled and **agreed on 2026-08-25** ([R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)): the `Dimension Definition` row listed three axes as *examples* and now names all five with their columns, grain and buckets, in a form check 18 reads back — and the check caught a quotation of the old wording inside the row's own amendment note on its first run. **One new shortcut**: [DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) — that registry is one table cell read by a prose parse, where the other two are tables — so the open-debt count is **10**. **[DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) carries the dated deferral note [R7](../plan/step-004-semantic-layer.md#r7--the-date-axis-defers-debt-012s-trigger-rather-than-avoiding-it--approved-by-amino-2026-08-21) asked for** and stays open on all three arms. **Step 004 is `in review`** — all five Sub-steps written, the first four committed, and **4.5 reviewed and approved by Amino on 2026-08-25**: *"all approved"*, recorded in full as [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25). [R5](../plan/step-004-semantic-layer.md#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21)'s pre-agreed split point was never needed. **Three questions travel on to [Grounding](../glossary.md#a-the-system)**, ruled there in the same words four times — *"the Step that grounds a query"* — and none of them a defect in what was built: `by region` sits inside no metric route because no Join Path reaches `dim_client`; there is no `by settlement date` axis; and check 17 forecloses an axis whose values are data but not dates.
-**Eleven rulings now carry this Step**, and one question outlives it. Amino approved the plan and all seven of its rulings on 2026-08-21, and amended it four times since: [R8](../plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22) on 2026-08-22, [R9](../plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23) on 2026-08-23, [R10](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24) on 2026-08-24 — the five things the [4.4 review](../reviews/step-004-semantic-layer.md#sub-step-44--write-the-ambiguous-terms) put up sceptically plus the prefix question R9 had left open — and [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25) on 2026-08-25. **The question neither R10 nor R11 reached is whether the `resolution` field name wants a Glossary row**; it blocks nothing, and no file changes either way. 4.4 took no shortcut, and its review says why its two candidates are neither debt nor extension. **Sub-step 4.5 — the Dimension Definitions — is this commit, the last of this Step.** **The Warehouse is full: all ten tables of Glossary Section B hold rows, every Certified Metric can return a number, and the adapter seam is checked in all three of the readings ADR-0002's two signals now come to.**
+**Last updated:** 2026-08-25 — **Step 004 is finished and committed in full**, all five Sub-steps, and this commit closes it formally. **Step 005 — Build the Validation Gate — is planned, `active` and approved: written 2026-08-25 and approved by Amino the same day, with **ten rulings**, all of that date — the plan's own seven (six as written, [R1](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25) widened, and the `Dimension Definition` Glossary amendment inside it approved too) and three more that came after it: [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25) makes the Step's check a package with one module per rule, [R9](../plan/step-005-validation-gate.md#r9--no-test-framework-in-this-step-and-step-002s-prediction-is-set-aside--approved-by-amino-2026-08-25) declines pytest and sets aside Step 002's prediction that it would arrive here, and [R10](../plan/step-005-validation-gate.md#r10--current-state-is-trimmed-in-its-own-commit-between-the-plan-and-51--approved-by-amino-2026-08-25) trims this file in its own commit before 5.1.** **Nothing of it is built** — there is no `veritas/validation/`, and this commit changes four documents and no code. **The Semantic Layer is complete and approved**: `semantic/` holds all four entry types [Glossary Section A](../glossary.md#a-the-system) registers — nine Metric Definitions, eight Join Paths, five Ambiguous Terms and five Dimension Definitions, **twenty-seven entries** — and `check_semantic_layer.py` runs **eighteen checks** over them. **The Warehouse is full**: all ten tables of [Glossary Section B](../glossary.md#b-the-warehouse) hold rows, every Certified Metric can return a number, and the adapter seam is checked in all three of the readings [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md)'s two signals now come to. **The sqlglot spike has answered all four of its claims and the go/no-go is recorded**: [validation-feasibility.md](validation-feasibility.md) says **GO** on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md), and four of its six constraints bind the Step now planned. **The open-debt count is 10**, unchanged — planning pays nothing, and R8, R9 and R10 open no entry: each is a scope boundary or a document change, and the reasoning for all three is in the plan rather than repeated here. **Two questions travel on to [Grounding](../glossary.md#a-the-system)** and two to [Retrieval](../glossary.md#a-the-system), all recorded below. R11 handed Grounding three; **Sub-step 5.5 now answers the first of them** under R1's widening, and the Step touches neither of Retrieval's two.
+**Step 004 was carried by eleven rulings**, and one question outlives it. Amino approved that plan and all seven of its rulings on 2026-08-21, and amended it four times since: [R8](../plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22) on 2026-08-22, [R9](../plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23) on 2026-08-23, [R10](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24) on 2026-08-24 — the five things the [4.4 review](../reviews/step-004-semantic-layer.md#sub-step-44--write-the-ambiguous-terms) put up sceptically plus the prefix question R9 had left open — and [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25) on 2026-08-25. **The question neither R10 nor R11 reached is whether the `resolution` field name wants a Glossary row**; it blocks nothing, and no file changes either way. 4.4 took no shortcut, and its review says why its two candidates are neither debt nor extension. **Sub-step 4.5 — the Dimension Definitions — was the last of that Step and is committed in `7ddd96c`.**
 
-**Steps completed:** Step 000 (framework), Step 001 and **Step 002, all six Sub-steps, fully committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, **Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`**. **Step 004 planning is committed in `5d95393`** and **Sub-step 4.1 in `6c15736`**, which is what wrote 3.5's hash above and turned the [Step 003 plan](../plan/step-003-validation-feasibility.md) from `in review` to `done` — how every hash above arrived, and how `40d72d8` closed Step 002. **Sub-step 4.2 is committed in `333d6fc`, Sub-step 4.3 in `ae75f0e` and Sub-step 4.4 in `71ce677`. This commit is Sub-step 4.5, the last of Step 004**; its own hash is not here for the reason every Sub-step's is not, which is that this file is part of it, and the first commit of Step 005 fills it in — as `40d72d8` closed Step 002 and `6c15736` closed Step 003.
+**Steps completed:** Step 000 (framework), Step 001, **Step 002, all six Sub-steps**, **Step 003, all five**, and **Step 004, all five — every one committed**. Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`, Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the R16 plan amendment in `cd5e7dd`, Sub-step 2.2 in `0fc5a34`, Sub-step 2.3 in `a58ef91`, Sub-step 2.4 in `13b99bb`, Sub-step 2.5 in `ce2961a`, Sub-step 2.6 in `6a16d3d`, Step 003 planning in `40d72d8`, Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub-step 3.3 in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`, Step 004 planning in `5d95393`, Sub-step 4.1 in `6c15736`, Sub-step 4.2 in `333d6fc`, Sub-step 4.3 in `ae75f0e`, Sub-step 4.4 in `71ce677`, **Sub-step 4.5 in `7ddd96c`**. **This commit is the Step 005 planning commit**, which is what wrote 4.5's hash above and turned the [Step 004 plan](../plan/step-004-semantic-layer.md) from `in review` to `done` — how every hash above arrived, and how `6c15736` closed Step 003 and `40d72d8` closed Step 002. Its own hash is not here for the same reason 4.5's was not: this file is part of it, and the first commit of Step 005 fills it in.
 
 ---
 
 ## Resume here
 
-- **Next: plan Step 005.** Step 004 has no Sub-step left — 4.5 is the last, it is
-  written, verified and **approved on 2026-08-25** ([R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)), and
-  [the plan](../plan/step-004-semantic-layer.md) stays `in review` until Step 005's
-  first commit can carry 4.5's hash, which is how every Step's plan reaches `done`.
-  The next move is `planning-a-step`
-  against a Semantic Layer that exists, with the
-  [six constraints](validation-feasibility.md#consequences-for-step-004) already spent
-  and [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md)'s go recorded.
-  The plan's own scope boundary calls the Validation Gate *"the **expected** Step 005,
-  which is an expectation and not a plan"* — so it is expected and not decided, and
-  **nothing here plans it**.
-  **Three things the next Step should read first.** The three questions
-  [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25) handed to Grounding, below — the first of them, `by region`, is the
-  corpus's one certified-and-inapplicable axis. The two questions
-  [R10](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24)
-  handed to Retrieval, also below. And
+- **Next: trim this file ([R10](../plan/step-005-validation-gate.md#r10--current-state-is-trimmed-in-its-own-commit-between-the-plan-and-51--approved-by-amino-2026-08-25)), then Sub-step 5.1 — the Validation Gate
+  refuses anything that is not a bounded read.** The [Step 005 plan](../plan/step-005-validation-gate.md) is
+  **`active`**: written 2026-08-25 and **approved by Amino the same day**, together
+  with **ten rulings** of that date — the seven in
+  [Questions for Amino](../plan/step-005-validation-gate.md#questions-for-amino) and three that came after them.
+  **Still no code**: `veritas/validation/` does not exist, and this commit creates no
+  file outside `.claude/docs/`.
+  **The order of the next three commits is fixed**: this planning commit, then the
+  trim, then 5.1. The trim is not a Sub-step — it builds nothing — and it is separate
+  so that a diff deleting several hundred lines of history is reviewed on its own
+  rather than inside the diff that builds a Gate. It removes narrative a dated review
+  already holds and no fact recorded only here; [R10](../plan/step-005-validation-gate.md#r10--current-state-is-trimmed-in-its-own-commit-between-the-plan-and-51--approved-by-amino-2026-08-25) is where that rule and
+  the one open question about it are written.
+  **Six of the plan's seven rulings were approved as written and one was widened.** [R1](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
+  is the widening, and the only one that changed what gets built: Amino declined the
+  narrow half the plan offered to take, so **the rule that lets a query add a Join Path
+  for a *slice*** — which
+  [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
+  handed to the Grounding Step — comes back into **5.5**. Concretely: a Dimension
+  Definition gains a `routes` field mapping a metric's `from_table` to the Join Paths
+  that reach the axis from there, the Gate's route rule takes its permitted joins from
+  three named sources and never searches for a fourth, and an Access Profile names the
+  `by region` axis rather than restating its column and its buckets. **The one thing
+  inside that ruling put up to be rejected on its own was approved on the same day**:
+  the `Dimension Definition` Glossary row says an axis names *"the column, its grain,
+  and its allowed values"*, and after 5.5 it also names where it can be reached from.
+  The amendment lands in 5.5 with the field, and it adds the **definition** only — the
+  routes stay in `semantic/dimensions/` where `check_semantic_layer.py` reads them,
+  because listing them in the cell would repeat the shortcut
+  [DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)
+  is still open for.
+  **The other six**: the spike imports the Gate rather than keeping its own tracer
+  (**R2**, approved with a rule attached — logic that belongs to a component becomes
+  reachable only from that component once it exists); two term proposals (**R3**); C3
+  binds at the Step rather than the Sub-step (**R4**); 5.5 is the pre-agreed split
+  point (**R5**); no new ADR (**R6**); and the bounded read tries the engine's estimate
+  and falls back to the parse tree if it is not reachable through the adapter (**R7**,
+  approved with the order restated — *"check if proposal 1 works and if not fall back
+  to proposal 2"*).
+  **The three that came after** all answer one question Amino raised once the seven
+  were settled — why sessions have become context-heavy, and whether a test framework
+  would help. [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25): **this Step's check is a package**,
+  `.claude/scripts/check_validation_gate/`, a runner plus one module per rule, added
+  one module per Sub-step and run as one command — because the three checks grown by
+  the method it inherits are each well over a thousand lines, and splitting a package
+  that does not exist yet is free where splitting a written one is not. It converts
+  none of the existing checks. [R9](../plan/step-005-validation-gate.md#r9--no-test-framework-in-this-step-and-step-002s-prediction-is-set-aside--approved-by-amino-2026-08-25): **no pytest**, which is the fourth Step to
+  decline it and the first to contradict something written down — Step 002's R5 named
+  the Validation Gate as where pytest would arrive. The win it would bring is
+  decomposition's and R8 takes it; the evidence model here is printed output a review
+  quotes, and a sixth Sub-step would fire R5's split point and cost 5.5. Neither debt
+  nor extension, and the plan says why. [R10](../plan/step-005-validation-gate.md#r10--current-state-is-trimmed-in-its-own-commit-between-the-plan-and-51--approved-by-amino-2026-08-25): **the trim above**.
+  **Step 005 is the Validation Gate**, which was Step 004's stated *expectation*
+  rather than its plan; the plan confirms it rather than inherits it, and its
+  [Why this Step](../plan/step-005-validation-gate.md#why-this-step) is where the
+  argument is. Four of the six
+  [constraints](validation-feasibility.md#consequences-for-step-004) bind it —
+  C3, C4, C5 and C6, each of which Step 004's own table marked *"Binds the Gate
+  Step"* — and [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md)'s go
+  is recorded.
+  **This commit also closes Step 004 formally** — it writes 4.5's hash into
+  the list above and turns the [plan](../plan/step-004-semantic-layer.md) from
+  `in review` to `done`, exactly how `6c15736` closed Step 003 and `40d72d8` closed
+  Step 002. **No component row moved**, because planning builds nothing.
+  **Two Ledger entries the Gate Step reads first**, and the plan reads both:
   [DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject),
-  whose trigger is *"the Sub-step that builds the Validation Gate"* and which the Step
-  004 plan says this Step wrote the fields for.
+  whose trigger is *"the Sub-step that builds the Validation Gate"* and which the plan
+  fires and pays in 5.4; and
+  [DEBT-016](../debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type),
+  which fires **earlier than its own entry predicted** — it names *"the Orchestrator's
+  execute step"* as where it expected to, and the Gate gets there first, because a
+  bounded-read check asks the engine to plan caller-supplied SQL and that can be
+  refused. It is paid in 5.1.
+  **The question counts moved.** R11 handed three questions to Grounding; **5.5 answers
+  the first**, so two travel on — no `by settlement date` axis, and check 17's
+  foreclosure. The two
+  [R10](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24)
+  handed to Retrieval are untouched. Both sets are listed below.
 - **Sub-step 4.5 was approved on 2026-08-25, and one question stays open.** The seven
   things the [4.5 review](../reviews/step-004-semantic-layer.md#sub-step-45--write-the-dimension-definitions) put up sceptically and the five it deliberately
   left undone were ruled on together — *"all approved"* — and argued in full as
   [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25), in the plan rather than only in the review, because a review is read
   once. Nothing was reverted and nothing was renamed. **Four of the items carry a stated
   reason and it is the same one four times**: they belong to the Step that grounds a
-  query, which is [Grounding](../glossary.md#a-the-system) — the three questions below.
+  query, which is [Grounding](../glossary.md#a-the-system) — the three questions below,
+  **the first of which Step 005 took back** when Amino widened R1 on 2026-08-25.
   The **Glossary amendment stands**, so the `Dimension Definition` row is agreed rather
   than provisional and check 18 keeps both halves; the four remaining sceptical points —
   `grain` compared as text, the plural `columns`, the `dimension_definition` kind, and
@@ -63,8 +123,9 @@ wrong and gets fixed immediately.
   values are minted by the data; and the Glossary's `Dimension Definition` row and the
   corpus register the same five axes with the same columns, grain and buckets. Five
   probes give the first three teeth on every run.
-  **`by region` sits inside no metric route, and that is the first of the three
-  questions Grounding inherits.** Nothing under `semantic/joins/` reaches `dim_client`, so the axis the
+  **`by region` sits inside no metric route** — the first of the three questions
+  R11 handed to Grounding, and the one [Step 005 took back](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25) on
+  2026-08-25. Nothing under `semantic/joins/` reaches `dim_client`, so the axis the
   Glossary's own worked example uses — *"Net Revenue by region last quarter"* — is
   certified, true and not yet applicable. It is not a defect in anything written here:
   4.2 wrote the routes the **expressions** need, and no expression needs `dim_client`;
@@ -84,17 +145,23 @@ wrong and gets fixed immediately.
   **Nothing from a later Step was built**: no `veritas/validation/`, no Retrieval, no
   Access Profile, no `README.md`. `semantic/metrics/`, `semantic/joins/` and
   `semantic/ambiguous/` were not touched — `git status` on all three is empty.
-- **Three questions the Grounding Step inherits**, all ruled on 2026-08-25 and none of
-  them a defect in anything built here. They are [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)'s first three rulings, and
-  they take the shape R10 gave the two questions above: a named place to look first, not
-  an open defect.
-  1. **`by region` is certified and unreachable.** Nothing under `semantic/joins/`
-     reaches `dim_client`, so the axis the Glossary's own worked example uses cannot yet
-     be applied. What closes it is two Join Path files — `trade_to_account` and
-     `account_to_client` — **plus the rule that lets a query add a Join Path for a
-     *slice* rather than for an expression**, and it is that second half that makes it
-     Grounding's work rather than authoring work. It is **not** debt: *"correctly belongs
-     to the Step that grounds a query."*
+- **Two questions the Grounding Step inherits, and a third Step 005 took back**, all
+  ruled on 2026-08-25 and none of them a defect in anything built here. They are
+  [R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)'s
+  first three rulings, and they take the shape R10 gave the two questions above: a named
+  place to look first, not an open defect.
+  1. **`by region` is certified and unreachable — and it is Sub-step 5.5's now, not
+     Grounding's.** Nothing under `semantic/joins/` reaches `dim_client`, so the axis the
+     Glossary's own worked example uses cannot yet be applied. What closes it is Join
+     Path files **plus the rule that lets a query add a Join Path for a *slice* rather
+     than for an expression**, and it was that second half that made it Grounding's work
+     rather than authoring work. On 2026-08-25 Amino
+     [widened R1](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25) and gave
+     both halves to Step 005: *"it's ok to cover this specific part's grounding half
+     here."* **Still unbuilt** — 5.5 is planned, not written — but it is no longer
+     travelling. It was never debt: *"correctly belongs to the Step that grounds a
+     query"*, and the Step that grounds a query turned out to be one Step later than the
+     Step that enforces the route.
   2. **There is no `by settlement date` axis, and it is deferred rather than rejected.**
      The column exists and holds real dates, but every Metric Definition keys its period
      filter on `trade_date`, so certifying it would let one question be *sliced* on one
@@ -434,7 +501,7 @@ wrong and gets fixed immediately.
   `FIXTURE_EXEMPTIONS` is a register holding one entry. **3.2 did not widen any
   exemption**: the abbreviation check failed on two shouted constant names in the
   review's prose and the review was reworded, rather than the list extended.
-- **Active Step:** 003 — Prove the Validation Gate's parse-tree claim
+- **Step 003, while it was the active Step** — Prove the Validation Gate's parse-tree claim
   ([plan](../plan/step-003-validation-feasibility.md)), **written and approved
   2026-08-15, committed in `40d72d8`**, and **complete: every Sub-step is built and
   approved, and the plan is `in review` until 3.5's commit makes it `done`**. All
@@ -498,8 +565,10 @@ wrong and gets fixed immediately.
   missed it.
 - **Step 004 was planned in its own commit rather than appended to the Step it
   follows** — the route to the Target State is discovered one Step at a time, so
-  planning it was the next session's first act. **Step 005 is not planned**, and the
-  Validation Gate is its *expectation* rather than its plan.
+  planning it was the next session's first act. At the time of that commit **Step 005
+  was not planned**, and the Validation Gate was its *expectation* rather than its
+  plan; the [Step 005 plan](../plan/step-005-validation-gate.md) was written on
+  2026-08-25 and approved the same day.
 - **Sub-step 2.6 was committed unchanged**, so the three points its review put up
   under *Look at this sceptically* stand as built, with no ruling recorded against
   them: `generate_series` is not standard SQL and the scan does not flag it,
