@@ -45,11 +45,12 @@ SEMANTIC_DIR = REPO_ROOT / "semantic"
 # makes the files *more* portable rather than less.
 #
 # Quoting the key in the file would fix that one key and nothing else. The values
-# are where this gets expensive later: a Dimension Definition's allowed values are
-# domain text, and YAML 1.1 reads `no`, `on`, `y` and `n` as booleans in any casing
-# — Norway's country code, Ontario's province code, and both halves of every yes/no
+# are where this gets expensive: a Dimension Definition's allowed values are domain
+# text, and YAML 1.1 reads `no`, `on`, `y` and `n` as booleans in any casing —
+# Norway's country code, Ontario's province code, and both halves of every yes/no
 # flag ever written. Silently turning one of those into False is a certified axis
-# that lies, which is the failure Sub-step 4.5's check exists to catch.
+# that lies, and `.claude/scripts/check_semantic_layer.py` compares those values
+# against the ones the Warehouse holds, where `False` matches nothing.
 YAML_12_BOOLEANS = re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$")
 
 
@@ -202,25 +203,72 @@ class AmbiguousTerm(SemanticEntry):
     resolution: str
 
 
+@dataclass(frozen=True)
+class DimensionDefinition(SemanticEntry):
+    """A certified axis for slicing a metric — the answer to "by what?".
+
+    The three fields past `SemanticEntry`'s are the Glossary's own definition of
+    this entry type — *"Names the column, its grain, and its allowed values, so 'by
+    region' always means the same column with the same buckets"*:
+
+      `columns`        where the axis lives in the Warehouse, `table.column`.
+                       Plural because one axis can be one column in several tables:
+                       `Snapshot` is registered as living in both
+                       `fct_position_snapshot` and `fct_balance_snapshot`, and
+                       slicing by Snapshot date is the same axis in each.
+      `grain`          how fine a slice the axis can cut. `daily` for a date, and
+                       for an enumerated axis the subject one value hangs off —
+                       every Client has one region, so the region axis groups
+                       Clients.
+      `allowed_values` the buckets, when the axis has a registered vocabulary of
+                       them. Empty for a date, whose values the data mints rather
+                       than the Glossary registering, and where writing today's
+                       dates into the corpus would be a measurement dressed as a
+                       definition.
+
+    **It publishes no SQL**, for the reason an Ambiguous Term does not: `columns`
+    holds identifiers rather than an expression, and what checks them is the live
+    schema rather than a parse. `SQL_FIELDS` below therefore has no row for it.
+
+    **It is a leaf.** Nothing in the corpus references a Dimension Definition — a
+    Metric Definition names its Join Paths and the metrics it derives from, and an
+    Ambiguous Term names the metrics it disambiguates between, but no field
+    anywhere names an axis. What joins an axis to a metric is a query, which is
+    the Grounding Step's subject and not this corpus's.
+    """
+
+    description: str
+    columns: tuple[str, ...]
+    grain: str
+    allowed_values: tuple[str, ...]
+
+
 # Directory -> the `kind` files in it must declare, and the type they load as. The
 # directory names are Glossary Section A's own homes: `semantic/metrics/`,
 # `semantic/joins/`, `semantic/ambiguous/`. This mapping is deliberately not a scan
 # of the tree — a file in a directory it does not know fails to load rather than
 # being skipped, which is why Sub-step 4.4 had to come here and add its row rather
 # than dropping five files into a new directory and having them silently ignored.
-# `semantic/dimensions/` is the one remaining entry type and stays absent on the
-# same terms, so Sub-step 4.5 comes here too.
+# `semantic/dimensions/` is Sub-step 4.5 and completes the four.
+#
+# The `kind` a file declares is the Glossary's own term, snake-cased, except where a
+# shorter term is registered for the same thing: `Certified Metric` is registered
+# and `metric` is what a Metric Definition declares. No `Dimension` is registered,
+# so the axis entries declare `dimension_definition` in full rather than coining a
+# noun by shortening one.
 ENTRY_KINDS: dict[str, tuple[str, type[SemanticEntry]]] = {
     "metrics": ("metric", MetricDefinition),
     "joins": ("join_path", JoinPath),
     "ambiguous": ("ambiguous_term", AmbiguousTerm),
+    "dimensions": ("dimension_definition", DimensionDefinition),
 }
 
 # Fields whose value is a list of strings rather than one string. Read off the
-# annotation would be tidier and is not worth the reflection: five names, in one
+# annotation would be tidier and is not worth the reflection: seven names, in one
 # place, next to the dataclasses that declare them.
 STRING_LISTS = frozenset({
-    "aliases", "derives_from", "join_paths", "filters", "disambiguates"
+    "aliases", "derives_from", "join_paths", "filters", "disambiguates",
+    "columns", "allowed_values"
 })
 
 # Fields whose value is SQL — text pasted into a query and therefore text that
@@ -240,11 +288,10 @@ SQL_FIELDS: dict[type[SemanticEntry], tuple[str, ...]] = {
 class SemanticLayer:
     """The certified registry, loaded.
 
-    Three of the four entry types are here. Dimension Definitions are Sub-step 4.5,
-    and this class gains a mapping each time — which is an addition rather than a
-    change, because nothing keys off the absence. Sub-step 4.4 adding
-    `ambiguous_terms` is that prediction holding: no existing field moved and no
-    caller of the other two noticed.
+    All four entry types are here. The class gained a mapping in each of the two
+    Sub-steps that added one, and both times that was an addition rather than a
+    change, because nothing keys off the absence: no existing field moved and no
+    caller of the older mappings noticed.
 
     Entries are held by their `name` and not by their filename, because `name` is
     what every reference in the corpus uses: a Metric Definition names its Join Path
@@ -259,6 +306,7 @@ class SemanticLayer:
     metrics: dict[str, MetricDefinition]
     join_paths: dict[str, JoinPath]
     ambiguous_terms: dict[str, AmbiguousTerm]
+    dimensions: dict[str, DimensionDefinition]
 
     def entries(self) -> list[SemanticEntry]:
         """Every entry, whatever its kind, in the order the files were read."""
@@ -266,6 +314,7 @@ class SemanticLayer:
             *self.metrics.values(),
             *self.join_paths.values(),
             *self.ambiguous_terms.values(),
+            *self.dimensions.values(),
         ]
 
 
@@ -360,6 +409,7 @@ def load_semantic_layer(root: Path = SEMANTIC_DIR) -> SemanticLayer:
     metrics: dict[str, MetricDefinition] = {}
     join_paths: dict[str, JoinPath] = {}
     ambiguous_terms: dict[str, AmbiguousTerm] = {}
+    dimensions: dict[str, DimensionDefinition] = {}
     seen: dict[str, Path] = {}
 
     for path in entry_files(root):
@@ -378,9 +428,14 @@ def load_semantic_layer(root: Path = SEMANTIC_DIR) -> SemanticLayer:
                 join_paths[entry.name] = entry
             case AmbiguousTerm():
                 ambiguous_terms[entry.name] = entry
+            case DimensionDefinition():
+                dimensions[entry.name] = entry
 
     return SemanticLayer(
-        metrics=metrics, join_paths=join_paths, ambiguous_terms=ambiguous_terms
+        metrics=metrics,
+        join_paths=join_paths,
+        ambiguous_terms=ambiguous_terms,
+        dimensions=dimensions,
     )
 
 
@@ -395,7 +450,8 @@ def sql_fields(entry: SemanticEntry) -> list[tuple[str, str]]:
     That is how Ambiguous Terms arrived in Sub-step 4.4 — one names Certified
     Metrics, which is a claim about language rather than text a query pastes — and
     it is why adding the type cost the two readers nothing: they ask this function
-    and get an empty list. Dimension Definitions arrive on the same terms.
+    and get an empty list. Dimension Definitions arrived on the same terms in
+    Sub-step 4.5, holding identifiers the live schema checks rather than SQL.
     """
     published: list[tuple[str, str]] = []
     for field in SQL_FIELDS.get(type(entry), ()):

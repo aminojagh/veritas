@@ -1,0 +1,16 @@
+# Trade Date and Settlement Date are a Glossary Section C pair, and there is
+# deliberately no `by settlement date` axis: every Metric Definition keys its
+# period filter on trade_date, so certifying the other axis would let a question
+# be sliced on one date while being filtered on the other.
+name: by trade date
+version: 1
+kind: dimension_definition
+description: >
+  When a Trade was executed. The axis every trade-side metric — Gross Revenue,
+  Net Revenue, Traded Notional, Trade Count — is both filtered and sliced on.
+  Distinct from Settlement Date, which is when the cash moves: which of the two a
+  period uses shifts revenue across period boundaries and also selects the FX
+  Rate, so it moves the number twice.
+columns: [fct_trade.trade_date]
+grain: daily
+allowed_values: []

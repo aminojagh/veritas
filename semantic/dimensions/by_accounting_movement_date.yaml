@@ -1,0 +1,16 @@
+# Named for the Accounting Movement rather than for the column, because
+# fct_cash_movement carries a movement_date too and Cash Movement against
+# Accounting Movement is a Glossary Section C pair. An axis called "by movement
+# date" would be the blur that pair exists to catch.
+name: by accounting movement date
+version: 1
+kind: dimension_definition
+description: >
+  The date an Accounting Movement recognised value — when it was earned, whether
+  or not cash moved. The axis Realised P&L is filtered and sliced on. Commission
+  is earned on Trade Date and collected on Settlement Date, so in any period
+  straddling a settlement cycle this axis and the cash side disagree, and both
+  are right about different questions.
+columns: [fct_accounting_movement.movement_date]
+grain: daily
+allowed_values: []

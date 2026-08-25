@@ -1884,3 +1884,370 @@ with the ampersand dropped, which is a two-letter shout the Glossary does not re
 as an abbreviation — and the check reads this review. The example is now
 `Realized P&L` — the American spelling, which is a better example anyway, since
 `realised_pnl.yaml` already carries it as an alias precisely because people write it.
+
+---
+
+## Sub-step 4.5 — Write the Dimension Definitions
+
+**What changed**
+
+**The fourth entry type, and with it the corpus is whole.** `semantic/dimensions/`
+publishes the certified axes a metric can be sliced along — the answer to *"by
+what?"* — and the Semantic Layer now holds all four of the entry types
+[Glossary Section A](../glossary.md#a-the-system) registers: nine Metric Definitions,
+eight Join Paths, five Ambiguous Terms and five Dimension Definitions, twenty-seven
+entries in all.
+
+Five things, in the order they were written:
+
+1. **`veritas/semantic/loader.py` gained `DimensionDefinition`** — `description`,
+   `columns`, `grain` and `allowed_values` past the three fields every entry carries
+   — and the `dimensions` row in `ENTRY_KINDS`, which had to come first for the
+   reason Sub-step 4.4's row did: that mapping is not a scan of the tree, so five
+   files in an unregistered directory fail to load rather than being skipped.
+   `SemanticLayer` gained its fourth mapping, which is the addition the class's own
+   docstring predicted twice and both times correctly — nothing keys off the absence,
+   so no existing field moved and no caller of the older three noticed.
+2. **The five entries.** `by trade date`, `by snapshot date`,
+   `by accounting movement date`, `by region` and `by instrument type`.
+   `semantic/metrics/`, `semantic/joins/` and `semantic/ambiguous/` were **not
+   touched** — `git status` on all three is empty.
+3. **Four checks, numbered 15 to 18**, and they read the **Warehouse** rather than
+   the rest of the corpus. That is forced by what this entry type is: a Dimension
+   Definition is the only **leaf** in the corpus — no field anywhere names an axis —
+   so nothing above one would notice if it were wrong, and its claim is about the
+   data rather than about the other entries. Check 15 is that every named column
+   exists in the live schema; check 16 is that every column an axis names holds the
+   same set of values and that an enumerated axis's buckets are exactly that set;
+   check 17 is that an axis enumerates exactly when its buckets are a registered
+   vocabulary rather than dates; check 18 is check 2 pointed at the Glossary row that
+   registers the axes.
+4. **One Glossary amendment**, below, and a **dated status note on
+   [DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)**
+   recording that its third trigger arm was in reach and was deliberately not fired,
+   which is what
+   [R7](../plan/step-004-semantic-layer.md#r7--the-date-axis-defers-debt-012s-trigger-rather-than-avoiding-it--approved-by-amino-2026-08-21)
+   asked this Sub-step for.
+5. **[DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)**,
+   opened by check 18 — the axes are registered inside one Glossary table cell and
+   read back out of prose, where the other two registries this project reads back are
+   tables.
+
+**The single date axis became three, and that is the amendment.** The Glossary row
+offered *"by date (`trade_date`, daily)"* as one of three examples. One axis named
+`fct_trade.trade_date` cannot be applied to five of the nine Certified Metrics: a
+Snapshot metric's route never reaches that column, so slicing `Account Value` by it
+is a certified axis that produces a broken query or, worse, joins in the whole Trade
+table to get one. The corpus therefore publishes the three date senses the Warehouse
+actually keys on, each named for the registered term it belongs to —
+[`Trade Date`](../glossary.md#c-distinctions-we-must-not-blur),
+[`Snapshot`](../glossary.md#b-the-warehouse) and
+[`Accounting Movement`](../glossary.md#b-the-warehouse). Two consequences are
+deliberate:
+
+- **`by accounting movement date` is not called "by movement date".**
+  `fct_cash_movement` carries a `movement_date` too, and *Cash Movement* against
+  *Accounting Movement* is a Section C pair — *"in any period that straddles a
+  settlement cycle the two disagree, and both are correct answers to different
+  questions."* An axis called "by movement date" would be exactly that blur.
+- **There is no `by settlement date` axis**, though the column exists and holds real
+  dates. Every Metric Definition keys its period filter on `trade_date`, so
+  certifying the other half of that Section C pair as an axis would let one question
+  be *sliced* on one date while being *filtered* on the other. That is a real
+  question the Warehouse can answer and the corpus deliberately does not certify yet.
+
+**`by snapshot date` is one axis over two columns**, because `Snapshot` is one term
+registered as living in both `fct_position_snapshot` and `fct_balance_snapshot`, and
+the claim that makes them one axis is that one calendar writes both. Check 16 holds
+them to it: the two columns must hold the same set of dates, so a drift between them
+fails the run rather than surfacing as an Account Value missing its cash leg on the
+dates only one table has. The run reads 453 dates on both.
+
+**Check 17 is the rule that stops check 16 being dodgeable.** An axis that enumerates
+nothing has opted out of being compared with the Warehouse, so the corpus has to say
+when that is allowed: **exactly when the column is a date**. A date's values are
+minted by the data, and a list of them written into a file is a measurement dressed
+as a definition — the same rule this project applies to every other figure. Every
+other axis is a registered vocabulary and must write its buckets down. The rule runs
+in both directions, so a date axis that *did* enumerate fails too.
+
+**The Glossary amendment.** The `Dimension Definition` row listed three axes as
+*examples*; it now names the five certified axes with their columns, their grain and
+their buckets, in a form check 18 reads back — `(columns — grain — allowed values)`,
+the third part absent on a date axis. The row previously duplicated `client_region`'s
+values and `instrument_type`'s values with nothing comparing them, which is the state
+that let the instrument-type list disagree with the `Instrument` row for two days in
+Step 002. **This is the change most worth rejecting if Amino disagrees**, and it is
+one cell to revert plus `dimension_axes_in_glossary` to delete.
+
+The check earned its keep before it was finished: the amendment note appended to that
+same cell quoted the old wording, and the run read the quotation as a sixth axis and
+failed. The note now quotes it without its bold. That is DEBT-017's cost arriving on
+day one, which is why the entry exists rather than a comment.
+
+**One reading is printed rather than asserted, and it is the finding this Sub-step
+hands on.** `by region` sits inside **no** metric route: nothing under
+`semantic/joins/` routes a fact table to `dim_client`, so the axis the Glossary's own
+worked example uses — *"Net Revenue by region last quarter"* — is certified, true, and
+not yet applicable. It is not a defect in anything written here. Sub-step 4.2 wrote
+the routes the **expressions** need, and no expression needs `dim_client`; what a
+grouping needs is a Join Path added for a *slice* plus the rule that lets a query add
+one, and both belong to the Step that grounds a query. The evidence that this is a
+known shape rather than an oversight is in the Sub-step 3.2 spike, whose
+`net revenue by region` probe writes `fct_trade → dim_account → dim_client` **by
+hand** and calls it *"two more joins … and the shape nearly every real question
+produces"*. The check prints the count on every run so it cannot go quiet:
+
+```
+      by region:                       0 — no route arrives at dim_client
+```
+
+**Three claims in Current State had stopped being true before this Sub-step, and were
+fixed with it.** Its *Known gaps* section still read *"The Semantic Layer is two entry
+types of four … there is no Ambiguous Term"*, which 4.4 falsified and did not sweep;
+its repository-layout tree showed `semantic/metrics/` and `semantic/joins/` and no
+`semantic/ambiguous/`; and it said `Cash Balance` over the whole Warehouse is *"640
+dates added together"* where the Snapshot calendar holds 453, which this Sub-step's own
+run prints. The third is the rule about run-contingent figures catching the project
+that wrote it: the sentence now names the line of the check that prints the count
+instead of carrying one.
+
+**Two pieces of Sub-step 4.4's code moved, and both are one-name-for-one-thing.**
+`ambiguous_term_home` became `section_a_row` plus `registered_home`, because check 18
+needed a different cell of the same table and two scans of one table is how they stop
+scanning the same table. `COULD_MEAN_SEPARATOR` became `GLOSSARY_LIST_SEPARATOR`: it
+is one character doing one job in two Glossary cells, and two names for it would have
+been the disease Non-Negotiable #1 exists to prevent.
+
+**Verification**
+
+```bash
+uv run python .claude/scripts/check_semantic_layer.py
+```
+
+The new block and the run's last line. The counts on the first line and the
+Ambiguous Term block are the only other changes; the nine metric reports, the Section
+C pairs, the widening casts, the parse rule and the spike pin are unchanged from 4.4
+and elided:
+
+```
+  Semantic Layer: semantic/ — 9 Metric Definition(s), 8 Join Path(s), 5 Ambiguous Term(s), 5 Dimension Definition(s)
+  Glossary Section B names 9 terms living in semantic/metrics/
+
+[... the Ambiguous Term block, the nine Metric Definition reports, the Section C
+     pairs and the widening casts, all unchanged ...]
+
+  dimensions — the certified axes a metric can be sliced by
+    Glossary Section A's `Dimension Definition` row names 5 axis(es); semantic/dimensions/ publishes 5
+    'by accounting movement date' — fct_accounting_movement.movement_date (DATE) — daily — 497 value(s), not enumerated
+    'by instrument type' — dim_instrument.instrument_type (VARCHAR) — one Instrument — equity · ETF · future · currency pair
+    'by region' — dim_client.client_region (VARCHAR) — one Client — EU · UK · APAC
+    'by snapshot date' — fct_position_snapshot.snapshot_date · fct_balance_snapshot.snapshot_date (DATE) — daily — 453 value(s), not enumerated
+    'by trade date' — fct_trade.trade_date (DATE) — daily — 497 value(s), not enumerated
+    reach — the metric routes an axis already sits inside, of 9 that assemble
+      by accounting movement date:     1 — Realised P&L
+      by instrument type:              3 — Account Value, Traded Notional, Unrealised P&L
+      by region:                       0 — no route arrives at dim_client
+      by snapshot date:                4 — Account Value, Cash Balance, Position Change, Unrealised P&L
+      by trade date:                   4 — Gross Revenue, Net Revenue, Trade Count, Traded Notional
+    probes — run against 'by instrument type' and 'by accounting movement date', which are real entries
+      refuses  a column the live schema does not hold
+      refuses  a bucket the Warehouse has never held
+      refuses  a held value the axis does not name
+      refuses  an enumeration written where the data mints the values
+      refuses  no enumeration where the Glossary registers the buckets
+
+[... the parse rule and the spike pin, unchanged ...]
+
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+exit=0
+```
+
+**The mutation the plan names, and two more.** The plan asks for one — *"add a fourth
+region to the allowed values, see the run fail against the Warehouse's three, restore,
+`cmp`"* — and the other two exist because check 16 has a second direction and check 18
+has a second side, and a rule proved in one direction is a rule half proved.
+
+```
+$ sed -i "s/[EU, UK, APAC]/[EU, UK, APAC, LATAM]/" semantic/dimensions/by_region.yaml
+
+FAIL — 2 problem(s)
+  - Dimension Definition 'by region' promises the bucket(s) ['LATAM'], and the Warehouse holds no such value in dim_client.client_region — a slice along that bucket comes back empty, and empty is what a real bucket with no rows looks like
+  - the Glossary's `Dimension Definition` row gives 'by region' the allowed values ['APAC', 'EU', 'UK'] and semantic/dimensions/ publishes ['APAC', 'EU', 'LATAM', 'UK'] — the registered axis and the retrievable one are not the same axis
+exit=1
+cmp: identical
+```
+
+```
+$ sed -i "s/[EU, UK, APAC]/[EU, UK]/" semantic/dimensions/by_region.yaml
+
+FAIL — 2 problem(s)
+  - Dimension Definition 'by region' does not name the value(s) ['APAC'], which the Warehouse holds in dim_client.client_region — every row carrying one of them is a row the certified buckets drop, so the slices do not add up to the total and nothing says why
+  - the Glossary's `Dimension Definition` row gives 'by region' the allowed values ['APAC', 'EU', 'UK'] and semantic/dimensions/ publishes ['EU', 'UK'] — the registered axis and the retrievable one are not the same axis
+cmp: identical
+```
+
+The third mutates the **Glossary** instead of the corpus, leaving the five files
+untouched — so check 16 stays quiet, because the corpus still matches the Warehouse,
+and check 18 fires alone. That is the direction Sub-step 4.4's Section D amendment
+came from, and the direction a check that only read the corpus would miss:
+
+```
+$ # the Dimension Definition row's region cell grows a fourth bucket
+FAIL — 1 problem(s)
+  - the Glossary's `Dimension Definition` row gives 'by region' the allowed values ['APAC', 'EU', 'LATAM', 'UK'] and semantic/dimensions/ publishes ['APAC', 'EU', 'UK'] — the registered axis and the retrievable one are not the same axis
+cmp: identical
+```
+
+**The other four committed checks still pass**, which is the claim that a new entry
+type cost the readers of the corpus nothing:
+
+```bash
+uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+
+uv run python .claude/scripts/check_language.py
+PASS — documents agree with the Glossary and the writing conventions
+
+uv run python .claude/scripts/verify_framework.py
+PASS — framework is wired up correctly
+```
+
+**Deliberately left undone**
+
+- **[DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)
+  — the axes are registered in one Glossary cell and check 18 parses prose.** Opened
+  here, not later. Its cost was paid once inside this Sub-step already.
+- **[DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)
+  stays open on all three arms.** The date axes name Warehouse columns rather than
+  calendar periods, so arm 3 is unfired; arms 1 and 2 are untouched and fire on their
+  own schedule. The entry carries the dated note R7 asked for, including what the
+  deferral costs — a Semantic Layer whose date axis cannot express *"Account Value at
+  the end of Q2"*, only "as of a date the Snapshot calendar holds".
+- **No Join Path was added**, so `by region` remains certified and unreachable. See
+  the sceptical point below, which is where this belongs if Amino disagrees.
+- **No `by settlement date` axis**, for the reason given above.
+
+  > **Ruled 2026-08-25 — both stay undone, and both belong to Grounding:** *"both belong
+  > to the Step that grounds a query."* The Join Path pair is therefore **not** filed as
+  > debt, and the settlement-date axis is **deferred rather than rejected** — the Step
+  > that decides which date a query filters on is the one that decides whether it can
+  > also be sliced on. [R11.1](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25) and [R11.2](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25).
+
+- **Nothing from a later Step.** No `veritas/validation/`, no Access Profile, no
+  Retrieval, no embeddings, no `README.md`.
+
+**Look at this sceptically**
+
+> **Ruled 2026-08-25 — all seven approved:** *"all approved."* Nothing below was
+> overruled, so nothing was reverted and nothing was renamed. Points **1** and **4**
+> carry a stated reason and are annotated where they stand; point **2** is settled by
+> the ruling on the Glossary amendment in *Language* below; and points **3**, **5**,
+> **6** and **7** are approved **as written, with no separate reason given** —
+> [R11.5](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25) records them plainly rather than inventing one for them.
+
+1. **`by region` is printed at zero and not failed, and this is the judgement most
+   worth overruling.** The argument for printing: nothing in the corpus is wrong — no
+   entry claims a route that does not exist, and what would make the axis applicable
+   is a grouping Join Path *plus* the rule that lets a query add one, which is
+   Grounding Step work. The argument against: the Glossary's own worked example for
+   this term is *"Net Revenue by region last quarter"*, and shipping the axis it names
+   as inapplicable is a corpus that reads better than it works. If you want it closed
+   inside Step 004 it is two Join Path files —
+   `trade_to_account` and `account_to_client`, exactly the joins the 3.2 spike writes
+   by hand — and that is a widening of this Sub-step or a sixth one, which fires
+   [R5](../plan/step-004-semantic-layer.md#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21).
+   I did not file it as debt because the Ledger's own test says debt is *"the current
+   code is wrong, cheaply"* and nothing written here is wrong — but the case for
+   calling it debt is that a reader cannot tell the difference from outside.
+
+   > **Ruled 2026-08-25 — printed, not failed, and not debt:** *"correctly belongs to the
+   > Step that grounds a query."* The judgement stands as taken, so
+   > [R5](../plan/step-004-semantic-layer.md#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21)'s
+   > split point stays unused and no sixth Sub-step is opened. What closes it is the two
+   > Join Path files **plus the rule that lets a query add one for a slice**, and it is
+   > that second half that makes it Grounding's work. The reach count keeps printing on
+   > every run, which is what stops the axis going quiet in the meantime. [R11.1](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25).
+
+2. **Three date axes where the Glossary had one, and the amendment that follows.** The
+   reasoning is above and it turns on a claim you should check: that a single axis
+   named `fct_trade.trade_date` would be wrong for the five Snapshot-and-movement
+   metrics rather than merely awkward. If you read it as awkward, the cheaper design
+   is one `by date` axis whose column is the metric's own `date_column`, and that is a
+   different format — the axis would then name no column of its own and check 15
+   would have nothing to check.
+
+   > **Ruled 2026-08-25 — the three axes stand, with the amendment that publishes them:**
+   > the claim was read as *wrong* rather than merely awkward, so the corpus keeps the
+   > three date senses and the Glossary keeps the cell that registers them. See the
+   > ruling on the amendment in *Language* below. [R11.4](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25).
+
+3. **Check 18 compares `grain` as text, where check 13 explicitly refused to compare
+   `resolution` as text** — *"comparing two pieces of prose would fail on a comma"*.
+   The distinction I drew is that `grain` is a value (`daily`, `one Client`,
+   `one Instrument`) and `resolution` is a sentence. It is a real distinction and it
+   is also exactly the kind that erodes: the third axis's grain is one word today and
+   a clause the moment someone wants to explain it.
+4. **Check 17 forecloses an axis whose values are data but not dates.** A
+   `by denomination currency` axis would hold a handful of codes that ingestion
+   produced rather than the Glossary registering — under this rule it would have to
+   enumerate them, and the enumeration would be a measurement in the corpus. Nobody
+   wants that axis today. The rule as written says the corpus may not have one
+   without a decision, which I think is the right default and is not free.
+
+   > **Ruled 2026-08-25 — the rule stands, and the axis it forecloses is Grounding's to
+   > ask for:** *"belongs to the Step that grounds a query."* The foreclosure is not
+   > loosened — a data-minted enumeration stays out of the corpus — and what the ruling
+   > settles is **where** an axis like `by denomination currency` gets decided, which is
+   > where a query needs to slice by one. The cost stated above is accepted with it.
+   > [R11.3](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25).
+
+5. **`columns` is plural where the Glossary says *"Names the column"*.** Only `by
+   snapshot date` needs the plural, and it needs it for a registered reason —
+   `Snapshot` lives in two tables. The alternative is two axes named for the same
+   Snapshot calendar, which would be two names for one thing.
+6. **The `kind` is `dimension_definition`, not `dimension`.** `metric` is short
+   because `Certified Metric` is registered; no `Dimension` is, so shortening it would
+   have coined a noun in a file that certifies vocabulary. The cost is the longest
+   `kind` value in the corpus.
+7. **Two of Sub-step 4.4's names changed** — `ambiguous_term_home` and
+   `COULD_MEAN_SEPARATOR`. Renaming committed code from a later Sub-step is churn if
+   the reason is taste; the reason here is that a second reader of the same table and
+   a second name for the same separator both arrived in this diff, and one name for
+   one thing is the rule this project is built on.
+
+**Language**
+
+No new domain noun was coined, and one `agreed` row was amended.
+
+- **The five axis names are compounds of registered terms** — `Trade Date` and
+  `Snapshot` and `Accounting Movement` from Sections B and C, and "region" and
+  "instrument type" from the `Dimension Definition` row's own words. `by
+  accounting movement date` is spelled in full rather than "by movement date"
+  precisely to keep a Section C pair apart.
+- **The three field names are the Glossary row's own words** — it says a Dimension
+  Definition *"Names the column, its grain, and its allowed values"*, which is
+  `columns`, `grain` and `allowed_values`. `description` is the field every other
+  retrievable entry type carries.
+- **`dimension_definition`** is the `kind` a file declares, in full, because
+  `Dimension` is not a registered term.
+- **🆕 Amended: the `Dimension Definition` row.** Three examples became the five
+  certified axes, in a form `check_semantic_layer.py` reads back. Agree, amend, or
+  reject — it is one cell, and rejecting it costs check 18 and DEBT-017, not the five
+  entries.
+
+  > **Ruled 2026-08-25 — the amendment stands:** *"all approved."* The row is **agreed
+  > rather than provisional**, which is what check 18 needed, since it reads that cell
+  > and rejecting the amendment would have meant deleting the check. The revert the
+  > review priced — one cell plus `dimension_axes_in_glossary` — is not exercised, and
+  > [DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)
+  > stays open on its own trigger: approving what the cell says is not approving that it
+  > is a cell. [R11.4](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25).
+
+- **Still open from Sub-step 4.4:** whether `resolution` wants a Glossary row of its
+  own. Nothing here touches it. **Still open at 2026-08-25**, when everything above was
+  approved: 4.5 adds no field by that name, so *"all approved"* approves nothing about
+  it. It is the one question Step 004 closes without answering. [R11.6](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25).

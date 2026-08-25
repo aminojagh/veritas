@@ -44,8 +44,9 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate | open |
 | [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast — **🔴 fired** | **paid** (Sub-step 4.3) |
 | [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query | open |
+| [DEBT-017](#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) | The certified axes are registered inside one Glossary cell | S | A sixth certified axis, or a rewording of that cell failing the run | open |
 
-**Open debt:** 9 · **Paid:** 4 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 10 · **Paid:** 4 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -972,6 +973,32 @@ itself and the hole cannot be reached. After one of them exists it can be reache
 by accident, which is why the trigger is the arrival of the first one rather than
 the first wrong answer.
 
+**Status note — 2026-08-24, Sub-step 4.5: arm 3 was in reach and was deliberately
+not fired.** `semantic/dimensions/` now publishes three date axes — `by trade date`,
+`by snapshot date` and `by accounting movement date` — and each names a Warehouse
+date column rather than a calendar period, so no certified axis carries a period
+boundary the Snapshot calendar does not itself hold. That narrowing was agreed
+before the Sub-step was written, as
+[R7](plan/step-004-semantic-layer.md#r7--the-date-axis-defers-debt-012s-trigger-rather-than-avoiding-it--approved-by-amino-2026-08-21),
+and it is written down here because *"a deferral nobody wrote down is
+indistinguishable from not having noticed."*
+
+- **What it buys:** repaying this entry stays a **Warehouse** change — a provenance
+  column, the build, and the seven simulated tables that hang off it — instead of
+  being paid inside the Step that authors a corpus, which is the same objection that
+  deferred it out of Sub-step 2.5.
+- **What it costs, and it is not nothing:** the Semantic Layer ships with a date axis
+  that cannot express *"Account Value at the end of Q2"* — only "as of a date the
+  Snapshot calendar holds". Every component above it inherits that, so the Gold
+  Question Set Step meets this hole as a **design constraint** and not merely as a
+  trigger it happens to trip. `semantic/dimensions/by_snapshot_date.yaml` says so in
+  the entry a reader retrieves, and `check_semantic_layer.py` holds the two Snapshot
+  tables to one calendar, so a drift between them fails the run rather than surfacing
+  as an Account Value missing a leg.
+- **Arms 1 and 2 are untouched and still live.** A gold question naming a date and
+  the App accepting one from a user fire on their own schedule, and neither is
+  affected by how the date axis was written. This entry stays **open** on all three.
+
 ---
 
 ### DEBT-013 — The decisions that move a number live only in internal reviews
@@ -1304,3 +1331,68 @@ the Orchestrator's execute step, which is where a Grounded Answer has to say *"t
 Validation Gate passed this and the engine still refused it"*. That component cannot
 catch `Exception` and stay honest, because it has to tell a user which of the two
 happened.
+
+### DEBT-017 — The certified axes are registered inside one Glossary cell
+
+- **Status:** open
+- **Opened:** Sub-step 4.5 (`.claude/docs/reviews/step-004-semantic-layer.md`)
+- **Size:** S
+- **Location:** [`glossary.md`](glossary.md#a-the-system) — the `Dimension
+  Definition` row's *Definition* cell — and
+  `.claude/scripts/check_semantic_layer.py`, `dimension_axes_in_glossary`
+
+**What we did**
+
+Registered the five certified axes — their names, their columns, their grain and
+their allowed values — inside the prose of one Section A table cell, and read them
+back out of it with a regular expression over that prose. Check 18 is what makes the
+Glossary and `semantic/dimensions/` say the same thing, and it works: it caught a
+quotation of the old wording inside the amendment note appended to the same cell, on
+its first run.
+
+The other two registries this project reads back are **tables**. Section B gives every
+Certified Metric a row and check 2 reads a column of it; Section D gives every
+Ambiguous Term a row and check 13 reads two columns of it. The axes got a sentence.
+
+**What we should have done**
+
+Give the axes a Glossary section of their own, one row per axis, with the columns,
+the grain and the allowed values in columns of their own — the shape Section D
+already has, which is why check 13 splits cells rather than matching a pattern. The
+`Dimension Definition` row would then define the term and point at that section, the
+way the `Ambiguous Term` row's meaning lives in Section D.
+
+**Why we deferred**
+
+A new Glossary section changes the shape of the shared vocabulary, which is Amino's
+to agree to rather than a Sub-step's to take while writing five YAML files — and at
+five axes the sentence is still legible, which is the honest reason it was not worth
+putting up. The parse is strict on purpose: a reworded parenthetical fails the run
+rather than silently reading a different list, so this debt cannot go quiet.
+
+**Cost while unpaid**
+
+Two costs, and the second is the one that will actually be paid.
+
+**The check is bound to a sentence's punctuation.** `dimension_axes_in_glossary`
+requires a bold axis name followed immediately by a parenthetical of two or three
+em-dash-separated parts. Anyone editing that cell for readability — adding a clause,
+quoting the old wording, reaching for a different dash — fails the run for a reason
+that has nothing to do with the corpus, and the failure names the Glossary rather
+than the edit. That already happened once, inside this Sub-step.
+
+**The cell gets less legible with every axis added.** Five axes are a long sentence;
+ten would be a paragraph nobody reads, which is the state a registry must not reach —
+the instrument-type values disagreed with the `Instrument` row for two days in Step
+002 precisely because a list sat where a reader would not look.
+
+**Trigger**
+
+Whichever lands first:
+
+1. **A sixth certified axis.** The Grounding Step is where "by account" or "by
+   client" becomes a question someone asks, and a sixth item is where the sentence
+   stops being a list a reader can hold.
+2. **The first time that cell is reworded and the run fails for it.** That is the
+   cost arriving as an interruption, and repaying it then is cheaper than working
+   around it twice.

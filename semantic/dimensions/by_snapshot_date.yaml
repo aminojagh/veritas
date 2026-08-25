@@ -1,0 +1,17 @@
+# One axis over two tables because `Snapshot` is one term registered as living in
+# both, written by one calendar. Check 16 holds them to that: the two columns must
+# hold the same set of dates, so a Position Snapshot calendar that drifted from the
+# Balance Snapshot calendar fails the run rather than showing up as an Account
+# Value missing a leg.
+name: by snapshot date
+version: 1
+kind: dimension_definition
+description: >
+  The date a Snapshot describes the state of the world as of, at the close. The
+  axis every Snapshot-grain metric — Cash Balance, Account Value, Unrealised P&L,
+  Position Change — is asked "as of" along. It is not a calendar: only dates the
+  Snapshot calendar holds are answerable, and a date it skips has no Snapshot to
+  return rather than an empty one.
+columns: [fct_position_snapshot.snapshot_date, fct_balance_snapshot.snapshot_date]
+grain: daily
+allowed_values: []

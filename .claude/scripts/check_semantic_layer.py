@@ -5,7 +5,7 @@ Run with:  uv run python .claude/scripts/check_semantic_layer.py
 Needs a filled Warehouse — `uv run python -m veritas.ingestion` first — because a
 published expression that has never been executed is a claim rather than a metric.
 
-A corpus cannot be proved by running it, only by running what it claims. Fourteen
+A corpus cannot be proved by running it, only by running what it claims. Eighteen
 checks do that. Five are the ones
 [Sub-step 4.1](../docs/plan/step-004-semantic-layer.md#41--publish-the-semantic-entry-format-on-one-metric-definition)
 names; the sixth is Non-Negotiable #1 applied to the one place this corpus can coin
@@ -19,7 +19,10 @@ reproducible. Checks 12 to 14 arrived with
 [Sub-step 4.4](../docs/plan/step-004-semantic-layer.md#44--write-the-ambiguous-terms)
 and are the only ones in this file that execute nothing: they are claims about
 **language** rather than about arithmetic, so they fail when a word is wrong while
-every number is right.
+every number is right. Checks 15 to 18 arrived with
+[Sub-step 4.5](../docs/plan/step-004-semantic-layer.md#45--write-the-dimension-definitions),
+the last entry type, and read the **Warehouse** rather than the rest of the corpus:
+a Dimension Definition is a leaf, so nothing above it would notice if one were wrong.
 
   1. Every file under `semantic/` loads, and every field the format names is
      present. The loader is what enforces this — its dataclasses *are* the field
@@ -111,6 +114,29 @@ every number is right.
      review recorded that nothing enforced it; the second is the same failure
      happening outside Section D, where nothing can ask the user about it.
 
+ 15. Every column a Dimension Definition names exists in the live schema. An axis
+     over a column nobody has cannot be applied to any metric, and without this the
+     failure arrives inside a generated query rather than here.
+
+ 16. Every column an axis names holds the **same** set of values, and where the axis
+     enumerates its buckets, that set is exactly the enumeration. Both directions: a
+     bucket the Warehouse has never held is the certified axis that lies, and a held
+     value the axis does not name is a bucket every slice silently drops, so the
+     slices do not add up to the total.
+
+ 17. An axis enumerates its buckets exactly when they are a **registered
+     vocabulary** — which is to say, exactly when its columns are not dates. A
+     date's values are minted by the data, so a list of them in the corpus is a
+     measurement that stops being true on the next load; every other axis writes its
+     buckets down, and one that does not has opted out of check 16 by saying nothing.
+     Five probes give 15, 16 and 17 teeth on every run, for check 6's reason.
+
+ 18. Glossary [Section A](../docs/glossary.md#a-the-system)'s `Dimension Definition`
+     row and `semantic/dimensions/` register the same axes, with the same columns,
+     the same grain and the same buckets. Check 2 for axes, read out of the Glossary
+     for the same reason — the row and the corpus hold one list twice, and the
+     `Instrument` sweep of 2026-08-05 is what a duplicated list nobody compares does.
+
 Exits non-zero if any check fails.
 """
 
@@ -134,6 +160,7 @@ sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 from veritas.semantic import (  # noqa: E402
     ENTRY_KINDS,
     AmbiguousTerm,
+    DimensionDefinition,
     MetricDefinition,
     SemanticEntryError,
     SemanticLayer,
@@ -227,10 +254,11 @@ MIN_DISTINCTION_GAP = Decimal("0.005")
 # statement checked in one dialect and run in another is two statements.
 DIALECT = "duckdb"
 
-# The cell position the "Lives in" column sits at once a leading pipe has made
-# cells[0] the empty string. `METRIC_HOME` — where Section B says a Certified Metric
-# lives — is imported above rather than spelled again, because two readers of one
-# Glossary column agreeing by coincidence is how they stop agreeing.
+# The cell positions the "Definition" and "Lives in" columns sit at once a leading
+# pipe has made cells[0] the empty string. `METRIC_HOME` — where Section B says a
+# Certified Metric lives — is imported above rather than spelled again, because two
+# readers of one Glossary column agreeing by coincidence is how they stop agreeing.
+DEFINITION_COLUMN = 2
 LIVES_IN_COLUMN = 3
 
 # The two halves the period split asks for. SQL operators rather than anything read
@@ -268,10 +296,22 @@ PARSE_PROBES = (
 USER_SAYS_COLUMN = 1
 COULD_MEAN_COLUMN = 2
 
-# What separates one meaning from the next inside Section D's "Could mean" cell.
-# The Glossary's own separator rather than a convention invented here, which is why
-# check 13 can read that column at all instead of taking the entry's word for it.
-COULD_MEAN_SEPARATOR = "\u00b7"
+# What separates one item from the next inside a Glossary cell that holds a list —
+# Section D's "Could mean" meanings, and the columns and allowed values of each axis
+# in Section A's `Dimension Definition` row. The Glossary's own separator rather than
+# a convention invented here, which is why checks 13 and 18 can read those cells at
+# all instead of taking the entry's word for what they say. One name for it, because
+# it is one character doing one job in two places.
+GLOSSARY_LIST_SEPARATOR = "\u00b7"
+
+# The two Section A rows this script reads by name, and how that row writes an axis:
+# a bold name followed immediately by a parenthetical, whose parts the em dash
+# separates. Read out of the Glossary rather than listed here for the reason check 2
+# reads Section B — see `dimension_axes_in_glossary`.
+AMBIGUOUS_TERM = "Ambiguous Term"
+DIMENSION_TERM = "Dimension Definition"
+AXIS_IN_GLOSSARY = re.compile(r"\*\*(by [^*]+)\*\*\s*\(([^)]*)\)")
+AXIS_PART_SEPARATOR = "\u2014"
 
 # The name check 12's first probe points at, chosen because it is *not* a Certified
 # Metric and reads exactly like one — a plausible brokerage metric the Glossary has
@@ -279,7 +319,27 @@ COULD_MEAN_SEPARATOR = "\u00b7"
 # rejected obvious nonsense.
 UNREGISTERED_METRIC = "Gross Margin"
 
+# The column check 15's probe points at, chosen the same way and for the same
+# reason: the `Client` row says a Client is *"the entity a region or segment
+# attaches to"*, so a segment column is exactly what a reader would expect
+# `dim_client` to carry. It does not, and an axis over it would be certified over
+# nothing.
+UNREGISTERED_COLUMN = "dim_client.client_segment"
+
+# The declared type of a column whose values the data mints rather than the Glossary
+# registering them, and therefore the one type of column an axis may decline to
+# enumerate — check 17. Compared against `information_schema`'s own word for it,
+# through the Warehouse Adapter, so an engine that spells it differently is a
+# question for the adapter rather than for this script.
+DATE_TYPE = "DATE"
+
 problems: list[str] = []
+
+# What the Warehouse holds in each column a Dimension Definition names, filled on
+# first use by `held_values` below. A cache rather than a constant: the axes and the
+# probes built from them ask the same column several times in one run, and the
+# largest of those columns is on the largest table in the Warehouse.
+COLUMN_VALUES: dict[str, set[str]] = {}
 
 
 def certified_metric_terms() -> set[str]:
@@ -352,34 +412,105 @@ def ambiguous_terms_in_glossary() -> dict[str, str]:
     return registered
 
 
-def ambiguous_term_home() -> str:
-    """Where Glossary Section A says an Ambiguous Term lives.
+def section_a_row(term: str) -> list[str] | None:
+    """One Glossary Section A row, as its cells, or None with the problem reported.
 
-    Section A registers the directory, the loader's `ENTRY_KINDS` reads it, and
-    check 13 puts the two in one sentence. Without this the directory name
-    `ambiguous` would be pinned by nothing but the fact that files happen to sit
-    there — and a domain noun pinned by nothing is what Non-Negotiable #1 is about.
+    Section A is where every entry type is registered — what it is, and which
+    directory it lives in. Two checks read it and they read different cells of it:
+    check 13 wants the *Lives in* cell of the `Ambiguous Term` row, check 18 wants
+    the *Definition* cell of the `Dimension Definition` row. One reader rather than
+    two, because two scans of one table is how they stop scanning the same table.
     """
     text = GLOSSARY.read_text()
     section = re.search(r"^### A\. The system\n(.*?)^### ", text, re.S | re.M)
     if not section:
         problems.append(
             "glossary.md: could not find the `### A. The system` section, so nothing "
-            "here knows where an Ambiguous Term is registered to live"
+            f"here knows what a {term} is registered as"
         )
-        return ""
+        return None
 
     for line in section.group(1).splitlines():
         cells = line.split("|")
-        if len(cells) <= LIVES_IN_COLUMN:
-            continue
-        if cells[1].strip().strip("*").strip() == "Ambiguous Term":
-            return cells[LIVES_IN_COLUMN].strip().strip("`").strip()
+        if len(cells) > LIVES_IN_COLUMN and cells[1].strip().strip("*").strip() == term:
+            return cells
     problems.append(
-        "glossary.md: Section A has no `Ambiguous Term` row, so the entry type "
-        "being written under semantic/ambiguous/ is registered nowhere"
+        f"glossary.md: Section A has no `{term}` row, so the entry type being "
+        f"written under semantic/ is registered nowhere"
     )
-    return ""
+    return None
+
+
+def registered_home(term: str) -> str:
+    """Where Glossary Section A says one entry type lives.
+
+    Section A registers the directory, the loader's `ENTRY_KINDS` reads it, and
+    checks 13 and 18 put the two in one sentence. Without this the directory names
+    `ambiguous` and `dimensions` would be pinned by nothing but the fact that files
+    happen to sit there — and a domain noun pinned by nothing is what
+    Non-Negotiable #1 is about.
+    """
+    cells = section_a_row(term)
+    if cells is None:
+        return ""
+    return cells[LIVES_IN_COLUMN].strip().strip("`").strip()
+
+
+def dimension_axes_in_glossary() -> dict[str, tuple[frozenset[str], str, frozenset[str]]]:
+    """Glossary Section A's `Dimension Definition` row, as {axis: (columns, grain, values)}.
+
+    The row names the certified axes the way Section D's table names the ambiguous
+    words, and this is check 18's half of the same claim check 13 makes: the
+    **Glossary** and the **corpus** agree, rather than the corpus agreeing with a
+    list typed into this script.
+
+    Each axis is written `**name** (columns — grain — allowed values)`, with the
+    Glossary's own separator between the columns and between the values, and the
+    third part absent on an axis that enumerates nothing. Only a bold name followed
+    immediately by a parenthetical is read, which is what keeps the row's closing
+    example — *"Net Revenue **by region** last quarter"* — from parsing as a sixth
+    axis.
+
+    This is a parse of prose and it is deliberately strict: a reworded parenthetical
+    fails the run. That is the right failure, because the words being reworded are a
+    registered row that five files in `semantic/dimensions/` copy.
+    """
+    cells = section_a_row(DIMENSION_TERM)
+    if cells is None:
+        return {}
+
+    axes: dict[str, tuple[frozenset[str], str, frozenset[str]]] = {}
+    for name, described in AXIS_IN_GLOSSARY.findall(cells[DEFINITION_COLUMN]):
+        parts = [part.strip() for part in described.split(AXIS_PART_SEPARATOR)]
+        if not 2 <= len(parts) <= 3:
+            problems.append(
+                f"glossary.md: the `{DIMENSION_TERM}` row writes {name.strip()!r} as "
+                f"({described.strip()}), which is not "
+                f"`columns {AXIS_PART_SEPARATOR} grain` or `columns "
+                f"{AXIS_PART_SEPARATOR} grain {AXIS_PART_SEPARATOR} allowed values`"
+            )
+            continue
+        columns, grain, *enumerated = parts
+        axes[name.strip()] = (
+            frozenset(_listed(columns)),
+            grain,
+            frozenset(_listed(enumerated[0]) if enumerated else ()),
+        )
+    return axes
+
+
+def _listed(cell: str) -> list[str]:
+    """One Glossary cell fragment holding a list, as its items.
+
+    The Glossary's own separator, and its own backticks around anything that is an
+    identifier rather than a word — both are presentation, and neither is part of
+    the value the corpus publishes.
+    """
+    return [
+        item.strip().strip("`").strip()
+        for item in cell.split(GLOSSARY_LIST_SEPARATOR)
+        if item.strip()
+    ]
 
 
 def source(metric: MetricDefinition, layer: SemanticLayer) -> str:
@@ -880,7 +1011,7 @@ def check_ambiguous_terms(layer: SemanticLayer, certified: set[str]) -> None:
         f"semantic/{name}/" for name, (_, entry_type) in ENTRY_KINDS.items()
         if entry_type is AmbiguousTerm
     )
-    home = ambiguous_term_home()
+    home = registered_home(AMBIGUOUS_TERM)
     if home and home != directory:
         problems.append(
             f"Glossary Section A registers the Ambiguous Term as living in {home!r} "
@@ -920,7 +1051,7 @@ def check_ambiguous_terms(layer: SemanticLayer, certified: set[str]) -> None:
         # check that silently dropped whatever it could not resolve would drop a
         # misspelled metric name just as quietly.
         parts = [
-            part.strip() for part in registered[term.name].split(COULD_MEAN_SEPARATOR)
+            part.strip() for part in registered[term.name].split(GLOSSARY_LIST_SEPARATOR)
         ]
         named = {part for part in parts if part in certified}
         prose = [part for part in parts if part not in certified]
@@ -1021,6 +1152,312 @@ def check_alias_collisions(layer: SemanticLayer) -> None:
             f"nobody registered. Either register the word in Glossary Section D and "
             f"drop it from both metrics, or narrow one of the two aliases"
         )
+
+
+def held_values(warehouse: WarehouseAdapter, qualified: str) -> set[str]:
+    """Every distinct value the Warehouse holds in one column, read once per run.
+
+    Cached because check 16 asks for the same column from the axis itself and from
+    every probe built out of it, and `fct_position_snapshot` is the largest table in
+    the Warehouse. The values come back as text: an axis's allowed values are text in
+    the file, and a date compared against the string a date prints as is the same
+    comparison in both directions.
+
+    The caller has already established that the column exists. An engine refusal here
+    is therefore something else going wrong, and `rows_from` has already named it —
+    the empty set that follows is the failure staying reported once.
+    """
+    if qualified not in COLUMN_VALUES:
+        table, _, column = qualified.partition(".")
+        rows = rows_from(warehouse, f"SELECT DISTINCT {column} FROM {table}")
+        COLUMN_VALUES[qualified] = {str(value) for (value,) in rows or ()}
+    return COLUMN_VALUES[qualified]
+
+
+def declared_type(warehouse: WarehouseAdapter, qualified: str) -> str | None:
+    """The live schema's own type for one `table.column`, or None if it has no such column."""
+    table, _, column = qualified.partition(".")
+    return dict(warehouse.columns(table)).get(column, "").upper() or None
+
+
+def axis_problem(
+    axis: DimensionDefinition, warehouse: WarehouseAdapter
+) -> str | None:
+    """Checks 15, 16 and 17 — one certified axis, against the Warehouse it slices.
+
+    Separated from its caller the way `disambiguation_problem` is, so
+    `check_dimensions` can point it at axes the corpus does not contain. A rule that
+    has only ever seen the five real entries reads the same whether it works or does
+    nothing.
+
+    In the order a wrong axis is usually wrong:
+
+      * **check 15** — a column the live schema does not hold. Then the axis cannot
+        be applied at all, and the failure arrives as an engine error inside a
+        generated query rather than here;
+      * one axis whose columns disagree about what they hold. `by snapshot date` is
+        one axis over two tables because `Snapshot` is one term registered as living
+        in both, and the claim that makes it one axis is that both are written by one
+        calendar. A drift between them would surface as an Account Value missing a
+        leg on the dates only one table has;
+      * **check 16** — an enumerated value the Warehouse has never held, which is the
+        certified axis that lies, and a held value the axis does not enumerate, which
+        is a bucket every slice silently drops;
+      * **check 17** — enumerating, or declining to, against the wrong kind of
+        column. A date's values are minted by the data, so writing them into the
+        corpus would be a measurement dressed as a definition; every other axis is a
+        registered vocabulary, and one that enumerates nothing has opted out of
+        check 16 by writing nothing down.
+    """
+    held: dict[str, set[str]] = {}
+    types: set[str] = set()
+    for qualified in axis.columns:
+        table, _, column = qualified.partition(".")
+        if not table or not column:
+            return (
+                f"Dimension Definition {axis.name!r} names the column {qualified!r}, "
+                f"which is not written `table.column` — an axis names where in the "
+                f"Warehouse it lives, and a bare column name names it in as many "
+                f"tables as happen to carry one"
+            )
+        column_type = declared_type(warehouse, qualified)
+        if column_type is None:
+            return (
+                f"Dimension Definition {axis.name!r} names {qualified!r}, which the "
+                f"live schema does not hold — a certified axis over a column nobody "
+                f"has cannot be applied to any metric, and the failure would arrive "
+                f"inside a generated query rather than here"
+            )
+        types.add(column_type)
+        held[qualified] = held_values(warehouse, qualified)
+
+    if len(types) > 1:
+        return (
+            f"Dimension Definition {axis.name!r} names columns of {sorted(types)} — "
+            f"one axis is one kind of value, and buckets of two types are two axes"
+        )
+
+    disagreeing = sorted(
+        qualified for qualified, values in held.items()
+        if values != next(iter(held.values()))
+    )
+    if disagreeing:
+        spread = " · ".join(
+            f"{qualified} holds {len(values)}" for qualified, values in held.items()
+        )
+        return (
+            f"Dimension Definition {axis.name!r} names columns that do not hold the "
+            f"same values — {spread}. They are one axis only if they are one list of "
+            f"buckets, so a metric sliced on one column and a metric sliced on the "
+            f"other would be sliced differently under one certified name"
+        )
+
+    distinct = next(iter(held.values())) if held else set()
+    promised = set(axis.allowed_values)
+    if len(promised) != len(axis.allowed_values):
+        return (
+            f"Dimension Definition {axis.name!r} enumerates "
+            f"{list(axis.allowed_values)}, which repeats a value — one bucket "
+            f"written twice is one bucket, and the second one is a typo nobody sees"
+        )
+
+    if types == {DATE_TYPE}:
+        if promised:
+            return (
+                f"Dimension Definition {axis.name!r} is an axis over {DATE_TYPE} "
+                f"columns and enumerates {sorted(promised)} — the dates a date axis "
+                f"holds are minted by the data, so a list of them in the corpus is a "
+                f"measurement that stops being true on the next load"
+            )
+        return None
+    if not promised:
+        return (
+            f"Dimension Definition {axis.name!r} enumerates no allowed values, and "
+            f"its columns are {sorted(types)} rather than {DATE_TYPE} — the buckets "
+            f"of every axis but a date are a registered vocabulary, and an axis that "
+            f"writes none down has opted out of being checked against the Warehouse"
+        )
+
+    unheld = sorted(promised - distinct)
+    if unheld:
+        return (
+            f"Dimension Definition {axis.name!r} promises the bucket(s) {unheld}, "
+            f"and the Warehouse holds no such value in "
+            f"{' or '.join(sorted(held))} — a slice along that bucket comes back "
+            f"empty, and empty is what a real bucket with no rows looks like"
+        )
+    unpromised = sorted(distinct - promised)
+    if unpromised:
+        return (
+            f"Dimension Definition {axis.name!r} does not name the value(s) "
+            f"{unpromised}, which the Warehouse holds in "
+            f"{' and '.join(sorted(held))} — every row carrying one of them is a row "
+            f"the certified buckets drop, so the slices do not add up to the total "
+            f"and nothing says why"
+        )
+    return None
+
+
+def axis_probes(
+    enumerated: DimensionDefinition, dated: DimensionDefinition
+) -> tuple[tuple[str, DimensionDefinition], ...]:
+    """The teeth of checks 15, 16 and 17: five axes that must all be refused.
+
+    Built out of the two real entries the corpus already holds, for the reason
+    `ambiguity_probes` is: a probe written as a literal goes on probing the corpus
+    of the day it was written. Only `UNREGISTERED_COLUMN` is a literal, and it has
+    to be one — it is a column the schema does not have.
+    """
+    return (
+        ("a column the live schema does not hold",
+         replace(enumerated, columns=(UNREGISTERED_COLUMN,))),
+        ("a bucket the Warehouse has never held",
+         replace(enumerated, allowed_values=(*enumerated.allowed_values, "LATAM"))),
+        ("a held value the axis does not name",
+         replace(enumerated, allowed_values=enumerated.allowed_values[:-1])),
+        ("an enumeration written where the data mints the values",
+         replace(dated, allowed_values=("2026-01-01",))),
+        ("no enumeration where the Glossary registers the buckets",
+         replace(enumerated, allowed_values=())),
+    )
+
+
+def route_tables(metric: MetricDefinition, layer: SemanticLayer) -> set[str]:
+    """Every Warehouse table a metric's assembled query reaches.
+
+    Its own route and the route of each metric it derives from, because
+    `query_parts` puts every part in the statement and a slice applies to all of
+    them: `Account Value` sliced by instrument type has to reach `dim_instrument`
+    from the Positions half, and its Cash Balance half never arrives there.
+    """
+    reached: set[str] = set()
+    for part in [metric, *(layer.metrics[name] for name in metric.derives_from)]:
+        reached.add(part.from_table)
+        reached.update(layer.join_paths[name].to_table for name in part.join_paths)
+    return reached
+
+
+def check_dimensions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None:
+    """Checks 15 to 18 — the certified axes, and the Glossary row that registers them.
+
+    The last entry type, and the only one that is a **leaf**: nothing in the corpus
+    names an axis, so nothing above would notice if one were wrong. That is what
+    these checks are for, and it is why they read the Warehouse rather than the rest
+    of the corpus — an axis's claim is about the data, not about the other entries.
+    """
+    print()
+    print("  dimensions — the certified axes a metric can be sliced by")
+
+    directory = next(
+        f"semantic/{name}/" for name, (_, entry_type) in ENTRY_KINDS.items()
+        if entry_type is DimensionDefinition
+    )
+    home = registered_home(DIMENSION_TERM)
+    if home and home != directory:
+        problems.append(
+            f"Glossary Section A registers the {DIMENSION_TERM} as living in {home!r} "
+            f"and the loader reads {directory!r} — one of the two is describing a "
+            f"directory nothing writes to"
+        )
+
+    # Check 18, both directions, the way checks 2 and 13 take them. The Glossary row
+    # names the axes, their columns, their grain and their buckets; the corpus
+    # publishes the same four things; and a duplicated list nothing compares is how
+    # the instrument-type values came to disagree with the `Instrument` row for two
+    # days in Step 002.
+    registered = dimension_axes_in_glossary()
+    print(f"    Glossary Section A's `{DIMENSION_TERM}` row names {len(registered)} "
+          f"axis(es); {directory} publishes {len(layer.dimensions)}")
+
+    unwritten = sorted(set(registered) - set(layer.dimensions))
+    if unwritten:
+        problems.append(
+            f"the Glossary's `{DIMENSION_TERM}` row names {unwritten} and no file "
+            f"under {directory} publishes them — an axis registered and not "
+            f"retrievable is one nothing can be sliced along"
+        )
+
+    for axis in layer.dimensions.values():
+        broken = axis_problem(axis, warehouse)
+        if broken:
+            problems.append(broken)
+
+        types = {declared_type(warehouse, column) for column in axis.columns}
+        values = sorted(set().union(*(
+            held_values(warehouse, column) for column in axis.columns
+        ))) if not broken else []
+        shown = (
+            " · ".join(axis.allowed_values) if axis.allowed_values
+            else f"{len(values)} value(s), not enumerated"
+        )
+        print(f"    {axis.name!r} — {' · '.join(axis.columns)} "
+              f"({'/'.join(sorted(kind or '?' for kind in types))}) — "
+              f"{axis.grain} — {shown}")
+
+        if axis.name not in registered:
+            problems.append(
+                f"Dimension Definition {axis.name!r} is not an axis the Glossary's "
+                f"`{DIMENSION_TERM}` row names — register the axis before certifying "
+                f"that a metric may be sliced along it"
+            )
+            continue
+        columns, grain, enumerated = registered[axis.name]
+        for what, in_glossary, in_corpus in (
+            ("columns", columns, frozenset(axis.columns)),
+            ("allowed values", enumerated, frozenset(axis.allowed_values)),
+            ("grain", grain, axis.grain),
+        ):
+            if in_glossary != in_corpus:
+                problems.append(
+                    f"the Glossary's `{DIMENSION_TERM}` row gives {axis.name!r} the "
+                    f"{what} {sorted(in_glossary) if what != 'grain' else in_glossary!r}"
+                    f" and {directory} publishes "
+                    f"{sorted(in_corpus) if what != 'grain' else in_corpus!r} — the "
+                    f"registered axis and the retrievable one are not the same axis"
+                )
+
+    # A reading rather than an assertion, and the distinction is deliberate. An axis
+    # whose table no metric route reaches is certified, true, and not yet applicable:
+    # what would make it applicable is a Join Path added for a *grouping* rather than
+    # for an expression, and the rule that lets a query add one. Both belong to the
+    # Step that grounds a query, so this prints the count on every run rather than
+    # failing a corpus that is exactly what this Sub-step set out to write. The
+    # Sub-step 4.5 review names what it costs.
+    reachable = {
+        metric.name: route_tables(metric, layer)
+        for metric in layer.metrics.values() if assembles(metric, layer)
+    }
+    print(f"    reach — the metric routes an axis already sits inside, of "
+          f"{len(reachable)} that assemble")
+    for axis in layer.dimensions.values():
+        tables = {column.partition(".")[0] for column in axis.columns}
+        arriving = sorted(
+            name for name, reached in reachable.items() if reached & tables
+        )
+        how = (
+            ", ".join(arriving) if arriving
+            else f"no route arrives at {' or '.join(sorted(tables))}"
+        )
+        print(f"      {axis.name + ':':<32} {len(arriving)} — {how}")
+
+    enumerated = next(
+        (axis for axis in layer.dimensions.values() if axis.allowed_values), None
+    )
+    dated = next(
+        (axis for axis in layer.dimensions.values() if not axis.allowed_values), None
+    )
+    if enumerated is None or dated is None:
+        return
+    print(f"    probes — run against {enumerated.name!r} and {dated.name!r}, which "
+          f"are real entries")
+    for description, mutated in axis_probes(enumerated, dated):
+        verdict = axis_problem(mutated, warehouse)
+        print(f"      {'refuses' if verdict else 'ACCEPTS'}  {description}")
+        if verdict is None:
+            problems.append(
+                f"the certified-axis rule accepted {description}, pasted into a real "
+                f"entry — so it is not the rule this check reports it to be"
+            )
 
 
 def check_expressions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None:
@@ -1380,7 +1817,8 @@ def main() -> int:
 
     print(f"  Semantic Layer: semantic/ — {len(layer.metrics)} Metric Definition(s), "
           f"{len(layer.join_paths)} Join Path(s), "
-          f"{len(layer.ambiguous_terms)} Ambiguous Term(s)")
+          f"{len(layer.ambiguous_terms)} Ambiguous Term(s), "
+          f"{len(layer.dimensions)} Dimension Definition(s)")
     certified = certified_metric_terms()
     check_entries(layer, certified)
     check_ambiguous_terms(layer, certified)
@@ -1388,6 +1826,7 @@ def main() -> int:
     with WarehouseAdapter() as warehouse:
         print(f"  Warehouse: {DATABASE_PATH.relative_to(REPO_ROOT)}")
         check_expressions(warehouse, layer)
+        check_dimensions(warehouse, layer)
 
     check_parse_rule(layer)
     check_spike_pin(layer)
@@ -1399,8 +1838,9 @@ def main() -> int:
             print(f"  - {problem}")
         return 1
     print("PASS — every published expression executes against the Warehouse, every "
-          "figure with a second opinion agrees with it, and every registered "
-          "ambiguity resolves to metrics that exist")
+          "figure with a second opinion agrees with it, every registered ambiguity "
+          "resolves to metrics that exist, and every certified axis names buckets "
+          "the Warehouse holds")
     return 0
 
 

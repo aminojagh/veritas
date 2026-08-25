@@ -1,14 +1,25 @@
 # Step 004 — Build the Semantic Layer
 
-- **Status:** **active** — written 2026-08-21 and **approved by Amino the same day**,
-  together with all seven rulings in [Questions for Amino](#questions-for-amino).
-  **Sub-step 4.1 may begin once this plan is committed.** Four rulings were approved
-  as written; **R2, R4 and R7 were sent back once and approved on the second
-  pass** — R2 and R4 with their reasoning rewritten around the worked example that
-  decides each, and R7 restated as the **deferral** it is rather than the avoidance it
-  first claimed to be. The Step has five Sub-steps, and
-  [R5](#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21) pre-agrees
-  where it splits if it grows.
+- **Status:** **in review** — all five Sub-steps are written, verified and approved;
+  4.1 (`6c15736`), 4.2 (`333d6fc`), 4.3 (`ae75f0e`) and 4.4 (`71ce677`) are committed,
+  and **4.5 was reviewed and approved by Amino on 2026-08-25** —
+  [R11](#r11--aminos-rulings-on-the-45-review--decided-2026-08-25), *"all approved"* —
+  and is the commit this line is part of. It stays `in review` rather than `done` for
+  the reason every Step's plan does: `done` is written by the **next** Step's first
+  commit, which is the first one able to carry this Sub-step's hash — the way
+  `6c15736` closed Step 003 and `40d72d8` closed Step 002. The Step **did not grow**, so
+  [R5](#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21)'s split point
+  was never used and Dimension Definitions shipped here rather than becoming Step
+  005's first Sub-step. Written 2026-08-21 and **approved by Amino the same day**,
+  together with all seven rulings in [Questions for Amino](#questions-for-amino): four
+  as written, and **R2, R4 and R7 sent back once and approved on the second pass** —
+  R2 and R4 with their reasoning rewritten around the worked example that decides
+  each, and R7 restated as the **deferral** it is rather than the avoidance it first
+  claimed to be. Four further rulings were added while the Step ran: [R8](#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22),
+  [R9](#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23),
+  [R10](#r10--aminos-rulings-on-the-44-review--decided-2026-08-24) and
+  [R11](#r11--aminos-rulings-on-the-45-review--decided-2026-08-25), the last of which
+  closes the Step and hands **three questions to the Grounding Step**.
 - **Goal:** Author the certified registry Veritas retrieves over — every Certified
   Metric, Ambiguous Term, Join Path and Dimension Definition as a versioned YAML
   Semantic Entry under `semantic/` — in the shape the
@@ -847,6 +858,93 @@ not at all, because rewriting it earlier moves the corpus with nothing able to s
 the move helped. Until that measurement exists the five entries stay as authored, and the
 review's finding stands as written — if they are good, that is authorship and not
 verification.
+
+---
+
+### R11 — Amino's rulings on the 4.5 review → **decided 2026-08-25**
+
+The [4.5 review](../reviews/step-004-semantic-layer.md#sub-step-45--write-the-dimension-definitions)
+put seven things up sceptically and listed five it deliberately left undone. Amino ruled
+on 2026-08-25: *"all approved."* Nothing is reverted and nothing is renamed — the five
+entries, checks 15 to 18, the Glossary amendment and the two renames carried over from
+4.4 all stand as written, and 4.5 is committed as it was reviewed. **Four of the items
+carry a stated reason, and it is the same reason four times:** Amino's words are *"the
+Step that grounds a query"*, which is [**Grounding**](../glossary.md#a-the-system) —
+*"the step where retrieved Semantic Entries constrain SQL generation"*. They are recorded
+here for R9 and R10's reason: a review is read once, by the person who commits it, and a
+plan is read by every Sub-step that follows. **Three questions leave this Step for the
+Grounding Step, and none of them is a defect in it** — the same shape R10 gave the two
+that left for Retrieval.
+
+**1. `by region` stays certified, unreachable and printed at zero — and it is not debt.**
+The 4.5 review called this *"the judgement most worth overruling"* and offered the
+counter-case itself: *"the case for calling it debt is that a reader cannot tell the
+difference from outside."* Amino ruled on it directly — *"correctly belongs to the Step
+that grounds a query"* — so it is neither debt nor a widening of this Sub-step. What
+would close it is named and unbuilt: two Join Path files, `trade_to_account` and
+`account_to_client`, **plus the rule that lets a query add a Join Path for a *slice*
+rather than for an expression**, and it is that second half which makes it Grounding's
+work rather than authoring work. Sub-step 4.2 wrote the routes the **expressions** need
+and no expression reaches `dim_client`; the Sub-step 3.2 spike writes those two joins by
+hand and calls them *"two more joins … and the shape nearly every real question
+produces"*. Two consequences: [R5](#r5--45-is-a-pre-agreed-split-point--approved-by-amino-2026-08-21)'s
+pre-agreed split point stays unused, because closing it here was the widening that would
+have fired it; and the reach count stays **printed on every run**, which is what stops a
+certified-and-inapplicable axis going quiet between now and then.
+
+**2. No `by settlement date` axis, for the same reason.** The column exists and holds
+real dates, and every Metric Definition keys its period filter on `trade_date` — so
+certifying the other half of that [Section C](../glossary.md#c-distinctions-we-must-not-blur)
+pair as an axis would let one question be *sliced* on one date while being *filtered* on
+another. Amino ruled this together with the `by region` Join Path: *"both belong to the
+Step that grounds a query."* The axis is therefore **deferred, not rejected** — the
+Warehouse can answer the question, the corpus declines to certify it until the Step that
+decides which date a query filters on is the one deciding, and this ruling is where that
+Step finds the reasoning instead of rediscovering it.
+
+**3. Check 17's foreclosure stands, and admitting the axis it forecloses is Grounding's
+call.** The rule is that an axis enumerates its buckets **exactly when** they are a
+registered vocabulary rather than dates, which the review noted forecloses a third kind:
+*"A `by denomination currency` axis would hold a handful of codes that ingestion produced
+rather than the Glossary registering — under this rule it would have to enumerate them,
+and the enumeration would be a measurement in the corpus."* Amino: *"belongs to the Step
+that grounds a query."* So the rule is not loosened and the corpus may not grow such an
+axis by default; what the ruling settles is **where the decision is taken** — where a
+query needs to slice by one — rather than that the answer is no. The cost the review
+stated is accepted with it: the default is right and it is not free.
+
+**4. The Glossary amendment stands, so check 18 keeps both halves.** Section A's
+`Dimension Definition` row now names the five certified axes with their columns, their
+grain and their buckets, in the form `dimension_axes_in_glossary` reads back, where it
+listed three *examples*. The review called it *"the change most worth rejecting if Amino
+disagrees"* and priced the revert at *"one cell to revert plus `dimension_axes_in_glossary`
+to delete"*; it was not exercised. The row is **agreed rather than provisional**, which
+is what check 18 needed — it reads that cell, so rejecting the amendment would have meant
+deleting the check that keeps the registered axes and the retrievable ones the same five.
+Sceptical point 2 — three date axes where the Glossary had one — is settled by the same
+ruling, because the three axes *are* the amendment: an axis named `fct_trade.trade_date`
+applied to a Snapshot metric is a certified axis whose route never reaches the column.
+[DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)
+stays open on its own trigger — approving what the cell says is not approving that it is
+a cell.
+
+**5. The four remaining sceptical points are approved as written, with no separate reason
+given.** Recorded plainly rather than argued, because inventing a rationale for a blanket
+approval would put words in the reviewer's mouth: `grain` is compared as text where
+`resolution` is not, and the distinction — a value against a sentence — is accepted with
+the erosion risk the review named; `columns` stays plural for the one axis whose
+registered term lives in two tables; the `kind` stays `dimension_definition` in full,
+because no `Dimension` is registered to shorten it to; and 4.4's two renames
+(`ambiguous_term_home` → `section_a_row` plus `registered_home`, and
+`COULD_MEAN_SEPARATOR` → `GLOSSARY_LIST_SEPARATOR`) stay, on one-name-for-one-thing.
+
+**6. Untouched by this ruling: whether `resolution` wants a Glossary row.** It was flagged
+in the 4.4 review's Language section, left open by
+[R10](#r10--aminos-rulings-on-the-44-review--decided-2026-08-24), restated in the 4.5
+review as *"Still open from Sub-step 4.4"*, and this ruling does not reach it — 4.5 adds
+no field by that name, so *"all approved"* approves nothing about it. It blocks nothing:
+no file changes either way. It is now the **one question Step 004 closes without
+answering**, and it stays open into Step 005.
 
 ---
 

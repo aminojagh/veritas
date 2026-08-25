@@ -1,0 +1,15 @@
+# The axis the Glossary's own worked example uses — "Net Revenue by region last
+# quarter" — and the one no metric can currently reach: nothing under
+# semantic/joins/ routes a fact table to dim_client. The Sub-step 4.5 review says
+# what that costs and where it lands.
+name: by region
+version: 1
+kind: dimension_definition
+description: >
+  Where a Client is, as one of three buckets. The region is a property of the
+  Client rather than of the Account, the Trade or the Instrument, so a metric
+  sliced this way groups by whose money it is and not by where the market is —
+  a UK Client trading a Tokyo listing is UK on this axis.
+columns: [dim_client.client_region]
+grain: one Client
+allowed_values: [EU, UK, APAC]

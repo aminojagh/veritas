@@ -1,0 +1,15 @@
+# The four values are the Instrument term's own universe as narrowed on
+# 2026-08-03, and dim_instrument.instrument_type carries a CHECK constraint that
+# refuses anything else — so this axis, that constraint and the Glossary row are
+# three copies of one list. Check 16 is what keeps them one list.
+name: by instrument type
+version: 1
+kind: dimension_definition
+description: >
+  What kind of thing was traded or held. Single bonds and options are absent
+  because they are out of scope rather than because no row happens to carry them:
+  neither has a key-free Market Price source, and bond exposure arrives as a bond
+  ETF, which this axis buckets under ETF.
+columns: [dim_instrument.instrument_type]
+grain: one Instrument
+allowed_values: [equity, ETF, future, currency pair]

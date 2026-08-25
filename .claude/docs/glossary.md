@@ -43,10 +43,11 @@ old name is recognisable in history, with a pointer to its replacement).
 >
 > **A date dimension was rejected on 2026-08-05**, in the same conversation.
 > `target-state.md` had described the Warehouse as holding a *"date"* dimension
-> while the `Dimension Definition` row below points the date axis at a column
-> (*"**by date** (`trade_date`, daily)"*). No metric and no Section C distinction
-> needs a calendar attribute that is not derivable in SQL, so there is no
-> `dim_date` and the Target State's Warehouse row was corrected instead.
+> while the `Dimension Definition` row below points the date axis at a column —
+> at three of them since that row's amendment of 2026-08-24, the first being
+> *"**by trade date** (`fct_trade.trade_date` — daily)"*. No metric and no Section
+> C distinction needs a calendar attribute that is not derivable in SQL, so there
+> is no `dim_date` and the Target State's Warehouse row was corrected instead.
 >
 > **Three terms added on 2026-08-05** by Sub-step 2.1, all approved the same day,
 > each one found by writing the star schema's Data Definition Language (DDL) and
@@ -104,7 +105,7 @@ What Veritas is made of.
 | **Certified Metric** | A metric that exists in the Semantic Layer. The only kind Veritas is permitted to compute. | `semantic/metrics/` | agreed |
 | **Shadow Metric** | A metric computed inline in a query instead of drawn from the Semantic Layer. The failure mode Veritas exists to prevent. | — (an anti-pattern) | agreed |
 | **Ambiguous Term** | A word users say that maps to two or more Certified Metrics and therefore has no single correct answer. Not a metric — an instruction to disambiguate before generating SQL. | `semantic/ambiguous/` | agreed |
-| **Dimension Definition** | A certified axis for *slicing* a metric — the answer to "by what?". Names the column, its grain, and its allowed values, so "by region" always means the same column with the same buckets. Examples: **by date** (`trade_date`, daily), **by region** (`client_region` — EU · UK · APAC), **by instrument type** (equity · ETF · future · currency pair — swept 2026-08-05 to match the narrowed `Instrument` term). "Net Revenue **by region** last quarter" applies the region Dimension Definition to the Net Revenue metric. | `semantic/dimensions/` | agreed |
+| **Dimension Definition** | A certified axis for *slicing* a metric — the answer to "by what?". Names the column, its grain, and its allowed values, so "by region" always means the same column with the same buckets. The five certified axes, each written here as `(columns — grain — allowed values)`: **by trade date** (`fct_trade.trade_date` — daily), **by snapshot date** (`fct_position_snapshot.snapshot_date` · `fct_balance_snapshot.snapshot_date` — daily), **by accounting movement date** (`fct_accounting_movement.movement_date` — daily), **by region** (`dim_client.client_region` — one Client — EU · UK · APAC), **by instrument type** (`dim_instrument.instrument_type` — one Instrument — equity · ETF · future · currency pair). A date axis enumerates no allowed values, because its values are minted by the data rather than registered here. "Net Revenue **by region** last quarter" applies the region Dimension Definition to the Net Revenue metric. **Amended 2026-08-24** ([Sub-step 4.5](plan/step-004-semantic-layer.md#45--write-the-dimension-definitions)), approved 2026-08-25 ([R11](plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)): this cell listed three *examples*, one of them *"by date (`trade_date`, daily)"* — quoted without its bold here so the check does not read the quotation as a sixth axis — where `semantic/dimensions/` now publishes five certified axes, and `check_semantic_layer.py` reads this cell back against them. One axis named `trade_date` could not be applied to a Snapshot metric, whose route never reaches that column, so the single date axis became the three the Warehouse actually keys on; the instrument-type sweep of 2026-08-05 is recorded in the amendments above rather than in the parenthetical, which now holds only what the check reads. | `semantic/dimensions/` | agreed |
 | **Join Path** | A certified route between two warehouse tables, so the model never invents a join. | `semantic/joins/` | agreed |
 | **Grounding** | The step where retrieved Semantic Entries constrain SQL generation. Ungrounded generation is forbidden, not merely discouraged. | `veritas/grounding/` | agreed |
 | **Validation Gate** | Deterministic, non-LLM checks a query must pass before execution: certified-metrics-only, no restricted columns, access policy applied, cost bounded, read-only. | `veritas/validation/` | agreed |
