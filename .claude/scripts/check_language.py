@@ -96,8 +96,10 @@ KNOWN_NON_ABBREVIATIONS = {
     "DEBT", "EXT", "ADR",  # register identifier prefixes, e.g. EXT-001
     # Ordinary words that happen to be shouted: flow-diagram step labels,
     # document section markers, and the operating agreement's own filename.
+    # SKILL is a filename too, for the reason CLAUDE and README are: every skill
+    # is a `SKILL.md`, so a document naming one by path spells it out.
     "ANSWER", "GROUND", "REWRITE", "RETRIEVE", "GENERATE", "VALIDATE",
-    "EXECUTE", "DEBT", "TERM", "CLAUDE", "IMPORTANT",
+    "EXECUTE", "DEBT", "TERM", "CLAUDE", "IMPORTANT", "SKILL",
     # Filename and identifier placeholders in templates.
     "NNN", "NNNN", "YYYY", "MM", "DD", "NN",
     # Geography: region values of the "by region" Dimension Definition, plus the

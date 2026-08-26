@@ -46,6 +46,15 @@ Do these in order. Later items depend on earlier ones being honest.
    reality only — and refresh its **Resume here** block so a cold next session
    knows the active Step, the next Sub-step, and anything awaiting Amino. This is
    the project's memory; leaving it stale breaks the next session.
+
+   **Add what is now true; the story of how it got there goes to step 6.** Current
+   State describes the repository, not the Sub-steps that built it. A passage
+   narrating what *this* Sub-step did — what it found, what a figure used to read,
+   what changed and why — is a defect in this file even when every word of it is
+   accurate, because the review already holds it, dated and with its command. The
+   normal shape of this step is **editing the sentence that just became wrong**;
+   appending a second one beside it is how the file grows. If nothing true
+   changed, change nothing.
 6. **Write the review.** Append a `## Sub-step N.M` section to
    `.claude/docs/reviews/step-NNN-<slug>.md`.
 7. **Hand over.** Tell Amino what to look at sceptically and stop.
@@ -81,4 +90,5 @@ too small to need a review.
 | "The debt is obvious from the code" | It is obvious to you today and to nobody in a month |
 | "I'll record the debt at the end of the Step" | The Step ends and the memory is gone. Now |
 | "Nothing worth flagging sceptically" | You made choices. Name them |
+| "This detail matters, so Current State should carry it too" | Current State says what is true; how it became true is the review's. Two copies can disagree, and the shorter one is read more often |
 | "It mostly works" | State precisely what does and does not work |

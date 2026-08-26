@@ -21,6 +21,10 @@
   fifth monolith; [R9](#r9--no-test-framework-in-this-step-and-step-002s-prediction-is-set-aside--approved-by-amino-2026-08-25) settles the test-framework question three Steps have
   deferred to this one; and [R10](#r10--current-state-is-trimmed-in-its-own-commit-between-the-plan-and-51--approved-by-amino-2026-08-25) trims Current State in its own commit before
   5.1. **Ten rulings, all of 2026-08-25**, and with them the plan is final.
+  **An eleventh came with the trim commit itself**:
+  [R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26), of 2026-08-26, approves
+  how far the trim went and writes the rule it leaves behind into `closing-a-substep`.
+  It changes nothing about what gets built.
   **Nothing is built yet**: `veritas/validation/` does not exist, this commit is the
   plan and the three documents around it, and the two commits after it are the Current
   State trim and then 5.1.
@@ -193,9 +197,9 @@ fires 5.5's.
 
 ## Questions for Amino
 
-**Ten, all ruled by Amino on 2026-08-25.** They arrived in two batches and the
-distinction is worth keeping, because one batch is the plan asking and the other is
-the plan being corrected.
+**Eleven: ten ruled by Amino on 2026-08-25, and one on 2026-08-26.** The ten arrived
+in two batches and the distinction is worth keeping, because one batch is the plan
+asking and the other is the plan being corrected.
 
 **The seven the plan asked.** Six are here; the seventh
 ([R7](#r7--the-bounded-read-uses-the-engines-estimate-if-the-adapter-can-reach-it--approved-by-amino-2026-08-25))
@@ -210,6 +214,11 @@ decomposition's and not pytest's, so the check is decomposed and pytest is decli
 [R10](#r10--current-state-is-trimmed-in-its-own-commit-between-the-plan-and-51--approved-by-amino-2026-08-25) is the larger half of the same answer, and it is about a document rather
 than about code. None of the three changes what the Gate does; they change how it is
 checked, and what a session reads before it starts.
+
+**The eleventh is R10's own consequence.** R10 said the trim commit would put one
+question up and be ruled on there;
+[R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26) is that ruling, plus one
+on how far the trim went, and it lands inside the trim commit rather than after it.
 
 ### R1 — The Access Profile's predicate and the slice rule ship together, in this Step → **approved and widened by Amino 2026-08-25**
 
@@ -646,7 +655,42 @@ true now, and the story of how it got there stays in the review* — should be w
 into `closing-a-substep`, which is the skill that refreshes the file. If it is not
 written down, the file re-accumulates and the trim is a one-off rather than a fix.
 That is a change to the framework rather than to this Step, so the trim commit puts it
-up and Amino rules on it there.
+up and Amino rules on it there. It was ruled in
+[R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26).
+
+### R11 — Amino's rulings on the trim → **decided 2026-08-26**
+
+Two rulings, on the entry the trim commit wrote —
+[The Current State trim](../reviews/step-005-validation-gate.md#the-current-state-trim--not-a-sub-step).
+Neither changes what the Gate does or how it is built; the first settles how far the
+trim went, and the second is the framework change [R10](#r10--current-state-is-trimmed-in-its-own-commit-between-the-plan-and-51--approved-by-amino-2026-08-25)
+said this commit would put up. They land **in the trim commit itself** rather than
+after it, because the ruling arrived before the commit did.
+
+**1. The component table's Notes were trimmed, and that reading of R10 stands.**
+Amino: *"your call about the component table is approved."* The sceptical item that
+asked — the trim kept the table and everything it says about what exists **now**,
+while the per-Sub-step chronology inside its cells went the way of the rest of the
+narrative — is the first item in
+[the review entry's sceptical list](../reviews/step-005-validation-gate.md#the-current-state-trim--not-a-sub-step).
+So R10's *"keeps the component table"* means the table as a description, not the
+table verbatim, and the alternative reading the entry offered — restore the Notes
+cells from `git show aa42205:.claude/docs/design/current-state.md` — is declined.
+
+**2. The rule goes into `closing-a-substep`.** Amino: *"the rule this trim leaves
+behind should be written into the `closing-a-substep` skill."* It is now step 5 of
+that skill, beside *"reality only"*, which was already there and was already true
+every time the file grew — the reason the review entry gave for sharpening the words
+rather than assuming they covered it. The addition says where the narrative goes
+instead: a passage about what **this** Sub-step did is a defect in Current State even
+when accurate, because step 6's review already holds it, dated and with its command.
+A second row joins the skill's rationalization table for the excuse that puts it back.
+
+**What this makes true that was not.** The trim was a repair; the rule is what stops
+the repeat. Without it the file re-accumulates and the trim is a one-off — R10's own
+argument for asking, and what the evidence showed: the file gained a passage every
+Sub-step across four Steps and lost none, which is the absence of a rule rather than
+a lapse by any one Sub-step.
 
 ---
 
