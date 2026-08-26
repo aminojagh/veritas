@@ -955,6 +955,51 @@ It is the pre-agreed split point under [R5](#r5--55-is-a-pre-agreed-split-point-
   watch `Cash Balance by instrument type` be allowed to join a table with no Instrument
   in it.
 
+### R12 — Amino's rulings on the 5.1 review → **decided 2026-08-26**
+
+One ruling, on the eight sceptical items of
+[the 5.1 review entry](../reviews/step-005-validation-gate.md#sub-step-51--the-validation-gate-refuses-anything-that-is-not-a-bounded-read).
+Amino: *"all approved."* Nothing is rebuilt. It lands **in the 5.1 commit itself**
+rather than after it, for the reason [R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26)
+did: the ruling arrived before the commit did.
+
+**Four of the eight offered a concrete reversal, and each reversal is declined.** These
+are the ones worth naming, because a later Sub-step hangs off them and approval is what
+makes them load-bearing rather than provisional.
+
+1. **`veritas/validation/` stays two modules** (item 1). The `Validation Gate outcome`
+   is a data contract before it is a return value — [R3](#r3--validation-gate-outcome-and-rejection-reason-get-glossary-rows--approved-by-amino-2026-08-25)'s
+   words — so a Grounded Answer, the App and Observability read a verdict without
+   importing sqlglot, two optimizer rules and the Warehouse Adapter. Merging
+   `outcome.py` into `gate.py`, which the entry offered as one move since `__init__.py`
+   re-exports both names, is not taken.
+2. **A `UNION` of two `SELECT`s goes on being refused** (item 3). *"Anything that is not
+   a single `SELECT`"* holds at its literal reading, and that probe's `rejected` verdict
+   is now a measurement rather than a default — a later Sub-step that wants unions flips
+   it deliberately, against this ruling.
+3. **`check_language.py` keeps its third keyword derivation** (item 7). The fifty-line
+   fix stands over the three-line hand-list, so the comment in that file saying the
+   keywords of the SQL this project writes are derived and not remembered goes on being
+   true now that `DROP` is one of them.
+4. **`TRUSTED_REWRITES` stays declared ahead of its first user** (item 8). [C5](../design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
+   asks for the constant named in one place, printed, and reported on the outcome, and
+   5.1 does all three; 5.2's tracer hangs off the contour line rather than drawing it.
+
+**The other four are declared limits, not offers**, and approval records them as known
+rather than deciding anything to build: `SCAN_CEILING` is a policy that cannot fire on
+today's Warehouse and is exercised by a probe that lowers the ceiling instead (item 2);
+`one_statement` reads a failed parse as zero statements, which is what makes mutation 1
+legible (item 4); `reasons` is a tuple holding one member until 5.3 fills it (item 5);
+and the independence proof uses a stand-in that is not a `WarehouseAdapter`, which
+proves the rules touch nothing and does not prove they survive a degraded Warehouse
+(item 6).
+
+**What this makes true that was not.** The four seams above are settled, so 5.2 builds
+on them instead of relitigating them: it imports the contract from `outcome.py`, it
+applies `TRUSTED_REWRITES` where 5.1 declared it, and it inherits a rule set whose
+`rejected` verdicts are all measurements. Nothing in the ruling changes a name, an
+interface or the flow, which is why it costs no code.
+
 ---
 
 ## Which Debt Ledger triggers this Step fires

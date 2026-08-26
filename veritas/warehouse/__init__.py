@@ -8,6 +8,13 @@ from veritas.warehouse.adapter import (
     IN_MEMORY,
     SCHEMA_PATH,
     WarehouseAdapter,
+    WarehouseError,
 )
 
-__all__ = ["DATABASE_PATH", "IN_MEMORY", "SCHEMA_PATH", "WarehouseAdapter"]
+__all__ = [
+    "DATABASE_PATH",
+    "IN_MEMORY",
+    "SCHEMA_PATH",
+    "WarehouseAdapter",
+    "WarehouseError",
+]

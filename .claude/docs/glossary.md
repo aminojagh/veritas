@@ -111,6 +111,8 @@ What Veritas is made of.
 | **Validation Gate** | Deterministic, non-LLM checks a query must pass before execution: certified-metrics-only, no restricted columns, access policy applied, cost bounded, read-only. | `veritas/validation/` | agreed |
 | **Access Profile** | The identity Veritas runs a question as — role and permitted region. Determines which rows and columns the Validation Gate allows. | `veritas/validation/` | agreed |
 | **Restricted Column** | A column an Access Profile forbids from appearing in a Grounded Answer's projection. *In the projection* is judged on the parse tree once `SELECT *` has been expanded against the real schema: the name in a comment, in a string literal, or in a filter is not a projection of it. | `veritas/validation/` | agreed |
+| **Validation Gate outcome** | The verdict the Validation Gate returns: allowed or rejected, the Rejection Reasons that fired, the explanation a caller shows a person, and the rule set the decision was taken under. What a Grounded Answer carries, what the App renders, and what Observability charts. | `veritas/validation/` | agreed |
+| **Rejection Reason** | One member of the stable taxonomy a rejected Validation Gate outcome carries — the thing *"Validation-Gate rejections by reason"* is grouped by. The **members** are registered in `veritas/validation/`, where the Gate enumerates them, and deliberately not in this cell: a vocabulary inside one table cell read by a prose parse is [DEBT-017](debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell), opened four days before this row and still open. | `veritas/validation/` | agreed |
 | **Grounded Answer** | The response object: the answer, the SQL, the Lineage, and the Validation Gate outcome. Veritas never returns a bare number. | `veritas/` | agreed |
 | **Lineage** | The record of which Semantic Entries and which Metric Definition versions produced a Grounded Answer. What makes an answer auditable. | `veritas/` | agreed |
 | **Gold Question Set** | The evaluation corpus: question, gold SQL, gold result, and the Semantic Entries the gold SQL touches. | `data/gold/` | agreed |
@@ -200,6 +202,22 @@ Extension Register were all revisited in the same Sub-step so no document uses a
 old name. The Step Reviews were **not** rewritten: they are point-in-time records
 of what was true when written, and editing them would destroy the history that
 makes the renames traceable.
+
+#### `Validation Gate outcome` and `Rejection Reason` — `agreed` 2026-08-25
+
+Proposed by the Step 005 plan and ruled the same day
+([R3](plan/step-005-validation-gate.md#r3--validation-gate-outcome-and-rejection-reason-get-glossary-rows--approved-by-amino-2026-08-25)),
+written into the table when Sub-step 5.1 made them code identifiers.
+
+- **`Validation Gate outcome` was already in use and had never been defined.** Three
+  agreed rows name it — `Grounded Answer`, `App` and `Observability` — so it was a
+  compound the Glossary relied on and did not register.
+- **`Rejection Reason` is the taxonomy
+  [ADR-0003](adr/0003-validation-gate-is-deterministic-code.md) sold determinism on.**
+  Without a registered name the same concept becomes a reason code in the Gate, a
+  chart label in Grafana and a string in the App — three names for one thing, which
+  is the disease Non-Negotiable #1 exists to prevent. The **members** are enumerated
+  in `veritas/validation/` rather than in the row, for the reason R3 gives.
 
 ### B. The warehouse
 

@@ -111,7 +111,11 @@ REPO_ROOT = CLAUDE_DIR.parent                        # <repo>
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 
-from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
+from veritas.warehouse import (  # noqa: E402
+    DATABASE_PATH,
+    WarehouseAdapter,
+    WarehouseError,
+)
 # E402 is pycodestyle/ruff's "module-level import not at top of file".
 # The veritas import has to come after sys.path.insert(0, str(REPO_ROOT)),
 # or the script can't find the package when run from .claude/scripts/.
@@ -1376,10 +1380,21 @@ def check_widening_cast(warehouse: WarehouseAdapter) -> None:
     arithmetic, or a Warehouse whose largest notional has shrunk, both mean the
     certified expression should be revisited rather than left carrying a cast for
     a reason that has expired.
+
+    **`WarehouseError` is what is caught**, which it could not be until Sub-step 5.1
+    gave the adapter an error type —
+    [DEBT-016](../docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type).
+    Here the catch is the branch that *prints the measurement holding*, so a wider
+    one would let this spike report the cast as load-bearing on the strength of a
+    bug in this file. Only the engine refusing the uncast expression says that.
+    [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+    pins the expression this probe runs, and that expression is untouched — the pin
+    keeps the inputs of a dated measurement fixed, not the code that decides whether
+    the measurement was taken.
     """
     try:
         ((computed,),) = warehouse.query(UNCAST_TRADED_NOTIONAL)
-    except Exception as refusal:
+    except WarehouseError as refusal:
         print(f"    without the widening cast, Traded Notional does not compute: "
               f"{type(refusal).__name__}")
         print(f"      {str(refusal).splitlines()[0].strip()}")

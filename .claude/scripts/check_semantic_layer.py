@@ -166,7 +166,11 @@ from veritas.semantic import (  # noqa: E402
     SemanticLayer,
     load_semantic_layer,
 )
-from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
+from veritas.warehouse import (  # noqa: E402
+    DATABASE_PATH,
+    WarehouseAdapter,
+    WarehouseError,
+)
 # E402 is "module-level import not at top of file". Both imports have to come after
 # the sys.path lines above, or the script cannot find the package when run from
 # anywhere. The comment marks those specific lines as deliberate and suppresses
@@ -670,16 +674,18 @@ def rows_from(
     caught so that one broken entry names itself and the rest of the corpus still
     runs, rather than the first failure hiding the other eight.
 
-    `Exception` is caught rather than the engine's own error class because this
-    script may not name it: ADR-0002 puts the dialect inside the Warehouse Adapter,
-    and an engine's exception types are part of its dialect. That is a real
-    imprecision, on the Ledger as
+    `WarehouseError` is what is caught, which it could not be until Sub-step 5.1:
+    ADR-0002 puts the dialect inside the Warehouse Adapter and an engine's exception
+    types are part of its dialect, so until the adapter had an error type of its own
+    the only expressible catch here was `Exception`. That was
     [DEBT-016](../docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type),
-    and it is kept to the two lines that actually execute SQL.
+    and it is paid: a `WarehouseError` is the engine refusing SQL a caller supplied,
+    and a bug anywhere else in this script now surfaces as a traceback rather than as
+    a false accusation against a YAML file that is fine.
     """
     try:
         return warehouse.query(sql, parameters)
-    except Exception as refusal:  # noqa: BLE001 — see DEBT-016 above
+    except WarehouseError as refusal:
         problems.append(
             f"the engine refused the query below — {type(refusal).__name__}: "
             f"{refusal}\n      {sql}"
@@ -1755,7 +1761,7 @@ def check_widening_cast(
         rows = None
         try:
             rows = warehouse.query(executable_query(uncast, layer))
-        except Exception as refusal:  # noqa: BLE001 — see DEBT-016 above
+        except WarehouseError as refusal:
             first_line = str(refusal).splitlines()[0]
             print(f"    refused  {metric.name}: {type(refusal).__name__}: "
                   f"{first_line}")

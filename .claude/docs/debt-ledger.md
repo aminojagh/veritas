@@ -43,10 +43,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
 | [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate | open |
 | [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast — **🔴 fired** | **paid** (Sub-step 4.3) |
-| [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query | open |
+| [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query — **🔴 fired** | **paid** (Sub-step 5.1) |
 | [DEBT-017](#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) | The certified axes are registered inside one Glossary cell | S | A sixth certified axis, or a rewording of that cell failing the run | open |
 
-**Open debt:** 10 · **Paid:** 4 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 9 · **Paid:** 5 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -1274,7 +1274,8 @@ and what makes it debt as written, is a check claiming coverage it does not have
 
 ### DEBT-016 — The Semantic Layer check cannot name the engine's error type
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 5.1, 2026-08-26, under the trigger that fired in the
+  same Sub-step
 - **Opened:** Sub-step 4.1 (`.claude/docs/reviews/step-004-semantic-layer.md`)
 - **Size:** S
 - **Location:** `.claude/scripts/check_semantic_layer.py` — `rows_from`, the two
@@ -1331,6 +1332,60 @@ the Orchestrator's execute step, which is where a Grounded Answer has to say *"t
 Validation Gate passed this and the engine still refused it"*. That component cannot
 catch `Exception` and stay honest, because it has to tell a user which of the two
 happened.
+
+**Fired 2026-08-26, in Sub-step 5.1 — two components earlier than this entry
+predicted.** The Orchestrator does not exist. The Validation Gate got there first,
+because its bounded-read rule asks the engine to *plan* caller-supplied SQL and the
+engine can refuse to, and the entry's own reasoning applies to the Gate unchanged: a
+query the engine will not plan is a **rejection**, and an adapter that cannot open the
+Warehouse is a broken installation, and a rule that cannot tell those apart cannot say
+which happened. The [Step 005 plan](plan/step-005-validation-gate.md#which-debt-ledger-triggers-this-step-fires)
+predicted this before the Step began.
+
+**Paid 2026-08-26, in Sub-step 5.1.** The repayment is the entry's own prescription:
+`WarehouseError` in `veritas/warehouse/adapter.py`, raised from the engine's exception
+at the boundary that owns the engine, and every `except Exception` that was waiting on
+it narrowed to name it — the `check_semantic_layer.py` lines this entry gave as its
+Location, and the two sites below that it named as outside them. The deferred decision the
+entry named — *"whether every adapter method wraps or only the two that execute
+caller-supplied SQL"* — was taken the narrow way and written into the class's
+docstring: only the methods that hand the engine text a **caller** supplied, which is
+`execute`, `query` and the `estimated_scan_rows` the same Sub-step added.
+`create_schema` and `run_build` run SQL this package wrote, and a failure there is a
+broken installation that deserves its traceback.
+
+Both halves are probed on every run by `.claude/scripts/check_validation_gate/` —
+`check_engine_refusal_is_named` — and the
+[Sub-step 5.1 review](reviews/step-005-validation-gate.md#sub-step-51--the-validation-gate-refuses-anything-that-is-not-a-bounded-read)
+carries the output. **What the payment does not buy**, so nothing is read into it: DuckDB
+classifies some caller mistakes as its own errors, so `WarehouseAdapter.query(None)`
+comes back as a `WarehouseError` too. What the type separates is the engine refusing
+SQL from the Warehouse failing to open — the second half of the entry's cost sentence —
+and that separation is real because opening happens in the constructor, which is not
+wrapped.
+
+**Two more sites carried the same construct, and were narrowed in the same Sub-step**
+rather than left outside the Location: `check_warehouse.py`'s constraint probe (two
+`except Exception` clauses) and `check_validation_feasibility.py`'s widening-cast probe
+(one). At both of them a caught exception is what **prints a pass**, so the cost there
+was not the mistaken diagnosis this entry's cost paragraph describes but a wrong
+verdict: a probe statement the file itself had mistyped, rejected by the adapter before
+the engine saw it, printed as a constraint firing or as a cast proving load-bearing.
+Narrowing the catch is the whole change — the spike's certified expressions are
+untouched, so
+[R4 of Step 004](plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+still holds: it pins the inputs of a dated measurement, not the code that decides
+whether the measurement was taken. One line of the spike's **output** does move, in
+every file this payment touches — the printed exception name is now `WarehouseError`
+where it was DuckDB's own class, so lines quoted in the Step 003 and Step 004 reviews no
+longer reproduce verbatim. The engine's class is the `__cause__`, and
+`check_engine_refusal_is_named` fails the run if it ever is not.
+
+**Two `except Exception` clauses are left in the repository on purpose**, both commented
+on the line: `veritas/ingestion/__main__.py`'s top-level handler, and the clause in
+`.claude/scripts/check_validation_gate/read_only.py` that proves a Warehouse which will
+not open raises something that is **not** a `WarehouseError` — where catching the narrow
+type would be the failure.
 
 ### DEBT-017 — The certified axes are registered inside one Glossary cell
 

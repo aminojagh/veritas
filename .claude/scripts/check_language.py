@@ -21,6 +21,7 @@ the framework's rules rest on discipline with no mechanism behind them.
 """
 
 import ast
+import logging
 import re
 import sys
 from pathlib import Path
@@ -88,6 +89,14 @@ KNOWN_NON_ABBREVIATIONS = {
     # reading is explained, which is prose about what the other engine says back.
     "DECIMAL", "OWL", "RDF", "SPARQL", "DAG", "CTE", "LIMIT", "ABS",
     "NULLS", "LAST", "STRING",
+    # The one keyword of SQL this project *does* write that `literal_sql_keywords()`
+    # below cannot reach. `WarehouseAdapter.estimated_scan_rows` holds
+    # `EXPLAIN (FORMAT json) ` as a **fragment** — a prefix concatenated with the
+    # caller's own statement — because the statement it explains is supplied at run
+    # time and is the whole point. A fragment parses as nothing, so the derivation
+    # that reads statements cannot see it, and a review that quotes what the adapter
+    # sends needs the word.
+    "FORMAT",
     # Document and tooling shorthand. HEAD is git's name for the current commit —
     # an ordinary word shouted by convention, not something a reader looks up, and
     # any review that compares its work against the committed version says it.
@@ -212,9 +221,88 @@ def published_sql_keywords() -> set[str]:
     return keywords
 
 
+def literal_sql_keywords() -> set[str]:
+    """Shouted keywords of the SQL this project writes as Python string literals.
+
+    The **third** body of hand-authored SQL, and the one that has no file extension
+    to find it by. `warehouse_sql_keywords` reads `veritas/warehouse/**/*.sql` and
+    `published_sql_keywords` reads the fields a Semantic Entry publishes; between
+    them they miss every statement a module or a check script writes down — the
+    ingestion pipeline's, `check_warehouse.py`'s constraint probes, the spike's
+    twenty-five, and from Sub-step 5.1 the Validation Gate check's probes, which are
+    deliberately full of statements the Gate must refuse. `DROP` is a keyword this
+    project now writes and no `.sql` file contains.
+
+    Which literals are SQL is **sqlglot's** answer rather than a guess, for the
+    reason `check_warehouse.py`'s dialect scan asks it the same question: this
+    repository writes about SQL constantly, and the word FROM appears in more English
+    sentences here than in queries. A string sqlglot reads as a bare column, an
+    identifier, or its generic `Command` fallback is prose that happened to start
+    with a SQL word — *"drop a table"* is a probe's description, and exempting the
+    uppercase tokens in a sentence like that is exactly what this function must not
+    do. Docstrings are skipped for the same reason and by the same rule: what is
+    excused is a *position* in the syntax tree, which no file can claim by choosing a
+    name.
+
+    Statement kinds beyond the six the dialect scan reads are included here, because
+    the two functions want different things from the same parse. That scan asks
+    *"is this SQL that leaves the adapter"* and a `DROP` never does; this asks *"is
+    this SQL a document may quote"*, and a review that shows what the Gate refuses
+    quotes every one of them.
+
+    Quoted literals are stripped for the reason the other two strip them: a probe
+    names domain values, and those are registered Glossary vocabulary this function
+    has no business exempting.
+    """
+    import sqlglot
+    from sqlglot import exp
+
+    # sqlglot logs a warning whenever it falls back to a generic Command node. Most
+    # strings offered below are English, so that is the expected outcome rather than
+    # news — the same line `check_warehouse.py` carries above its own scan.
+    logging.getLogger("sqlglot").setLevel(logging.CRITICAL)
+
+    statements = (
+        exp.Select, exp.Union, exp.Insert, exp.Create, exp.Delete, exp.Update,
+        exp.Subquery, exp.Drop, exp.Copy, exp.Pragma, exp.Attach,
+    )
+    keywords: set[str] = set()
+    for root in CODE_ROOTS:
+        for path in sorted(root.rglob("*.py")):
+            tree = ast.parse(path.read_text(), filename=str(path))
+            documentation = {
+                id(node.body[0].value)
+                for node in ast.walk(tree)
+                if isinstance(
+                    node,
+                    ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
+                )
+                and node.body
+                and isinstance(node.body[0], ast.Expr)
+                and isinstance(node.body[0].value, ast.Constant)
+                and isinstance(node.body[0].value.value, str)
+            }
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+                    continue
+                if id(node) in documentation:
+                    continue
+                try:
+                    parsed = sqlglot.parse_one(node.value, dialect="duckdb")
+                except sqlglot.errors.SqlglotError:
+                    continue
+                if not isinstance(parsed, statements):
+                    continue
+                keywords.update(
+                    re.findall(r"\b[A-Z]{2,6}\b", re.sub(r"'[^']*'", " ", node.value))
+                )
+    return keywords
+
+
 KNOWN_NON_ABBREVIATIONS |= traded_universe_tokens()
 KNOWN_NON_ABBREVIATIONS |= warehouse_sql_keywords()
 KNOWN_NON_ABBREVIATIONS |= published_sql_keywords()
+KNOWN_NON_ABBREVIATIONS |= literal_sql_keywords()
 
 problems: list[str] = []
 

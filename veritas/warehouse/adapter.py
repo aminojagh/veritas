@@ -11,9 +11,17 @@ ADR-0002 sets both the shape and the licence for how crude the inside may be:
     path, ignore connection pooling, and handle no errors at all — each of those
     is fixed in one place, later, for the same price as today.
 
-So the hardcoded database path, the absent pooling and the absent error handling
-below are not undeclared shortcuts; they are the costs that ADR already accepted
-in writing. What may not be deferred is the boundary itself.
+So the hardcoded database path and the absent pooling below are not undeclared
+shortcuts; they are the costs that ADR already accepted in writing. What may not
+be deferred is the boundary itself.
+
+The absent error handling was on that list too, and Sub-step 5.1 took it back off:
+`WarehouseError` below is the type
+[DEBT-016](../../.claude/docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)
+was opened for, because a caller that may not import `duckdb` may not name the
+engine's exceptions either. It wraps only the methods that hand the engine text a
+caller supplied; a failure in SQL this package wrote is still an unhandled
+traceback, which is what a broken installation should look like.
 
 One rule the ADR added on 2026-08-05 does bind the code here: *prefer the
 construct that assembles no text*, inside the adapter as well as outside it. Every
@@ -22,6 +30,7 @@ with a bound parameter, and row counts go through DuckDB's relational API, so no
 method in this file builds a SQL string out of a value it was handed.
 """
 
+import json
 from pathlib import Path
 from types import TracebackType
 
@@ -51,6 +60,46 @@ DATABASE_PATH = REPO_ROOT / "data" / "veritas.duckdb"
 # same string by coincidence rather than by design, so code that treats it as a
 # path works today and would break the moment anything resolved or joined it.
 IN_MEMORY = ":memory:"
+
+
+# What the engine is asked for when a caller wants to know how much a statement
+# will read before running it. `EXPLAIN` renders the plan as a drawn box diagram
+# by default, and reading a number out of a drawn diagram is the text-matching
+# [ADR-0003](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md)
+# rejected by name; the JavaScript Object Notation (JSON) form is a document with
+# a number in a field. Both the keyword and the field names below are DuckDB's,
+# which is precisely why they are in this file and nowhere else.
+EXPLAIN_JSON = "EXPLAIN (FORMAT json) "
+PLAN_CHILDREN = "children"
+PLAN_DETAIL = "extra_info"
+PLAN_TABLE = "Table"
+PLAN_ROWS = "Estimated Cardinality"
+
+
+class WarehouseError(Exception):
+    """The engine refused a statement the caller supplied.
+
+    The type [DEBT-016](../../.claude/docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)
+    was opened for the absence of. A caller outside this package cannot name
+    DuckDB's own exception classes — an engine's exception types are part of its
+    dialect, and `check_warehouse.py` fails the run on a `duckdb` import anywhere
+    else — so before this class the only expressible catch was `Exception`, which
+    reports a bug in the caller as a refusal by the engine.
+
+    **It is raised only where a caller's own SQL was refused.** A statement this
+    package wrote — the schema, a build script — failing is a broken installation,
+    and a broken installation deserves the traceback rather than a caught,
+    prettified message; so `create_schema` and `run_build` are deliberately not
+    wrapped. That is the decision DEBT-016 said this class could not be added
+    without taking: *"whether every adapter method wraps or only the two that
+    execute caller-supplied SQL."* Only those, plus `estimated_scan_rows`, which
+    arrived with the same Sub-step and is the third method that hands the engine
+    text it was given.
+
+    The engine's own exception is kept as `__cause__`, so nothing is lost: a
+    reader who needs the DuckDB class name still has it, and gets it by asking
+    rather than by importing.
+    """
 
 
 class WarehouseAdapter:
@@ -175,6 +224,59 @@ class WarehouseAdapter:
         ).fetchone()
         return count
 
+    def estimated_scan_rows(self, sql: str) -> int:
+        """How many rows the engine's planner expects to read from tables, without
+        running the statement.
+
+        **The caller must have established that `sql` is one single read before
+        calling this.** Prefixing `EXPLAIN` does not neuter a string holding two
+        statements: the engine plans the first and *executes* the rest, so
+        `EXPLAIN ... SELECT 1; DROP TABLE t;` drops the table. That is measured
+        rather than asserted — `.claude/scripts/check_validation_gate/read_only.py`
+        does it to a throwaway table in an in-memory Warehouse on every run — and it
+        is why the Validation Gate's single-statement and read-only rules are
+        ordered ahead of its bounded-read rule rather than beside it.
+
+        **What the number is.** The planner's estimated cardinality summed over the
+        operators that read a table. Not the statement's output size and not its
+        peak intermediate size: *scan*, which is the quantity the
+        [Target State](../../.claude/docs/design/target-state.md#flow) bounds — it
+        says *"scan bounded"* — and the quantity BigQuery's dry run bills, which is
+        what the
+        [extension path](../../.claude/docs/design/target-state.md#extension-path-to-the-full-proposal)
+        swaps this for.
+
+        **What it cannot see**, so the Gate's rule is not read as more than it is: an
+        operator that multiplies rows without reading a table carries no estimate of
+        its own in this plan format. A cross product of a table with itself scans
+        each side once and is therefore small by this measure while producing the
+        square. Bounding *that* is the certified-route rule's job, not this one's.
+
+        Everything DuckDB-specific about the answer — the `EXPLAIN` spelling, the
+        JSON plan format, the field names — is in the constants at the top of this
+        file, which is the point of the method being here at all.
+        """
+        try:
+            plan = self._connection.execute(EXPLAIN_JSON + sql).fetchall()
+        except duckdb.Error as refusal:
+            raise WarehouseError(str(refusal)) from refusal
+        try:
+            roots = json.loads(plan[0][1])
+        except (IndexError, ValueError) as unreadable:
+            raise WarehouseError(
+                f"the engine returned a plan this adapter cannot read: {plan!r}"
+            ) from unreadable
+
+        scanned = 0
+        pending = list(roots)
+        while pending:
+            node = pending.pop()
+            detail = node.get(PLAN_DETAIL) or {}
+            if PLAN_TABLE in detail and PLAN_ROWS in detail:
+                scanned += int(detail[PLAN_ROWS])
+            pending.extend(node.get(PLAN_CHILDREN) or [])
+        return scanned
+
     # -- reading and writing -----------------------------------------------
 
     def execute(self, sql: str, parameters: list[object] | None = None) -> None:
@@ -184,7 +286,10 @@ class WarehouseAdapter:
         call site — the Validation Gate's read-only rule is a claim about which of
         these two a generated statement is allowed to reach.
         """
-        self._connection.execute(sql, parameters or [])
+        try:
+            self._connection.execute(sql, parameters or [])
+        except duckdb.Error as refusal:
+            raise WarehouseError(str(refusal)) from refusal
 
     def query(
         self, sql: str, parameters: list[object] | None = None
@@ -196,4 +301,7 @@ class WarehouseAdapter:
         a caller with a value to interpolate has a bound parameter available, so
         there is never a reason to build the string.
         """
-        return self._connection.execute(sql, parameters or []).fetchall()
+        try:
+            return self._connection.execute(sql, parameters or []).fetchall()
+        except duckdb.Error as refusal:
+            raise WarehouseError(str(refusal)) from refusal

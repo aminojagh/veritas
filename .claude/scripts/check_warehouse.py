@@ -103,7 +103,11 @@ from veritas.semantic import (  # noqa: E402
     read_entry,
     sql_fields,
 )
-from veritas.warehouse import DATABASE_PATH, WarehouseAdapter  # noqa: E402
+from veritas.warehouse import (  # noqa: E402
+    DATABASE_PATH,
+    WarehouseAdapter,
+    WarehouseError,
+)
 
 # sqlglot logs a warning whenever it cannot parse a string and falls back to a
 # generic Command node. The dialect scan below offers it every string literal in
@@ -441,6 +445,15 @@ def check_constraints() -> None:
     it never touches the real one. Without this the constraints are a claim in a
     comment; ADR-0002's whole argument is that a promise nothing runs is a promise
     that goes stale.
+
+    **Both probes catch `WarehouseError` and nothing wider**, which they could not
+    do until Sub-step 5.1 gave the adapter an error type — that was
+    [DEBT-016](../docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type).
+    The narrowing matters most in the second loop, where a caught exception is what
+    *prints a pass*: under `except Exception`, a probe statement this file had
+    mistyped into something the adapter rejects before the engine sees it would have
+    printed `refused` and counted as a constraint doing its job. Only the engine
+    refusing the row proves the constraint fired.
     """
     print("  constraint probe (in-memory Warehouse from the same schema.sql)")
     with WarehouseAdapter.in_memory() as probe:
@@ -449,7 +462,7 @@ def check_constraints() -> None:
         for statement in SEED:
             try:
                 probe.execute(statement)
-            except Exception as failure:
+            except WarehouseError as failure:
                 problems.append(
                     f"the valid seed row was rejected, so the probe below proves "
                     f"nothing: {statement} -> {type(failure).__name__}: {failure}"
@@ -460,7 +473,7 @@ def check_constraints() -> None:
         for description, statement in REJECTIONS:
             try:
                 probe.execute(statement)
-            except Exception:
+            except WarehouseError:
                 print(f"    refused   {description}")
             else:
                 print(f"    ACCEPTED  {description}")
