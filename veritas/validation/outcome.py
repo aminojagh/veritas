@@ -19,11 +19,18 @@ read by a prose parse is
 [DEBT-017](../../.claude/docs/debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell),
 opened four days earlier and still open.
 
-**The set is incomplete on purpose.** Sub-step 5.1 ships the rules that need neither
-the corpus nor the schema, so it registers four members. Each later rule of
+**The set is incomplete on purpose.** Sub-step 5.1 shipped the rules that need
+neither the corpus nor the schema and registered four members; Sub-step 5.2 added the
+tracing rule and the three ways it can fail. Each later rule of
 [Step 005](../../.claude/docs/plan/step-005-validation-gate.md) adds its own with the
 Sub-step that adds the rule. A member with no rule behind it would be a chart
 category nothing can ever fall into.
+
+**A rule may register more than one member.** Four rules and four members made them
+look paired; the tracing rule is one rule with three distinct failures behind it, and
+they are separate members because they are separate bars a reader would act on
+differently — a statement the optimizer cannot resolve, a Shadow Metric, and a
+statement that aggregates nothing are three different things to go and fix.
 """
 
 from dataclasses import dataclass
@@ -79,6 +86,56 @@ class RejectionReason(StrEnum):
     The `Validation Gate`'s registered definition ends with *"cost bounded,
     read-only"*, and the [Target State](../../.claude/docs/design/target-state.md#flow)
     spells the first of those *"scan bounded"*.
+    """
+
+    UNRESOLVABLE = "unresolvable"
+    """The statement parses, but cannot be resolved against the live schema.
+
+    A different mechanism from every reason above it and from the two below, and the
+    spike is where the distinction was found: its `unknown table` probe is there
+    because *"sqlglot resolves it without objecting, so the rejection has to come
+    from the expression not matching rather than from resolution failing — two
+    mechanisms a Gate must not confuse."* Resolution is what attaches every column to
+    the table it came from and expands a `SELECT *` into real columns, so a statement
+    that will not resolve is one no parse-tree rule can reach a verdict about. It is
+    refused rather than passed, which is
+    [ADR-0003](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md)'s
+    fail-closed commitment applied to the second way a statement can be unreadable.
+
+    It is reachable rather than theoretical: the engine plans some statements
+    sqlglot's optimizer will not resolve, and `check_validation_gate/traces.py` puts
+    one in front of the Gate on every run.
+    """
+
+    SHADOW_METRIC = "shadow metric"
+    """The statement computes an expression that is not a Certified Metric.
+
+    The Glossary's own words for the thing: *"a metric computed inline in a query
+    instead of drawn from the Semantic Layer. The failure mode Veritas exists to
+    prevent."* The rule is the
+    [Target State](../../.claude/docs/design/target-state.md#flow)'s, verbatim —
+    *"every metric expression traces to a Certified Metric"* — and **every** is what
+    this member reports failing: one uncertified expression beside three certified
+    ones is still a rejection.
+
+    A paraphrase that returns the identical number lands here too, by design.
+    [C1](../../.claude/docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
+    chose a pasteable form over a normalising comparison precisely so the Gate does
+    not have to decide which rewrites preserve meaning, and the price of that choice
+    is that a commuted operand is a Shadow Metric.
+    """
+
+    NO_METRIC_EXPRESSION = "no metric expression"
+    """The statement computes no metric expression at all.
+
+    Separate from `SHADOW_METRIC` because the two are different failures with
+    different fixes: one says the generator invented arithmetic, the other says it
+    wrote a statement that aggregates nothing. Charting them as one bar would hide
+    which.
+
+    Without this member the tracing rule would pass a statement vacuously — *"every
+    metric expression traces"* is trivially true of a statement holding none — and a
+    vacuous pass is half of what the spike achieved by accident.
     """
 
 

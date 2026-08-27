@@ -129,9 +129,22 @@ generated SQL ─┬─► is it a statement we will run at all?        ← 5.1 
 ```
 
 **The order is not arbitrary — it is what each rule needs to reach a verdict.** 5.1
-needs the statement's parse tree and nothing else; 5.2 needs the corpus as well; 5.3,
-5.4 and 5.5 need the live schema through the adapter on top of that. Each rule
-therefore runs before every rule that needs more than it does.
+needs the statement's parse tree and nothing else; 5.2 needs the corpus **and** the live
+schema through the adapter; 5.3, 5.4 and 5.5 need that same pair, plus the Access Profile
+the caller hands in. Each rule therefore runs before every rule that needs more than it
+does.
+
+**Corrected 2026-08-27** ([R13](#r13--aminos-rulings-on-the-52-review--decided-2026-08-27)).
+This sentence read *"5.2 needs the corpus as well; 5.3, 5.4 and 5.5 need the live schema
+through the adapter on top of that"* — the schema one Sub-step later than it actually
+arrived. `qualify` cannot attach a column to the table it came from without a catalogue,
+so the rule that traces an expression needs both from its first line.
+[C4](../design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time) had
+already said the Gate's interface *"takes the schema, not just the statement"*, and
+**nothing about the rule order changes**: the tracing rule still runs after every rule
+that needs less than it does, which is the property this section is about. What was
+wrong was the prediction of *when* the second dependency lands, and a route sentence
+that has quietly stopped being true is worse than one that was never written.
 
 **The reason to order them that way is not speed.** The first of
 [the six shapes below](#the-six-shapes-read-only-has-to-cover) — a statement that drops
@@ -999,6 +1012,73 @@ on them instead of relitigating them: it imports the contract from `outcome.py`,
 applies `TRUSTED_REWRITES` where 5.1 declared it, and it inherits a rule set whose
 `rejected` verdicts are all measurements. Nothing in the ruling changes a name, an
 interface or the flow, which is why it costs no code.
+
+### R13 — Amino's rulings on the 5.2 review → **decided 2026-08-27**
+
+Rulings on the eight sceptical items and the one Term Proposal of
+[the 5.2 review entry](../reviews/step-005-validation-gate.md#sub-step-52--the-gate-traces-every-metric-expression-to-a-certified-metric).
+Amino: *"3 → edit the plan accordingly. 5 → if this won't get built in a specific future
+step, create a debt for it which triggers when a semantic definition drifts. 7 → amend.
+The `metric expression` term proposal is approved. All other changes are reviewed,
+approved, and staged."* They land **in the 5.2 commit itself** rather than after it, for
+the reason [R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26) and
+[R12](#r12--aminos-rulings-on-the-51-review--decided-2026-08-26) did: the ruling arrived
+before the commit did.
+
+**Three items cost an edit and five do not.** The five approved as they stand are
+declared limits rather than offers, and approval records them as known: `count(*)` is a
+Shadow Metric by [C1](../design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)'s
+design, so the pressure lands on Grounding rather than on a patch here (item 1); the
+three new `Rejection Reason` members stay three bars rather than one, so a chart can
+separate a Grounding problem from a generator problem from a statement that will not
+resolve (item 2); `certified_form` goes on raising `ValueError` on a broken corpus, which
+is the call [R12](#r12--aminos-rulings-on-the-51-review--decided-2026-08-26) made for a
+Warehouse that will not open (item 4); the rewritten positive control stands over
+changing 5.1's two probe statements (item 6); and the timing figures stay dated evidence
+that no check asserts on (item 8).
+
+**1. The plan's dependency sentence is corrected** (item 3). Amino: *"edit the plan
+accordingly."* [What the Gate must decide](#what-the-gate-must-decide) predicted that the
+live schema arrives with 5.3; it arrived with 5.2, because `qualify` cannot attach a
+column to its table without a catalogue. The sentence now says 5.2 needs both, and it
+carries the correction and its date rather than being quietly rewritten — the rule order
+it exists to justify is unchanged, and only the prediction of when the second dependency
+lands was wrong.
+
+**2. [DEBT-018](../debt-ledger.md#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus) is opened** (item 5).
+Amino: *"if this won't get built in a specific future step, create a debt for it which
+triggers when a semantic definition drifts."* It will not get built: no Sub-step of this
+Step pins an expression's text, and 5.5's corpus edit adds Join Paths and a `routes`
+field rather than touching an `expression`. So the entry is opened with exactly that
+trigger — the first edit to a Certified Metric's `expression` in `semantic/metrics/`.
+Writing it forced the gap to be measured rather than asserted:
+`check_semantic_layer.py`'s check 4 already compares **all nine** metrics' numbers
+against SQL that reads nothing from `semantic/`, so what nothing catches is narrower than
+the review claimed — an edit to one of the **six** metrics
+[R4 of Step 004](step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+did not pin, that changes an expression's text **without changing its number**. The
+repayment is check 9's pin widened from three metrics to nine.
+
+**3. The `Shadow Metric` row is amended** (item 7). Amino: *"amend."* Its *Lives in* cell
+read *"— (an anti-pattern)"*, which was true while nothing in the repository named one;
+`veritas/validation/` now returns `RejectionReason.SHADOW_METRIC`, so the cell names that
+home and keeps what the parenthetical was really saying — no Semantic Entry publishes a
+Shadow Metric. The definition cell carries the amendment, its date and a pointer here,
+which is the shape the `Dimension Definition` row's amendment of 2026-08-24 set.
+
+**4. `metric expression` is registered** — the Term Proposal the review raised and did
+not take. Amino: *"the `metric expression` term proposal is approved."* It goes into
+[Glossary Section A](../glossary.md#a-the-system) between `Certified Metric` and
+`Shadow Metric`, **entirely in lower case**, because that is how the `agreed` Target
+State's flow, ADR-0001 and ADR-0003 have spelled it since Step 001 and how
+`metric_expressions` has been spelled since Step 003. Registering it in Title Case would
+have meant editing an `agreed` Target State to match a Glossary row, which is the wrong
+way round; the row registers a word three agreed documents already relied on.
+
+**What this makes true that was not.** The plan's route sentence is true again, the
+corpus has a tripwire under it, and both `Shadow Metric` and `metric expression` are
+registered where a reader naming something will look. Only the Ledger gains an entry: no
+name, no interface and no flow moves, so 5.3 starts from the same seams 5.2 finished on.
 
 ---
 

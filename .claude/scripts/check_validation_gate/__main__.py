@@ -21,19 +21,20 @@ runs before every rule that needs more than it does — and a check that read th
 different order would be checking a different Gate.
 
   * `read_only` — Sub-step 5.1. Parseable, one statement, a read, bounded.
+  * `traces` — Sub-step 5.2. Every metric expression traces to a Certified Metric.
 
-The four still to come are `traces` (5.2), `restricted` (5.3), `route` (5.4) and
-`access` (5.5).
+The three still to come are `restricted` (5.3), `route` (5.4) and `access` (5.5).
 """
 
 import read_only
+import traces
 from probes import problems, warehouse
 
 
 def main() -> int:
     with warehouse() as adapter:
         print(f"  Warehouse: {adapter.database_path}")
-        reports = [read_only.check(adapter)]
+        reports = [read_only.check(adapter), traces.check(adapter)]
 
     for report in reports:
         report.print()
@@ -46,8 +47,9 @@ def main() -> int:
         return 1
     print(
         "PASS — the Validation Gate refuses what it cannot read, what is more than "
-        "one statement, what is not a read, and what the planner expects to scan past "
-        "the ceiling; and it allows an ordinary question"
+        "one statement, what is not a read, what the planner expects to scan past "
+        "the ceiling, and what computes a metric the Semantic Layer does not "
+        "certify; and it allows every Certified Metric"
     )
     return 0
 

@@ -723,3 +723,494 @@ PASS — documents agree with the Glossary and the writing conventions
 
 Both counts are higher than the ones the trim entry above carries, for the ordinary
 reason: R12, this section and the whole 5.1 entry are among what the run now reads.
+
+---
+
+## Sub-step 5.2 — The Gate traces every metric expression to a Certified Metric
+
+**What changed.** The Validation Gate's fifth rule, and the first that reads the
+Semantic Layer. A statement is now allowed only when it computes at least one metric
+expression and **every** one of them traces to a Certified Metric loaded from
+`semantic/metrics/`. `gate.py` gains the tracer that decides it — `resolve`,
+`projected_expressions`, `metric_expressions`, `certified_form`, `certified_forms` and
+`certified_metrics_only` — and `ValidationGate` gains a `semantic` field holding the
+corpus it traces against. `outcome.py` gains three `Rejection Reason` members, because
+the rule fails in three distinguishable ways.
+
+Three things landed with it.
+
+- **[R2](../plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+  is discharged for the tracer.** `check_validation_feasibility.py` holds no copy of
+  `resolve`, `canonical`, `certified_forms`, `certified_metrics_only`,
+  `metric_expressions`, `TracerRefused` or the two-rule constant; it imports each from
+  `veritas/validation/`. Its own corpus stays three pinned literals under
+  [R4 of Step 004](../plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21),
+  so one tracer now answers for two corpora. **All 25 of its declared verdicts are
+  unchanged by the move**, which is the evidence that it was a move and not a rewrite.
+  The projection walker and the restricted-column detector are still the spike's and
+  go in with 5.3.
+- **`WarehouseAdapter.columns_by_table`**, which is C4's *"the Gate's interface takes
+  the schema"* made concrete. It is the spike's `warehouse_schema` moved in under R2's
+  wider rule, and it reads the whole catalogue in one query rather than one per table.
+- **`.claude/scripts/check_validation_gate/traces.py`**, the second of
+  [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)'s
+  five modules.
+
+### The finding the plan asked for: `Position Change` traces, and only just
+
+The [plan](../plan/step-005-validation-gate.md#52--the-gate-traces-every-metric-expression-to-a-certified-metric)
+named `Position Change` as *"the shape nobody has measured"* — the
+[4.2 review](../reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)
+called it *"the one expression shape the spike never measured — a correlated scalar
+subquery with an `ORDER BY` and a `LIMIT` inside an aggregate"* — and said that if it
+did not trace, the Sub-step must report it rather than route around it, with three
+options: a third trusted rewrite, a rewritten expression, or debt.
+
+**It did not trace, and none of the three was needed.** The cause is one alias:
+
+```
+statement  SUM("fct_position_snapshot"."quantity" - COALESCE((SELECT "previous_snapshot"."quantity" AS "quantity" FROM …
+corpus     SUM("fct_position_snapshot"."quantity" - COALESCE((SELECT "previous_snapshot"."quantity"                FROM …
+```
+
+`qualify` gives the projection of a nested `SELECT` an output alias. The statement goes
+through `qualify`; the corpus, canonicalised by parsing the expression on its own, does
+not. For flat arithmetic the two agree, which is why nine Sub-steps of measurement
+never saw it — every expression the spike traced is flat.
+
+**The fix is a fourth option the plan did not list: put the corpus through the same
+reader as the statement.** `certified_form` wraps a certified expression in
+`SELECT <expression> FROM <the Warehouse tables it names>` and runs it through the same
+`resolve`, so both sides of the comparison are rewritten by the same two rules. That
+widens nothing —
+[C5](../design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)'s
+two rewrites on both sides rather than a third on one — and it needs no corpus edit, so
+Step 004 is not reopened. It is also the property claim 4 already relies on: *"query and
+corpus go through one rewrite"*.
+
+The scope is built from the tables the **expression** names, not from the Metric
+Definition's `from_table` and `join_paths`. Both were measured and produce identical
+forms for all nine metrics; the expression's own tables were chosen because a canonical
+form is a property of the expression, and reading the declared route would make the
+corpus move when 5.4 edits a route. It also keeps `certified_forms` callable with a
+bare expression, which is what lets the spike keep its three pins.
+
+**This is checked, not asserted.** `check_symmetric_canonicalisation_is_load_bearing`
+builds the corpus the rejected way on every run and prints which metrics it loses —
+today, one of nine, `Position Change`. It **fails the run if it loses none**, because at
+that point the explanation in `certified_form` has stopped being true and a reason
+nothing checks is how a comment quietly goes wrong. That is 5.1's rule about citations
+applied to this Sub-step's own.
+
+### Three reasons for one rule, and why they are not one bar
+
+| Reason | What it means | The probe |
+|---|---|---|
+| `unresolvable` | parses, will not resolve against the live catalogue | a DuckDB list comprehension — the engine plans it, sqlglot's optimizer will not resolve the name it binds |
+| `shadow metric` | an expression the corpus does not hold | five Shadow Metrics, two commuted forms, and one certified expression sitting beside a Shadow Metric |
+| `no metric expression` | the statement aggregates nothing | a projection of two columns, and the cross product |
+
+The spike is where the first distinction was found rather than invented: its
+`unknown table` probe exists because *"sqlglot resolves it without objecting, so the
+rejection has to come from the expression not matching rather than from resolution
+failing — two mechanisms a Gate must not confuse."* `unresolvable` is that second
+mechanism given a name and a bar of its own.
+
+**A rule may register more than one member.** 5.1's four rules and four members made
+them look paired; `outcome.py` now says they are not. Three bars rather than one because
+a reader acts on them differently: a Shadow Metric is a Grounding problem, a statement
+that aggregates nothing is a generator problem, and an unresolvable statement is neither.
+
+### Two verdicts Sub-step 5.1 declared have flipped
+
+Both are the Gate getting stricter, and both are worth reading carefully.
+
+- **`an ordinary question`** — `SELECT count(*) FROM fct_trade WHERE …` — is now a
+  Shadow Metric. `Trade Count` is certified as `count(fct_trade.trade_id)`, so `count(*)`
+  is a paraphrase, and
+  [C1](../design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
+  chose a pasteable form over a Gate that decides which paraphrases are safe. This is
+  the constraint working, and it is also the sharpest thing in this Sub-step to
+  disagree with — see below.
+- **`a cross product`** is now rejected as `no metric expression`. It does **not** close
+  the bounded read's blind spot: that statement selects columns, so it computes no
+  metric, and a cross product computing a certified one would still be allowed. 5.4
+  still owns it, and `check_the_estimate_does_not_count` still prints the two numbers.
+
+**The positive control they used to be has been rewritten as the property it always
+meant.** A rule module needs a statement its own rules *allow*, and "allowed by the
+whole Gate" stops meaning that the moment a later rule exists — which will happen again
+in 5.3, 5.4 and 5.5. `check_these_rules_allow_them` therefore asks whether **all four of
+this module's rules ran without rejecting**, read off `ValidationGateOutcome.rules` —
+the field 5.1 added for the reader who *"wants to know what a verdict covers rather than
+assuming"*. It needs no edit when the next rule lands.
+
+### A defect this Sub-step found in the adapter
+
+Reading the catalogue one query per table cost **53 ms against 4 ms** for the same
+mapping on the run below — an N+1 against `information_schema`, on a path the Gate now
+takes on every judgement. `columns_by_table` does it in one query, and the check prints
+both figures and fails the run if the two disagree, so a later tidy-up cannot quietly
+restore the slow shape or a different mapping.
+
+### Verification
+
+Needs a filled Warehouse; `uv run python -m veritas.ingestion` was run first, as every
+session of this Step must.
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+  Warehouse: /home/amino/Projects/veritas/data/veritas.duckdb
+
+  read-only, single, parseable, bounded
+    trusted rewrites: qualify, merge_subqueries — sqlglot's optimize() runs fourteen
+    rejected  drop a table             not a read
+    rejected  write to a table         not a read
+    rejected  write to the filesystem  not a read
+    rejected  engine introspection     not a read
+    rejected  a second database        not a read
+    rejected  two statements           not a single statement
+    rejected  a union                  not a read
+    rejected  not sql at all           unparseable
+    rejected  over the ceiling         unbounded scan, ceiling 10
+    rejected  engine will not plan it  unbounded scan
+    rejected  a cross product          no metric expression
+    rejected  an ordinary question     shadow metric
+    all 4 rules here ran on `SELECT * FROM fct_trade AS left_side, fct_tr…` and none rejected it — refused later by traces
+    all 4 rules here ran on `SELECT count(*) FROM fct_trade WHERE fct_tra…` and none rejected it — refused later by traces
+    8 probe(s) reached the same verdict through a Warehouse that raises on contact
+    asking the engine to plan a two-statement string dropped the table — so the single-statement rule runs before it or not at all
+    planner estimate 61907 against 61907 rows actually in fct_position_snapshot
+    scan ceiling 1000000 against a largest table of 61907 rows — headroom 16x
+    a cross product of fct_trade with itself estimates 3340 scanned against 2788900 rows returned — the estimate counts what is read, not what a join makes from it
+    SELECT count(*) FROM fct_trade estimates 0 — a real answer off a table of 1670 rows, and the same number an unread plan would give
+    the engine refusing a caller's SQL raises WarehouseError, caused by BinderException
+    a Warehouse that will not open raises IOException from the constructor, which no rule catches
+
+  every metric expression traces to a Certified Metric
+    corpus: 9 Certified Metrics, read from semantic/metrics/ through veritas.semantic.loader — not Python literals (R2)
+    corpus canonicalised through the Gate's own reader: 1 of 9 Certified Metrics would not trace if it were parsed alone — Position Change
+    allowed   bare                     —
+    allowed   aliased                  —
+    allowed   derived table            —
+    allowed   common table expression  —
+    allowed   net revenue              —
+    allowed   net revenue by region    —
+    allowed   traded notional          —
+    rejected  commuted subtraction     shadow metric
+    rejected  commuted multiplication  shadow metric
+    rejected  open-coded net revenue   shadow metric
+    rejected  unconverted commission   shadow metric
+    rejected  rebate silently dropped  shadow metric
+    allowed   notional, wrong currency —
+    rejected  certified beside shadow  shadow metric
+    rejected  half-certified union     not a read
+    rejected  unknown table            unbounded scan
+    rejected  no metric expression     no metric expression
+    rejected  unresolvable             unresolvable
+
+    one probe per Certified Metric, built from semantic/metrics/:
+    allowed   Account Value            —
+    allowed   Cash Balance             —
+    allowed   Gross Revenue            —
+    allowed   Net Revenue              —
+    allowed   Position Change          —
+    allowed   Realised P&L             —
+    allowed   Trade Count              —
+    allowed   Traded Notional          —
+    allowed   Unrealised P&L           —
+
+    one judgement, fastest of 15: schema 5 ms · corpus 23 ms · statement 2 ms · whole Gate 37 ms
+    the catalogue in one query against one query per table: 4 ms against 53 ms, same mapping: True
+
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement, what is not a read, what the planner expects to scan past the ceiling, and what computes a metric the Semantic Layer does not certify; and it allows every Certified Metric
+```
+
+The other five checks, run in the same session and each exiting zero:
+
+```
+$ uv run python .claude/scripts/check_validation_feasibility.py
+  claim 1 — does a certified expression survive the shapes a generator writes?
+    ALLOWED   bare                                 Gross Revenue
+    ALLOWED   aliased                              Gross Revenue
+    ALLOWED   derived table                        Gross Revenue
+    ALLOWED   common table expression              Gross Revenue
+    ALLOWED   net revenue                          Net Revenue
+    ALLOWED   net revenue by region                Net Revenue
+    ALLOWED   traded notional                      Traded Notional
+    REJECTED  commuted subtraction                 1 expression(s), none certified
+    REJECTED  commuted multiplication              1 expression(s), none certified
+    REJECTED  open-coded net revenue               1 expression(s), none certified
+    REJECTED  unconverted commission               1 expression(s), none certified
+    REJECTED  rebate silently dropped              1 expression(s), none certified
+    ALLOWED   notional through the wrong currency  Traded Notional
+    REJECTED  half-certified union                 Gross Revenue, plus 1 uncertified
+    REJECTED  unknown table                        1 expression(s), none certified
+    REFUSED   unparseable                          ParseError: Expecting ). Line 1, Col: 48.
+
+    7 certified · 2 form · 5 shadow · 1 blind spot · 1 refused
+…
+    25 of 25 statements keep both parse-tree verdicts through the round trip
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+
+$ uv run python .claude/scripts/check_semantic_layer.py
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_language.py
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/verify_framework.py
+PASS — framework is wired up correctly
+```
+
+### Mutation testing
+
+The pattern Sub-step 2.6 established and 5.1 followed: break one thing, re-run, see the
+check fail on the probes that name it, restore, compare with `cmp`. Four mutations, one
+per claim this Sub-step makes.
+
+```
+$ # for each: apply the mutation, run the check, restore, cmp
+mutation testing — delete the rule, re-run, restore, cmp
+  the tracing rule is dropped from rules()             FAIL — 10 problem(s)
+      'a cross product' was measured as rejected and came back allowed
+      'an ordinary question' was measured as rejected and came back allowed
+      'commuted subtraction' was measured as rejected and came back allowed
+      'commuted multiplication' was measured as rejected and came back allowed
+      'open-coded net revenue' was measured as rejected and came back allowed
+      'unconverted commission' was measured as rejected and came back allowed
+      'rebate silently dropped' was measured as rejected and came back allowed
+      'certified beside shadow' was measured as rejected and came back allowed
+      'no metric expression' was measured as rejected and came back allowed
+      'unresolvable' was measured as rejected and came back allowed
+  'every ... traces' becomes 'some'                    FAIL — 7 problem(s)
+      'an ordinary question' was measured as rejected and came back allowed
+      'commuted subtraction' was measured as rejected and came back allowed
+      'commuted multiplication' was measured as rejected and came back allowed
+      'open-coded net revenue' was measured as rejected and came back allowed
+      'unconverted commission' was measured as rejected and came back allowed
+      'rebate silently dropped' was measured as rejected and came back allowed
+      'certified beside shadow' was measured as rejected and came back allowed
+  the corpus is parsed alone, not resolved             FAIL — 2 problem(s)
+      'Position Change' was measured as allowed and came back rejected
+  a statement that will not resolve is allowed         FAIL — 1 problem(s)
+      'unresolvable' was measured as rejected and came back allowed
+
+gate.py restored byte-for-byte after every mutation
+PASS — the Validation Gate refuses what it cannot read, …
+```
+
+The second mutation is the one the `certified beside shadow` probe was added for: it is
+the only probe in the file that separates *every* from *some*, because the spike's
+demonstration of that hole — the half-certified union — is now refused a rule earlier
+for being a `UNION`. The third reports two problems; the second is
+`check_symmetric_canonicalisation_is_load_bearing` finding that nothing depends on the
+symmetry any more, which is the same defect said the other way round.
+
+### Deliberately left undone
+
+- **[DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+  stands open and now has a second home.** The Gate traces
+  `notional through the wrong currency` to `Traded Notional` and allows it, exactly as
+  the spike's tracer does, so `traces.py` carries a probe of that name declaring
+  `allowed`. Nothing is paid; the entry gained a dated status note saying 5.4 now has
+  two declared verdicts to flip rather than one. Both fail loudly if only one is
+  flipped.
+- **`resolve` will be called more than once per judgement from 5.3.** The tracing rule
+  resolves the statement itself; the Restricted Column and route rules will each need a
+  resolved tree too, and the rule signature 5.1 fixed — `Callable[[Reading], …]` — has
+  nowhere to thread one between rules. Resolving is 2 ms on the run above and
+  deterministic, so this is a cost rather than a bug, and it is **not** on the Ledger:
+  paying it means changing the rule signature, which is a seam R12 has just settled.
+  Flagged below.
+- **No new debt was taken by the code.** The one shortcut worth naming — rebuilding the
+  corpus on every judgement instead of caching it — is not debt, because caching it is
+  what would be wrong: both sides of the comparison have to come from one reading of the
+  catalogue. **One entry was opened by the ruling**, on sceptical item 5 rather than on
+  anything in the diff:
+  [DEBT-018](../debt-ledger.md#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus),
+  the nine per-metric probes built from the corpus they check.
+
+### Look at this sceptically
+
+1. **`count(*)` is now a Shadow Metric.** This is C1's design and it is also the most
+   user-visible strictness in the project so far: `Trade Count` is
+   `count(fct_trade.trade_id)`, and a generator that writes the obvious thing is
+   refused. Grounding is meant to paste the certified form, so the pressure lands
+   there — but if it turns out that a model reliably writes `count(*)`, the answer is a
+   ruling (widen the corpus, or normalise) rather than a patch. Nothing about that is
+   decidable before Grounding exists, which is why nothing was done about it here.
+2. **Three new Rejection Reason members in one Sub-step, against 5.1's four in one.**
+   Each has a probe and each is reachable, and I have argued they are three different
+   things to go and fix. The cheaper reading is that `unresolvable` and
+   `no metric expression` are both "the Gate could not find a metric here" and should
+   be one bar. I do not think so, but the taxonomy is a data contract Observability
+   will chart, so it is worth disagreeing with now rather than after there is a chart.
+3. **The plan said 5.2 needs the corpus and 5.3 needs the live schema; 5.2 needs
+   both.** `qualify` cannot attach a column to its table without a catalogue, so the
+   schema arrives one Sub-step earlier than
+   [the plan's dependency sentence](../plan/step-005-validation-gate.md#what-the-gate-must-decide)
+   predicted. Nothing about the rule order changes — the tracing rule still runs after
+   every rule that needs less — and C4 already said the Gate's interface takes the
+   schema. But the plan's sentence is now wrong and I have not edited the plan.
+   **Ruled 2026-08-27 — edit the plan.** Done: the sentence now says 5.2 needs both, and
+   carries the correction with its date rather than being quietly rewritten. See
+   [R13](../plan/step-005-validation-gate.md#r13--aminos-rulings-on-the-52-review--decided-2026-08-27).
+4. **`certified_form` raises `ValueError` on a corpus defect.** An expression naming no
+   Warehouse table, or yielding more than one metric expression, is a broken corpus and
+   gets a traceback rather than a rejection — the same call 5.1 made for a Warehouse
+   that will not open. It means a bad Metric Definition takes the Gate down rather than
+   failing one query. `check_semantic_layer.py` would catch most such defects first,
+   but not all of them, and nothing checks that claim.
+5. **The nine per-metric probes are built from the corpus, so they cannot catch a
+   corpus that is wrong in the same way twice.** They prove the Gate recognises what
+   `semantic/metrics/` says, not that `semantic/metrics/` says the right thing —
+   `check_semantic_layer.py` is what asks the second question. The spike's three pinned
+   literals are the only independent check that the corpus has not drifted, and they
+   cover three of nine.
+   **Ruled 2026-08-27 — open a debt triggered on a semantic definition drifting.**
+   [DEBT-018](../debt-ledger.md#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus).
+   **Writing it corrected the last sentence above**, which is wrong as written: the three
+   pinned literals are not the only independent check. `check_semantic_layer.py`'s check 4
+   compares **all nine** metrics' numbers — twice each — against `check_warehouse.py`'s
+   own SQL, which reads nothing from `semantic/`, so every edit that moves a number
+   already fails a run. What the pins alone cover is the **text**, and the real gap is the
+   intersection: an edit to one of the six unpinned metrics that changes an expression's
+   text without changing its number. That is what the entry records and what its
+   repayment — check 9 widened from three metrics to nine — closes.
+6. **The two flipped 5.1 verdicts are a judgement call.** I rewrote that module's
+   positive control rather than changing its probe statements to certified ones. The
+   alternative — make `an ordinary question` compute `Trade Count` properly — is
+   smaller today and breaks again in 5.4 when a date predicate becomes required.
+7. **`Shadow Metric` is now a code identifier and its Glossary row still says its home
+   is *"— (an anti-pattern)"*.** The definition is accurate and I did not amend an
+   `agreed` row without a ruling, but a reader checking the Glossary before naming
+   something will not learn from that cell that the Gate returns it as a
+   `Rejection Reason`. Amend, or leave?
+   **Ruled 2026-08-27 — amend.** The *Lives in* cell now reads
+   *"`veritas/validation/` — as a Rejection Reason (no file publishes one)"*, and the
+   definition cell carries the amendment, its date and a pointer to
+   [R13](../plan/step-005-validation-gate.md#r13--aminos-rulings-on-the-52-review--decided-2026-08-27).
+8. **The timing figures are dated evidence and will move.** They come from
+   `check_what_a_judgement_reads`, which prints them on every run and asserts nothing
+   about them; only the *equality* of the two catalogue readings is checked. A machine
+   twice as slow changes every number in this section and breaks nothing.
+
+### Language
+
+**No new terms, and one used for the first time as a code identifier.**
+`RejectionReason.SHADOW_METRIC` takes its name from the `Shadow Metric` row, agreed and
+spelled exactly as registered — *"a metric computed inline in a query instead of drawn
+from the Semantic Layer. The failure mode Veritas exists to prevent."* No Term Proposal
+is raised for it, because the term was already registered; item 7 above is the open
+question about its row.
+
+🆕 **Possible TERM PROPOSAL, raised and not taken** — **`metric expression`**: the SQL
+expression inside a query that computes a metric, as distinct from the
+`Metric Definition` that certifies one. It is not in the Glossary and it is load-bearing
+in three places that already exist: the agreed
+[Target State's flow](../design/target-state.md#flow) — *"every metric expression traces
+to a Certified Metric"* — the Step 005 plan, and the spike's `metric_expressions`, in
+the repository since Step 003. This Sub-step makes it a `Rejection Reason` value as well
+(`no metric expression`). I have not coined it and I have not registered it: every use
+is the Target State's own wording. Whether a phrase three agreed documents rely on
+should have a row is Amino's call.
+
+**Approved and registered 2026-08-27.** Amino: *"the `metric expression` term proposal is
+approved."* The row sits in
+[Glossary Section A](../glossary.md#a-the-system) between `Certified Metric` and
+`Shadow Metric`, and it is **entirely in lower case** — the first term registered that
+way; `Validation Gate outcome` is the nearest precedent and it capitalises the component
+it names. Lower case because the `agreed` Target State, ADR-0001 and ADR-0003 have all
+spelled it that way since Step 001: Title Case would have meant editing an agreed
+document to match a new Glossary row, which is the wrong direction of travel for a row
+whose whole justification is that the word was already in use.
+
+### The eight sceptical items and one Term Proposal → **ruled, and answered in this commit**
+
+**Amino, 2026-08-27:** *"3 → edit the plan accordingly. 5 → if this won't get built in a
+specific future step, create a debt for it which triggers when a semantic definition
+drifts. 7 → amend. The `metric expression` term proposal is approved. All other changes
+are reviewed, approved, and staged."* Recorded as
+[R13](../plan/step-005-validation-gate.md#r13--aminos-rulings-on-the-52-review--decided-2026-08-27),
+and landing in this commit rather than after it because it arrived before the commit did
+— the shape [R11](../plan/step-005-validation-gate.md#r11--aminos-rulings-on-the-trim--decided-2026-08-26)
+set on the trim and [R12](../plan/step-005-validation-gate.md#r12--aminos-rulings-on-the-51-review--decided-2026-08-26)
+kept.
+
+**No code changed.** Every figure, verdict and mutation above was measured before the
+ruling and is unchanged by it. Five documents changed — the plan, the Glossary, the Debt
+Ledger, Current State and this file — and the four edits are marked inline on items 3, 5
+and 7 and in the Language section above, with R13 carrying the reasoning for each.
+
+**What it settles.** Items 1, 2, 4, 6 and 8 are approved as they stand, and two of the
+five offered a concrete reversal that is therefore declined. **Item 2** offered folding
+`unresolvable` and `no metric expression` into one bar; they stay three, so a chart can
+separate a Grounding problem from a generator problem from a statement the optimizer will
+not resolve — and that matters more with every Sub-step, because 5.3, 5.4 and 5.5 each add
+members to the same taxonomy. **Item 6** offered rewriting 5.1's two flipped probe
+statements into certified ones instead of rewriting that module's positive control; the
+control stands, so it needs no edit when the next rule lands. The other three are declared
+limits rather than offers, and approval records them as known: `count(*)` stays a Shadow
+Metric and the pressure lands on Grounding (item 1), `certified_form` goes on raising on a
+broken corpus (item 4), and the timings stay dated evidence nothing asserts on (item 8).
+
+**What it does not settle.** The two open costs this entry named are still open and are
+still not debt: `resolve` will be called more than once per judgement from 5.3, and
+DEBT-014 still has two declared verdicts for 5.4 to flip. And approval is not a
+measurement — the probe verdicts hold because the check re-establishes them on every run.
+
+**Verification.** These edits change five documents and no code, so the two checks that
+read documents are the ones that can break. Both were re-run after the edits and are
+re-pasted here because their counts moved:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  skill ok   closing-a-substep       795 words
+  skill ok   planning-a-step         564 words
+  skill ok   recording-debt          849 words
+  skill ok   registering-language    564 words
+  skill ok   writing-an-adr         1037 words
+  links      1018 links, 776 anchors 53 documents and python files
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py
+  glossary: 92 registered terms
+  proposed terms: 0 · python files scanned: 24 · identifiers: 1463
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+**92 terms, up from 91** — `metric expression`, the one row this ruling adds. The link
+and anchor counts are higher for the ordinary reason: R13, this section, DEBT-018 and the
+inline answers on items 3, 5 and 7 are among what the run now reads.
+
+The other four checks were re-run in the same session, after
+`uv run python -m veritas.ingestion`, and each exited zero with the output already pasted
+above — no code changed, so nothing in them could:
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement, what is not a read, what the planner expects to scan past the ceiling, and what computes a metric the Semantic Layer does not certify; and it allows every Certified Metric
+
+$ uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+
+$ uv run python .claude/scripts/check_semantic_layer.py
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+```
+
+**One figure in the run above moved and nothing asserts on it**, which is sceptical item
+8 arriving the same day it was approved: the catalogue read in one query against one per
+table printed **4 ms against 53 ms** in the block above and **2 ms against 27 ms** on this
+run, on a machine under a different load. What the check asserts is that the two readings
+produce the **same mapping**, and that is `True` in both runs.

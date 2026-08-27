@@ -10,7 +10,10 @@ registered when the Gate made them code identifiers: `Validation Gate outcome` a
 Laid out like `veritas/warehouse/` and `veritas/semantic/`: this file re-exports, and
 the modules behind it hold the work. `outcome.py` is the verdict and the reason
 taxonomy — a data contract three components that import no rule still have to read —
-and `gate.py` is the rules that produce one.
+and `gate.py` is the rules that produce one, together with the tracer they read a
+parse tree with — which `check_validation_feasibility.py` imports back from here
+under [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25),
+so that one tracer answers for both corpora.
 """
 
 from veritas.validation.gate import (
@@ -18,8 +21,17 @@ from veritas.validation.gate import (
     SCAN_CEILING,
     TRUSTED_REWRITES,
     Reading,
+    Schema,
+    TracerRefused,
     ValidationGate,
+    canonical,
+    certified_form,
+    certified_forms,
+    certified_metrics_only,
+    metric_expressions,
+    projected_expressions,
     read,
+    resolve,
     trusted_rewrite_names,
 )
 from veritas.validation.outcome import RejectionReason, ValidationGateOutcome
@@ -30,8 +42,17 @@ __all__ = [
     "TRUSTED_REWRITES",
     "Reading",
     "RejectionReason",
+    "Schema",
+    "TracerRefused",
     "ValidationGate",
     "ValidationGateOutcome",
+    "canonical",
+    "certified_form",
+    "certified_forms",
+    "certified_metrics_only",
+    "metric_expressions",
+    "projected_expressions",
     "read",
+    "resolve",
     "trusted_rewrite_names",
 ]

@@ -45,8 +45,9 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast — **🔴 fired** | **paid** (Sub-step 4.3) |
 | [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query — **🔴 fired** | **paid** (Sub-step 5.1) |
 | [DEBT-017](#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) | The certified axes are registered inside one Glossary cell | S | A sixth certified axis, or a rewording of that cell failing the run | open |
+| [DEBT-018](#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus) | Six Certified Metrics have no expression text pinned outside the corpus | S | The first edit to a Certified Metric's `expression` | open |
 
-**Open debt:** 9 · **Paid:** 5 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 10 · **Paid:** 5 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -1140,6 +1141,16 @@ rather than applied silently, because widening an entry's scope after the fact i
 thing to do in the open, and **approved by Amino on 2026-08-20**. The Trigger below
 is unchanged and now covers both halves.
 
+**Status note, Sub-step 5.2 (2026-08-26) — the blind spot now has a second home, and
+the entry is still open.** The Validation Gate's tracing rule traces
+`notional through the wrong currency` to `Traded Notional` and **allows** it, exactly
+as the spike's tracer does, so `.claude/scripts/check_validation_gate/traces.py`
+carries a probe of that name declaring `allowed`. Nothing is paid and nothing is
+worse: the Gate reads the projection and the projection is identical either way,
+which is the entry's own diagnosis. What changes is that the Sub-step which pays this
+now has **two** declared verdicts to flip rather than one, and both fail loudly if it
+flips only the other. The Location above is read as covering both files.
+
 ---
 
 ### DEBT-015 — The dialect scan names functions, and the loss measured was in a cast
@@ -1451,3 +1462,92 @@ Whichever lands first:
 2. **The first time that cell is reworded and the run fails for it.** That is the
    cost arriving as an interruption, and repaying it then is cheaper than working
    around it twice.
+### DEBT-018 — Six Certified Metrics have no expression text pinned outside the corpus
+
+- **Status:** open
+- **Opened:** Sub-step 5.2 (`.claude/docs/reviews/step-005-validation-gate.md`), on
+  Amino's ruling of 2026-08-27
+- **Size:** S
+- **Location:** `.claude/scripts/check_validation_gate/traces.py` — `certified_probes`;
+  and `.claude/scripts/check_semantic_layer.py`'s check 9, which pins three of the nine
+
+**What we did**
+
+Built the Gate check's nine per-metric probes **out of the corpus they are checked
+against**. `certified_probes` reads each Metric Definition and writes the simplest
+statement that computes it — its own `expression`, over its own `from_table`, joined
+along its own `join_paths`, with its own `filters` — and declares that statement
+`allowed`. That is what makes a tenth Metric Definition a tenth probe with no edit to
+the file, and it is the same property that stops the probe ever disagreeing with the
+corpus: edit an expression in `semantic/metrics/` and the probe and the Gate's
+certified form move together, so the run goes on printing `allowed` beside the metric's
+name.
+
+**What already covers a corpus edit, and where the hole is**
+
+Two independent checks cover most of one, which is why this entry is S:
+
+- `check_semantic_layer.py`'s **check 4** executes every published expression and
+  compares the number against `check_warehouse.py`'s own SQL, which reads nothing from
+  `semantic/` ([R2 of Step 004](plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)).
+  All nine metrics, twice each — over the whole Warehouse and over one period. **Any
+  edit that moves a number fails that run.**
+- Its **check 9** asserts the exact *text* of the three expressions the Step 003 spike
+  measured is what `semantic/metrics/` publishes, which is
+  [R4 of Step 004](plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)'s
+  pin: `Gross Revenue`, `Net Revenue` and `Traded Notional`.
+
+The hole is the intersection. An edit to one of the **six unpinned** metrics —
+`Account Value`, `Cash Balance`, `Position Change`, `Realised P&L`, `Trade Count`,
+`Unrealised P&L` — that changes the expression's **text without changing its number**
+is caught by neither. Commuting a subtraction, reassociating one, splitting a single
+aggregate into three added together, spelling `count(fct_trade.trade_id)` as `count(*)`:
+the arithmetic survives, so check 4 agrees; the text is not pinned, so check 9 has
+nothing to say — and dropping a cast is **not** an example, because check 11 already runs
+every expression without its cast and expects the engine to refuse. The Gate's certified
+form silently becomes a different form; and every probe in `traces.py` follows it without a word, because both
+sides of that comparison came out of the same file.
+
+**What we should have done**
+
+Widen check 9's pin from three metrics to nine: one recorded expression text per
+Certified Metric, held outside `semantic/`, with the run failing and both texts printed
+when a published expression no longer matches its record. The record is deliberately a
+second copy of something, and that is the mechanism rather than a flaw in it — the cost
+of keeping two copies in step is what turns a silent drift into an edit somebody makes
+on purpose and a reviewer reads in the diff. It is the shape R4 already chose for three.
+
+**Why we deferred**
+
+Widening R4's pin is a decision about what a **dated spike verdict** holds still versus
+what the **corpus check** holds still, and R4 argued the three at length on exactly that
+distinction. Taking it inside a Sub-step whose job was the tracing rule would have
+settled a ruling's scope while writing a rule. The narrower reason is that the fix
+belongs to `check_semantic_layer.py`, which already owns the pin, and not to the Gate's
+own check, which is where the probes that exposed the gap live.
+
+**Cost while unpaid**
+
+**The Semantic Layer can drift into a paraphrase of itself and stay green.** This is the
+Validation Gate's own failure mode arriving through the one door it does not watch:
+`traces.py` refuses a generator that writes a paraphrase of a certified expression, and
+a paraphrase written *into* `semantic/metrics/` is certified by definition. After such
+an edit the Gate rejects the statement it allowed the day before and allows one it
+rejected, and no check in the repository says so.
+
+**The nine per-metric probes prove less than they read as proving.** They prove the Gate
+recognises what `semantic/metrics/` says — which is the claim Sub-step 5.2 needed — and
+not that `semantic/metrics/` says the right thing. Six of the nine have no second
+opinion on their text at all, so a reader taking the block of nine `allowed` lines as
+nine independent facts is reading three.
+
+**Trigger**
+
+**The first edit to a Certified Metric's `expression` in `semantic/metrics/`** — a
+semantic definition drifting. That edit is the moment the two costs above stop being
+hypothetical, and it is cheap to pay then: the nine texts are already on disk, so the
+repayment is recording them and pointing check 9 at all nine.
+
+Nothing in the rest of Step 005 fires it — 5.4 adds a route rule and 5.5 adds Join Paths
+and a `routes` field, and neither touches an `expression` — so this is a tripwire laid
+ahead of the Step that will actually trip it rather than one firing inside this one.

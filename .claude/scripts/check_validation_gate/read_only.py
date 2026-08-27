@@ -30,7 +30,6 @@ import tempfile
 from pathlib import Path
 
 from probes import (
-    ALLOWED,
     REJECTED,
     Probe,
     Report,
@@ -62,10 +61,23 @@ ESTIMATE_TOLERANCE = 2
 # judges the same string, and two copies of a probe statement can drift apart.
 CROSS_PRODUCT = "SELECT * FROM fct_trade AS left_side, fct_trade AS right_side"
 COUNTED_FROM_METADATA = "SELECT count(*) FROM fct_trade"
+ORDINARY_QUESTION = "SELECT count(*) FROM fct_trade WHERE fct_trade.trade_side = 'buy'"
+
+# This module's four rules, by the names `ValidationGate.rules()` gives them. Named
+# here because that list grows: every Sub-step of Step 005 appends to it, and the
+# positive control below asks whether **these** rules allowed a statement, not whether
+# the whole Gate did.
+THESE_RULES = ("parses", "one statement", "a read", "bounded")
 
 # The six shapes read-only has to cover, then the parse failure C6 requires a rule
-# for, then the boundedness cases, then the ordinary query that must be allowed —
-# because a Gate that rejects everything passes every rejection probe.
+# for, then the boundedness cases, then the two statements **these** rules allow.
+#
+# Every probe here now declares `rejected`, and that is not a Gate refusing everything:
+# the last two are refused by Sub-step 5.2's tracing rule, one rule past this module's
+# four. `check_these_rules_allow_them` is what says so, by reading which rules ran
+# rather than which verdict came back — because a Gate that rejects everything passes
+# every rejection probe, and after 5.2 no statement this module can write is allowed
+# end to end without also being a Certified Metric.
 #
 # Every statement here is a string literal inside `.claude/scripts/`, which is one of
 # `check_warehouse.py`'s scanned roots, so the dialect scan Sub-step 2.6 built reads
@@ -164,19 +176,33 @@ PROBES = (
     Probe(
         name="a cross product",
         sql=CROSS_PRODUCT,
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.NO_METRIC_EXPRESSION,),
         why="the bounded read's measured blind spot, declared rather than discovered: "
             "the estimate counts rows read off a table, and a join makes its rows "
             "instead of reading them, so this scans each side once and returns the "
-            "square. `check_the_estimate_does_not_count` prints both numbers. "
-            "Bounding it is the certified-route rule's job in Sub-step 5.4",
+            "square. `check_the_estimate_does_not_count` prints both numbers and "
+            "`check_these_rules_allow_them` proves the bounded rule still passes it. "
+            "**The rejection arrives from Sub-step 5.2's tracing rule, not from this "
+            "module's**, and it does not close the blind spot: this statement selects "
+            "columns, so it computes no metric — a cross product that computed a "
+            "certified one would still be allowed here. Bounding that is the "
+            "certified-route rule's job in Sub-step 5.4",
     ),
     Probe(
         name="an ordinary question",
-        sql="SELECT count(*) FROM fct_trade WHERE fct_trade.trade_side = 'buy'",
-        verdict=ALLOWED,
-        why="the probe without which every rejection above proves nothing, because a "
-            "Gate that rejects everything passes every rejection probe",
+        sql=ORDINARY_QUESTION,
+        verdict=REJECTED,
+        reasons=(RejectionReason.SHADOW_METRIC,),
+        why="a question an analyst would call ordinary and the Semantic Layer does "
+            "not certify: `Trade Count` is `count(fct_trade.trade_id)`, so `count(*)` "
+            "is a paraphrase, and "
+            "[C1](../../docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes) "
+            "chose a pasteable form over a Gate that decides which paraphrases are "
+            "safe. Sub-step 5.1 declared this `allowed` because nothing then judged "
+            "an expression; Sub-step 5.2's tracing rule is what refuses it. The "
+            "positive control it used to be is now `check_these_rules_allow_them` "
+            "below, and the nine Certified Metrics in `traces.py`",
     ),
 )
 
@@ -419,6 +445,42 @@ def check_engine_refusal_is_named(warehouse: WarehouseAdapter, report: Report) -
             )
 
 
+def check_these_rules_allow_them(gate: ValidationGate, report: Report) -> None:
+    """The two statements this module's rules pass, and a later rule refuses.
+
+    A Gate that rejects everything passes every rejection probe, so a rule module
+    needs a statement its own rules **allow**. Both of the two here were declared
+    `allowed` in Sub-step 5.1 and are rejected by Sub-step 5.2's tracing rule, which
+    is the Gate getting stricter rather than either verdict being wrong — and it will
+    keep happening, because every Sub-step of Step 005 appends a rule.
+
+    So the control is written as the property it always meant: **none of this
+    module's four rules rejected the statement.** `ValidationGate` stops at the first
+    rejection and reports the rules that actually ran, which is exactly what makes
+    that answerable — the field exists for a reader who *"wants to know what a verdict
+    covers rather than assuming"*, and this is that reader. It survives 5.3, 5.4 and
+    5.5 without an edit.
+    """
+    for sql in (CROSS_PRODUCT, ORDINARY_QUESTION):
+        outcome = gate.judge(sql)
+        ran = set(outcome.rules)
+        missing = [rule for rule in THESE_RULES if rule not in ran]
+        report.say(
+            f"all {len(THESE_RULES)} rules here ran on `{sql[:44]}…` and none "
+            f"rejected it — refused later by {', '.join(outcome.rules[len(THESE_RULES):]) or 'nothing'}"
+            if not missing
+            else f"`{sql[:44]}…` was stopped inside this module"
+        )
+        if missing:
+            problems.append(
+                f"`{sql}` was rejected by one of this module's own rules — it "
+                f"reached {list(outcome.rules)} and never reached {missing}. These "
+                f"two statements are the only evidence that the read-only, "
+                f"single-statement and bounded rules are not simply refusing "
+                f"everything put in front of them: {outcome.explanation}"
+            )
+
+
 def check(warehouse: WarehouseAdapter) -> Report:
     """Everything this module has to say, in one report."""
     report = Report("read-only, single, parseable, bounded")
@@ -428,6 +490,7 @@ def check(warehouse: WarehouseAdapter) -> Report:
     )
     gate = ValidationGate(warehouse)
     check_probes(gate, report)
+    check_these_rules_allow_them(gate, report)
     check_rules_that_need_nothing(gate, report)
     check_explain_executes_the_tail(report)
     check_the_estimate_is_read(warehouse, report)

@@ -100,16 +100,35 @@ from typing import NamedTuple
 import sqlglot
 from sqlglot import exp
 from sqlglot.lineage import lineage
-from sqlglot.optimizer import optimize
-from sqlglot.optimizer.merge_subqueries import merge_subqueries
-from sqlglot.optimizer.qualify import qualify
-from sqlglot.optimizer.scope import build_scope
 
 CLAUDE_DIR = Path(__file__).resolve().parent.parent  # <repo>/.claude
 REPO_ROOT = CLAUDE_DIR.parent                        # <repo>
 
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
+
+from veritas.validation import (  # noqa: E402
+    TRUSTED_REWRITES,
+    TracerRefused,
+    certified_forms,
+    certified_metrics_only,
+    metric_expressions,
+    resolve,
+)
+# The tracer this file measured is now `veritas/validation/`'s, imported back under
+# [R2 of Step 005](../docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25):
+# *"the logic that belongs to veritas must be only accessible from veritas once its
+# containing component is built."* The Validation Gate is built, so the tracer, the
+# canonical form, the two trusted rewrites and the refusal all live there and this
+# file holds none of them — the same move Sub-step 4.3 made for `retarget`, so that
+# the dated measurement and the check that runs on every commit are one trip.
+#
+# **What did not move is the corpus.** [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+# pins the three certified expressions below as Python literals so *"the dated
+# measurement stays the measurement that was taken"*. One tracer, two corpora: the
+# Gate traces against `semantic/metrics/` and this file goes on tracing against its
+# pins, with `check_semantic_layer.py` asserting the two agree character for
+# character.
 
 from veritas.warehouse import (  # noqa: E402
     DATABASE_PATH,
@@ -171,27 +190,6 @@ REPORTING_CURRENCY = "EUR"
 # the loaded data, this one is the floor for a rejection being worth having. They
 # are free to move apart, and neither reads the other.
 MIN_GAP = Decimal("0.005")
-
-# The optimizer rules the tracer runs, and no more. Each does exactly one job the
-# tracer needs, and dropping either one is measured in the Sub-step 3.2 review
-# rather than argued here:
-#
-#   qualify           resolves every column to the table it came from, using the
-#                     real schema — which is what makes a table alias invisible.
-#   merge_subqueries  inlines a subquery into the statement that selects from it.
-#                     A generator can write half a certified expression inside a
-#                     WITH block or a FROM (SELECT ...) and the other half outside
-#                     it: the columns fetched in, the arithmetic done out. This
-#                     rule removes that boundary, which puts the two halves back
-#                     together into the one expression they compute.
-#
-# sqlglot's own `optimize()` runs fourteen rules. The other twelve are left out
-# deliberately: ADR-0003 already names sqlglot as "load-bearing safety
-# infrastructure", and every rule is one more rewrite trusted to preserve meaning
-# between the statement a reviewer reads and the statement a Gate judges. Two is
-# what the shapes below actually need — which is itself a finding, and it is
-# printed on every run rather than asserted here.
-TRACING_RULES = (qualify, merge_subqueries)
 
 # The certified expressions the tracer traces to, as they would be written in a
 # Metric Definition: qualified by base table, in one Reporting Currency, with the
@@ -796,242 +794,33 @@ RESTRICTED_COLUMN_PROBES = (
 problems: list[str] = []
 
 
-class TracerRefused(Exception):
-    """sqlglot could not read the statement, so the tracer returns no verdict.
+def pinned_corpus(
+    schema: dict[str, dict[str, str]], dialect: str = DIALECT
+) -> dict[str, str]:
+    """The three pinned expressions, canonicalised by the Gate's own reader.
 
-    Raised rather than swallowed because ADR-0003 fails closed: a statement the
-    parser cannot read is rejected, never passed. A tracer that returned "no
-    certified expression found" here would be indistinguishable from one that had
-    read the query and found nothing, which is the difference between a rejection
-    and a hole.
+    `certified_forms` is `veritas/validation/`'s and takes the expressions it is to
+    canonicalise, which is what lets this file go on tracing against its pins while
+    the Gate traces against `semantic/metrics/`.
+
+    In a dialect other than the Warehouse's, each expression is transpiled before it
+    is canonicalised, because that is what a Gate standing in front of that engine
+    would hold: the Semantic Layer publishes one expression and the same retargeting
+    that rewrites the query rewrites the corpus.
+
+    **That is also why the tracer cannot see a lossy round trip.** Query and corpus
+    go through one rewrite, so anything the rewrite erases is erased on both sides
+    and the two still match. Claim 4 measures the verdict here and the meaning in
+    `check_cast_collapse`, and the second is not implied by the first.
     """
-
-
-def warehouse_schema(warehouse: WarehouseAdapter) -> dict[str, dict[str, str]]:
-    """The real star schema, in the shape sqlglot's optimizer wants.
-
-    Read through `WarehouseAdapter.columns` rather than parsed out of
-    `schema.sql`, so the tracer is qualified against the schema that exists rather
-    than against a second reading of the file that made it.
-    """
-    return {
-        table_name: dict(warehouse.columns(table_name))
-        for table_name in warehouse.tables()
-    }
-
-
-def canonical(expression: exp.Expression, dialect: str = DIALECT) -> str:
-    """One expression, written the one way this file compares expressions.
-
-    `Expression.sql()` writes a parse tree back out as text, and the two flags
-    settle how identifiers are spelled on the way out:
-
-      `identify=True`   quote every table and column name, so a generator that
-                        wrote `"commission"` and one that wrote `commission` come
-                        out as the same text.
-      `normalize=True`  lower-case them, so `SUM(T.COMMISSION)` and
-                        `sum(t.commission)` do too.
-
-    Both are about spelling and not about meaning: DuckDB is case-insensitive, and
-    quoting an identifier there does not change what it refers to. Without the two
-    flags the tracer would report differences no engine would.
-
-    `dialect` is what makes claim 4 possible: the same expression written as
-    BigQuery quotes identifiers with backticks rather than double quotes, so a
-    retargeted statement and a retargeted corpus have to be written by the same
-    generator or every comparison between them fails on punctuation.
-    """
-    return expression.sql(dialect=dialect, identify=True, normalize=True)
-
-
-def certified_forms(dialect: str = DIALECT) -> dict[str, str]:
-    """Canonical form -> the Certified Metric it is. The tracer's whole corpus.
-
-    In a dialect other than the Warehouse's, each expression is transpiled before
-    it is canonicalised, because that is what a Gate standing in front of that
-    engine would hold: the Semantic Layer publishes one expression and the same
-    retargeting that rewrites the query rewrites the corpus.
-
-    **That is also why the tracer cannot see a lossy round trip.** Query and
-    corpus go through one rewrite, so anything the rewrite erases is erased on
-    both sides and the two still match. Claim 4 measures the verdict here and the
-    meaning in `check_cast_collapse`, and the second is not implied by the first.
-    """
-    return {
-        canonical(sqlglot.parse_one(retarget(expression, dialect), dialect=dialect),
-                  dialect): name
-        for name, expression in CERTIFIED_EXPRESSIONS.items()
-    }
-
-
-def resolve(
-    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
-) -> exp.Expression:
-    """Parse one statement and rewrite it into the form both claims are judged on.
-
-    The shared half of the two parse-tree claims, and the only place the rewriting
-    settings live. `qualify` attaches every column to the table it came from using
-    the real schema and expands `SELECT *` into the columns that star actually
-    stands for; `merge_subqueries` folds a derived table or a common table
-    expression (CTE) back into the statement that selects from it. After this a
-    certified expression written across a subquery boundary is one expression
-    again, and a star is a list of real columns.
-
-    Claim 1 then reads the result one way and claim 2 another, in the two functions
-    below.
-
-    Raises `TracerRefused` if sqlglot cannot read the statement.
-    """
-    # `parse_one` turns SQL text into a tree of `exp.*` nodes; `optimize` rewrites
-    # that tree with the rules it is handed and returns a new one.
-    try:
-        # One statement in, its root node out — `exp.Select` here, `exp.Union` for a
-        # union. Bad syntax raises instead of returning a tree.
-        statement = sqlglot.parse_one(sql, dialect=dialect)
-        # `optimize` applies each rule in `rules` to the tree in turn. `qualify` is
-        # handed the schema and uses it to give every column the table it came
-        # from; `merge_subqueries` needs no schema and flattens subqueries away.
-        return optimize(
-            statement,
-            schema=schema,
-            dialect=dialect,
-            rules=TRACING_RULES,
-            # `optimize` passes this to `qualify` as True by default, on the
-            # library's own comment that it is "needed for other optimizations to
-            # perform well" — it wraps every base table in a subquery selecting
-            # that table's columns. It is groundwork for the twelve rules this
-            # tracer does not run, and it costs both of the two it does. Left on,
-            # `qualify` resolves each column to one of those wrappers rather than
-            # to `fct_trade`, so the rename below finds no base table to rename to;
-            # and `merge_subqueries` spends itself unwrapping what `qualify` just
-            # wrapped, instead of folding the subqueries the generator wrote.
-            # Turned off, each rule does exactly the one job it is here for.
-            isolate_tables=False,
-            # `qualify`'s default, written out because claim 2 rests on it: a
-            # `SELECT *` is replaced by the columns the schema says that star
-            # stands for. Without it the projection holds one `exp.Star` node, no
-            # column name is anywhere in the statement, and a Restricted Column
-            # reaches the answer with nothing in the text or the tree to catch it.
-            expand_stars=True,
-        )
-    except sqlglot.errors.SqlglotError as failure:
-        raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
-
-
-def projected_expressions(
-    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
-) -> list[exp.Expression]:
-    """Claim 1's reading: every expression projected in every scope, on base tables.
-
-    One step on top of `resolve`. Resolution qualifies columns with whatever alias
-    the generator chose, so `billed.commission` stays `billed.commission`; each
-    alias is replaced by the table it stands for, which is what makes aliasing
-    invisible without making anything else invisible with it.
-
-    **Every scope, not only the outermost one.** The first version of this code read
-    the root scope's projections alone, which is right for every shape here and
-    wrong for a union. A union node projects nothing itself, and asking it for its
-    projections hands back its **first branch's** — so it read one branch, read it
-    with no table sources to resolve aliases against, and never looked at the second
-    at all. A statement whose first branch is certified and whose second is a Shadow
-    Metric would have been judged on the first. The `half-certified union` probe is
-    that case, and it is here because writing this docstring is what found it.
-
-    Reading every scope is right for claim 1: a metric expression computed anywhere
-    in the statement is a metric expression the Gate must place. It is **not** right
-    for claim 2, which asks a narrower question and gets its own reading in
-    `columns_reaching_the_answer` below.
-
-    Raises `TracerRefused` if sqlglot cannot read the statement.
-    """
-    resolved = resolve(sql, schema, dialect)
-
-    # `build_scope` returns one `Scope` per SELECT: the SELECT itself in
-    # `scope.expression`, and in `scope.sources` what each name in its FROM and
-    # JOIN clauses stands for — an `exp.Table` for a base table, another Scope for
-    # a subquery. A statement with no SELECT in it at all, an INSERT among them,
-    # gets no scope and so gets no verdict from this tracer.
-    root = build_scope(resolved)
-    if root is None:
-        raise TracerRefused("sqlglot built no scope for the statement")
-
-    found: list[exp.Expression] = []
-    # `traverse()` yields every scope in the tree, innermost first and the root
-    # last, so each branch of a union is read on its own turn round this loop.
-    for scope in root.traverse():
-        # A union's own scope projects nothing — its branches do, and each of them
-        # arrives here as a scope of its own. Reading the union node as though it
-        # projected is the hole described above.
-        if not isinstance(scope.expression, exp.Select):
-            continue
-        # The lookup: alias -> the base table it stands for. A source that is
-        # another Scope is a subquery `merge_subqueries` could not flatten, and is
-        # left out of this map because its projections are read on its own turn.
-        base_tables = {
-            name: source.name
-            for name, source in scope.sources.items()
-            if isinstance(source, exp.Table)
-        }
-        # `scope.expression.selects` is the projection list: one node per selected
-        # item, in the order they were written.
-        for projection in scope.expression.selects:
-            # `unalias()` strips an `AS revenue` wrapper and leaves the expression
-            # that computes. The copy keeps the rename below out of `resolved`.
-            expression = projection.unalias().copy()
-            # `billed.commission` becomes `fct_trade.commission`, edited into this
-            # copy of the tree. Whatever alias the generator chose is gone by the
-            # time the expression is read.
-            for column in expression.find_all(exp.Column):
-                if column.table in base_tables:
-                    column.set("table", exp.to_identifier(base_tables[column.table]))
-            found.append(expression)
-    return found
-
-
-def metric_expressions(
-    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
-) -> list[str]:
-    """Claim 1's half: the canonical form of every projection that computes something.
-
-    A projection with no aggregate in it is a grouping column — `client_region`
-    sitting beside the metric — which belongs to a Dimension Definition rather than
-    to this claim. The rule being measured is the
-    [Target State](../docs/design/target-state.md#flow)'s: *"every metric
-    expression traces to a Certified Metric"*, and a grouping column is not a
-    metric expression. Which columns may appear in a projection **at all** is a
-    different question — claim 2's, in `columns_reaching_the_answer` below.
-
-    `find_all` walks a subtree for nodes of one type, and `exp.AggFunc` is the base
-    class sqlglot gives every aggregate — so this asks whether anything aggregates
-    without listing `sum`, `count` and `avg` by name.
-    """
-    return [
-        canonical(expression, dialect)
-        for expression in projected_expressions(sql, schema, dialect)
-        if list(expression.find_all(exp.AggFunc))
-    ]
-
-
-def certified_metrics_only(
-    expressions: list[str], corpus: dict[str, str]
-) -> tuple[bool, list[str], list[str]]:
-    """Claim 1's rule: allowed, what it traced to, and what it could not place.
-
-    The rule is the Target State's, verbatim: *"every metric expression traces to
-    a Certified Metric"*. **Every**, not *some* — so a statement is allowed when it
-    computes at least one metric expression and all of them trace, and is rejected
-    otherwise. Written as *some*, a statement could carry a certified expression
-    and a Shadow Metric side by side and be allowed on the strength of the first,
-    which is the `half-certified union` probe.
-    """
-    traced = [corpus.get(expression) for expression in expressions]
-    hit = [name for name in traced if name is not None]
-    untraced = [
-        expression
-        for expression, name in zip(expressions, traced)
-        if name is None
-    ]
-    return bool(expressions) and not untraced, hit, untraced
+    return certified_forms(
+        {
+            name: retarget(expression, dialect)
+            for name, expression in CERTIFIED_EXPRESSIONS.items()
+        },
+        schema,
+        dialect,
+    )
 
 
 # The alias every output column is given before its lineage is asked for. A
@@ -1171,20 +960,21 @@ def check_reporting_currency() -> None:
           f"{converting} conversion predicates and checked against every probe")
 
 
-def describe_tracer() -> dict[str, str]:
-    """Print the corpus the tracer traces to, and the rewrites it is allowed.
+def describe_tracer(schema: dict[str, dict[str, str]]) -> dict[str, str]:
+    """Print the corpus this file traces to, and the rewrites the tracer is allowed.
 
     Both are printed rather than described, because both are the finding: which
-    expressions count as certified, and how much of sqlglot's optimizer a Gate
-    has to trust in order to recognise them.
+    expressions count as certified, and how much of sqlglot's optimizer a Gate has to
+    trust in order to recognise them.
     """
-    corpus = certified_forms()
+    corpus = pinned_corpus(schema)
     print(f"  certified expressions: {len(corpus)}, as Python literals in this "
-          f"script (R2)")
+          f"script (Step 004 R4)")
     for form, name in sorted(corpus.items(), key=lambda item: item[1]):
         print(f"    {name:<18} {form}")
-    print(f"  tracing rules: {' · '.join(rule.__name__ for rule in TRACING_RULES)}"
-          f" (sqlglot's own optimize() runs 14)")
+    print(f"  trusted rewrites: "
+          f"{' · '.join(rule.__name__ for rule in TRUSTED_REWRITES)}"
+          f" (veritas/validation/, sqlglot's own optimize() runs 14)")
     return corpus
 
 
@@ -1555,8 +1345,8 @@ def check_retargeting(
     question, which is cheaper than leaving the Warehouse's own schema in place and
     arguing that the rewrites only read column names.
     """
-    away = certified_forms(TARGET_DIALECT)
     away_schema = retarget_schema(schema)
+    away = pinned_corpus(away_schema, TARGET_DIALECT)
     respelled = sum(
         column_type != away_schema[table][column]
         for table, columns in schema.items()
@@ -1581,13 +1371,13 @@ def check_retargeting(
         except (TracerRefused, sqlglot.errors.SqlglotError):
             away_verdict = REFUSED_BY_THE_TRACER
             # Two refusals with one cause, and they are named separately because
-            # they are raised in different files. `TracerRefused` is this file's,
-            # for a statement the tracer cannot read; `SqlglotError` is what
-            # `retarget` lets through for a statement sqlglot cannot transpile,
-            # since Sub-step 4.3 moved it into `check_warehouse.py` where a
-            # transpiler refusal is a finding about the seam rather than about a
-            # tracer. Claim 4 asks whether a verdict *moves*, and a statement that
-            # never arrives has no verdict either way.
+            # they are raised in different components. `TracerRefused` is
+            # `veritas/validation/`'s, for a statement the tracer cannot read;
+            # `SqlglotError` is what `retarget` lets through for a statement sqlglot
+            # cannot transpile, since Sub-step 4.3 moved it into `check_warehouse.py`
+            # where a transpiler refusal is a finding about the seam rather than
+            # about a tracer. Claim 4 asks whether a verdict *moves*, and a statement
+            # that never arrives has no verdict either way.
 
         same = home_verdict == away_verdict
         moved += not same
@@ -1856,12 +1646,12 @@ def main() -> int:
         return 1
 
     with WarehouseAdapter() as warehouse:
-        schema = warehouse_schema(warehouse)
+        schema = warehouse.columns_by_table()
         print(f"  Warehouse: {DATABASE_PATH.relative_to(REPO_ROOT)} · "
               f"{len(schema)} tables · "
               f"{warehouse.row_count('fct_trade')} Trades")
         check_reporting_currency()
-        corpus = describe_tracer()
+        corpus = describe_tracer(schema)
         print()
         print("  claim 1 — does a certified expression survive the shapes a "
               "generator writes?")

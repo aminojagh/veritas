@@ -204,6 +204,42 @@ class WarehouseAdapter:
             [table_name],
         ).fetchall()
 
+    def columns_by_table(self) -> dict[str, dict[str, str]]:
+        """Every table's columns and declared types, in the shape sqlglot calls a schema.
+
+        The live catalogue, read at run time, which is what
+        [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)
+        requires of the Validation Gate: *"the Gate's interface therefore takes the
+        schema, not just the statement, and reads it through the Warehouse Adapter —
+        which keeps it on the right side of ADR-0002's seam."* Read here rather than
+        parsed out of `schema.sql`, so a rule is qualified against the schema that
+        exists rather than against a second reading of the file that made it.
+
+        It lives in the adapter rather than in the caller under
+        [R2 of Step 005](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25):
+        *"the logic that belongs to veritas must be only accessible from veritas once
+        its containing component is built."* `check_validation_feasibility.py` held
+        this as `warehouse_schema` while `veritas/warehouse/` was the only thing that
+        existed to hold it; the Warehouse is built, so it moved in and the spike
+        imports it back.
+
+        **One query rather than one per table.** The catalogue is read on every
+        Validation Gate judgement, and asking `information_schema` per table costs a
+        catalogue scan each time — the Step 005 Sub-step 5.2 review measures both
+        shapes. The ordering is `tables()`'s and `columns()`', so the mapping this
+        returns is the one those two would have built.
+        """
+        rows = self._connection.execute(
+            "SELECT table_name, column_name, data_type "
+            "FROM information_schema.columns "
+            "WHERE table_schema = 'main' "
+            "ORDER BY table_name, ordinal_position"
+        ).fetchall()
+        schema: dict[str, dict[str, str]] = {}
+        for table_name, column_name, column_type in rows:
+            schema.setdefault(table_name, {})[column_name] = column_type
+        return schema
+
     def row_count(self, table_name: str) -> int:
         """Exact row count for one table, star-schema or `raw.`-qualified.
 
