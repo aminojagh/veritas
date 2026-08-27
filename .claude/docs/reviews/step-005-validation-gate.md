@@ -1214,3 +1214,550 @@ PASS — the star schema matches Glossary Section B and the adapter seam holds
 table printed **4 ms against 53 ms** in the block above and **2 ms against 27 ms** on this
 run, on a machine under a different load. What the check asserts is that the two readings
 produce the **same mapping**, and that is `True` in both runs.
+
+---
+
+## Sub-step 5.3 — The Gate refuses a Restricted Column, under an Access Profile
+
+**What changed.** The Validation Gate's sixth rule, and the first that judges a statement
+against an *identity*. A statement is now refused when the columns reaching its answer
+include one the Access Profile forbids — *reaching the answer*, not appearing in the
+text, which is the distinction the whole rule is about. `veritas/validation/profile.py`
+is new and holds the `Access Profile`: a role, the `RestrictedColumn`s that role may not
+see, and the one profile this slice declares. `gate.py` gains the detector that decides
+it — `columns_reaching_the_answer`, `restricted_columns_in_projection` and the numbered
+output aliases they need — plus the `no_restricted_column` rule and the Access Profile
+argument `judge` now takes. `outcome.py` gains one `Rejection Reason` member. The check package gains
+`restricted.py`, the third of [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)'s
+five modules.
+
+Four things landed with it.
+
+- **[R2](../plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+  is discharged in full.** The 5.2 review recorded that *"the projection walker and the
+  restricted-column detector are still the spike's and go in with 5.3."* They have gone
+  in: `check_validation_feasibility.py` holds no copy of `columns_reaching_the_answer`,
+  the lineage walk, `ANSWER_COLUMN` or the detector, and its `RESTRICTED_COLUMNS` is now
+  a `frozenset` of the `RestrictedColumn` the Glossary registers rather than an anonymous
+  pair of strings. **Its 25 declared verdicts and its nine detector readings are
+  unchanged**, which is the evidence that this was a move and not a rewrite.
+- **A defect in `resolve`**, found by this Sub-step's own probe and fixed here — below.
+- **`judge` gained a required argument.** `ValidationGate.judge(sql, access_profile)`
+  takes the identity and has no default, so no statement is judged without one to judge
+  it under; a Gate is still built with only what its rules read out of the world. It was
+  a **constructor** argument in this Sub-step's first draft and moved under
+  [R14](../plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)
+  — sceptical item 1 below is where it was raised, and the ruling section at the end of
+  this entry is what it cost.
+- **[DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+  gains a dated status note and its own sentence gains a home.** `gate.py`'s module
+  docstring now quotes the entry verbatim — *"applied in the application layer, over
+  synthetic data … it does not protect the Warehouse from being read another way"* — and
+  the entry says where the enforcement lives. **Nothing is paid**: the Trigger is a claim
+  in `README.md`, the App or a demo script, and none of the three exists.
+
+### The plan said ten shapes and the spike has nine
+
+The [plan's verification for this Sub-step](../plan/step-005-validation-gate.md#53--the-gate-refuses-a-restricted-column-under-an-access-profile)
+reads *"holding the spike's ten restricted-column shapes"*. `RESTRICTED_COLUMN_PROBES`
+holds **nine** — five that must be caught and four that must not — and the check reads
+them out of the spike on every run rather than trusting either count. There are ten here
+because this Sub-step added one, for the reason in the next section. Recorded rather than
+quietly reconciled, the way [R13](../plan/step-005-validation-gate.md#r13--aminos-rulings-on-the-52-review--decided-2026-08-27)
+recorded the plan's route sentence.
+
+### The finding: the spike's star probe does not reach this rule
+
+`star over a join to dim_client` is the shape
+[ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md) named and the one
+[C4](../design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time) exists
+for — *"the one shape whose restricted name exists nowhere in its own text"*. Inside the
+assembled Gate it never gets here: a star projection aggregates nothing, so the tracing
+rule refuses it as `no metric expression` one rule earlier. The leak is real and the
+verdict that reports it is somebody else's.
+
+That is not a hole — the statement is refused either way — but it would have left C4's
+run-time schema read load-bearing only inside the detector, tested by a function call
+rather than by the Gate. **So this Sub-step added a tenth shape**: `client.*` beside the
+certified Net Revenue expression, grouped by ordinal so that no column name appears
+anywhere in the statement. It traces, so the tracing rule passes it; the star expands
+against the live catalogue into three real columns, one of them a Client's name; and the
+Gate refuses it as `restricted column`. The text search misses it, as the table below
+shows. Turning `expand_stars` off is mutation 2, and that probe is what it breaks.
+
+Three shapes in this module are refused before this rule runs, and all three are declared
+with the reason they actually return, the way
+[5.2 declared its two](#sub-step-52--the-gate-traces-every-metric-expression-to-a-certified-metric).
+What the check adds is that **every** shape is also read by the detector directly, so a
+leak in a statement refused for another reason is still measured rather than assumed.
+
+### A defect this Sub-step found: sqlglot refuses in two spellings, and one of them was a crash
+
+`resolve` caught `sqlglot.errors.SqlglotError` and turned it into `TracerRefused`, which
+is what makes an unreadable statement a rejection rather than an error. sqlglot also
+signals optimizer failures through `Expression.assert_is`, which raises the built-in
+**`AssertionError`** — not a `SqlglotError`, and so not caught. A statement that tripped
+it escaped the Gate as a traceback: an error where the caller had asked for a verdict,
+which is the exact failure `TracerRefused` was introduced to prevent.
+
+It surfaced while running mutation 2 — with `expand_stars` off, the tenth probe's
+`client.*` cannot be aliased and `GROUP BY 1` asserts on it, so the mutation produced a
+traceback instead of a legible failure. It then reproduced **without** the mutation:
+
+```
+SELECT unknown_table.*, count(fct_trade.trade_id) FROM fct_trade, unknown_table GROUP BY 1
+```
+
+a star no schema can expand, referred to by position. `resolve` raises
+`AssertionError: unknown_table.* is not <class 'sqlglot.expressions.core.Alias'>.`
+
+**The fix is one line in each of the two places that turn a library refusal into
+`TracerRefused`**, and it is narrow on purpose: `AssertionError` is caught, a `KeyError`
+out of a broken schema mapping is not, which keeps
+[DEBT-016](../debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)'s
+distinction — *"a query the engine will not plan is a rejection, and an adapter that
+cannot open the Warehouse is a broken installation."*
+
+**Reachability, stated honestly.** Through the assembled Gate it is **not** reachable
+today: the bounded rule asks the engine to plan the statement first, and DuckDB will not
+plan a query over a table it does not have. `resolve` is nonetheless exported from
+`veritas.validation`, the spike calls it, and [R7](../plan/step-005-validation-gate.md#r7--the-bounded-read-uses-the-engines-estimate-if-the-adapter-can-reach-it--approved-by-amino-2026-08-25)
+pre-approved a parse-tree fallback for the bounded rule that would remove the shield. The
+check puts both statements to the detector directly on every run and requires a refusal,
+so the two spellings stay measured rather than argued.
+
+### Verification
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+
+  no Restricted Column reaches the answer
+    Access Profile: role 'analyst', 1 Restricted Column(s) — dim_client.client_name
+    9 of the spike's 9 claim-2 statements are here character for character; 1 added by Sub-step 5.3
+    rejected  net revenue by client                  restricted column
+    rejected  star over a join to dim_client         no metric expression
+    rejected  aliased to a benign name               restricted column
+    rejected  hidden behind a derived table          restricted column
+    rejected  a union branch that names the Client   not a read
+    allowed   the name in a comment                  —
+    allowed   the name in a string literal           —
+    allowed   the name in a filter only              —
+    rejected  projected inside, aggregated away      shadow metric
+    rejected  star beside a certified metric         restricted column
+
+    tree      text      shape                                 reaching the answer
+    FOUND     matched   net revenue by client                 dim_client.client_name
+    FOUND     missed    star over a join to dim_client        dim_client.client_name
+    FOUND     matched   aliased to a benign name              dim_client.client_name
+    FOUND     matched   hidden behind a derived table         dim_client.client_name
+    FOUND     matched   a union branch that names the Client  dim_client.client_name
+    —         matched   the name in a comment                 —
+    —         matched   the name in a string literal          —
+    —         matched   the name in a filter only             —
+    —         matched   projected inside, aggregated away     —
+    FOUND     missed    star beside a certified metric        dim_client.client_name
+    text matching and the parse tree disagree on 6 of 10 shapes: 2 the text cannot see, 4 it would reject with no Restricted Column reaching the answer at all
+
+    this rule ran on 7 of 10 shapes and allowed 3 of them — the other 3 were refused by an earlier rule
+    the optimizer will not resolve it: the Gate refuses it at 'traces', and asked directly the detector raises OptimizeError rather than reporting nothing found
+    sqlglot asserts rather than raising its own error: the Gate refuses it at 'bounded', and asked directly the detector raises AssertionError rather than reporting nothing found
+
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement,
+what is not a read, what the planner expects to scan past the ceiling, what computes a
+metric the Semantic Layer does not certify, and what would carry a Restricted Column into
+the answer; and it allows every Certified Metric
+```
+
+The three columns are the point. **Text matching and the parse tree disagree on six of
+the ten shapes, in both directions** — two the text cannot see at all, and four it would
+refuse with nothing restricted reaching the answer. Those four are ordinary questions: a
+generator explaining in a comment why it grouped by region instead, a label saying which
+column was withheld, one Client's revenue with the name in the `WHERE` clause, and a
+count of distinct Clients. A Gate that refused all four is a Gate people route around.
+
+The rest of the run, and the other five checks:
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+    one judgement, fastest of 15: schema 3 ms · corpus 20 ms · statement 2 ms · whole Gate 42 ms
+
+$ uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+
+$ uv run python .claude/scripts/check_semantic_layer.py
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_language.py
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/verify_framework.py
+PASS — framework is wired up correctly
+```
+
+**The timing line is dated evidence, measured 2026-08-27 on this machine against the
+loaded Warehouse, and it is what
+[DEBT-019](../debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
+records.** A whole judgement was 32 ms when 5.2 shipped and is 42 ms now; the same line
+printed 3 ms for one catalogue read, and this rule takes a second one and resolves the
+statement a second time. The corpus rebuild still dominates both. Every figure here moves
+with the machine and no check asserts on any of them — the line is printed by
+`check_validation_gate/` on every run.
+
+### Mutation testing
+
+The pattern 2.6 established and 5.1 and 5.2 followed: break one thing, re-run, see the
+check fail on the probes that name it, restore, compare with `cmp`. Four mutations, one
+per claim this Sub-step makes. Problem lines are trimmed at the em dash, where the
+probe's `why` begins.
+
+```
+$ # for each: apply the mutation, run the check, restore, cmp
+  the rule is dropped from rules()
+    FAIL
+      - the Gate's rule list holds no entry for `no_restricted_column`, so nothing below is judging the rule this module exists to check
+      - 'net revenue by client' was measured as rejected and came back allowed
+      - 'aliased to a benign name' was measured as rejected and came back allowed
+      - 'hidden behind a derived table' was measured as rejected and came back allowed
+      - 'star beside a certified metric' was measured as rejected and came back allowed
+      - this rule allowed none of the shapes it ran on, so nothing here separates it from a rule that refuses everything
+  SELECT * is not expanded
+    FAIL
+      - 'star beside a certified metric' was rejected for ['unresolvable'] where it was measured as ['restricted column']
+      - 'star over a join to dim_client' carries a Restricted Column into its answer and the parse tree did not find one
+      - the columns reaching 'star beside a certified metric''s answer could not be read (AssertionError: client.* is not <class 'sqlglot.expressions.core.Alias'>.)
+  the Access Profile restricts nothing
+    FAIL
+      - the Access Profile restricts no columns, so every probe below passes this rule for the one reason that proves nothing
+      - 'net revenue by client' was measured as rejected and came back allowed
+      - 'aliased to a benign name' was measured as rejected and came back allowed
+      - 'hidden behind a derived table' was measured as rejected and came back allowed
+      - 'star beside a certified metric' was measured as rejected and came back allowed
+      - 'net revenue by client' carries a Restricted Column into its answer and the parse tree did not find one
+      - 'net revenue by client' was measured as matched by text matching and is now missed
+      … 12 more, one per shape whose tree or text column moved
+  resolve catches only SqlglotError
+        raise AssertionError(f"{self} is not {type_}.")
+    AssertionError: unknown_table.* is not <class 'sqlglot.expressions.core.Alias'>.
+
+gate.py and profile.py restored byte-for-byte after every mutation
+```
+
+Three of the four read as they should. **The fourth is a traceback and that is the
+finding**, not a failure of the check: reverting the widened `except` puts the Gate back
+to raising where it should reject, and a traceback is what that looks like from outside.
+Mutation 2's third line is the same defect *after* the fix — contained, reported as a
+problem, and legible.
+
+Mutation 1 breaks four probes and mutation 3 breaks nineteen, which is the difference
+between deleting the rule and emptying the declaration it reads: the first leaves the
+detector answering correctly and nobody asking, the second makes the detector answer
+*nothing restricted* about every shape, so the tree column and the text column both move.
+
+### Deliberately left undone
+
+- **The Access Profile's permitted region.** The Glossary registers *"role and permitted
+  region"* and this profile carries the role and its Restricted Columns only. Sub-step
+  5.5 adds the region, as [R1](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
+  specifies — *"a permitted value of the `by region` axis"*, refused at load if the axis
+  does not certify it. A field with no rule behind it would be a promise this module
+  cannot keep, which is the same reasoning `outcome.py` applies to a `Rejection Reason`
+  with no rule.
+- **One profile and one role.** The plan's scope boundary — *"both are files or rows added
+  rather than fields changed, so this is a scope boundary rather than debt."*
+- **The route rule and the date predicate.** 5.4, where DEBT-014 is paid.
+- **[DEBT-019](../debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
+  is opened.** Each parse-tree rule reads the catalogue and resolves the statement again.
+  The consistency argument is the real cost — two rules judging one statement against two
+  readings of a live catalogue can disagree about what a `SELECT *` stands for — and the
+  trigger is 5.4's route rule, the third rule to read the same catalogue in one judgement.
+- **DEBT-008 is not paid**, and the mechanism it is honest about is currently *narrower*
+  than the entry describes: the entry says the Gate *"requires the Access Profile's
+  predicate to be present"* and that half does not exist until 5.5.
+- **`traces.py`'s own *character for character* claim is still unchecked.** `restricted.py`
+  reads its nine statements out of the spike and fails if any differs; the module beside
+  it asserts the same thing about its own probes in a comment. Extending the check is
+  small and belongs to whoever touches that file next — see the sceptical items.
+
+### Look at this sceptically
+
+1. **The Access Profile is a constructor argument, not a `judge()` argument.** The
+   Glossary says *"the identity Veritas runs a **question** as"*, which argues for
+   `judge(sql, profile)` — one Gate serving many identities, which is what an App
+   process does. I made it a field because `ValidationGate` is *"built once with what its
+   rules read"* and because a caller wanting a second identity writes
+   `replace(gate, access_profile=other)`, which shares the loaded corpus. **This is the
+   seam most likely to be wrong**, and it is cheap to move now and not later: the
+   Orchestrator does not exist, and there are four construction sites in the repository.
+   **Ruled 2026-08-27 — separate the profile from the Gate, as `judge(sql, profile)`.**
+   Done: the field is gone, `judge` and `rules` take an `access_profile`, and the one
+   rule that reads it is bound to it with `functools.partial` so the other five keep a
+   signature that says they need nothing but the statement. Four construction sites gave
+   the argument up; seven `judge` calls and four `judge_probes` calls took it, and no
+   check's output moved. See
+   [R14](../plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)
+   and the ruling section below.
+2. **`role="analyst"` is a value with no registered vocabulary.** I treated it the way
+   `EU` is treated — data carried by an entry rather than a component of the system —
+   and Section A of the Glossary is about components, so a row there would be a poor fit.
+   The counter-argument is that the constant is named `ANALYST`, which *is* a code
+   identifier carrying domain meaning, and Non-Negotiable 1 governs those. Raised in
+   Language below rather than resolved.
+   **Ruled 2026-08-27 — fine for now, and approved.** No row. **What brings it back is a
+   second role**, which this Step's scope boundary puts outside it; the row is one line
+   and `ANALYST` does not move if it is written. This closes the question Language below
+   raises, and R14 records why it is not Ledger debt.
+3. **`RestrictedColumn` is a class where a tuple did the job.** It buys `str(column)`
+   spelling `dim_client.client_name` in one place, a stable sort, and a Glossary term
+   with a code identifier. It costs a type in the spike's pinned declaration, which is
+   a change to something [R4 of Step 004](../plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+   deliberately froze — the *content* is identical and every declared reading is
+   unchanged, but a pin that gets respelled is a pin somebody edited.
+4. **The tenth probe groups by ordinal.** `GROUP BY 1, 2, 3` is how I got a star to sit
+   beside an aggregate without naming a column, and it is not what a generator with a
+   style guide writes. A reviewer could fairly say the probe is built to reach the rule
+   rather than drawn from life. The defence is that the property being measured — a
+   restricted column reaching the answer with its name nowhere in the text — is real
+   whatever syntax produces it, and no other syntax produced it.
+5. **`restricted.py` imports the spike.** The provenance check reads
+   `check_validation_feasibility.RESTRICTED_COLUMN_PROBES`, which couples the check that
+   runs on every commit to a 1,700-line script. The import is inside the function, of one
+   constant, and the dependency runs one way — but it is new, and the same claim in
+   `traces.py` is still a comment. Either both should be checked or neither.
+   **Ruled 2026-08-27 — do not import the spike; what is the alternative?** The
+   alternative is to check a claim about **text** against text:
+   `probes.spike_statements` reads the `name=` and `sql=` literals off the spike's parse
+   tree with `ast` and executes none of it. The shared check it feeds now runs in
+   **both** modules — `traces.py`'s comment became a run — which is this item's own
+   *"either both should be checked or neither"*. See
+   [R14](../plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)
+   and the ruling section below.
+6. **The rule's `UNRESOLVABLE` branch is unreached inside the Gate**, and the check says
+   so rather than hiding it. The two statements that exercise the detector's refusal are
+   put to it directly, which is a function call and not a verdict. The `lineage` arm is
+   thinner still: no statement is on file that resolves and whose lineage then cannot be
+   walked, and the docstring says exactly that rather than implying a case exists.
+7. **Widening `except` to `AssertionError` catches more than sqlglot.** An assertion
+   failing anywhere inside `optimize` — including in code we later add — now reads as
+   *"the library refused this statement"*. I judged that better than a Gate that crashes,
+   and DEBT-016's line still holds for every other exception type, but it is a real
+   widening of what gets called a rejection.
+   **Ruled 2026-08-27 — fine for now.** It stands. What would make it wrong is an
+   `AssertionError` out of **Veritas's own code** inside `optimize` being reported as a
+   library refusal, which cannot happen while nothing of ours runs in there; R14 records
+   that condition and why the item is not Ledger debt.
+8. **`found_by_text` exists twice**, here and in the spike, because each side searches for
+   its own declaration and because the rejected alternative should not live inside
+   `veritas/validation/` where something could call it. Five lines duplicated to avoid a
+   function nobody may use is a trade, not an obvious win.
+9. **Two changes to shared check machinery that this Sub-step forced.** `judge_probes`
+   now rebuilds a ceiling-carrying probe's Gate with `dataclasses.replace` instead of
+   `ValidationGate(gate.warehouse, probe.ceiling)`; the old form silently re-defaulted
+   every field it did not name, which meant a ceiling probe was quietly judged against a
+   *second* load of `semantic/` and would now be judged under a different identity. And
+   the probe-name column widened from 24 to 38 characters, because this module's names
+   are the spike's and three of them overflowed. The first is a latent bug fixed in
+   passing; the second changes 5.1's and 5.2's printed output, which a reviewer may
+   reasonably want out of this commit.
+   **Ruled 2026-08-27 — approved.** Both stand. **One clause above stopped being true
+   the same day**: item 1's ruling took the Access Profile off the Gate, so a rebuilt
+   Gate can no longer pick up a different identity — `judge` carries it. The corpus half
+   is the whole of the latent bug now, and `judge_probes`'s docstring says so.
+
+### Language
+
+**No new terms.** Everything this Sub-step names was registered before it started:
+[`Access Profile`](../glossary.md#a-the-system) and
+[`Restricted Column`](../glossary.md#a-the-system) have been `agreed` since the Domain
+Language was, both with `veritas/validation/` as their *Lives in*, and this is the
+Sub-step that makes those cells true.
+
+**Code identifiers added, and the term each answers to:** `AccessProfile` and its
+`access_profile` field (`Access Profile`); `RestrictedColumn`, the `restricted_columns`
+field, `restricted_columns_in_projection` and `RejectionReason.RESTRICTED_COLUMN`
+(`Restricted Column`); `no_restricted_column`, the rule, named for what it decides.
+`columns_reaching_the_answer` and `ANSWER_COLUMN` are the spike's own names, moved rather
+than coined.
+
+**One question, raised and answered by
+[R14](../plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)
+on the day it was raised: does the Access Profile's `role` want a Glossary row?** It does
+not, for now — sceptical item 2 above carries the ruling and what brings it back. The
+argument that was put, unchanged:
+
+The value is `"analyst"` and the constant naming the profile is `ANALYST`. I read
+the role as a *value* — the same kind of thing as `EU`, a bucket the `by region` axis
+certifies, which lives in the entry and not in a Glossary row — and Section A is a table
+of components, which a job title is not. Against that: `ANALYST` is a code identifier
+carrying domain meaning, and Non-Negotiable 1 says those must match Glossary terms. The
+question only becomes load-bearing when a second role exists, which the plan puts outside
+this Step, so it is recorded rather than settled. If it should be registered, the row is
+one line and the constant does not move.
+
+That last sentence is what the ruling took: no row now, and a second role is what asks
+again.
+
+### The nine sceptical items and one question → **ruled, and answered in this commit**
+
+**Amino, 2026-08-27:** *"1 → separate the profile from the gate as in `judge(sql,
+profile)`. 2 → fine for now and approved. 3 → fine and approved. 4 → fine and approved.
+5 → we shouldn't import the spike. what is the alternative? 6 → approved. 7 → fine for
+now. 8 → approved. 9 → approved and very good. All other changes are reviewed, approved
+and staged."* Recorded as
+[R14](../plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27),
+and landing in this commit rather than after it because it arrived before the commit did
+— the shape [R11](../plan/step-005-validation-gate.md#r11--aminos-rulings-on-the-trim--decided-2026-08-26),
+[R12](../plan/step-005-validation-gate.md#r12--aminos-rulings-on-the-51-review--decided-2026-08-26)
+and [R13](../plan/step-005-validation-gate.md#r13--aminos-rulings-on-the-52-review--decided-2026-08-27)
+set.
+
+**Code changed this time**, which is the difference from the three rulings before it: two
+of the nine items cost an edit, and one of the two moved a seam. Everything above was
+re-measured after the edits and the marks are inline on items 1, 2, 5, 7 and 9.
+
+**Item 1 — the Access Profile left the Gate.** `ValidationGate` no longer has an
+`access_profile` field; `judge(sql, access_profile)` and `rules(access_profile)` take it,
+with no default. The identity is bound into the single rule that reads it with
+`functools.partial`, so `Rule` stays *one `Reading` in, a verdict out* and the three
+module-level rules keep a signature that says they need nothing but the statement — which
+is what the module's whole ordering argument rests on. Six files: `gate.py`, and the five
+in `.claude/scripts/check_validation_gate/`. **Four** construction sites gave the argument
+up and **eleven** call sites took it — seven `judge` calls, and four calls to the checks'
+shared `judge_probes`, which gained a parameter of its own; `rule_name` gained two lines
+to unwrap the `partial`.
+
+**No verdict, reason, count or column moved.** The `no Restricted Column reaches the
+answer` block above was re-run after the move and is the same 29 lines, character for
+character. That is the evidence this was a seam moved and not a rule changed, and it is
+the reason the move was cheap today: the Orchestrator does not exist, and what used to be
+four construction sites are now four call sites.
+
+**Item 5 — nothing imports the spike.** `probes.spike_statements` parses
+`check_validation_feasibility.py` with `ast` and reads the `name=` and `sql=` literals off
+its parse tree, executing none of it. What the checks depend on is now a **file at a
+path** holding a dated measurement, rather than a 1,700-line module that has to keep
+importing; the direction stays the one
+[R2](../plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+set, with the spike importing `veritas/validation/` and nothing importing the spike.
+
+The shared check it feeds runs in **both** rule modules, which is the item's own *"either
+both should be checked or neither"*. `restricted.py`'s line is unchanged. `traces.py`'s
+comment became three lines of run output:
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+
+  every metric expression traces to a Certified Metric
+    15 of the spike's 16 claim-1 statements are here character for character (1 renamed); 3 added by Sub-step 5.2
+    'notional, wrong currency' is the spike's 'notional through the wrong currency', character for character, under a shorter name
+    the spike's 'unparseable' is not judged here — the Gate refuses it at `parses`, three rules earlier, and `read_only.py` measures that shape with a statement of its own
+```
+
+The third line is the part worth reading twice. A statement the spike measures and a rule
+module does not judge is a **problem** unless it is declared, and `traces.py` declares
+exactly one, naming where the shape is covered instead. A declaration that stops
+describing anything — the spike drops the statement, or the module judges it after all —
+fails the run too, because an allowance nobody re-reads is how coverage quietly shrinks.
+The rename line is the same idea: the local name is shorter than the spike's and the
+**statement** is identical, so the check says so rather than counting it as a new shape.
+
+**Mutation testing, re-run.** The four above were re-applied against the moved seam and
+each produced the same output it did before the ruling — 6 problems, 3, 19 and a
+traceback — though mutation 1's edit is now the removal of a `partial`-bearing entry
+rather than a bound method. A fifth was added for the mechanism item 5 introduced:
+
+```
+$ # apply the mutation, run the check, restore, cmp
+  a probe statement drifts from the spike's
+    FAIL — 1 problem(s)
+      - the statement for 'bare' differs from the spike's, so this module and the spike's
+        dated measurement are no longer judging the same shape
+          spike: SELECT sum(fct_trade.commission * fct_fx_rate.fx_rate) FROM fct_trade …
+          here:  SELECT  sum(fct_trade.commission * fct_fx_rate.fx_rate) FROM fct_trade …
+
+gate.py, profile.py and traces.py restored byte-for-byte after every mutation
+```
+
+**The mutation is one extra space** after `SELECT` in `traces.py`'s first probe — a
+change no engine would notice, which is the whole point: the two files would go on
+looking like they agreed about a shape while judging different text. The check names the
+file, the shape and both statements. It is the claim that was a comment in that file
+until today.
+
+**And the declared allowance was mutated in both directions**, because a coverage
+allowance that nothing tests is exactly the kind of thing this Sub-step added:
+
+```
+$ # apply the mutation, run the check, restore, cmp
+  the declared allowance is dropped
+    FAIL — 1 problem(s)
+      - the spike measures 'unparseable' and this module does not judge it — a shape the feasibility run covered and the Gate's own check does not
+  an allowance that describes nothing is declared
+    FAIL — 1 problem(s)
+      - 'aliased' is declared as covered elsewhere (a shape this module judges) and the spike no longer has a statement this module skips under that name — the allowance has stopped describing anything and should be removed
+
+traces.py restored byte-for-byte after both
+```
+
+The second is the one worth having. Declaring a shape as covered elsewhere is how a check
+is talked out of a finding, so the declaration has to fail when it stops being about
+anything — otherwise the list only ever grows.
+
+**Items 2 and 7 are approved *for now*, and neither is Ledger debt.** R14 carries the
+reasoning and the condition that brings each back: a second role for the `role` row, and
+an `AssertionError` raised by Veritas's own code inside `optimize` for the widened
+`except`. Neither is the cheap thing standing in for the right thing, and an entry whose
+trigger cannot fire inside this project's life is a wish rather than debt.
+
+**Item 9's second clause stopped being true the same day it was approved.** The review
+said a rebuilt Gate *"would now be judged under a different identity"*; after item 1 there
+is no identity on the Gate to re-default, so the latent bug `replace` fixes is the corpus
+half alone. `judge_probes`'s docstring is corrected rather than left as the version this
+entry quoted.
+
+**Verification, after the edits.** Every check was re-run in the same session:
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement, what is not a read, what the planner expects to scan past the ceiling, what computes a metric the Semantic Layer does not certify, and what would carry a Restricted Column into the answer; and it allows every Certified Metric
+
+$ uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+
+$ uv run python .claude/scripts/check_semantic_layer.py
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_language.py
+  glossary: 92 registered terms
+  proposed terms: 0 · python files scanned: 26 · identifiers: 1538
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/verify_framework.py
+  links      1088 links, 843 anchors 55 documents and python files
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+```
+
+**The spike's own run is the one to look at.** It imports the tracer and the detector from
+`veritas/validation/` and it exercises no `ValidationGate`, so the seam move could not
+have touched it — and its 25 declared verdicts and nine detector readings are unchanged,
+for the second time in this Sub-step.
+
+**Two figures in the timing line moved and nothing asserts on either**, the same way item
+8 predicted: *"one judgement, fastest of 15"* printed **schema 3 ms · corpus 20 ms ·
+statement 2 ms · whole Gate 42 ms** in the block above and **schema 4 ms · corpus 22 ms ·
+statement 2 ms · whole Gate 49 ms** on this run, on a machine under a different load. The
+line is printed on every run and no check compares it with anything.
+
+**What this does not settle.** DEBT-014's two declared verdicts are still there for 5.4 to
+flip, DEBT-019 is still open and its trigger is still 5.4's route rule, and DEBT-008 is
+still unpaid and still describes an enforcement wider than the one that exists — the
+Access Profile's predicate arrives in 5.5.

@@ -36,12 +36,14 @@ from probes import (
     REJECTED,
     Probe,
     Report,
+    check_the_statements_are_the_spikes,
     judge_probes,
     problems,
 )
 
 from veritas.semantic import load_semantic_layer
 from veritas.validation import (
+    ANALYST,
     RejectionReason,
     ValidationGate,
     canonical,
@@ -61,6 +63,13 @@ from veritas.validation import DIALECT  # noqa: E402
 # verdict moves between the spike's tracer and the Gate is visible as a difference
 # rather than hidden by a rewrite. What is new here is the **reason** each rejection
 # comes back with, which the spike had no taxonomy to declare.
+#
+# That claim is **checked** rather than asserted here, by
+# `probes.check_the_statements_are_the_spikes`, which reads the spike's source text.
+# It was a comment in this file while `restricted.py` beside it checked the same claim
+# about its own probes, and
+# [R14](../../docs/plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)
+# is where either-both-or-neither was settled on both.
 #
 # Every statement here is a string literal inside `.claude/scripts/`, one of
 # `check_warehouse.py`'s scanned roots, so the dialect scan reads each one it can
@@ -495,7 +504,7 @@ def check_what_a_judgement_reads(gate: ValidationGate, report: Report) -> None:
         f"schema {fastest(gate.warehouse.columns_by_table):.0f} ms · "
         f"corpus {fastest(lambda: certified_forms(expressions, schema)):.0f} ms · "
         f"statement {fastest(lambda: metric_expressions(statement, schema)):.0f} ms · "
-        f"whole Gate {fastest(lambda: gate.judge(statement)):.0f} ms"
+        f"whole Gate {fastest(lambda: gate.judge(statement, ANALYST)):.0f} ms"
     )
     same = per_table_schema(gate.warehouse) == schema
     report.say(
@@ -512,16 +521,33 @@ def check_what_a_judgement_reads(gate: ValidationGate, report: Report) -> None:
         )
 
 
+# The spike's claim-1 statements this module deliberately does not judge, and where the
+# shape is covered instead. Declared rather than skipped silently: a shape that leaves
+# this list without leaving the spike is coverage lost, and the check fails on it.
+COVERED_ELSEWHERE = {
+    "unparseable": "the Gate refuses it at `parses`, three rules earlier, and "
+                   "`read_only.py` measures that shape with a statement of its own",
+}
+
+
 def check(warehouse: WarehouseAdapter) -> Report:
     """Everything this module has to say, in one report."""
     report = Report("every metric expression traces to a Certified Metric")
     gate = ValidationGate(warehouse, semantic=load_semantic_layer())
+    check_the_statements_are_the_spikes(
+        PROBES,
+        constant="PROBES",
+        label="claim-1",
+        added_by="Sub-step 5.2",
+        covered_elsewhere=COVERED_ELSEWHERE,
+        report=report,
+    )
     check_the_corpus_is_the_one_on_disk(gate, report)
     check_symmetric_canonicalisation_is_load_bearing(gate, report)
-    judge_probes(gate, PROBES, report)
+    judge_probes(gate, PROBES, report, ANALYST)
     report.say("")
     report.say("one probe per Certified Metric, built from semantic/metrics/:")
-    judge_probes(gate, certified_probes(gate), report)
+    judge_probes(gate, certified_probes(gate), report, ANALYST)
     report.say("")
     check_what_a_judgement_reads(gate, report)
     return report

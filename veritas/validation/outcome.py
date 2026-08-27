@@ -21,7 +21,8 @@ opened four days earlier and still open.
 
 **The set is incomplete on purpose.** Sub-step 5.1 shipped the rules that need
 neither the corpus nor the schema and registered four members; Sub-step 5.2 added the
-tracing rule and the three ways it can fail. Each later rule of
+tracing rule and the three ways it can fail; Sub-step 5.3 added the Restricted Column
+rule and the one way it can. Each later rule of
 [Step 005](../../.claude/docs/plan/step-005-validation-gate.md) adds its own with the
 Sub-step that adds the rule. A member with no rule behind it would be a chart
 category nothing can ever fall into.
@@ -139,6 +140,28 @@ class RejectionReason(StrEnum):
     """
 
 
+    RESTRICTED_COLUMN = "restricted column"
+    """A column the Access Profile forbids reaches the statement's answer.
+
+    The [Target State](../../.claude/docs/design/target-state.md#flow)'s second check on the
+    parse tree, and the half of
+    [C3](../../.claude/docs/design/validation-feasibility.md#c3--the-two-parse-tree-rules-ship-together)
+    that a Step shipping certified-metrics-only alone would have left out: *"a Step that
+    builds certified-metrics-only alone and defers the Restricted Column check has not
+    built half a Gate; it has built a Gate that passes the leak."*
+
+    **One member for the rule, and the columns go in the explanation.** A chart grouping
+    by reason answers *"how often does the generator try to project an identity"*, which
+    is one bar however many columns one statement names; *which* column it was is what a
+    person reading the rejection needs, so the rule names every column it found rather
+    than the first.
+
+    Separate from `SHADOW_METRIC` because the two are unrelated failures that can arrive
+    together. A statement can compute a Certified Metric exactly and still put a Client's
+    name beside it — the spike's `net revenue by client` is that statement, and it is why
+    the two rules are two rules.
+    """
+
 @dataclass(frozen=True, slots=True)
 class ValidationGateOutcome:
     """The verdict: allowed or rejected, why, and what it was decided under.
@@ -147,13 +170,23 @@ class ValidationGateOutcome:
     charting it there is an Orchestrator and a Grounded Answer, and a verdict any of
     them can edit is a verdict none of them can be held to.
 
-    `reasons` is empty exactly when `allowed` is true, and one rule may contribute
-    several members — Sub-step 5.3's Restricted Column rule names every column it
-    found rather than the first. `explanation` is the sentence a person reads;
-    `reasons` is what a chart groups by. Both, because the
+    `reasons` is empty exactly when `allowed` is true. `explanation` is the sentence a
+    person reads; `reasons` is what a chart groups by. Both, because the
     [Target State's flow](../../.claude/docs/design/target-state.md#flow) says
     *"fail → explain the violation"* and ADR-0003 says the taxonomy has to be stable,
     and neither one does the other's job.
+
+    **A tuple, and so far every rule has put exactly one member in it.** Sub-step 5.1
+    wrote the plural expecting the Restricted Column rule to contribute one member per
+    column it found; Sub-step 5.3 built that rule and it contributes one member and
+    names the columns in the `explanation` instead, because a chart grouping by reason
+    is answering *"how often does the generator try to project an identity"* and that
+    is one bar whether the statement named one column or three. The prediction is
+    corrected here rather than deleted, since the shape it argued for is the shape
+    that shipped. What keeps the tuple is not that prediction: `reasons` is the
+    outcome's contract with three components that import no rule, and widening a
+    single member into a tuple later is a change every reader of a verdict has to
+    follow, where a tuple that has only ever held one member is not.
 
     `rules` names the rules that actually ran, in order, which is not the same as the
     rules that exist: the Gate stops at the first rule that rejects, so a statement

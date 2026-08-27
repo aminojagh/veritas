@@ -99,7 +99,6 @@ from typing import NamedTuple
 
 import sqlglot
 from sqlglot import exp
-from sqlglot.lineage import lineage
 
 CLAUDE_DIR = Path(__file__).resolve().parent.parent  # <repo>/.claude
 REPO_ROOT = CLAUDE_DIR.parent                        # <repo>
@@ -109,11 +108,13 @@ sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 
 from veritas.validation import (  # noqa: E402
     TRUSTED_REWRITES,
+    RestrictedColumn,
     TracerRefused,
     certified_forms,
     certified_metrics_only,
     metric_expressions,
     resolve,
+    restricted_columns_in_projection,
 )
 # The tracer this file measured is now `veritas/validation/`'s, imported back under
 # [R2 of Step 005](../docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25):
@@ -122,6 +123,13 @@ from veritas.validation import (  # noqa: E402
 # canonical form, the two trusted rewrites and the refusal all live there and this
 # file holds none of them — the same move Sub-step 4.3 made for `retarget`, so that
 # the dated measurement and the check that runs on every commit are one trip.
+#
+# **Sub-step 5.3 finished the move.** The projection walker this file measured claim 2
+# with — `columns_reaching_the_answer`, the lineage walk, and the numbered output
+# aliases it needs — is `veritas/validation/`'s too, along with the `RestrictedColumn`
+# the Glossary registers and this file used to hold as an anonymous pair of strings.
+# One detector now answers for both declarations, the way one tracer answers for both
+# corpora.
 #
 # **What did not move is the corpus.** [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
 # pins the three certified expressions below as Python literals so *"the dated
@@ -226,11 +234,18 @@ CERTIFIED_EXPRESSIONS = {
 # the ten tables in Glossary Section B it is the only column naming a firm rather
 # than describing a Trade, a Position or a price.
 #
-# Held as (table, column) rather than as a bare name, because a parse tree resolves
-# a column to the table it came from and a Gate that forbade the *name* would
+# Held as a table and a column rather than as a bare name, because a parse tree
+# resolves a column to the table it came from and a Gate that forbade the *name* would
 # forbid it everywhere it appeared. Two tables are free to have a `name` column and
-# for only one of them to be restricted.
-RESTRICTED_COLUMNS = frozenset({("dim_client", "client_name")})
+# for only one of them to be restricted. `RestrictedColumn` is the Glossary term made
+# a type, in `veritas/validation/`; this file was holding the same pair as an
+# anonymous tuple until Sub-step 5.3 gave it a home.
+#
+# **The declaration is pinned here and the Access Profile declares its own**, for the
+# reason [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+# pins the three expressions below: a dated measurement whose inputs move is not
+# evidence. One detector, two declarations.
+RESTRICTED_COLUMNS = frozenset({RestrictedColumn("dim_client", "client_name")})
 
 
 # What each probe's verdict means. Every probe declares one, so that "did not
@@ -823,82 +838,28 @@ def pinned_corpus(
     )
 
 
-# The alias every output column is given before its lineage is asked for. A
-# generated query is free to name two output columns the same thing — `SELECT *`
-# over a join does it by itself, twice over on this schema — and lineage is asked
-# for a column *by name*, so a duplicate name would answer for the first column and
-# leave the second unexamined. Numbering the outputs first removes the ambiguity
-# rather than hoping a generator avoids it.
-ANSWER_COLUMN = "answer_column_"
-
-
-def columns_reaching_the_answer(
+def pinned_restricted_columns(
     sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
-) -> set[tuple[str, str]]:
-    """Claim 2's reading: every base-table column that reaches the statement's output.
+) -> list[str]:
+    """Claim 2's verdict: the Restricted Columns above that reach this statement's answer.
 
-    **Reaching the answer is the question, not appearing in the statement.** The
-    rule is the [Target State](../docs/design/target-state.md#flow)'s *"no restricted
-    column in the projection"*, and *the projection* means the columns a reader of
-    the Grounded Answer sees. Three kinds of column are therefore not returned, and
-    each is a probe:
+    `restricted_columns_in_projection` is `veritas/validation/`'s and takes the columns
+    it is to look for, which is what lets this file go on judging against its pinned
+    declaration while the Gate judges against the Access Profile's. The same shape as
+    `pinned_corpus` above, for the same reason: the detector moved to the component that
+    owns it, the dated declaration stayed here.
 
-      * a column in a WHERE clause, a JOIN condition or a GROUP BY, which no reader
-        of the answer sees;
-      * a column projected inside a subquery and aggregated away before the answer
-        — `count(*)` over `SELECT DISTINCT client_name` shows nobody a Client's
-        name;
-      * a name that is not a column at all: a comment, or a string literal.
-
-    `sqlglot.lineage` is what makes the second one answerable. It takes one output
-    column and walks back through every scope to the base-table columns that
-    produced it, following a subquery `merge_subqueries` could not flatten and both
-    branches of a union. Reading the projections of every scope instead — which is
-    what claim 1 does, correctly, for its own question — counts a column the answer
-    never carries, and rejects the ordinary query that asks how many distinct
-    Clients traded.
-
-    **It adds no new trust.** `lineage` runs `qualify` and nothing else, so the two
-    rewrites this file is willing to rely on are still the only two. It is handed
-    the already-resolved statement so that a `SELECT *` is expanded before it starts.
+    What the detector does, and why it is a lineage walk rather than a read of every
+    scope's projections, is argued where it now lives.
 
     Raises `TracerRefused` if sqlglot cannot read the statement.
     """
-    resolved = resolve(sql, schema, dialect)
-
-    # Number the output columns. `.selects` on a union is its first branch's
-    # projection list, which is where a union's output names come from, so
-    # numbering there names the outputs of both branches.
-    for position, projection in enumerate(resolved.selects):
-        projection.replace(
-            exp.alias_(projection.unalias().copy(), f"{ANSWER_COLUMN}{position}")
+    return [
+        str(column)
+        for column in restricted_columns_in_projection(
+            sql, RESTRICTED_COLUMNS, schema, dialect
         )
-
-    reaching: set[tuple[str, str]] = set()
-    try:
-        for position in range(len(resolved.selects)):
-            # `lineage` returns a tree of `Node`s: the root is the output column,
-            # and walking it reaches one leaf per base-table column that feeds it.
-            # A leaf carries the table it came from in `source` and the column as
-            # `<source alias>.<column>` in `name`.
-            for step in lineage(
-                f"{ANSWER_COLUMN}{position}", resolved, schema=schema, dialect=dialect
-            ).walk():
-                if isinstance(step.source, exp.Table) and "." in step.name:
-                    reaching.add((step.source.name, step.name.split(".")[-1]))
-    except sqlglot.errors.SqlglotError as failure:
-        raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
-    return reaching
-
-
-def restricted_columns_in_projection(
-    sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
-) -> list[str]:
-    """Claim 2's verdict: the Restricted Columns that reach the statement's answer."""
-    reaching = columns_reaching_the_answer(sql, schema, dialect)
-    return sorted(
-        f"{table}.{column}" for table, column in reaching & RESTRICTED_COLUMNS
-    )
+    ]
 
 
 def found_by_text(sql: str) -> list[str]:
@@ -911,9 +872,9 @@ def found_by_text(sql: str) -> list[str]:
     """
     lowered = sql.lower()
     return sorted(
-        f"{table}.{column}"
-        for table, column in RESTRICTED_COLUMNS
-        if column in lowered
+        str(restricted)
+        for restricted in RESTRICTED_COLUMNS
+        if restricted.column in lowered
     )
 
 
@@ -1058,8 +1019,8 @@ def check_restricted_columns(
     """
     print(f"    Restricted Columns: {len(RESTRICTED_COLUMNS)}, as Python literals "
           f"in this script (R2)")
-    for table, column in sorted(RESTRICTED_COLUMNS):
-        print(f"      {table}.{column}")
+    for restricted in sorted(RESTRICTED_COLUMNS):
+        print(f"      {restricted}")
     print(f"    {'verdict':<10}{'text':<10}{'claim 1':<10}"
           f"{'shape':<38}in the projection")
 
@@ -1067,7 +1028,7 @@ def check_restricted_columns(
     rejected_by_text_alone = 0
     for probe in RESTRICTED_COLUMN_PROBES:
         try:
-            projected = restricted_columns_in_projection(probe.sql, schema)
+            projected = pinned_restricted_columns(probe.sql, schema)
             traces, _, _ = certified_metrics_only(
                 metric_expressions(probe.sql, schema), corpus
             )
@@ -1288,7 +1249,7 @@ def both_verdicts(
         allowed, hit, _ = certified_metrics_only(
             metric_expressions(sql, schema, dialect), corpus
         )
-        projected = restricted_columns_in_projection(sql, schema, dialect)
+        projected = pinned_restricted_columns(sql, schema, dialect)
     except TracerRefused:
         return REFUSED_BY_THE_TRACER
     # `dict.fromkeys` for the reason `check_traces` uses it: one statement can

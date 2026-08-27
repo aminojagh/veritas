@@ -22,11 +22,14 @@ different order would be checking a different Gate.
 
   * `read_only` — Sub-step 5.1. Parseable, one statement, a read, bounded.
   * `traces` — Sub-step 5.2. Every metric expression traces to a Certified Metric.
+  * `restricted` — Sub-step 5.3. No Restricted Column reaches the answer, under the
+    Access Profile the statement is judged under.
 
-The three still to come are `restricted` (5.3), `route` (5.4) and `access` (5.5).
+The two still to come are `route` (5.4) and `access` (5.5).
 """
 
 import read_only
+import restricted
 import traces
 from probes import problems, warehouse
 
@@ -34,7 +37,11 @@ from probes import problems, warehouse
 def main() -> int:
     with warehouse() as adapter:
         print(f"  Warehouse: {adapter.database_path}")
-        reports = [read_only.check(adapter), traces.check(adapter)]
+        reports = [
+            read_only.check(adapter),
+            traces.check(adapter),
+            restricted.check(adapter),
+        ]
 
     for report in reports:
         report.print()
@@ -48,8 +55,9 @@ def main() -> int:
     print(
         "PASS — the Validation Gate refuses what it cannot read, what is more than "
         "one statement, what is not a read, what the planner expects to scan past "
-        "the ceiling, and what computes a metric the Semantic Layer does not "
-        "certify; and it allows every Certified Metric"
+        "the ceiling, what computes a metric the Semantic Layer does not certify, "
+        "and what would carry a Restricted Column into the answer; and it allows "
+        "every Certified Metric"
     )
     return 0
 

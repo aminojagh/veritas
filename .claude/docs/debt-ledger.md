@@ -46,8 +46,9 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query — **🔴 fired** | **paid** (Sub-step 5.1) |
 | [DEBT-017](#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) | The certified axes are registered inside one Glossary cell | S | A sixth certified axis, or a rewording of that cell failing the run | open |
 | [DEBT-018](#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus) | Six Certified Metrics have no expression text pinned outside the corpus | S | The first edit to a Certified Metric's `expression` | open |
+| [DEBT-019](#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again) | Every parse-tree rule reads the catalogue and resolves the statement again | S | The next Gate rule that reads the catalogue — Sub-step 5.4's route rule | open |
 
-**Open debt:** 10 · **Paid:** 5 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 11 · **Paid:** 5 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -556,6 +557,24 @@ believe a guarantee exists that does not — and the project's whole argument is
 that a confident, well-formatted overstatement is the failure worth preventing.
 Making that mistake in our own documentation, about our own governance, would be
 the sharpest possible own goal.
+
+**Status note, Sub-step 5.3 (2026-08-27) — the enforcement now exists, and the entry
+is still open.** `veritas/validation/` holds the `Access Profile` and the rule that
+reads it: a role, the Restricted Columns that role may not see, and a parse-tree rule
+that refuses any statement whose answer would carry one. So *"Built — will build"* below
+is now simply *built*, and it has an address — `veritas/validation/profile.py` for the
+declaration, `gate.py`'s `no_restricted_column` for the enforcement. The paragraph this
+entry asks to be said is in `gate.py`'s module docstring, in this entry's own words
+rather than a paraphrase of them. The **Location** above is unchanged, because it names
+where the unpaid *claim* will be made and neither of those files makes one.
+
+**Nothing is paid by that.** The Trigger is a *claim*, and `README.md`, the App and a
+demo script all still do not exist, so the first person to write one is still the person
+who pays this. What the note buys is that they will find the sentence beside the code
+instead of reconstructing it. The half the Gate does **not** yet have is the Access
+Profile's predicate — the permitted region — which Sub-step 5.5 adds; until then the
+mechanism this entry is honest about is narrower again than the entry describes, and the
+Step Review says so.
 
 **Trigger**
 
@@ -1551,3 +1570,74 @@ repayment is recording them and pointing check 9 at all nine.
 Nothing in the rest of Step 005 fires it — 5.4 adds a route rule and 5.5 adds Join Paths
 and a `routes` field, and neither touches an `expression` — so this is a tripwire laid
 ahead of the Step that will actually trip it rather than one firing inside this one.
+
+---
+
+### DEBT-019 — Every parse-tree rule reads the catalogue and resolves the statement again
+
+- **Status:** open
+- **Opened:** Sub-step 5.3 (`.claude/docs/reviews/step-005-validation-gate.md`)
+- **Size:** S
+- **Location:** `veritas/validation/gate.py` — `ValidationGate.traces` and
+  `ValidationGate.no_restricted_column`, each opening with
+  `self.warehouse.columns_by_table()`
+
+**What we did**
+
+Gave each parse-tree rule its own reading of the world. `traces` reads the catalogue,
+resolves the statement and rebuilds the corpus's canonical forms against that reading;
+`no_restricted_column` then reads the catalogue **again** and resolves the same statement
+**again** to walk its lineage. Two rules, two catalogues, two resolutions of one
+statement, inside one judgement.
+
+The alternative is one reading per judgement, handed to the rules that want it. It was
+not taken because the shape it wants — a per-judgement context, or a `schema` field on
+`Reading`, or a wider `Rule` signature — is a decision about the rule interface `Reading`
+and `Rule` fix, and Sub-step 5.3's subject was the Restricted Column rule. Choosing that
+shape against the two rules that exist rather than the four that will is what would make
+it the wrong shape.
+
+**What we should have done**
+
+Read the catalogue once in `judge`, hand it to the rules that need it, and resolve the
+statement once for every rule that reads a tree. `resolve` already copies the tree it is
+handed and every parse-tree rule wants the identical rewriting, so the resolved statement
+is a property of the judgement rather than of the rule.
+
+**Why we deferred**
+
+Two rules is not enough to see the shape. Sub-step 5.4's route rule and 5.5's access
+predicate both read the catalogue and both read a resolved tree, and the interface that
+serves four rules is the one worth drawing — see
+[R8 of this Step](plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25),
+which made the same argument about the check's container and drew the line *before* the
+file grew rather than while the second rule was being written. This entry is the same
+argument arriving one rule too late to act on cheaply and one rule too early to act on
+correctly.
+
+**Cost while unpaid**
+
+**The consistency cost is the real one.** The
+[Sub-step 5.2 review](reviews/step-005-validation-gate.md#sub-step-52--the-gate-traces-every-metric-expression-to-a-certified-metric)
+argued that a certified expression and the statement computing it must be resolved
+against the *same* reading of the schema, because *"caching one side and re-reading the
+other is how the two would come to disagree with nothing to notice."* That argument does
+not stop at one rule. Two rules judging one statement against two readings of a live
+catalogue can, in principle, disagree about what a `SELECT *` stands for — the tracing
+rule seeing one column list and the Restricted Column rule another — and a verdict
+assembled from two views of the Warehouse is a verdict about neither. The window is
+small and the Warehouse is not being written to during a judgement today; the day
+something does write to it, nothing here would say so.
+
+**The measured cost is small and it is on the hot path.** The figures are printed by
+`.claude/scripts/check_validation_gate/` on every run — `whole Gate` beside `schema`,
+`corpus` and `statement` — and the 5.3 review records what they read the day this entry
+was opened. The catalogue read is the cheap half; the resolution is repeated per rule
+and the corpus rebuild dominates both.
+
+**Trigger**
+
+**The next Gate rule that reads the catalogue** — Sub-step 5.4's route rule, which
+compares a statement's joins against a Metric Definition's own and needs a resolved tree
+to do it. That is the third reading of one catalogue in one judgement, and the Sub-step
+that adds it is the Sub-step where hoisting the read costs less than repeating it.

@@ -1080,6 +1080,116 @@ corpus has a tripwire under it, and both `Shadow Metric` and `metric expression`
 registered where a reader naming something will look. Only the Ledger gains an entry: no
 name, no interface and no flow moves, so 5.3 starts from the same seams 5.2 finished on.
 
+### R14 — Amino's rulings on the 5.3 review → **decided 2026-08-27**
+
+Rulings on the nine sceptical items and the one question of
+[the 5.3 review entry](../reviews/step-005-validation-gate.md#sub-step-53--the-gate-refuses-a-restricted-column-under-an-access-profile).
+Amino: *"1 → separate the profile from the gate as in `judge(sql, profile)`. 2 → fine for
+now and approved. 3 → fine and approved. 4 → fine and approved. 5 → we shouldn't import
+the spike. what is the alternative? 6 → approved. 7 → fine for now. 8 → approved. 9 →
+approved and very good. All other changes are reviewed, approved and staged."* They land
+**in the 5.3 commit itself** rather than after it, for the reason
+[R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26),
+[R12](#r12--aminos-rulings-on-the-51-review--decided-2026-08-26) and
+[R13](#r13--aminos-rulings-on-the-52-review--decided-2026-08-27) did: the ruling arrived
+before the commit did.
+
+**Two items cost an edit and seven do not**, and one of the two is the only seam this
+Step has moved. The seven approved as they stand are declared limits rather than offers,
+and approval records them as known: `RestrictedColumn` stays a class rather than a tuple
+(item 3); the tenth probe goes on grouping by ordinal, because the property it measures
+— a restricted column reaching the answer with its name nowhere in the text — is real
+whatever syntax produces it (item 4); the `UNRESOLVABLE` branch stays unreached inside
+the assembled Gate and the check goes on saying so (item 6); `found_by_text` stays
+duplicated rather than becoming a function in `veritas/validation/` that nothing may call
+(item 8); and 5.1's and 5.2's printed output keeps the widened probe column and the
+`replace`-based rebuild that
+[came with it](../reviews/step-005-validation-gate.md#look-at-this-sceptically) (item 9).
+
+**1. The Access Profile leaves the Gate and becomes an argument to `judge`** (item 1).
+Amino: *"separate the profile from the gate as in `judge(sql, profile)`."* The review
+raised this as *"the seam most likely to be wrong"*, and it was: the Glossary registers
+an Access Profile as *"the identity Veritas runs a **question** as"* — per question, so
+one Gate serves many identities and an application process loads the corpus once for all
+of them. A field made a second identity a second Gate.
+
+What a Gate is **built with** is now only what its rules read out of the world — the
+Warehouse Adapter, the corpus, the scan ceiling — and what a statement is **judged
+under** is passed in: `ValidationGate.judge(sql, access_profile)`, with no default, so a
+caller who does not say who is asking gets a `TypeError` rather than a verdict reached
+under an identity nobody chose.
+
+**The rule list stays one shape.** `rules(access_profile)` binds the identity into the
+one rule that reads it with `functools.partial`, so `Rule` is still *one `Reading` in, a
+verdict out*. The alternative — every rule taking an Access Profile — would have given
+the three rules that need nothing a parameter they ignore, and the module's whole
+ordering argument rests on those three needing nothing: a signature that takes an
+identity is a rule a reader has to check does not consult one.
+
+It is cheap now for the reason the review gave — the Orchestrator does not exist, and
+four construction sites is the whole of the blast radius. The cost was those four losing
+an argument, eleven call sites gaining one, a parameter on the checks' shared
+`judge_probes`, and two lines in `restricted.py`'s `rule_name` to unwrap the `partial`.
+**No check's output moved**, which is the evidence that this was a seam moved and not a
+rule changed.
+
+**2. Nothing imports the spike; its statements are read out of its text** (item 5).
+Amino: *"we shouldn't import the spike. what is the alternative?"* The alternative is to
+stop treating a claim about **text** as a claim about objects. `probes.spike_statements`
+parses `check_validation_feasibility.py` with `ast` and reads the `name=` and `sql=`
+literals off the parse tree without executing a line of it — and adjacent string literals
+are folded by the parser, so a statement the spike writes across fifteen source lines
+comes back as the one string the spike compiled.
+
+Three things are better, and one is the point:
+
+  * **The dependency is a file, not a module.** What these checks depend on is a dated
+    measurement held in this repository at a path; an import would have made the Gate's
+    own check stop working the day the spike stopped importing.
+  * **A 1,700-line script's module-level work no longer runs** inside a check whose
+    question is *"is this string the same string"*.
+  * **The direction is now unambiguous.** The spike imports the tracer and the detector
+    from `veritas/validation/` under [R2](#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25);
+    nothing imports the spike.
+
+**And the claim is checked in both places that make it**, which is the review's own
+*"either both should be checked or neither"*. `probes.check_the_statements_are_the_spikes`
+is shared, and `traces.py`'s comment is now a run: 15 of the spike's 16 claim-1
+statements are there character for character, one of them under a shorter local name, 3
+added by 5.2 — and the one the spike measures that `traces.py` does not judge,
+`unparseable`, is **declared** rather than silently absent, naming `read_only.py` as
+where the Gate refuses that shape. A declaration that stops describing anything fails the
+run too, because an allowance nobody re-reads is how coverage quietly shrinks.
+
+**3. Two items are approved *for now*, and each has a condition that brings it back.**
+Neither is Ledger debt: nothing here is the cheap thing standing in for the right thing,
+and an entry with no trigger that can fire inside this project's life is a wish.
+
+  * **`role` gets no Glossary row** (item 2). Amino: *"fine for now and approved."* The
+    value is read as data an entry carries — the way `EU` is a bucket of the `by region`
+    axis — and [Glossary Section A](../glossary.md#a-the-system) is a table of
+    components, which a job title is not. **What brings it back is a second role**, which
+    this Step's scope boundary puts outside it: one profile, one role. The row is one
+    line and `ANALYST` does not move if it is written. This closes the one question the
+    5.3 review left open.
+  * **`resolve` goes on catching `AssertionError`** (item 7). Amino: *"fine for now."*
+    It is a real widening of what gets called a rejection, and the Gate that crashes is
+    the worse of the two. What would make it wrong is an `AssertionError` raised by
+    **Veritas's own code** inside `optimize` being reported as a library refusal — which
+    cannot happen while nothing of ours runs in there, and would be the thing to look at
+    first the day a trusted rewrite of our own joins `TRUSTED_REWRITES`.
+    [DEBT-016](../debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)'s
+    line is unchanged for every other exception type: a `KeyError` out of a broken schema
+    mapping still escapes.
+
+**What this makes true that was not.** A second identity is a second call rather than a
+second Gate, and the corpus behind it is loaded once — which is what an App process will
+need and what a field would have cost. The Gate's check no longer imports a spike to
+prove a text claim, and the same claim is now measured in both modules that make it. One
+seam moved, in the Sub-step that introduced it and before anything was built on it;
+nothing else did, so 5.4 starts from the rule list, the taxonomy and the detector 5.3
+finished on.
+
 ---
 
 ## Which Debt Ledger triggers this Step fires

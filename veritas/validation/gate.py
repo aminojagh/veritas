@@ -8,15 +8,33 @@ decision to allow or reject a query."*
 measuring whether that is possible on this schema and this data, and returned **GO**.
 This module is the thing that was measured for.
 
-**Five rules, and two Sub-steps have shipped.** The
+**Five decisions, and three Sub-steps have shipped.** The
 [Target State's flow](../../.claude/docs/design/target-state.md#flow) names what
 `VALIDATE` decides; the [Step 005 plan](../../.claude/docs/plan/step-005-validation-gate.md#what-the-gate-must-decide)
 puts them in the order a statement meets them. Sub-step 5.1 shipped everything that
 needs neither the Semantic Layer nor a certified metric — can this be read at all, is
-it one statement, is it a read, will it stay inside the scan ceiling — and Sub-step
+it one statement, is it a read, will it stay inside the scan ceiling — Sub-step
 5.2 added the first rule that reads the corpus: does every metric expression trace to
-a Certified Metric. The Restricted Column, certified-route and Access Profile rules
-are still to come.
+a Certified Metric; and Sub-step 5.3 added the first rule that reads an identity: does
+a Restricted Column reach the answer. The certified-route and Access-Profile-predicate
+rules are still to come.
+
+**What the Access Profile enforcement here is, and is not.**
+[DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+is open on the honesty of that claim, and its own words are the ones to repeat rather
+than paraphrase:
+
+> Access Profile enforcement is applied in the application layer, over synthetic
+> data. It demonstrates the mechanism; it is not a production access control, and
+> it does not protect the Warehouse from being read another way.
+
+The entry is not paid by this sentence sitting here — its Trigger is the first
+access-control claim in `README.md`, the App or a demo script, and none of the three
+exists. The sentence is here so that the first person to write one finds it beside the
+code instead of having to reconstruct it, and so that this module never reads as more
+than it is. When
+[EXT-001](../../.claude/docs/extension-register.md#ext-001--warehouse-native-security-and-concurrency)
+lands, warehouse-native security **replaces** this check rather than joining it.
 
 **The order is a safety property, not a speed one.** Two things depend on it.
 
@@ -36,6 +54,11 @@ are still to come.
     the parse tree alone, and a Gate that loaded twenty-seven Semantic Entries before
     refusing it would have made a rule that needs nothing depend on something that
     can fail underneath it.
+  * The Restricted Column rule reads all of that **and** the Access Profile the
+    question is asked under, so it runs last of the three. Ordering it first would gain
+    nothing and cost the property above: the rules that need nothing would run behind
+    the rule that needs the most, and a caller who asked *"does this write?"* would be
+    told instead that the Warehouse would not open.
 
 **The Gate stops at the first rule that rejects.** A statement that does not parse
 has no tree for a later rule to read, and a rejected outcome names the rules that
@@ -46,11 +69,13 @@ actually ran, so nothing has to be inferred from a verdict's silence.
 query it just approved is a Gate with no boundary.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from functools import partial
 
 import sqlglot
 from sqlglot import exp
+from sqlglot.lineage import lineage
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.merge_subqueries import merge_subqueries
 from sqlglot.optimizer.qualify import qualify
@@ -58,6 +83,7 @@ from sqlglot.optimizer.scope import build_scope
 
 from veritas.semantic import SemanticLayer, load_semantic_layer
 from veritas.validation.outcome import RejectionReason, ValidationGateOutcome
+from veritas.validation.profile import AccessProfile, RestrictedColumn
 from veritas.warehouse import WarehouseAdapter, WarehouseError
 
 # The shape sqlglot's optimizer wants a catalogue in, and the shape
@@ -145,9 +171,10 @@ def read(sql: str) -> Reading:
 
 
 # A rule returns the Rejection Reasons that fired and the sentence explaining them,
-# or None when the statement passed it. Reasons rather than one reason because a
-# single rule may find several things wrong at once — Sub-step 5.3's Restricted
-# Column rule names every column it found rather than the first.
+# or None when the statement passed it. Reasons rather than one reason because the
+# taxonomy is a contract with components that import no rule — see
+# `ValidationGateOutcome`, which carries the same tuple and the correction to what
+# Sub-step 5.1 predicted would first put two members in it.
 Rejected = tuple[tuple[RejectionReason, ...], str]
 Rule = Callable[[Reading], Rejected | None]
 
@@ -286,6 +313,18 @@ def resolve(
     Raises `TracerRefused` if sqlglot cannot resolve the statement — which is not the
     same as being unable to parse it, and is measured to be reachable: the engine
     plans some statements the optimizer will not resolve.
+
+    **`AssertionError` is one of the ways it says so.** sqlglot signals some optimizer
+    failures through `Expression.assert_is`, which raises the built-in `AssertionError`
+    rather than anything under `sqlglot.errors` — `check_validation_gate/restricted.py`
+    puts a statement in front of this function that does exactly that on every run.
+    Catching it here is not catching everything: a `KeyError` out of a broken schema
+    mapping still escapes, which is
+    [DEBT-016](../../.claude/docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)'s
+    distinction kept — *"a query the engine will not plan is a rejection, and an adapter
+    that cannot open the Warehouse is a broken installation."* What is caught is the
+    library refusing a caller's statement, however it spells the refusal, because a Gate
+    that raises where it should reject hands its caller an error instead of a verdict.
     """
     try:
         return optimize(
@@ -313,7 +352,7 @@ def resolve(
             # catch it.
             expand_stars=True,
         )
-    except sqlglot.errors.SqlglotError as failure:
+    except (sqlglot.errors.SqlglotError, AssertionError) as failure:
         raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
 
 
@@ -491,6 +530,106 @@ def certified_metrics_only(
     return bool(expressions) and not untraced, hit, untraced
 
 
+# The alias every output column is given before its lineage is asked for. A generated
+# query is free to name two output columns the same thing — `SELECT *` over a join does
+# it by itself, twice over on this schema — and lineage is asked for a column *by name*,
+# so a duplicate name would answer for the first column and leave the second unexamined.
+# Numbering the outputs first removes the ambiguity rather than hoping a generator
+# avoids it.
+ANSWER_COLUMN = "answer_column_"
+
+
+def columns_reaching_the_answer(
+    statement: exp.Expression | str, schema: Schema, dialect: str = DIALECT
+) -> set[tuple[str, str]]:
+    """Every base-table column that reaches the statement's output, as (table, column).
+
+    **Reaching the answer is the question, not appearing in the statement.** The rule is
+    the [Target State](../../.claude/docs/design/target-state.md#flow)'s *"no restricted
+    column in the projection"*, and
+    [`Restricted Column`](../../.claude/docs/glossary.md#a-the-system) registers what
+    *the projection* means: judged on the parse tree once `SELECT *` has been expanded,
+    and *"the name in a comment, in a string literal, or in a filter is not a projection
+    of it."* Four kinds of column are therefore not returned, and the spike wrote a probe
+    for each:
+
+      * a column in a WHERE clause, a JOIN condition or a GROUP BY, which no reader of
+        the answer sees;
+      * a column projected inside a subquery and aggregated away before the answer —
+        `count(*)` over `SELECT DISTINCT client_name` shows nobody a Client's name;
+      * a name that is not a column at all: a comment, or a string literal.
+
+    `sqlglot.lineage` is what makes the second one answerable. It takes one output column
+    and walks back through every scope to the base-table columns that produced it,
+    following a subquery `merge_subqueries` could not flatten and both branches of a
+    union. Reading the projections of every scope instead — which is what
+    `projected_expressions` does, correctly, for its own question — counts a column the
+    answer never carries, and rejects the ordinary query that asks how many distinct
+    Clients traded.
+
+    **It adds no new trust.** `lineage` runs `qualify` and nothing else, so
+    `TRUSTED_REWRITES` is still the whole of what
+    [C5](../../.claude/docs/design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
+    names. It is handed the already-resolved statement so that a `SELECT *` is expanded
+    before it starts.
+
+    Raises `TracerRefused` if sqlglot cannot read the statement — from `resolve`, and
+    from `lineage` itself, which runs `qualify` again and so can refuse in either of the
+    two ways `resolve` documents. No probe has yet produced a statement that resolves and
+    whose lineage then cannot be walked; the arm is kept because *"nothing found"* and
+    *"could not look"* are the two answers a rule must never confuse, not because a case
+    is on file.
+    """
+    resolved = resolve(statement, schema, dialect)
+
+    # Number the output columns. `.selects` on a union is its first branch's projection
+    # list, which is where a union's output names come from, so numbering there names the
+    # outputs of both branches.
+    for position, projection in enumerate(resolved.selects):
+        projection.replace(
+            exp.alias_(projection.unalias().copy(), f"{ANSWER_COLUMN}{position}")
+        )
+
+    reaching: set[tuple[str, str]] = set()
+    try:
+        for position in range(len(resolved.selects)):
+            # `lineage` returns a tree of `Node`s: the root is the output column, and
+            # walking it reaches one leaf per base-table column that feeds it. A leaf
+            # carries the table it came from in `source` and the column as
+            # `<source alias>.<column>` in `name`.
+            for step in lineage(
+                f"{ANSWER_COLUMN}{position}", resolved, schema=schema, dialect=dialect
+            ).walk():
+                if isinstance(step.source, exp.Table) and "." in step.name:
+                    reaching.add((step.source.name, step.name.split(".")[-1]))
+    except (sqlglot.errors.SqlglotError, AssertionError) as failure:
+        raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
+    return reaching
+
+
+def restricted_columns_in_projection(
+    statement: exp.Expression | str,
+    restricted: Iterable[RestrictedColumn],
+    schema: Schema,
+    dialect: str = DIALECT,
+) -> list[RestrictedColumn]:
+    """The Restricted Columns that reach this statement's answer, in a stable order.
+
+    It takes the Restricted Columns rather than reading an Access Profile itself, for the
+    reason `certified_forms` takes the expressions: `check_validation_feasibility.py`
+    holds its own pinned declaration of the same column and judges nine shapes against it
+    on every run, while the Gate judges against whatever the Access Profile it was built
+    with carries. One detector, two declarations — which is
+    [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+    applied to the second of the two parse-tree rules, the same way 5.2 applied it to the
+    first.
+    """
+    reaching = columns_reaching_the_answer(statement, schema, dialect)
+    return sorted(
+        column for column in restricted if (column.table, column.column) in reaching
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ValidationGate:
     """The Gate. Built once with what its rules read, then asked for a verdict.
@@ -505,6 +644,23 @@ class ValidationGate:
     The scan ceiling is a constructor argument rather than a constant read inside a
     rule so that a caller can say what it is willing to spend, and so that the rule
     can be given teeth without building a query big enough to trip the real one.
+
+    **The Access Profile is an argument to `judge`, not a field here.** The Glossary
+    registers it as *"the identity Veritas runs a **question** as"* — per question, so
+    one Gate serves many identities and an application process loads the corpus once for
+    all of them. That is
+    [R14](../../.claude/docs/plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27),
+    ruled against this class's first draft, where the profile was a second constructor
+    argument: what a Gate is **built with** is what its rules read out of the world —
+    the adapter, the corpus, the ceiling — and what a statement is **judged under** is
+    the identity asking. A field would have made the second look like the first, and
+    would have made a second identity a second Gate.
+
+    `judge` requires it and there is no default profile, so a caller who does not say
+    who is asking gets a `TypeError` rather than a verdict reached under an identity
+    nobody chose. There is exactly one profile in this slice, `profile.ANALYST`, and
+    naming it at every call site is what keeps the day there are two from being a
+    silent change of meaning at the sites that did not name it.
 
     **The Semantic Layer is read once, at construction; the schema and the canonical
     forms built from it are read again on every judgement.** `semantic/` is committed
@@ -621,12 +777,78 @@ class ValidationGate:
             f"reading of the rule allows"
         )
 
-    def rules(self) -> tuple[tuple[str, Rule], ...]:
-        """The rules, in the order a statement meets them.
+    def no_restricted_column(
+        self, reading: Reading, access_profile: AccessProfile
+    ) -> Rejected | None:
+        """No column the Access Profile restricts reaches this statement's answer.
+
+        The one rule that takes an argument beyond the `Reading`, because it is the one
+        rule that judges against an identity rather than against the world the Gate was
+        built with. `rules` binds it to the profile `judge` was called with.
+
+        The [Target State](../../.claude/docs/design/target-state.md#flow)'s *"no
+        restricted column in the projection"*, and the other half of
+        [C3](../../.claude/docs/design/validation-feasibility.md#c3--the-two-parse-tree-rules-ship-together),
+        which is why it is in the same Step as the tracing rule and not a Step later:
+        *"a Step that builds certified-metrics-only alone and defers the Restricted
+        Column check has not built half a Gate; it has built a Gate that passes the
+        leak."*
+
+        **The question is whether the column reaches the answer, not whether the name
+        appears.** `columns_reaching_the_answer` is where that distinction is made and
+        argued; a Gate that refused every query mentioning a restricted name in a
+        comment, or every query counting distinct Clients, is a Gate people route
+        around, and a Gate people route around protects nothing.
+
+        `SELECT *` is the shape this rule cannot do without
+        [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)'s
+        run-time schema read: it is *"the one shape whose restricted name exists nowhere
+        in its own text"*, and only the live column list says what the star stands for.
+
+        **An unreadable statement is a rejection here too.** In the assembled Gate this
+        branch is unreached: an earlier rule refuses every statement found so far that
+        cannot be read — the bounded rule refuses what the engine will not plan, and the
+        tracing rule refuses what the optimizer will not resolve.
+        `check_validation_gate/restricted.py` measures that on every run, naming which
+        rule caught which, rather than leaving it to be assumed. It is kept because the two
+        refusals are not the same refusal: `lineage` walks a resolved tree and can
+        refuse one the optimizer accepted, and a rule that let that through would fail
+        open on exactly the statement nobody wrote a probe for.
+        """
+        schema = self.warehouse.columns_by_table()
+        try:
+            projected = restricted_columns_in_projection(
+                reading.statement, access_profile.restricted_columns, schema
+            )
+        except TracerRefused as refusal:
+            return (RejectionReason.UNRESOLVABLE,), (
+                f"the statement parses but the columns reaching its answer cannot be "
+                f"read, so whether a Restricted Column is among them is unknown: "
+                f"{refusal}"
+            )
+        if projected:
+            names = ", ".join(str(column) for column in projected)
+            return (RejectionReason.RESTRICTED_COLUMN,), (
+                f"the Access Profile {access_profile.role!r} may not see "
+                f"{names} and this statement's answer would carry "
+                f"{'them' if len(projected) > 1 else 'it'}"
+            )
+        return None
+
+    def rules(self, access_profile: AccessProfile) -> tuple[tuple[str, Rule], ...]:
+        """The rules, in the order a statement meets them, under one identity.
 
         One list in one place, which is what lets the ordering argument in this
         module's docstring be something the code states rather than something the
         file happens to be. Each later Sub-step of Step 005 appends to it.
+
+        **Every rule is a `Rule` — one `Reading` in, a verdict out — and the identity
+        is bound in here rather than passed down the loop in `judge`.** The three
+        module-level rules need nothing beyond the statement, and giving them a
+        parameter they ignore would make that untrue on the page: a signature that
+        takes an Access Profile is a rule a reader has to check does not consult one.
+        `partial` puts the identity where it is actually read, and leaves `judge` with
+        one shape to call.
         """
         return (
             ("parses", parses),
@@ -634,19 +856,26 @@ class ValidationGate:
             ("a read", a_read),
             ("bounded", self.bounded),
             ("traces", self.traces),
+            (
+                "no restricted column",
+                partial(self.no_restricted_column, access_profile=access_profile),
+            ),
         )
 
-    def judge(self, sql: str) -> ValidationGateOutcome:
-        """Allow or reject one statement, and say under what.
+    def judge(self, sql: str, access_profile: AccessProfile) -> ValidationGateOutcome:
+        """Allow or reject one statement, asked under one identity, and say under what.
 
         Stops at the first rule that rejects: a statement that does not parse has no
         tree for the next rule to read, and there is nothing to gain from asking a
         rule a question it cannot answer. The outcome names the rules that ran, so a
         reader never has to infer what a verdict covered.
+
+        The Access Profile is required and has no default — see the class docstring for
+        why it is here rather than on the Gate.
         """
         reading = read(sql)
         ran: list[str] = []
-        for name, rule in self.rules():
+        for name, rule in self.rules(access_profile):
             ran.append(name)
             rejected = rule(reading)
             if rejected is None:

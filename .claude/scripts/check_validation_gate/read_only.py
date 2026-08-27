@@ -38,6 +38,7 @@ from probes import (
 )
 
 from veritas.validation import (
+    ANALYST,
     SCAN_CEILING,
     RejectionReason,
     ValidationGate,
@@ -227,7 +228,7 @@ class WarehouseThatWillNotOpen:
 
 def check_probes(gate: ValidationGate, report: Report) -> None:
     """Every probe, judged against the verdict this Sub-step measured for it."""
-    judge_probes(gate, PROBES, report)
+    judge_probes(gate, PROBES, report, ANALYST)
 
 
 def check_rules_that_need_nothing(gate: ValidationGate, report: Report) -> None:
@@ -242,11 +243,11 @@ def check_rules_that_need_nothing(gate: ValidationGate, report: Report) -> None:
     blind = ValidationGate(WarehouseThatWillNotOpen())  # type: ignore[arg-type]
     judged = 0
     for probe in PROBES:
-        real = gate.judge(probe.sql)
+        real = gate.judge(probe.sql, ANALYST)
         if "bounded" in real.rules:
             continue
         judged += 1
-        blinded = blind.judge(probe.sql)
+        blinded = blind.judge(probe.sql, ANALYST)
         # Against the real verdict rather than the declared one, so this reports only
         # what it is about — a rule that turned out to need a Warehouse. A probe whose
         # declared verdict has moved is `judge_probes`'s finding and is reported there,
@@ -462,7 +463,7 @@ def check_these_rules_allow_them(gate: ValidationGate, report: Report) -> None:
     5.5 without an edit.
     """
     for sql in (CROSS_PRODUCT, ORDINARY_QUESTION):
-        outcome = gate.judge(sql)
+        outcome = gate.judge(sql, ANALYST)
         ran = set(outcome.rules)
         missing = [rule for rule in THESE_RULES if rule not in ran]
         report.say(
