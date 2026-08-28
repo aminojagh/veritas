@@ -30,6 +30,7 @@ is the Gate's verdict, not the rule's.
 """
 
 import time
+from dataclasses import replace
 
 from probes import (
     ALLOWED,
@@ -39,6 +40,7 @@ from probes import (
     check_the_statements_are_the_spikes,
     judge_probes,
     problems,
+    rule_verdicts,
 )
 
 from veritas.semantic import load_semantic_layer
@@ -49,6 +51,7 @@ from veritas.validation import (
     canonical,
     certified_forms,
     metric_expressions,
+    read,
 )
 from veritas.warehouse import WarehouseAdapter
 
@@ -161,11 +164,19 @@ PROBES = (
             " AND rate.to_currency = 'EUR' "
             "GROUP BY client.client_region "
             "ORDER BY client.client_region",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
         why="a Dimension Definition applied to a metric — a grouping column sitting "
-            "beside the metric in the projection. It has to be allowed, and the rule "
-            "that allows it is that a projection with no aggregate in it is not a "
-            "metric expression",
+            "beside the metric in the projection. **This rule allows it**, and that is "
+            "still what the probe is here to show: a projection with no aggregate in it "
+            "is not a metric expression, so the grouping column does not have to trace. "
+            "The rejection arrives from Sub-step 5.4's certified-route rule, two rules "
+            "later, because the two joins that reach `dim_client` are named by no entry "
+            "in `semantic/` — `by region` is a certified axis no query can reach until "
+            "[5.5](../../docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020) "
+            "adds the Join Paths and the `routes` field that certify them, and this "
+            "verdict flips back there. `check_this_rules_verdicts` below is what says "
+            "this rule allowed it",
     ),
     Probe(
         name="traded notional",
@@ -259,14 +270,19 @@ PROBES = (
             "  ON rate.rate_date = billed.trade_date "
             " AND rate.from_currency = billed.denomination_currency "
             " AND rate.to_currency = 'EUR'",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
         why="Traded Notional's certified expression converted out of the wrong "
-            "currency column. Nothing in the projection differs, so it traces and "
-            "the Gate allows it — this is "
-            "[DEBT-014](../../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject) "
-            "standing open, and its verdict flips to rejected in Sub-step 5.4. A "
-            "probe declaring `allowed` is what makes the debt a measurement instead "
-            "of a memory",
+            "currency column. Nothing in the projection differs, so **this rule traces "
+            "it and allows it** — which is "
+            "[DEBT-014](../../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)'s "
+            "own diagnosis, and is why the entry could not be paid by a better tracer. "
+            "Sub-step 5.4's certified-route rule is what refuses it, two rules later, "
+            "on the join: the statement reaches fct_fx_rate through the Trade's "
+            "Denomination Currency and Traded Notional is certified through the "
+            "Instrument's Quotation Currency. This declaration was `allowed` until "
+            "that Sub-step, which is what made the debt a measurement rather than a "
+            "memory; `route.py` prints how far apart the two numbers are",
     ),
     Probe(
         name="certified beside shadow",
@@ -478,6 +494,90 @@ def per_table_schema(warehouse: WarehouseAdapter) -> dict[str, dict[str, str]]:
     return {table: dict(warehouse.columns(table)) for table in warehouse.tables()}
 
 
+class CountingWarehouse:
+    """The Warehouse Adapter with a tally of how often the catalogue was read.
+
+    Not a mock — it delegates every call to the real adapter and adds one integer. It
+    exists to make
+    [DEBT-019](../../docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)'s
+    payment a measurement instead of a claim about how the code is written.
+    """
+
+    def __init__(self, warehouse: WarehouseAdapter) -> None:
+        self.warehouse = warehouse
+        self.catalogue_reads = 0
+
+    def columns_by_table(self) -> dict[str, dict[str, str]]:
+        self.catalogue_reads += 1
+        return self.warehouse.columns_by_table()
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self.warehouse, name)
+
+
+def check_one_judgement_reads_once(gate: ValidationGate, report: Report) -> None:
+    """One judgement reads the catalogue once and resolves the statement once.
+
+    [DEBT-019](../../docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
+    was opened in Sub-step 5.3 and paid in 5.4, and its argument was never speed:
+    *"two rules judging one statement against two readings of a live catalogue can, in
+    principle, disagree about what a `SELECT *` stands for — the tracing rule seeing one
+    column list and the Restricted Column rule another — and a verdict assembled from
+    two views of the Warehouse is a verdict about neither."* So what is checked is the
+    **count**, not the milliseconds.
+
+    Two readings, because the entry names two things that were repeated:
+
+      * the catalogue, counted by an adapter that tallies the calls the Gate makes to it;
+      * the resolution and the corpus, read off the `Reading`'s own memo after every rule
+        has run. A `cached_property` puts its answer in the instance's `__dict__` the
+        first time it is asked, so a key that is present after six rules is a key that
+        was computed once and reused five times.
+
+    The rules are run by hand over one `Reading` rather than through `judge`, for the one
+    reason that `judge` does not hand its `Reading` back — and the point here is what
+    that object holds when the rules have finished with it.
+    """
+    counted = CountingWarehouse(gate.warehouse)
+    counting = replace(gate, warehouse=counted)  # type: ignore[arg-type]
+    counting.judge(PROBES[1].sql, ANALYST)
+
+    reading = read(
+        PROBES[1].sql,
+        catalogue=gate.catalogue,
+        certified_expressions={
+            name: metric.expression for name, metric in gate.semantic.metrics.items()
+        },
+    )
+    ran = 0
+    for _, rule in gate.rules(ANALYST):
+        rule(reading)
+        ran += 1
+    memoised = sorted(
+        key for key in ("schema", "resolved", "corpus") if key in vars(reading)
+    )
+
+    report.say(
+        f"one judgement, {ran} rules: the catalogue was read "
+        f"{counted.catalogue_reads} time(s), and the Reading holds one of each of "
+        f"{', '.join(memoised)} (DEBT-019)"
+    )
+    if counted.catalogue_reads != 1:
+        problems.append(
+            f"one judgement read the Warehouse's catalogue {counted.catalogue_reads} "
+            f"times. Once is the whole of DEBT-019's payment: rules judging one "
+            f"statement against two readings of a live catalogue can disagree about "
+            f"what a `SELECT *` stands for, and a verdict assembled from two views of "
+            f"the Warehouse is a verdict about neither"
+        )
+    if memoised != ["corpus", "resolved", "schema"]:
+        problems.append(
+            f"after {ran} rules the Reading has memoised {memoised or 'nothing'} — a "
+            f"parse-tree rule that stopped reading the shared resolution is a rule "
+            f"judging a different tree from the ones beside it"
+        )
+
+
 def check_what_a_judgement_reads(gate: ValidationGate, report: Report) -> None:
     """What one judgement costs, and where it goes.
 
@@ -530,6 +630,53 @@ COVERED_ELSEWHERE = {
 }
 
 
+def check_this_rules_verdicts(gate: ValidationGate, report: Report) -> None:
+    """Which shapes this rule refused, and which a later rule refused after it passed
+    them on.
+
+    Three of the probes above are declared `rejected` and this rule is not what rejects
+    them: `half-certified union` and `unknown table` are refused before it runs, and —
+    since Sub-step 5.4 — `net revenue by region` and `notional, wrong currency` are
+    refused by the certified-route rule **after** it runs and passes them on. Both of
+    those two carry a `why` claiming this rule allowed the statement, and until 5.4 the
+    Gate's verdict said so on its own. It no longer does, so the claim is measured here
+    rather than left in prose.
+
+    `notional, wrong currency` is the one to read: it is
+    [DEBT-014](../../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+    entire. The entry's diagnosis is that the projection is identical either way, which
+    is exactly the statement *"this rule allowed it and the next one did not"* — and a
+    check that only reported the Gate's rejection would have hidden the half of the
+    finding that explains why the rule had to be added.
+    """
+    rule = ""
+    for name, judged in gate.rules(ANALYST):
+        if getattr(judged, "__func__", None) is ValidationGate.traces:
+            rule = name
+    if not rule:
+        problems.append(
+            "the Gate's rule list holds no entry for `traces`, so nothing above is "
+            "judging the rule this module exists to check"
+        )
+        return
+    refused, allowed, unseen = rule_verdicts(gate, PROBES, rule, ANALYST)
+    later = [
+        probe.name
+        for probe in PROBES
+        if probe.name in allowed and probe.verdict == REJECTED
+    ]
+    report.say(
+        f"this rule ran on {len(refused) + len(allowed)} of {len(PROBES)} shapes and "
+        f"refused {len(refused)}; {len(unseen)} were refused before it and "
+        f"{len(later)} after it — {', '.join(later) or 'none'}"
+    )
+    if not allowed:
+        problems.append(
+            "this rule allowed none of the shapes it ran on, so nothing here separates "
+            "it from a rule that refuses everything"
+        )
+
+
 def check(warehouse: WarehouseAdapter) -> Report:
     """Everything this module has to say, in one report."""
     report = Report("every metric expression traces to a Certified Metric")
@@ -545,9 +692,11 @@ def check(warehouse: WarehouseAdapter) -> Report:
     check_the_corpus_is_the_one_on_disk(gate, report)
     check_symmetric_canonicalisation_is_load_bearing(gate, report)
     judge_probes(gate, PROBES, report, ANALYST)
+    check_this_rules_verdicts(gate, report)
     report.say("")
     report.say("one probe per Certified Metric, built from semantic/metrics/:")
     judge_probes(gate, certified_probes(gate), report, ANALYST)
     report.say("")
+    check_one_judgement_reads_once(gate, report)
     check_what_a_judgement_reads(gate, report)
     return report

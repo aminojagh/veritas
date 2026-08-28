@@ -22,10 +22,20 @@ argument.
 that do not matter as much as the six that do. A Gate that refuses every query mentioning
 a restricted name in a comment, or every query that counts distinct Clients, is a Gate
 people route around — and a Gate people route around protects nothing. Three of those
-four are this module's positive controls: statements this rule ran on and allowed. The
+four are this module's positive controls: statements this rule ran on and passed on. The
 fourth, `projected inside, aggregated away`, this rule allows and an earlier one
 refuses — counting Clients is not a Certified Metric — and two rules disagreeing about
 one statement is the clearest evidence they are asking different questions.
+
+**Since Sub-step 5.4 the Gate's verdict and this rule's verdict come apart on two of
+those three**, and that is why the first bullet above is not the last word on any of
+them. `the name in a comment` and `the name in a filter only` reach `dim_client` through
+two joins no Semantic Entry certifies, so the certified-route rule two places later
+refuses what this rule passed. Their declared verdict is `rejected` and their declared
+`reaches` is False, and both are checked — `check_this_rules_verdicts` reads
+`ValidationGateOutcome.rules` so that *"this rule refused it"* and *"the Gate refused
+it"* stay two different statements. Sub-step 5.5 certifies those two joins and their
+Gate verdict goes back to `allowed`.
 
 **Nine of the ten statements are the spike's, character for character**, and
 `probes.check_the_statements_are_the_spikes` reads them out of
@@ -46,6 +56,7 @@ from probes import (
     check_the_statements_are_the_spikes,
     judge_probes,
     problems,
+    rule_verdicts,
 )
 
 from veritas.validation import (
@@ -241,15 +252,19 @@ PROBES = (
             " AND rate.to_currency = 'EUR' "
             "GROUP BY client.client_region "
             "ORDER BY client.client_region",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
         reaches=False,
         found_by_text=True,
         why="a generator that was told the column is restricted, said so in a "
-            "comment, and grouped by region instead. Allowing this is the "
-            "false positive this rule is measured on: the query obeys the "
-            "rule and names the rule while obeying it. It is also this "
-            "module's positive control — a statement this rule ran on and "
-            "passed",
+            "comment, and grouped by region instead. **This rule allows it**, and that "
+            "is the false positive this rule is measured on: the query obeys the rule "
+            "and names the rule while obeying it. The rejection arrives from Sub-step "
+            "5.4's certified-route rule two places later, because the joins that reach "
+            "`dim_client` are certified by nothing until 5.5 — so the Gate's verdict "
+            "and this rule's verdict come apart here, which is what "
+            "`check_this_rules_verdicts` reads `ValidationGateOutcome.rules` to tell "
+            "apart",
     ),
     RestrictedProbe(
         name="the name in a string literal",
@@ -283,17 +298,19 @@ PROBES = (
             " AND rate.from_currency = billed.denomination_currency "
             " AND rate.to_currency = 'EUR' "
             "WHERE client.client_name = 'Northwind Asset Management'",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
         reaches=False,
         found_by_text=True,
         why="one Client's revenue, with the name in the WHERE clause and out "
-            "of the projection. The rule is the Target State's — *no "
-            "restricted column in the projection* — and the Glossary's "
+            "of the projection. **This rule allows it**: the rule is the Target "
+            "State's — *no restricted column in the projection* — and the Glossary's "
             "`Restricted Column` row says so in the same words: *\"the name in "
             "a comment, in a string literal, or in a filter is not a "
             "projection of it\"*. Whether a filter on a column nobody reads "
             "should be allowed is a different question, and this Step does "
-            "not widen into it",
+            "not widen into it. The rejection is Sub-step 5.4's, on the two joins that "
+            "reach `dim_client` and that nothing certifies until 5.5",
     ),
     RestrictedProbe(
         name="projected inside, aggregated away",
@@ -515,7 +532,7 @@ def check_the_parse_tree_against_the_text(
     )
 
 
-def check_this_rule_ran_and_allowed(
+def check_this_rules_verdicts(
     gate: ValidationGate, profile: AccessProfile, rule: str, report: Report
 ) -> None:
     """The shapes this rule lets through, and the proof that it read them.
@@ -524,28 +541,44 @@ def check_this_rule_ran_and_allowed(
     statements its own rule **allows** — and needs to show the rule actually ran on them
     rather than that some earlier rule refused them first. `ValidationGate` reports the
     rules that ran, which is exactly what makes that answerable.
+
+    **What this rule decides is read off `rules`, not off `allowed`.** Until Sub-step 5.4
+    the two were the same answer, because this was the last rule in the list; the
+    certified-route rule now runs after it and refuses two of the three shapes this rule
+    passes. Reading the Gate's verdict would report those two as shapes this rule
+    refused, which is the opposite of what happened — see `probes.rule_verdicts`.
+
+    The declaration compared against is `reaches`, not `verdict`. `verdict` is what a
+    caller gets from the whole Gate; `reaches` is this rule's own reading — a Restricted
+    Column is in the answer or it is not — so it is the honest thing to hold this rule's
+    behaviour to.
     """
-    ran = allowed = 0
-    for probe in PROBES:
-        outcome = gate.judge(probe.sql, profile)
-        if rule not in outcome.rules:
-            continue
-        ran += 1
-        allowed += outcome.allowed
-        if probe.verdict == ALLOWED and not outcome.allowed:
-            problems.append(
-                f"{probe.name!r} was measured as allowed and this rule ran on it and "
-                f"refused it: {outcome.explanation}"
-            )
+    refused, allowed, unseen = rule_verdicts(gate, PROBES, rule, profile)
     report.say(
-        f"this rule ran on {ran} of {len(PROBES)} shapes and allowed {allowed} of them "
-        f"— the other {len(PROBES) - ran} were refused by an earlier rule"
+        f"this rule ran on {len(refused) + len(allowed)} of {len(PROBES)} shapes, "
+        f"refused {len(refused)} and passed {len(allowed)} on — the other "
+        f"{len(unseen)} were refused by an earlier rule"
     )
     if not allowed:
         problems.append(
             "this rule allowed none of the shapes it ran on, so nothing here separates "
             "it from a rule that refuses everything"
         )
+    for probe in PROBES:
+        if probe.name in unseen:
+            continue
+        if probe.reaches and probe.name not in refused:
+            problems.append(
+                f"a Restricted Column reaches {probe.name!r}'s answer and this rule ran "
+                f"on it and passed it on — the leak this rule exists to stop. "
+                f"{probe.why}"
+            )
+        if not probe.reaches and probe.name in refused:
+            problems.append(
+                f"no Restricted Column reaches {probe.name!r}'s answer and this rule "
+                f"refused it — the false positive that makes a Gate people route "
+                f"around. {probe.why}"
+            )
 
 
 def check_the_rule_fails_closed(
@@ -616,6 +649,6 @@ def check(warehouse: WarehouseAdapter) -> Report:
     report.say("")
     check_the_parse_tree_against_the_text(gate, ANALYST, report)
     report.say("")
-    check_this_rule_ran_and_allowed(gate, ANALYST, rule, report)
+    check_this_rules_verdicts(gate, ANALYST, rule, report)
     check_the_rule_fails_closed(gate, ANALYST, rule, report)
     return report

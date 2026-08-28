@@ -109,12 +109,15 @@ sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 from veritas.validation import (  # noqa: E402
     TRUSTED_REWRITES,
     RestrictedColumn,
+    Route,
     TracerRefused,
     certified_forms,
     certified_metrics_only,
+    certified_route,
     metric_expressions,
     resolve,
     restricted_columns_in_projection,
+    route_of,
 )
 # The tracer this file measured is now `veritas/validation/`'s, imported back under
 # [R2 of Step 005](../docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25):
@@ -130,6 +133,14 @@ from veritas.validation import (  # noqa: E402
 # the Glossary registers and this file used to hold as an anonymous pair of strings.
 # One detector now answers for both declarations, the way one tracer answers for both
 # corpora.
+#
+# **Sub-step 5.4 added a third reading, and it is what closes claim 1's blind spot.**
+# `route_of` reads the joins a statement takes to its rows and `certified_route` builds
+# the same value out of a declaration, so claim 1's verdict is now *traces **and** takes
+# the metric's own route* — which is what makes `notional through the wrong currency` a
+# rejection here instead of a passing measurement of a hole
+# ([DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)).
+# One route reader, two declarations, exactly as above.
 #
 # **What did not move is the corpus.** [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
 # pins the three certified expressions below as Python literals so *"the dated
@@ -228,6 +239,54 @@ CERTIFIED_EXPRESSIONS = {
         "* fct_trade.execution_price * fct_fx_rate.fx_rate)",
 }
 
+# The route each pinned expression is certified across: where the query starts, and each
+# Join Path it is computed over as (table joined, join condition).
+#
+# **Pinned here for the reason the expressions above are**, under
+# [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21):
+# a dated measurement whose inputs move is not evidence. `check_semantic_layer.py`
+# asserts the pins and `semantic/` agree character for character, which is what makes
+# pinning safe rather than a second corpus nobody reads.
+#
+# **They are the whole reason claim 1's verdict is honest.** Gross Revenue and Net
+# Revenue convert through the *Trade's* Denomination Currency; Traded Notional converts
+# through the *Instrument's* Quotation Currency, one hop further out. The two routes are
+# the Section C pair `instrument_to_fx_rate_on_quotation_currency`'s own comment is
+# about, they project identically, and until Sub-step 5.4 nothing here could tell them
+# apart. Adding the pins is what turned `notional through the wrong currency` from a
+# measured hole into a rejection.
+CERTIFIED_ROUTES = {
+    "Gross Revenue": (
+        "fct_trade",
+        (
+            ("fct_fx_rate",
+             "fct_fx_rate.rate_date = fct_trade.trade_date "
+             "AND fct_fx_rate.from_currency = fct_trade.denomination_currency "
+             "AND fct_fx_rate.to_currency = 'EUR'"),
+        ),
+    ),
+    "Net Revenue": (
+        "fct_trade",
+        (
+            ("fct_fx_rate",
+             "fct_fx_rate.rate_date = fct_trade.trade_date "
+             "AND fct_fx_rate.from_currency = fct_trade.denomination_currency "
+             "AND fct_fx_rate.to_currency = 'EUR'"),
+        ),
+    ),
+    "Traded Notional": (
+        "fct_trade",
+        (
+            ("dim_instrument",
+             "dim_instrument.instrument_id = fct_trade.instrument_id"),
+            ("fct_fx_rate",
+             "fct_fx_rate.rate_date = fct_trade.trade_date "
+             "AND fct_fx_rate.from_currency = dim_instrument.quotation_currency "
+             "AND fct_fx_rate.to_currency = 'EUR'"),
+        ),
+    ),
+}
+
 # The Restricted Columns claim 2 probes for. A `Restricted Column` is registered as
 # *"a column an Access Profile forbids from appearing in a Grounded Answer's
 # projection"*, and `dim_client.client_name` is the one this Warehouse offers: of
@@ -250,11 +309,22 @@ RESTRICTED_COLUMNS = frozenset({RestrictedColumn("dim_client", "client_name")})
 
 # What each probe's verdict means. Every probe declares one, so that "did not
 # trace" is never left to the reader to interpret as good or bad news.
-CERTIFIED = "certified"    # must trace: this is the metric, in some shape
+CERTIFIED = "certified"    # must be allowed: this is the metric, on its own route
 FORM = "form"              # must not trace, and is arithmetically the metric
-SHADOW = "shadow"          # must not trace: a Shadow Metric
-BLIND_SPOT = "blind spot"  # traces, and tracing is the wrong answer
+SHADOW = "shadow"          # must be rejected: a Shadow Metric, or the wrong route
 REFUSED = "refused"        # the tracer cannot read it at all
+
+# `BLIND_SPOT = "blind spot"` — *traces, and tracing is the wrong answer* — was a fifth
+# kind here from Sub-step 3.2 until Sub-step 5.4, and it had exactly one member:
+# `notional through the wrong currency`. It named a real hole and it made this file the
+# one place in the repository where a check passed while demonstrating a wrong answer,
+# which is what
+# [DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+# was opened about. The entry's repayment condition — *"this probe's expected verdict
+# flips from allowed to rejected, `BLIND_SPOT` stops being one of the kinds a passing run
+# can contain, and the probe becomes an ordinary Shadow Metric"* — is what removed it.
+# The probe is a `SHADOW` now, and what changed to make that true is `check_traces`
+# reading the route as well as the projection.
 
 
 class Probe(NamedTuple):
@@ -488,12 +558,17 @@ PROBES = (
     ),
     Probe(
         name="notional through the wrong currency",
-        kind=BLIND_SPOT,
+        kind=SHADOW,
         metric="Traded Notional",
         why="Traded Notional's certified expression, converted out of the Trade's "
             "Denomination Currency instead of the Instrument's Quotation Currency "
             "— the Section C pair registered because both columns sit on "
-            "fct_trade. Nothing in the projection differs, so it traces",
+            "fct_trade. Nothing in the projection differs, so it traces, and until "
+            "Sub-step 5.4 this file recorded that as a passing BLIND_SPOT. It is "
+            "rejected now, on the route: Traded Notional is certified through "
+            "dim_instrument to the Quotation Currency and this reaches fct_fx_rate "
+            "in one hop from the Trade. The projection is still identical — that is "
+            "the finding, and it is why a tracer alone could never have caught it",
         sql="SELECT sum(CAST(billed.quantity AS DECIMAL(38, 6)) "
             "           * billed.execution_price * rate.fx_rate) AS traded_notional "
             "FROM fct_trade AS billed "
@@ -838,6 +913,69 @@ def pinned_corpus(
     )
 
 
+def pinned_routes(
+    schema: dict[str, dict[str, str]], dialect: str = DIALECT
+) -> dict[str, "Route"]:
+    """The three pinned routes, read by the Gate's own route reader.
+
+    The exact shape of `pinned_corpus` above, one level out: `certified_route` is
+    `veritas/validation/`'s and takes the declaration it is to read, which is what lets
+    this file judge against its pins while the Gate judges against `semantic/`. One route
+    reader, two declarations.
+
+    Retargeted the same way and for the same reason. A join condition is SQL, so a Gate
+    standing in front of another engine holds the transpiled condition and judges the
+    transpiled query against it; comparing a retargeted statement with a home-dialect
+    declaration would fail on punctuation and say nothing about the route.
+    """
+    return {
+        name: certified_route(
+            retarget(CERTIFIED_EXPRESSIONS[name], dialect),
+            from_table,
+            [(table, retarget(on, dialect)) for table, on in joins],
+            schema,
+            dialect,
+        )
+        for name, (from_table, joins) in CERTIFIED_ROUTES.items()
+    }
+
+
+def off_the_pinned_route(
+    sql: str,
+    hit: list[str],
+    routes: dict[str, "Route"],
+    schema: dict[str, dict[str, str]],
+    dialect: str = DIALECT,
+) -> list[str]:
+    """The pinned joins a statement that traced does **not** carry, for every metric
+    it hit.
+
+    **Claim 1's second reading, and the whole of what Sub-step 5.4 added here.** A tracer
+    that reads the projection alone cannot tell `Traded Notional` converted through the
+    Denomination Currency from the same metric converted through the Quotation Currency;
+    reading the route can, and this is that reading.
+
+    **It asks whether the metric's own joins are present, and not whether the statement
+    carries any others** — which is narrower than the Validation Gate's rule, on purpose.
+    The Gate must refuse a join no entry certifies, because permitting extra joins
+    permits a cross product and a hop into a table with an identity in it; this file has
+    no corpus of Dimension Definitions to certify a slice's extra joins against, and
+    `net revenue by region` is the probe that shows the difference — a legitimate slice
+    that reaches `dim_client` through two joins nothing here declares. The **reading** is
+    shared with the Gate; the **policy** differs because the questions do. Sub-step 5.5
+    is where the corpus grows the entries that let the Gate's policy admit that slice.
+
+    Raises `TracerRefused` if sqlglot cannot resolve the statement.
+    """
+    carried = route_of(sql, schema, dialect)
+    absent: list[str] = []
+    for name in dict.fromkeys(hit):
+        pinned = routes.get(name)
+        if pinned is not None:
+            absent.extend(pinned.joins_beyond(carried))
+    return absent
+
+
 def pinned_restricted_columns(
     sql: str, schema: dict[str, dict[str, str]], dialect: str = DIALECT
 ) -> list[str]:
@@ -940,10 +1078,25 @@ def describe_tracer(schema: dict[str, dict[str, str]]) -> dict[str, str]:
 
 
 def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> None:
-    """Claim 1: judge every probe by `certified_metrics_only`, and compare the
-    verdict with the one this Sub-step recorded."""
+    """Claim 1: judge every probe by its projection **and its route**, and compare the
+    verdict with the one this Sub-step recorded.
+
+    **Two readings, one verdict, since Sub-step 5.4.** `certified_metrics_only` asks
+    whether every expression traces; `off_the_pinned_route` asks whether the statement
+    took the joins the metric is certified across. A statement has to pass both, and the
+    reason is
+    [DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject):
+    `notional through the wrong currency` passes the first and fails the second, and
+    while this file read only the first it recorded that as a passing `BLIND_SPOT` —
+    *"the one place in this repository where a check passes while demonstrating a wrong
+    answer"*, in the entry's own words.
+
+    The route column is printed for every probe that traces, so the two readings can be
+    told apart rather than summed into one word.
+    """
+    routes = pinned_routes(schema)
     for probe in PROBES:
-        expected_allowed = probe.kind in (CERTIFIED, BLIND_SPOT)
+        expected_allowed = probe.kind == CERTIFIED
         try:
             expressions = metric_expressions(probe.sql, schema)
         except TracerRefused as refusal:
@@ -967,7 +1120,9 @@ def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> N
                 f"probe and is now measuring nothing"
             )
 
-        allowed, hit, untraced = certified_metrics_only(expressions, corpus)
+        traces, hit, untraced = certified_metrics_only(expressions, corpus)
+        absent = off_the_pinned_route(probe.sql, hit, routes, schema)
+        allowed = traces and not absent
 
         # `dict.fromkeys` drops repeats and keeps first-seen order: one statement
         # can compute the same metric in more than one projection, and printing
@@ -978,14 +1133,17 @@ def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> N
             detail += f", plus {len(untraced)} uncertified"
         elif untraced:
             detail = f"{len(untraced)} expression(s), none certified"
+        if absent:
+            detail += f" · off route: {len(absent)} pinned join(s) absent"
         print(f"    {'ALLOWED ' if allowed else 'REJECTED'}  {probe.name:<36} "
               f"{detail}")
 
         if expected_allowed and not allowed:
             problems.append(
                 f"probe {probe.name!r} has to be allowed and was rejected — it "
-                f"traced to {hit or 'nothing'} and could not place {untraced or 'any expression at all'}. "
-                f"{probe.why}"
+                f"traced to {hit or 'nothing'}, could not place "
+                f"{untraced or 'any expression at all'}, "
+                f"and is missing {absent or 'no'} pinned join(s). {probe.why}"
             )
         if expected_allowed and probe.metric not in hit:
             problems.append(
@@ -995,13 +1153,14 @@ def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> N
         if not expected_allowed and allowed:
             problems.append(
                 f"probe {probe.name!r} must be rejected and was allowed, tracing "
-                f"to {hit} — {probe.why}"
+                f"to {hit} across its pinned route — {probe.why}"
             )
 
     kinds = {kind: sum(1 for p in PROBES if p.kind == kind)
-             for kind in (CERTIFIED, FORM, SHADOW, BLIND_SPOT, REFUSED)}
+             for kind in (CERTIFIED, FORM, SHADOW, REFUSED)}
     print()
-    print("    " + " · ".join(f"{count} {kind}" for kind, count in kinds.items()))
+    print("    " + " · ".join(f"{count} {kind}" for kind, count in kinds.items())
+          + " · 0 blind spot (DEBT-014 paid in Sub-step 5.4)")
 
 
 def check_restricted_columns(
@@ -1244,27 +1403,42 @@ def both_verdicts(
     trip moved **anything** a Gate would read, and a rewrite that left the metric
     expressions alone while changing which columns reach the answer would be
     invisible to a narrower comparison.
+
+    **The route is the third reading, added with it in Sub-step 5.4.** A round trip that
+    rewrote a join condition and left the projection alone is exactly the shape this
+    function exists to catch, and until claim 1 read routes there was nothing here to
+    catch it with.
     """
     try:
-        allowed, hit, _ = certified_metrics_only(
+        traces, hit, _ = certified_metrics_only(
             metric_expressions(sql, schema, dialect), corpus
+        )
+        absent = off_the_pinned_route(
+            sql, hit, pinned_routes(schema, dialect), schema, dialect
         )
         projected = pinned_restricted_columns(sql, schema, dialect)
     except TracerRefused:
         return REFUSED_BY_THE_TRACER
     # `dict.fromkeys` for the reason `check_traces` uses it: one statement can
     # compute a metric twice, and the repeat is noise in a comparison.
-    return (allowed, tuple(dict.fromkeys(hit)), tuple(projected))
+    return (
+        traces and not absent,
+        tuple(dict.fromkeys(hit)),
+        tuple(projected),
+        len(absent),
+    )
 
 
 def render_verdict(verdict: tuple[object, ...]) -> str:
     """One verdict, in the width the table below prints it."""
     if verdict == REFUSED_BY_THE_TRACER:
         return "refused by the tracer"
-    allowed, hit, projected = verdict
+    allowed, hit, projected, absent = verdict
     detail = ", ".join(hit) if hit else "nothing certified"
     if projected:
         detail += f" · restricted: {', '.join(projected)}"
+    if absent:
+        detail += f" · off route by {absent} join(s)"
     return f"{'ALLOWED' if allowed else 'REJECTED'} · {detail}"
 
 

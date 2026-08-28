@@ -186,9 +186,13 @@ PROBES = (
             "`check_these_rules_allow_them` proves the bounded rule still passes it. "
             "**The rejection arrives from Sub-step 5.2's tracing rule, not from this "
             "module's**, and it does not close the blind spot: this statement selects "
-            "columns, so it computes no metric — a cross product that computed a "
-            "certified one would still be allowed here. Bounding that is the "
-            "certified-route rule's job in Sub-step 5.4",
+            "columns, so it computes no metric. **A cross product that computed a "
+            "certified one is refused since Sub-step 5.4**, by the certified-route "
+            "rule, because a join with no condition is a join no Semantic Entry names — "
+            "`route.py`'s `a cross product, certified metric` is that "
+            "statement, judged on every run. What closed is the hole a generator could "
+            "have walked through; the blind spot in the **estimate** is unchanged and "
+            "is still what this probe measures",
     ),
     Probe(
         name="an ordinary question",

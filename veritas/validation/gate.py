@@ -8,16 +8,18 @@ decision to allow or reject a query."*
 measuring whether that is possible on this schema and this data, and returned **GO**.
 This module is the thing that was measured for.
 
-**Five decisions, and three Sub-steps have shipped.** The
+**Five decisions, and four Sub-steps have shipped.** The
 [Target State's flow](../../.claude/docs/design/target-state.md#flow) names what
 `VALIDATE` decides; the [Step 005 plan](../../.claude/docs/plan/step-005-validation-gate.md#what-the-gate-must-decide)
 puts them in the order a statement meets them. Sub-step 5.1 shipped everything that
 needs neither the Semantic Layer nor a certified metric — can this be read at all, is
 it one statement, is it a read, will it stay inside the scan ceiling — Sub-step
 5.2 added the first rule that reads the corpus: does every metric expression trace to
-a Certified Metric; and Sub-step 5.3 added the first rule that reads an identity: does
-a Restricted Column reach the answer. The certified-route and Access-Profile-predicate
-rules are still to come.
+a Certified Metric; Sub-step 5.3 added the first rule that reads an identity: does
+a Restricted Column reach the answer; and Sub-step 5.4 added the rule that reads the
+rows underneath the projection: is the metric computed across the joins and over the
+period its own Metric Definition names. The Access-Profile-predicate rule is still to
+come.
 
 **What the Access Profile enforcement here is, and is not.**
 [DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
@@ -59,6 +61,14 @@ lands, warehouse-native security **replaces** this check rather than joining it.
     nothing and cost the property above: the rules that need nothing would run behind
     the rule that needs the most, and a caller who asked *"does this write?"* would be
     told instead that the Warehouse would not open.
+  * The certified-route rule reads the corpus twice over — the canonical forms, to learn
+    which metric the statement computes, and then that metric's `join_paths` and
+    `date_column`. It is the only rule that needs a Metric Definition's fields rather
+    than its expression, so it runs last, and the flow's own order
+    ([5.4 after 5.3](../../.claude/docs/plan/step-005-validation-gate.md#what-the-gate-must-decide))
+    is the same order. It matters where a statement is wrong in two ways at once: `net
+    revenue by client` reaches `dim_client` through uncertified joins **and** projects a
+    Client's name, and the leak is the more useful thing to be told about.
 
 **The Gate stops at the first rule that rejects.** A statement that does not parse
 has no tree for a later rule to read, and a rejected outcome names the rules that
@@ -71,7 +81,8 @@ query it just approved is a Gate with no boundary.
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from functools import partial
+from functools import cached_property, partial
+from types import MappingProxyType
 
 import sqlglot
 from sqlglot import exp
@@ -79,7 +90,7 @@ from sqlglot.lineage import lineage
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.merge_subqueries import merge_subqueries
 from sqlglot.optimizer.qualify import qualify
-from sqlglot.optimizer.scope import build_scope
+from sqlglot.optimizer.scope import Scope, build_scope
 
 from veritas.semantic import SemanticLayer, load_semantic_layer
 from veritas.validation.outcome import RejectionReason, ValidationGateOutcome
@@ -123,13 +134,30 @@ TRUSTED_REWRITES = (qualify, merge_subqueries)
 # BigQuery dry-run bytes-billed"*, where the same ceiling is spelled in bytes.
 SCAN_CEILING = 1_000_000
 
+# The declared type of every date column in the Warehouse. `veritas/warehouse/schema.sql`
+# writes `DATE` on all six of them — `trade_date`, `settlement_date`, `movement_date`,
+# `price_date`, `rate_date`, `snapshot_date` — and says why there is no `dim_date` to
+# read instead: *"The date axis is the trade_date, settlement_date, movement_date,
+# price_date, rate_date and snapshot_date columns."* The certified-route rule asks which
+# columns in a WHERE clause are dates, and the live catalogue is the only thing that
+# knows. `check_semantic_layer.py` holds the same constant for the same reason, and the
+# two are free to move apart: that one asks which axes may enumerate their values.
+DATE_TYPE = "DATE"
 
-@dataclass(frozen=True, slots=True)
+# What a `Reading` was given when nobody gave it a corpus — an empty mapping that cannot
+# be edited into a corpus by accident. A `Reading` built this way answers every rule that
+# needs only the statement, and fails closed at the first rule that needs more.
+# `MappingProxyType` is a wrapper class from Python's standard `types` module that creates
+# a read-only, dynamic view of a dictionary**.
+NO_CERTIFIED_EXPRESSIONS: Mapping[str, str] = MappingProxyType({})
+
+
+@dataclass(frozen=True)
 class Reading:
-    """What the Gate has read off a statement, before any rule has judged it.
+    """Everything one judgement reads, read at most once each.
 
-    Parsing happens once, here, rather than inside each rule: five rules that each
-    call `sqlglot.parse` are five chances to parse with different settings, and the
+    Parsing happens once, here, rather than inside each rule: six rules that each
+    call `sqlglot.parse` are six chances to parse with different settings, and the
     settings are the whole of what a parse tree means.
 
     `statements` is `None` exactly when sqlglot refused the string, and `refusal`
@@ -137,11 +165,44 @@ class Reading:
     [C6](../../.claude/docs/design/validation-feasibility.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)'s
     requirement made structural: a rule reads *"the parse failed"* as a fact it was
     handed, not as an empty list it has to interpret.
+
+    **Three more things are read at most once, and that is
+    [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
+    paid.** Until Sub-step 5.4 each parse-tree rule opened with its own
+    `columns_by_table()` and its own `resolve()`, so one judgement read the catalogue
+    twice and resolved one statement twice. The entry's own reason for that being wrong
+    is not speed: *"two rules judging one statement against two readings of a live
+    catalogue can, in principle, disagree about what a `SELECT *` stands for."* Its
+    Trigger was the third rule to read the catalogue, which is the rule this Sub-step
+    adds, and the shape it named is the one below — the catalogue, the resolved tree and
+    the corpus are properties of the **judgement**, not of the rule.
+
+    **Read at most once, not read eagerly**, which is the whole of why they are
+    `cached_property` and not fields. The Gate's rule order is a safety property: a rule
+    that needs nothing must return the right verdict on a day the Warehouse will not
+    open, and a `Reading` that read the catalogue in its constructor would break that for
+    every statement, including the ones refused three rules before anything needs a
+    schema. `read_only.py` judges every read-only shape through a Warehouse that raises
+    on contact, so a `Reading` that touched one too early fails that check rather than
+    passing quietly.
+
+    `catalogue` is *how to read the live schema* rather than the schema itself, for the
+    same reason. `certified_expressions` is the corpus as `{name: expression}` — the
+    Gate's own `semantic/metrics/`, or the spike's pins — and it is data rather than a
+    callable because `semantic/` is committed text that cannot change under a running
+    Gate, where the Warehouse's column list is live state that can.
+
+    `slots=True` is gone, and that is what pays for the caching: `cached_property` writes
+    its answer into the instance's `__dict__`, which a slotted class does not have.
+    Nothing else about the class changed — it is still frozen, and no rule can edit what
+    another rule read.
     """
 
     sql: str
     statements: tuple[exp.Expression, ...] | None = None
     refusal: str = ""
+    catalogue: Callable[[], Schema] | None = None
+    certified_expressions: Mapping[str, str] = NO_CERTIFIED_EXPRESSIONS
 
     @property
     def statement(self) -> exp.Expression:
@@ -149,8 +210,77 @@ class Reading:
         assert self.statements is not None and len(self.statements) == 1
         return self.statements[0]
 
+    @cached_property
+    def schema(self) -> Schema:
+        """The Warehouse's column list, read through the adapter once per judgement.
 
-def read(sql: str) -> Reading:
+        [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)
+        is why it is read at run time at all, and why it comes through the Warehouse
+        Adapter — *"which keeps it on the right side of ADR-0002's seam."*
+
+        A `Reading` made without a catalogue raises `TracerRefused` here rather than
+        answering with an empty mapping. An empty schema is not a schema: `qualify`
+        would resolve nothing against it, a `SELECT *` would expand to nothing, and
+        every parse-tree rule would reach a verdict about a statement it had not read.
+        Fail closed, and name the cause.
+        """
+        if self.catalogue is None:
+            raise TracerRefused(
+                "this Reading was made without a catalogue, so no rule that reads a "
+                "parse tree can reach a verdict from it"
+            )
+        return self.catalogue()
+
+    @cached_property
+    def resolved(self) -> exp.Expression:
+        """The statement rewritten into the form every parse-tree rule is judged on.
+
+        One resolution per judgement, shared by every rule that reads a tree — so the
+        tracing rule, the Restricted Column rule and the certified-route rule are all
+        looking at the **same** tree, qualified against the **same** catalogue.
+
+        It is not copied on the way out. `resolve` copies before it rewrites, so the
+        `statements` a caller handed in are safe; what a rule must not do is edit this
+        tree, because the rules after it read the same object. The one walk that does
+        edit — `columns_reaching_the_answer`, which renames every output column before
+        asking for its lineage — copies first, and says so where it does it.
+
+        **A refusal is not memoised.** `cached_property` stores what the property
+        *returns*, and a raise returns nothing — so if `resolve` raises `TracerRefused`,
+        the next rule to touch `resolved` runs `resolve` again and raises again. On
+        `SELECT a FROM no_such_table` that is one `qualify` per rule that asks, not one
+        in total.
+
+        Nothing in the assembled Gate pays that: the first rule to reach the refusal
+        turns it into `unresolvable`, and `judge` stops at the first rule that rejects,
+        so `resolve` refuses once and the judgement ends. Holding the exception in a
+        field of our own, to save a repeat nothing is paying, would be a second cache —
+        hand-written, on the path that ends in a refusal anyway. More code, guarding
+        less, on the side where being wrong is the more expensive mistake.
+        """
+        return resolve(self.statement, self.schema)
+
+    @cached_property
+    def corpus(self) -> dict[str, str]:
+        """`{canonical form: Certified Metric name}` — the corpus, built once per
+        judgement.
+
+        Rebuilt per judgement rather than cached on the Gate, and that is correctness
+        rather than caution: a certified expression and the statement computing it are
+        compared as text, so both have to be resolved against the **same** reading of
+        the schema. Caching one side and re-reading the other is how the two would come
+        to disagree with nothing to notice. What Sub-step 5.4 changed is that the
+        rebuild now happens once for the two rules that read it instead of once each.
+        The Sub-step 5.2 review measures what it costs.
+        """
+        return certified_forms(self.certified_expressions, self.schema)
+
+
+def read(
+    sql: str,
+    catalogue: Callable[[], Schema] | None = None,
+    certified_expressions: Mapping[str, str] = NO_CERTIFIED_EXPRESSIONS,
+) -> Reading:
     """Parse the statement, or record that it could not be parsed.
 
     `sqlglot.parse` rather than `parse_one`, and the difference is a rule: given
@@ -162,12 +292,27 @@ def read(sql: str) -> Reading:
     Empty segments come back as `None` — `sqlglot.parse("SELECT 1;;")` is a
     statement and a nothing — and are dropped, so a trailing semicolon is not a
     second statement and an empty string is no statements at all.
+
+    The two sources are optional because the three rules that need nothing beyond the
+    statement are answerable without them, and `read(sql)` on its own is exactly that
+    reading. `ValidationGate.judge` always supplies both.
     """
     try:
         parsed = sqlglot.parse(sql, dialect=DIALECT)
     except sqlglot.errors.SqlglotError as refusal:
-        return Reading(sql=sql, statements=None, refusal=str(refusal))
-    return Reading(sql=sql, statements=tuple(s for s in parsed if s is not None))
+        return Reading(
+            sql=sql,
+            statements=None,
+            refusal=str(refusal),
+            catalogue=catalogue,
+            certified_expressions=certified_expressions,
+        )
+    return Reading(
+        sql=sql,
+        statements=tuple(s for s in parsed if s is not None),
+        catalogue=catalogue,
+        certified_expressions=certified_expressions,
+    )
 
 
 # A rule returns the Rejection Reasons that fired and the sentence explaining them,
@@ -356,6 +501,38 @@ def resolve(
         raise TracerRefused(f"{type(failure).__name__}: {failure}") from failure
 
 
+def base_tables(scope: Scope) -> dict[str, str]:
+    """One scope's lookup: alias -> the base table it stands for.
+
+    `scope.sources` maps each name in a FROM or JOIN clause to what it stands for — an
+    `exp.Table` for a base table, another `Scope` for a subquery `merge_subqueries`
+    could not flatten. Only the base tables are here, because a subquery's contents are
+    read on its own turn round `traverse()`.
+    """
+    return {
+        name: source.name
+        for name, source in scope.sources.items()
+        if isinstance(source, exp.Table)
+    }
+
+
+def on_base_tables(
+    expression: exp.Expression, tables: Mapping[str, str]
+) -> exp.Expression:
+    """A copy of `expression` with every table alias replaced by the table it stands for.
+
+    The one edit that makes aliasing invisible without making anything else invisible
+    with it, and it is a **copy** because the tree it is read out of is shared by every
+    rule in a judgement. Three readings need it — the projections, the joins and the
+    date columns in a WHERE clause — so it is one function rather than three loops.
+    """
+    written = expression.copy()
+    for column in written.find_all(exp.Column):
+        if column.table in tables:
+            column.set("table", exp.to_identifier(tables[column.table]))
+    return written
+
+
 def projected_expressions(
     statement: exp.Expression | str, schema: Schema, dialect: str = DIALECT
 ) -> list[exp.Expression]:
@@ -374,8 +551,18 @@ def projected_expressions(
 
     Raises `TracerRefused` if sqlglot cannot resolve the statement.
     """
-    resolved = resolve(statement, schema, dialect)
+    return projections_of(resolve(statement, schema, dialect))
 
+
+def projections_of(resolved: exp.Expression) -> list[exp.Expression]:
+    """`projected_expressions`, given the resolved tree rather than resolving one.
+
+    The half of `projected_expressions` that reads a tree, split out in Sub-step 5.4 so
+    that a judgement resolves once and every rule reads the same tree — see `Reading`,
+    and [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
+    which the split pays. The public function above keeps the signature the spike and
+    the checks call it by.
+    """
     # `build_scope` returns one `Scope` per SELECT: the SELECT itself in
     # `scope.expression`, and in `scope.sources` what each name in its FROM and JOIN
     # clauses stands for — an `exp.Table` for a base table, another Scope for a
@@ -393,27 +580,14 @@ def projected_expressions(
         # arrives here as a scope of its own.
         if not isinstance(scope.expression, exp.Select):
             continue
-        # The lookup: alias -> the base table it stands for. A source that is another
-        # Scope is a subquery `merge_subqueries` could not flatten, and is left out
-        # of this map because its projections are read on its own turn.
-        base_tables = {
-            name: source.name
-            for name, source in scope.sources.items()
-            if isinstance(source, exp.Table)
-        }
+        base = base_tables(scope)
         # `scope.expression.selects` is the projection list: one node per selected
         # item, in the order they were written.
         for projection in scope.expression.selects:
             # `unalias()` strips an `AS revenue` wrapper and leaves the expression
-            # that computes. The copy keeps the rename below out of `resolved`.
-            expression = projection.unalias().copy()
-            # `billed.commission` becomes `fct_trade.commission`, edited into this
-            # copy of the tree. Whatever alias the generator chose is gone by the
-            # time the expression is read.
-            for column in expression.find_all(exp.Column):
-                if column.table in base_tables:
-                    column.set("table", exp.to_identifier(base_tables[column.table]))
-            found.append(expression)
+            # that computes. `billed.commission` then becomes `fct_trade.commission`,
+            # so whatever alias the generator chose is gone by the time it is read.
+            found.append(on_base_tables(projection.unalias(), base))
     return found
 
 
@@ -434,9 +608,20 @@ def metric_expressions(
     class sqlglot gives every aggregate — so this asks whether anything aggregates
     without listing `sum`, `count` and `avg` by name.
     """
+    return metric_expressions_of(resolve(statement, schema, dialect), dialect)
+
+
+def metric_expressions_of(
+    resolved: exp.Expression, dialect: str = DIALECT
+) -> list[str]:
+    """`metric_expressions`, given the resolved tree rather than resolving one.
+
+    The same split as `projections_of`, and for the same reason: two of the Gate's rules
+    ask this question of one judgement's tree.
+    """
     return [
         canonical(expression, dialect)
-        for expression in projected_expressions(statement, schema, dialect)
+        for expression in projections_of(resolved)
         if list(expression.find_all(exp.AggFunc))
     ]
 
@@ -580,25 +765,42 @@ def columns_reaching_the_answer(
     *"could not look"* are the two answers a rule must never confuse, not because a case
     is on file.
     """
-    resolved = resolve(statement, schema, dialect)
+    return columns_reaching_the_answer_of(
+        resolve(statement, schema, dialect), schema, dialect
+    )
+
+
+def columns_reaching_the_answer_of(
+    resolved: exp.Expression, schema: Schema, dialect: str = DIALECT
+) -> set[tuple[str, str]]:
+    """`columns_reaching_the_answer`, given the resolved tree rather than resolving one.
+
+    **The copy on the first line is load-bearing**, and it is the one hazard Sub-step
+    5.4's hoist introduced. This walk renames every output column before asking for its
+    lineage, which is an edit to the tree — and the tree is now shared by every rule in
+    the judgement, where before Sub-step 5.4 each rule resolved its own. Numbering the
+    outputs of a tree the next rule is about to read would leave that rule judging
+    `answer_column_0` instead of what the generator wrote.
+    """
+    numbered = resolved.copy()
 
     # Number the output columns. `.selects` on a union is its first branch's projection
     # list, which is where a union's output names come from, so numbering there names the
     # outputs of both branches.
-    for position, projection in enumerate(resolved.selects):
+    for position, projection in enumerate(numbered.selects):
         projection.replace(
             exp.alias_(projection.unalias().copy(), f"{ANSWER_COLUMN}{position}")
         )
 
     reaching: set[tuple[str, str]] = set()
     try:
-        for position in range(len(resolved.selects)):
+        for position in range(len(numbered.selects)):
             # `lineage` returns a tree of `Node`s: the root is the output column, and
             # walking it reaches one leaf per base-table column that feeds it. A leaf
             # carries the table it came from in `source` and the column as
             # `<source alias>.<column>` in `name`.
             for step in lineage(
-                f"{ANSWER_COLUMN}{position}", resolved, schema=schema, dialect=dialect
+                f"{ANSWER_COLUMN}{position}", numbered, schema=schema, dialect=dialect
             ).walk():
                 if isinstance(step.source, exp.Table) and "." in step.name:
                     reaching.add((step.source.name, step.name.split(".")[-1]))
@@ -628,6 +830,212 @@ def restricted_columns_in_projection(
     return sorted(
         column for column in restricted if (column.table, column.column) in reaching
     )
+
+
+def restricted_columns_in_projection_of(
+    resolved: exp.Expression,
+    restricted: Iterable[RestrictedColumn],
+    schema: Schema,
+    dialect: str = DIALECT,
+) -> list[RestrictedColumn]:
+    """`restricted_columns_in_projection`, given the resolved tree rather than resolving
+    one."""
+    reaching = columns_reaching_the_answer_of(resolved, schema, dialect)
+    return sorted(
+        column for column in restricted if (column.table, column.column) in reaching
+    )
+
+
+# One join, as the Gate compares joins: the table joined, and the condition it is joined
+# on written the one way `canonical` writes an expression. A pair rather than a type, for
+# the reason `columns_reaching_the_answer` returns `(table, column)` pairs — it is a
+# coordinate, and the thing with a name is the `Route` it belongs to.
+Join = tuple[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class Route:
+    """Where a statement's rows come from: the tables it starts at, and the joins it
+    reaches the rest of them through.
+
+    The word is the Glossary's own: a
+    [`Join Path`](../../.claude/docs/glossary.md#a-the-system) is *"a certified **route**
+    between two warehouse tables, so the model never invents a join"*, and
+    [R8 of Step 004](../../.claude/docs/plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
+    is titled *"the route a Metric Definition carries"*. A Route here is the whole chain
+    — one or more Join Paths, plus where the chain starts — read off a parse tree or
+    built from a Metric Definition's fields, so that the two can be compared as values.
+
+    **Sets, not sequences.** A statement that writes its two joins in the other order
+    reaches the same rows, and a Gate that refused it would be refusing punctuation. What
+    a set cannot express is one table joined twice on the same condition, which no
+    statement in this project writes and which would be a self-cross-product if one did.
+
+    Frozen and hashable, because it is half of a comparison and neither half may be
+    edited by the rule doing the comparing.
+    """
+
+    from_tables: frozenset[str]
+    joins: frozenset[Join]
+
+    def joins_beyond(self, other: "Route") -> list[str]:
+        """This Route's joins that `other` does not have, spelled for a person to read.
+
+        Both directions of the certified-route rule are this one method: called on the
+        statement it names the joins nothing certifies, and called on the certified route
+        it names the joins the statement left out. Sorted, so a rejection explanation is
+        the same string on every run.
+        """
+        return sorted(
+            f"{table} ON {on}" if on else f"{table} (no join condition)"
+            for table, on in self.joins - other.joins
+        )
+
+
+def route_of(
+    statement: exp.Expression | str, schema: Schema, dialect: str = DIALECT
+) -> Route:
+    """The Route a statement carries, read off the resolved tree.
+
+    Raises `TracerRefused` if sqlglot cannot resolve the statement.
+    """
+    return route_of_resolved(resolve(statement, schema, dialect))
+
+
+def route_of_resolved(resolved: exp.Expression) -> Route:
+    """`route_of`, given the resolved tree rather than resolving one.
+
+    **Every scope, for the reason `projections_of` reads every scope**: a union projects
+    nothing itself and its branches each join their own way, and a subquery
+    `merge_subqueries` could not flatten carries joins that reach real rows. A route read
+    from the outermost scope alone would be a route with a hole in it exactly where a
+    generator would hide one.
+
+    A join with no condition — `FROM fct_trade AS left_side, fct_trade AS right_side` —
+    comes back with an empty condition rather than being skipped. It is a cross product,
+    it is the one shape `read_only.py` measured the bounded rule cannot see, and no
+    Metric Definition certifies one, so recording it is what makes it a rejection.
+
+    The condition is written on base tables and then canonicalised, which is what makes
+    the comparison about the join and not about the alias the generator happened to
+    choose: `rate.rate_date = billed.trade_date` and
+    `fct_fx_rate.rate_date = fct_trade.trade_date` are one join written twice.
+    """
+    root = build_scope(resolved)
+    if root is None:
+        raise TracerRefused("sqlglot built no scope for the statement")
+
+    from_tables: set[str] = set()
+    joins: set[Join] = set()
+    for scope in root.traverse():
+        if not isinstance(scope.expression, exp.Select):
+            continue
+        base = base_tables(scope)
+        joined: set[str] = set()
+        for join in scope.expression.args.get("joins", []):
+            joined.add(join.this.alias_or_name)
+            condition = join.args.get("on")
+            joins.add(
+                (
+                    join.this.name,
+                    ""
+                    if condition is None
+                    else canonical(on_base_tables(condition, base)),
+                )
+            )
+        # What is left is what the scope starts at. Read as "the sources that were not
+        # joined" rather than off the FROM node, because sqlglot has moved that node's
+        # argument name between releases and `scope.sources` is the library's own answer
+        # to the question this is asking.
+        from_tables.update(
+            table for name, table in base.items() if name not in joined
+        )
+    return Route(frozenset(from_tables), frozenset(joins))
+
+
+def certified_route(
+    expression: str,
+    from_table: str,
+    joins: Iterable[Join],
+    schema: Schema,
+    dialect: str = DIALECT,
+) -> Route:
+    """The Route a Metric Definition declares, read the way a statement's is.
+
+    **The corpus goes through the same reader as the query**, which is `certified_form`'s
+    argument applied to the second thing C2 requires a Metric Definition to carry. The
+    declared route is assembled into the simplest statement that takes it — the metric's
+    own expression over its own `from_table`, joined along its own Join Paths — and that
+    statement is resolved and read by `route_of`. Canonicalising the corpus any other way
+    would compare a rewritten statement against an unrewritten declaration, and the two
+    agree only until a rewrite touches one of them.
+
+    The **expression** is here for the same reason, and it is not decoration: `Position
+    Change` holds a correlated scalar subquery whose own FROM clause is a scope of its
+    own, and a statement computing that metric carries that scope too. Building the
+    certified route without the expression would compare a statement that has that scope
+    against a declaration that does not.
+
+    It takes the fields rather than a `MetricDefinition` for the reason `certified_forms`
+    takes the expressions and `restricted_columns_in_projection` takes the columns:
+    `check_validation_feasibility.py` pins its own declarations and judges its dated
+    measurement against those, while the Gate reads `semantic/`. One reader, two
+    declarations —
+    [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+    applied to the third of the Gate's parse-tree rules.
+
+    A Metric Definition's `filters` are deliberately **not** assembled in. They are
+    certified predicates on the rows, not a route to them, and nothing in this Sub-step
+    checks that a statement carries them — see the Sub-step 5.4 review, which says what
+    that costs.
+
+    Raises `TracerRefused` if the assembled statement will not resolve, which is a corpus
+    defect rather than a caller's bad query.
+    """
+    route = " ".join(f"JOIN {table} ON {on}" for table, on in joins)
+    return route_of(
+        f"SELECT {expression} AS answer FROM {from_table} {route}", schema, dialect
+    )
+
+
+def date_columns_filtered(
+    resolved: exp.Expression, schema: Schema
+) -> set[tuple[str, str]]:
+    """Every date column a WHERE clause in this statement keys on, as (table, column).
+
+    **The WHERE clause, and not the JOIN conditions.** Every Join Path in `semantic/`
+    that reaches `fct_fx_rate` keys on a date, so a rule that read join conditions too
+    would find `fct_trade.trade_date` in every converted metric and have nothing left to
+    say. A period filter is what narrows the rows the answer covers; a join condition is
+    what pairs them up.
+
+    **Every scope**, for the reason the two readings above walk every scope — and
+    `Position Change` is why it matters rather than being a precaution: its expression's
+    correlated subquery carries `previous_snapshot.snapshot_date <
+    fct_position_snapshot.snapshot_date` in a WHERE of its own, so a statement computing
+    that metric has a date-keyed WHERE clause whether or not the question had a period in
+    it.
+
+    **A date is what the catalogue says is a date.** `DATE_TYPE` against the declared
+    type, rather than a list of column names spelled out here: a seventh date column
+    added to the Warehouse is caught by this rule on the day it is added, where a list
+    would go on being right about six columns.
+    """
+    filtered: set[tuple[str, str]] = set()
+    root = build_scope(resolved)
+    if root is None:
+        raise TracerRefused("sqlglot built no scope for the statement")
+    for scope in root.traverse():
+        if not isinstance(scope.expression, exp.Select):
+            continue
+        where = scope.expression.args.get("where")
+        if where is None:
+            continue
+        base = base_tables(scope)
+        for column in on_base_tables(where, base).find_all(exp.Column):
+            if schema.get(column.table, {}).get(column.name, "").upper() == DATE_TYPE:
+                filtered.add((column.table, column.name))
+    return filtered
 
 
 @dataclass(frozen=True, slots=True)
@@ -678,6 +1086,22 @@ class ValidationGate:
     warehouse: WarehouseAdapter
     scan_ceiling: int = SCAN_CEILING
     semantic: SemanticLayer = field(default_factory=load_semantic_layer)
+
+    def catalogue(self) -> Schema:
+        """The Warehouse's column list, read at the moment a rule asks for it.
+
+        A method rather than `self.warehouse.columns_by_table` handed straight to the
+        `Reading`, and the difference is not stylistic: **reaching for that bound method
+        is already touching the adapter.** `read_only.py` judges every read-only shape
+        through a Warehouse that raises on any attribute access, and it caught this the
+        first time `judge` was written the other way — a rule that needs nothing would
+        have failed on a statement it can refuse from the parse tree alone, which is the
+        exact property that check exists to hold.
+
+        So the indirection is what makes the laziness complete: nothing about the
+        Warehouse is looked at until a rule asks the `Reading` for a schema.
+        """
+        return self.warehouse.columns_by_table()
 
     def bounded(self, reading: Reading) -> Rejected | None:
         """The planner's estimate for what this will read, against the ceiling.
@@ -733,20 +1157,21 @@ class ValidationGate:
         certified expression and a Shadow Metric sitting side by side would be allowed
         on the strength of the first; and *at least one* must be found, or a statement
         that aggregates nothing would pass vacuously.
+
+        The catalogue, the resolved tree and the corpus come off the `Reading`, which
+        reads each of them at most once per judgement — see `Reading`, and
+        [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
+        which Sub-step 5.4 paid.
         """
-        schema = self.warehouse.columns_by_table()
         try:
-            expressions = metric_expressions(reading.statement, schema)
+            expressions = metric_expressions_of(reading.resolved)
         except TracerRefused as refusal:
             return (RejectionReason.UNRESOLVABLE,), (
                 f"the statement parses but will not resolve against the Warehouse's "
                 f"columns, so no expression in it can be traced: {refusal}"
             )
 
-        corpus = certified_forms(
-            {name: metric.expression for name, metric in self.semantic.metrics.items()},
-            schema,
-        )
+        corpus = reading.corpus
         allowed, hit, untraced = certified_metrics_only(expressions, corpus)
         if allowed:
             return None
@@ -815,10 +1240,9 @@ class ValidationGate:
         refuse one the optimizer accepted, and a rule that let that through would fail
         open on exactly the statement nobody wrote a probe for.
         """
-        schema = self.warehouse.columns_by_table()
         try:
-            projected = restricted_columns_in_projection(
-                reading.statement, access_profile.restricted_columns, schema
+            projected = restricted_columns_in_projection_of(
+                reading.resolved, access_profile.restricted_columns, reading.schema
             )
         except TracerRefused as refusal:
             return (RejectionReason.UNRESOLVABLE,), (
@@ -834,6 +1258,169 @@ class ValidationGate:
                 f"{'them' if len(projected) > 1 else 'it'}"
             )
         return None
+
+    def traced_metrics(self, reading: Reading) -> list[str]:
+        """The Certified Metrics this statement computes, in the order it computes them.
+
+        The certified-route rule needs to know **whose** route to compare against, and it
+        derives that here rather than being handed it by the tracing rule that ran before
+        it. Two reasons, and the second is the one that matters:
+
+          * it costs almost nothing. The catalogue, the resolved tree and the corpus are
+            all read once per judgement, so what this repeats is one walk of a tree the
+            `Reading` already holds and one dictionary lookup per projection;
+          * a rule that took another rule's output would stop being independently
+            answerable. Deleting the tracing rule from `rules()` would then break the
+            route rule too, and the check's first mutation is exactly that deletion —
+            a mutation that takes two rules out is a mutation that measures neither.
+
+        `dict.fromkeys` drops repeats and keeps first-seen order, because a statement can
+        compute one metric in two projections and the route is the same route either way.
+        """
+        expressions = metric_expressions_of(reading.resolved)
+        _, hit, _ = certified_metrics_only(expressions, reading.corpus)
+        return list(dict.fromkeys(hit))
+
+    def routed(self, reading: Reading) -> Rejected | None:
+        """The statement reaches its rows the way the Metric Definition says, or reject.
+
+        [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+        in one rule, and the payment of
+        [DEBT-014](../../.claude/docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject).
+        The reason both exist is one sentence of C2's: *"a certified expression pins down
+        the arithmetic and not the rows it is computed over."* The tracing rule reads the
+        projection, and `Traded Notional` converted out of the Trade's Denomination
+        Currency instead of the Instrument's Quotation Currency **projects identically**
+        to the right one. Nothing the tracing rule can see separates them. The join does.
+
+        **Both halves are one rule because C2 and DEBT-014 treat them as one question.**
+        [R4 of Step 003](../../.claude/docs/design/validation-feasibility.md#r4--debt-014-is-amended-to-name-the-date-predicate--approved-by-amino-2026-08-20)
+        settled that: the Trade Date / Settlement Date question *"is this entry's
+        question, not a second one"*, because it is the same shape — two columns on
+        `fct_trade`, a projection that cannot tell them apart, and a Section C pair that
+        exists because the choice moves the number. They are two `Rejection Reason`
+        members because they are two different things to go and fix.
+
+        **Permission comes from a list, and a join no entry names is a rejection.** The
+        list this Sub-step gives it has one source, the metric's own `join_paths`;
+        [5.5](../../.claude/docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
+        lengthens it with two more — the `routes` of each axis a statement groups by, and
+        the route the Access Profile's predicate needs. The Gate never searches
+        `semantic/joins/` for a chain that would reach a table, which is
+        [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+        decision and the difference between a Gate and a query planner.
+
+        **What that costs until 5.5 lands, stated rather than discovered:** a slice by a
+        certified axis whose column is not already on the metric's route is refused here.
+        `Net Revenue by region` reaches `dim_client` through two joins no Metric
+        Definition names, so it is rejected — which is the same sentence as *"`by region`
+        is a certified axis no query can reach"*, said by the Gate instead of by the
+        plan. `check_validation_gate/route.py` puts that statement in front of the Gate
+        on every run with `rejected` declared, so 5.5 flipping it back is a measurement
+        rather than a hope.
+
+        **A statement that traces to nothing is not this rule's business.** It returns
+        `None` — there is no metric whose route to compare against, and the tracing rule
+        one place earlier has already refused it. In the assembled Gate that branch is
+        unreached, and `route.py` says which rule caught what rather than leaving it to
+        be assumed.
+        """
+        try:
+            hit = self.traced_metrics(reading)
+        except TracerRefused as refusal:
+            return (RejectionReason.UNRESOLVABLE,), (
+                f"the statement parses but will not resolve against the Warehouse's "
+                f"columns, so the route it takes to its rows cannot be read: {refusal}"
+            )
+        if not hit:
+            return None
+
+        permitted = self.permitted_route(hit, reading.schema)
+        carried = route_of_resolved(reading.resolved)
+
+        uncertified = carried.joins_beyond(permitted)
+        if uncertified:
+            return (RejectionReason.UNCERTIFIED_ROUTE,), (
+                f"this statement computes {', '.join(hit)} across a join no Semantic "
+                f"Entry certifies for it — {'; '.join(uncertified)}"
+            )
+        missing = permitted.joins_beyond(carried)
+        if missing:
+            return (RejectionReason.UNCERTIFIED_ROUTE,), (
+                f"this statement computes {', '.join(hit)} without the join its Metric "
+                f"Definition is certified across — {'; '.join(missing)}"
+            )
+        if carried.from_tables != permitted.from_tables:
+            return (RejectionReason.UNCERTIFIED_ROUTE,), (
+                f"this statement computes {', '.join(hit)} starting from "
+                f"{', '.join(sorted(carried.from_tables))}, and its Metric Definition "
+                f"starts from {', '.join(sorted(permitted.from_tables))}"
+            )
+
+        # `date_column` is written `table.column` in the entry, and the loader keeps it
+        # as the entry wrote it, so it is split here into the pair the parse tree
+        # answers in. `check_semantic_layer.py` is what refuses one written any other
+        # way, which is why there is no second reading of that shape here.
+        certified_dates = {
+            tuple(self.semantic.metrics[name].date_column.split(".", 1)) for name in hit
+        }
+        filtered = date_columns_filtered(reading.resolved, reading.schema)
+        stray = sorted(
+            f"{table}.{column}" for table, column in filtered - certified_dates
+        )
+        if stray:
+            keyed = ", ".join(
+                sorted(f"{table}.{column}" for table, column in certified_dates)
+            )
+            return (RejectionReason.UNCERTIFIED_DATE_COLUMN,), (
+                f"this statement filters {', '.join(hit)} on {', '.join(stray)}, and "
+                f"the period {'each' if len(hit) > 1 else 'its'} Metric Definition is "
+                f"certified over is keyed on {keyed}"
+            )
+        return None
+
+    def permitted_route(self, metrics: Iterable[str], schema: Schema) -> Route:
+        """The one Route a statement computing these Certified Metrics may take.
+
+        The union of what each one declares, which for the one-metric statement this
+        project generates is that metric's own route and nothing else. It is a union
+        rather than a per-metric comparison because a statement computing two metrics
+        genuinely carries both routes, and the alternative — asking each metric whether
+        the whole statement matches its route alone — would refuse every such statement
+        on the strength of the joins the other one needed.
+
+        **What the union cannot say is which metric took which join**, and that is
+        [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart).
+        Two metrics converting through `fct_fx_rate` by different routes put two joins to
+        that one table in the permitted set, `route_of_resolved` and `projections_of` both
+        write columns on their base table before comparing, and so the two conversions can
+        be swapped over with every rule here satisfied.
+
+        **This is the list `permission comes from a list` means**, and
+        [5.5](../../.claude/docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
+        lengthens it here: an axis's `routes` and the Access Profile's predicate route
+        are two more sources of joins this method will union in, and the rule above does
+        not change when they arrive.
+        """
+        declared = [
+            certified_route(
+                metric.expression,
+                metric.from_table,
+                [
+                    (
+                        self.semantic.join_paths[path].to_table,
+                        self.semantic.join_paths[path].on,
+                    )
+                    for path in metric.join_paths
+                ],
+                schema,
+            )
+            for metric in (self.semantic.metrics[name] for name in metrics)
+        ]
+        return Route(
+            frozenset().union(*(route.from_tables for route in declared)),
+            frozenset().union(*(route.joins for route in declared)),
+        )
 
     def rules(self, access_profile: AccessProfile) -> tuple[tuple[str, Rule], ...]:
         """The rules, in the order a statement meets them, under one identity.
@@ -860,6 +1447,7 @@ class ValidationGate:
                 "no restricted column",
                 partial(self.no_restricted_column, access_profile=access_profile),
             ),
+            ("a certified route", self.routed),
         )
 
     def judge(self, sql: str, access_profile: AccessProfile) -> ValidationGateOutcome:
@@ -872,8 +1460,23 @@ class ValidationGate:
 
         The Access Profile is required and has no default — see the class docstring for
         why it is here rather than on the Gate.
+
+        **One `Reading` per judgement, and it is where the catalogue, the resolved tree
+        and the corpus are read.** Every rule below gets the same one, so the four that
+        read a parse tree read the *same* tree qualified against the *same* catalogue —
+        [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
+        whose own argument for this was never speed: *"a verdict assembled from two views
+        of the Warehouse is a verdict about neither."* Nothing is read here, only made
+        reachable — see `Reading` for why that distinction is the Gate's rule order.
         """
-        reading = read(sql)
+        reading = read(
+            sql,
+            catalogue=self.catalogue,
+            certified_expressions={
+                name: metric.expression
+                for name, metric in self.semantic.metrics.items()
+            },
+        )
         ran: list[str] = []
         for name, rule in self.rules(access_profile):
             ran.append(name)

@@ -46,8 +46,9 @@ reason) · `superseded`.
 | [EXT-007](#ext-007--corporate-actions) | Corporate actions | `fct_instrument_price` · `fct_position_snapshot` · the P&L Metric Definitions | M | open |
 | [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration) | The data checks run in continuous integration | `check_warehouse.py` · `check_data_availability.py` · the one-command bring-up | M | open |
 | [EXT-009](#ext-009--the-join-path-entry-type-at-warehouse-scale) | The Join Path entry type at Warehouse scale | `semantic/joins/` file format · a Metric Definition's `join_paths` | M | open |
+| [EXT-010](#ext-010--a-metric-certified-over-more-than-one-date-column) | A metric certified over more than one date column | `ValidationGate.routed`'s date half · a Metric Definition's `date_column` | S | open |
 
-**Open:** 9 · **Built:** 0 · **Dropped:** 0
+**Open:** 10 · **Built:** 0 · **Dropped:** 0
 
 ### Target State extension path, mapped
 
@@ -667,3 +668,89 @@ Any one of:
    prefix, or a route from a table to itself — the shape
    [`Position Change`](reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)
    already needs and reaches with a correlated subquery instead.
+
+---
+
+### EXT-010 — A metric certified over more than one date column
+
+- **Status:** open
+- **Opened:** Sub-step 5.4 (`.claude/docs/reviews/step-005-validation-gate.md`)
+- **Seam it lands against:** the date half of `ValidationGate.routed` · a Metric
+  Definition's `date_column`
+- **Size:** S
+- **Motivated by:** the eighth sceptical item of the
+  [Sub-step 5.4 review](reviews/step-005-validation-gate.md#sub-step-54--pay-debt-014-the-gate-checks-the-route-and-the-date-predicate),
+  ruled on in [R15](plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+
+**What the full system needs**
+
+A Metric Definition carries **one** `date_column`, and the Gate reads it as the only date
+column any WHERE clause in a statement computing that metric may key on. That conflates
+two different things which happen to be the same one today:
+
+- **the period axis** — the column a *question's* period narrows on, which is what
+  `date_column` is for and what
+  [C2](design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+  put on the entry;
+- **the date predicates the metric's own expression carries**, which are part of the
+  certified computation and have nothing to do with the question.
+
+A metric whose certified expression keyed on a *second* date column — a revenue metric
+that counts Trades executed in the period but settling after it, a lag test between
+`trade_date` and `settlement_date`, an as-of price read at a date the expression itself
+fixes — would be **refused by the Gate when computed exactly as its own entry says**. The
+full system needs the permitted set to come from a list, the way `permitted_route`
+already takes its joins from one: the metric's `date_column`, plus the date columns its
+own certified expression keys on, and nothing else.
+
+**What the slice does instead, and why that is correct here**
+
+One permitted date column per metric, read from `date_column`, and it is not a
+simplification that happens to hold — it is checked against every metric in the corpus on
+every run. `route.py`'s `check_every_certified_metric_stays_on_its_route` builds each of
+the nine metrics' own statement out of its own entry and puts it in front of the rule, so
+a metric that stopped satisfying this would fail the run rather than be discovered by a
+question.
+
+`Position Change` is the case that shows the reading is right rather than lucky. Its
+expression holds a correlated scalar subquery carrying
+`previous_snapshot.snapshot_date < fct_position_snapshot.snapshot_date` in a WHERE of its
+own, so a statement computing it has a date-keyed WHERE clause whether or not the
+question had a period in it — and it passes, because that column *is* its `date_column`.
+The one metric in the corpus with a date predicate inside its expression is the one metric
+for which one column is enough.
+
+**Why this is an extension and not debt**
+
+Nothing here is wrong, cheaply. Reading one column per metric is the correct reading of a
+corpus in which no metric keys on two, and the narrower rule is the stronger one: it
+refuses `a period keyed on Settlement Date`, which is a
+[Section C](glossary.md#c-distinctions-we-must-not-blur) pair the whole rule exists to
+separate. The trigger test settles it — *"a Certified Metric whose expression keys on a
+second date column"* cannot fire inside this project's life, because the nine metrics are
+fixed by [Glossary Section B](glossary.md#b-the-warehouse) and no Step in this project
+writes a tenth. Building the list shape now would be a permission list with one source
+and nothing to widen it for.
+
+**Not the same question as `by settlement date`.** [R11's second ruling of Step
+004](plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
+deferred a `by settlement date` **axis** to the Step that grounds a query, because
+certifying it *"would let one question be sliced on one date while being filtered on
+another."* That is about what the corpus may certify as a slice, and a slice puts the
+column in a GROUP BY. This entry is about what a metric's own **expression** may key on
+in a WHERE. The two meet only if a metric is later certified over both dates, which is
+Readiness 2 below.
+
+**Readiness**
+
+Any one of:
+
+1. A Certified Metric is written whose expression keys on a date column other than its
+   own `date_column` — the direct trigger, and the one that needs a tenth metric or an
+   edit to one of the nine.
+2. A metric is certified over **two** period axes, so `date_column` stops being a single
+   value at all. That is the corpus-side half of R11's deferred question and is decided
+   where R11 sent it.
+3. The date half of the route rule is widened for any other reason and gains the list
+   shape `permitted_route` already has, at which point this costs one more source rather
+   than a new mechanism.

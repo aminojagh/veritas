@@ -24,12 +24,15 @@ different order would be checking a different Gate.
   * `traces` — Sub-step 5.2. Every metric expression traces to a Certified Metric.
   * `restricted` — Sub-step 5.3. No Restricted Column reaches the answer, under the
     Access Profile the statement is judged under.
+  * `route` — Sub-step 5.4. The metric is computed across the joins its own Metric
+    Definition names, over the period its own `date_column` keys.
 
-The two still to come are `route` (5.4) and `access` (5.5).
+The one still to come is `access` (5.5).
 """
 
 import read_only
 import restricted
+import route
 import traces
 from probes import problems, warehouse
 
@@ -41,6 +44,7 @@ def main() -> int:
             read_only.check(adapter),
             traces.check(adapter),
             restricted.check(adapter),
+            route.check(adapter),
         ]
 
     for report in reports:
@@ -56,8 +60,9 @@ def main() -> int:
         "PASS — the Validation Gate refuses what it cannot read, what is more than "
         "one statement, what is not a read, what the planner expects to scan past "
         "the ceiling, what computes a metric the Semantic Layer does not certify, "
-        "and what would carry a Restricted Column into the answer; and it allows "
-        "every Certified Metric"
+        "what would carry a Restricted Column into the answer, and what computes a "
+        "certified metric across a route or over a period the corpus does not "
+        "certify for it; and it allows every Certified Metric"
     )
     return 0
 

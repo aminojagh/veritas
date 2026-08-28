@@ -105,6 +105,18 @@ old name is recognisable in history, with a pointer to its replacement).
 > wrong way round. The `Shadow Metric` row was amended in the same ruling: its
 > *Lives in* cell read *"— (an anti-pattern)"* and now names `veritas/validation/`,
 > where the Validation Gate returns the anti-pattern as a Rejection Reason.
+>
+> **`Route` registered on 2026-08-28** by Sub-step 5.4, approved the same day
+> ([R15](plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)).
+> The word was already the `Join Path` row's own definition — *"a certified **route**
+> between two warehouse tables"* — and the title of
+> [R8 of Step 004](plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22),
+> *"the route a Metric Definition carries"*. What it did not have was a row, and Sub-step
+> 5.4 needed one: the certified-route rule compares the Route a statement took against
+> the Route a Metric Definition declares, and the two halves of that comparison are the
+> same kind of thing while a Join Path is only ever one hop of it. Registered in Title
+> Case, unlike `metric expression`, because no `agreed` document had already fixed a
+> lower-case spelling of it as a noun in its own right.
 
 ### A. The system
 
@@ -121,6 +133,7 @@ What Veritas is made of.
 | **Ambiguous Term** | A word users say that maps to two or more Certified Metrics and therefore has no single correct answer. Not a metric — an instruction to disambiguate before generating SQL. | `semantic/ambiguous/` | agreed |
 | **Dimension Definition** | A certified axis for *slicing* a metric — the answer to "by what?". Names the column, its grain, and its allowed values, so "by region" always means the same column with the same buckets. The five certified axes, each written here as `(columns — grain — allowed values)`: **by trade date** (`fct_trade.trade_date` — daily), **by snapshot date** (`fct_position_snapshot.snapshot_date` · `fct_balance_snapshot.snapshot_date` — daily), **by accounting movement date** (`fct_accounting_movement.movement_date` — daily), **by region** (`dim_client.client_region` — one Client — EU · UK · APAC), **by instrument type** (`dim_instrument.instrument_type` — one Instrument — equity · ETF · future · currency pair). A date axis enumerates no allowed values, because its values are minted by the data rather than registered here. "Net Revenue **by region** last quarter" applies the region Dimension Definition to the Net Revenue metric. **Amended 2026-08-24** ([Sub-step 4.5](plan/step-004-semantic-layer.md#45--write-the-dimension-definitions)), approved 2026-08-25 ([R11](plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)): this cell listed three *examples*, one of them *"by date (`trade_date`, daily)"* — quoted without its bold here so the check does not read the quotation as a sixth axis — where `semantic/dimensions/` now publishes five certified axes, and `check_semantic_layer.py` reads this cell back against them. One axis named `trade_date` could not be applied to a Snapshot metric, whose route never reaches that column, so the single date axis became the three the Warehouse actually keys on; the instrument-type sweep of 2026-08-05 is recorded in the amendments above rather than in the parenthetical, which now holds only what the check reads. | `semantic/dimensions/` | agreed |
 | **Join Path** | A certified route between two warehouse tables, so the model never invents a join. | `semantic/joins/` | agreed |
+| **Route** | Where a statement's rows come from: the tables it starts at, and the joins it reaches the rest of them through. Read off a parse tree, or built from a Metric Definition's `from_table` and `join_paths`, so that what a query took and what the corpus certifies can be compared as values. A **Join Path** is one certified hop between two tables and is published as a file; a Route is the whole chain plus where it starts, and is never published — `Traded Notional`'s Route is two Join Paths and `fct_trade`, `Trade Count`'s is no Join Paths and `fct_trade`. **Registered 2026-08-28** ([R15](plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)), where Sub-step 5.4 made the word a class in `veritas/validation/` and the Gate gained the rule that compares the two. | `veritas/validation/` — read from a statement or from a Metric Definition's fields (no file publishes one) | agreed |
 | **Grounding** | The step where retrieved Semantic Entries constrain SQL generation. Ungrounded generation is forbidden, not merely discouraged. | `veritas/grounding/` | agreed |
 | **Validation Gate** | Deterministic, non-LLM checks a query must pass before execution: certified-metrics-only, no restricted columns, access policy applied, cost bounded, read-only. | `veritas/validation/` | agreed |
 | **Access Profile** | The identity Veritas runs a question as — role and permitted region. Determines which rows and columns the Validation Gate allows. | `veritas/validation/` | agreed |

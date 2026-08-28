@@ -196,7 +196,10 @@ from check_warehouse import (  # noqa: E402
 # `check_warehouse.py` reading `semantic/` would make both sides compute the same
 # wrong number and agree, which is R2's whole subject.
 
-from check_validation_feasibility import CERTIFIED_EXPRESSIONS  # noqa: E402
+from check_validation_feasibility import (  # noqa: E402
+    CERTIFIED_EXPRESSIONS,
+    CERTIFIED_ROUTES,
+)
 # The three expressions the Sub-step 3.2 spike measured, as Python literals. Check 9
 # pins them to the corpus rather than re-pointing the spike at it, which is
 # [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21).
@@ -1774,7 +1777,8 @@ def check_widening_cast(
 
 
 def check_spike_pin(layer: SemanticLayer) -> None:
-    """Check 9: the three expressions the spike measured are what the corpus publishes.
+    """Check 9: what the spike measured is what the corpus publishes — expression **and
+    route**.
 
     [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
     keeps `check_validation_feasibility.py`'s certified expressions as Python
@@ -1787,9 +1791,17 @@ def check_spike_pin(layer: SemanticLayer) -> None:
     A divergence forces a decision rather than passing unnoticed in either
     direction: re-run the spike and update the verdict, or put the Metric Definition
     back.
+
+    **Sub-step 5.4 widened it from the expression to the route**, because that Sub-step
+    gave the spike a second pinned declaration: `CERTIFIED_ROUTES`, the `from_table` and
+    the Join Path conditions each pinned metric is computed across. Claim 1's verdict now
+    reads the route as well as the projection — which is what turned the blind spot
+    [DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+    records into a rejection — and a pinned route nothing compares against `semantic/` is
+    exactly the second corpus this check exists to prevent.
     """
     print()
-    print("  spike pin — the expressions the Sub-step 3.2 spike measured")
+    print("  spike pin — the expressions and routes the Sub-step 3.2 spike measured")
     for name, measured in sorted(CERTIFIED_EXPRESSIONS.items()):
         metric = layer.metrics.get(name)
         if metric is None:
@@ -1809,7 +1821,36 @@ def check_spike_pin(layer: SemanticLayer) -> None:
                 f"      published {metric.expression}"
             )
             continue
-        print(f"    pinned   {name}")
+        pinned_route = CERTIFIED_ROUTES.get(name)
+        if pinned_route is None:
+            problems.append(
+                f"the spike pins {name!r}'s expression and not its route, so claim 1's "
+                f"verdict for that metric is reached against a route nothing here "
+                f"compares with the corpus"
+            )
+            continue
+        published_route = (
+            metric.from_table,
+            tuple(
+                (layer.join_paths[path].to_table, layer.join_paths[path].on)
+                for path in metric.join_paths
+            ),
+        )
+        if pinned_route != published_route:
+            problems.append(
+                f"{name!r}: the spike pins one route and the Semantic Layer publishes "
+                f"another, so claim 1 is measured against a route this project no "
+                f"longer uses\n"
+                f"      spike     {pinned_route}\n"
+                f"      published {published_route}"
+            )
+            continue
+        print(f"    pinned   {name:<18}{len(metric.join_paths)} join path(s)")
+    for name in sorted(set(CERTIFIED_ROUTES) - set(CERTIFIED_EXPRESSIONS)):
+        problems.append(
+            f"the spike pins a route for {name!r} and no expression, so nothing there "
+            f"computes the metric that route is for"
+        )
 
 
 def main() -> int:

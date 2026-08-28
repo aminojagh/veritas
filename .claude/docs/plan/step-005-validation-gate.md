@@ -174,7 +174,7 @@ veritas/validation/   ← 5.1  the seam: the outcome, the reason taxonomy, the b
 veritas/validation/   ← 5.2  trace every metric expression to a Certified Metric
 veritas/validation/   ← 5.3  the Access Profile, and the Restricted Column it forbids
 veritas/validation/   ← 5.4  pay DEBT-014 — the route and the date predicate
-semantic/  + the Gate  ← 5.5  the access predicate, the slice route, and the routes both read
+semantic/  + the Gate  ← 5.5  the access predicate, the slice route, and DEBT-020's filters
 ```
 
 Every commit subject is conjunction-free, and every adjacent pair passes
@@ -197,8 +197,12 @@ neither of which fired.
 
 **5.5 is now the largest Sub-step, and R1's widening is why.** Before the widening it
 was five files and one narrow rule; it is now five files, a new field on five more, a
-loader change, a semantic-layer check, and a Gate rule with two callers. If the Step
-grows anywhere it grows here, which is exactly the case R5 was written for.
+loader change, a semantic-layer check, and a Gate rule with two callers.
+[R15](#r15--aminos-rulings-on-the-54-review--decided-2026-08-28) added
+[DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)'s
+repayment on top of that, which is a third half on the same rule and a third clause in
+the Sub-step's title. If the Step grows anywhere it grows here, which is exactly the case
+R5 was written for — and R15 says where the split falls if it fires.
 
 **5.3 is the second largest and the one most likely to grow unexpectedly.** It
 introduces a new concept (the Access Profile), a new rule, and the run-time schema read
@@ -245,7 +249,7 @@ half of the problem that was not Grounding's. Amino declined the narrow half:
 
 So this Step takes **both** halves R11 named — the routes *and* the rule that lets a
 query add a Join Path for a slice — and
-[5.5](#55--the-gate-requires-the-access-profiles-predicate-and-admits-a-slice-route)
+[5.5](#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
 grows accordingly. What follows is the problem as it was put, then the design the
 ruling asked for.
 
@@ -914,7 +918,7 @@ condition is written as a test rather than an intention:
 commit. **This Sub-step is not done until the spike's `BLIND_SPOT` kind has no members**
 — the same bar the Ledger entry sets.
 
-### 5.5 — The Gate requires the Access Profile's predicate, and admits a slice route
+### 5.5 — The Gate requires the Access Profile's predicate, admits a slice route, and pays DEBT-020
 
 The last rule, the only Sub-step that changes `semantic/`, and the largest in the Step
 after [R1](#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25) widened it.
@@ -951,6 +955,18 @@ It is the pre-agreed split point under [R5](#r5--55-is-a-pre-agreed-split-point-
 - **What this does not close.** R11's other two questions are untouched — no `by
   settlement date` axis, and check 17's foreclosure stands. Both ask what the corpus may
   **certify**; this Sub-step certifies no axis, it gives certified ones a route.
+- **[DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+  is paid here**, added by [R15](#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+  rather than by the plan as approved. The route rule reads two of the three fields
+  [C2](../design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+  puts on a Metric Definition to pin down *which rows*; the third is `filters`, and a
+  statement that drops `movement_type = 'realised P&L'` computes `Realised P&L` over four
+  movement types and is allowed. The repayment is the comparison 5.4 already performs,
+  run against the **conjuncts of the statement's WHERE clause** instead of against a join
+  list: `certified_route` already assembles the metric's own statement, so the certified
+  side costs nothing new. **`route.py`'s `Realised P&L with its filter dropped` flips
+  from `allowed` to `rejected`** — the third declared verdict this Step moves on purpose,
+  and the one that stops a committed check passing while demonstrating a wrong answer.
 
 **Verification:** three families of probe, all in the package's `access.py`.
 
@@ -966,7 +982,13 @@ It is the pre-agreed split point under [R5](#r5--55-is-a-pre-agreed-split-point-
 - **The mutations.** Delete the access-predicate rule, re-run, and watch the nine
   un-predicated probes pass; restore and `cmp`. Then delete the absent-key branch and
   watch `Cash Balance by instrument type` be allowed to join a table with no Instrument
-  in it.
+  in it. Then delete the filter comparison and watch `Realised P&L with its filter
+  dropped` go back to being allowed — the mutation that proves DEBT-020's payment is a
+  rule and not a renamed probe.
+- **DEBT-020's own probe becomes a positive and a negative pair**, in `route.py` where it
+  already is: the statement with its certified filter stays **allowed** and the statement
+  without it becomes **rejected**, with `check_the_filter_gap` going on printing the two
+  numbers so the entry stays a measurement after it is paid.
 
 ### R12 — Amino's rulings on the 5.1 review → **decided 2026-08-26**
 
@@ -1189,6 +1211,124 @@ prove a text claim, and the same claim is now measured in both modules that make
 seam moved, in the Sub-step that introduced it and before anything was built on it;
 nothing else did, so 5.4 starts from the rule list, the taxonomy and the detector 5.3
 finished on.
+
+### R15 — Amino's rulings on the 5.4 review → **decided 2026-08-28**
+
+Rulings on the ten sceptical items, the one Term Proposal and the one question of
+[the 5.4 review entry](../reviews/step-005-validation-gate.md#sub-step-54--pay-debt-014-the-gate-checks-the-route-and-the-date-predicate).
+Amino: *"3 → term proposal is approved. 8 → create an extension for this if this kind of
+metric won't happen in the current project's slice. 10 → pay debt-20 in 5.5. All others
+approved as is."* Two clarifications came with them, on the review's own prose rather
+than on the rule: the `resolved` docstring's un-cached exception paragraph and the third
+*deliberately left undone* item were both to be made *"clearer, simpler and more
+tangible"*, and the second was to be filed — *"create an extension for the 3rd left
+undone case if the trigger won't happen in the current project's slice."* It does happen,
+so it is debt; see point 4 below. They land
+**in the 5.4 commit itself** rather than after it, for the reason
+[R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26),
+[R12](#r12--aminos-rulings-on-the-51-review--decided-2026-08-26),
+[R13](#r13--aminos-rulings-on-the-52-review--decided-2026-08-27) and
+[R14](#r14--aminos-rulings-on-the-53-review--decided-2026-08-27) did: the ruling arrived
+before the commit did.
+
+**No rule changed and no seam moved.** Eight of the ten items are approved as they stand
+and cost nothing; what the other two cost is a Glossary row, a Ledger entry, an
+Extension Register entry, and one more half on a rule that is not built yet. The eight
+are declared limits rather than offers, and approval records them as known: the route
+half and the date half stay **one** rule with two reasons, so a statement wrong in both
+ways reports only the route (item 1); the Gate compares routes for **equality** while the
+spike compares them for **containment**, one reading shared and two policies stated in
+both files (item 2); a Route stays a **set**, so a statement writing its joins in the
+other order is allowed and one table self-joined on the same condition collapses to one
+element (item 4); `Reading` stays unslotted, its `__dict__` doing double duty as the
+memo and as the evidence `check_one_judgement_reads_once` reads (item 5); the lazy
+catalogue stays one indirection deep, because taking a bound method is already touching
+the adapter and `read_only.py` is what found that (item 6); `DATE_TYPE` stays a second
+copy of `check_semantic_layer.py`'s constant, two literals rather than a script imported
+into `veritas/` (item 7); and `route.py` goes on reading two of its statements out of the
+spike's source text, which costs those two being invisible to `check_warehouse.py`'s
+dialect scan and claims no exemption for it (item 9).
+
+**1. `Route` is registered** (item 3). Amino: *"term proposal is approved."* It goes into
+[Glossary Section A](../glossary.md#a-the-system) directly after `Join Path`, in Title
+Case, because unlike [`metric expression`](#r13--aminos-rulings-on-the-52-review--decided-2026-08-27)
+no `agreed` document had already fixed a lower-case spelling of it as a noun. The row's
+whole content is the distinction the rule rests on: a **Join Path** is one certified hop
+between two tables and is published as a file in `semantic/joins/`; a **Route** is the
+whole chain plus where it starts, and is never published — it is read, off a parse tree
+or off a Metric Definition's fields, so that *what a query took* and *what the corpus
+certifies* are the same kind of thing and can be compared as values. The word was already
+the `Join Path` row's own definition and the title of
+[R8 of Step 004](step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22),
+so the row registers a word the project was using rather than coining one.
+
+**2. [EXT-010](../extension-register.md#ext-010--a-metric-certified-over-more-than-one-date-column)
+is opened** (item 8). Amino: *"create an extension for this if this kind of metric won't
+happen in the current project's slice."* It will not. The date half of the rule permits
+**one** column per metric — the `date_column` its entry names — and a Certified Metric
+whose own expression keyed on a second date column would be refused when computed exactly
+as its entry says. No such metric exists and none can arrive here: the nine are fixed by
+[Glossary Section B](../glossary.md#b-the-warehouse), 5.5's corpus change adds Join Paths
+and a `routes` field rather than a metric, and no later Step in this project writes a
+Metric Definition. So the trigger cannot fire inside this project's life, which is the
+Register's own test, and the entry carries a Readiness instead. It is filed with the
+boundary against [R11's second ruling of Step 004](step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
+written down, because the two are easy to confuse: R11 deferred a `by settlement date`
+**axis**, which is what a query may *slice* on and lands in a GROUP BY; EXT-010 is what a
+metric's own expression may *filter* on and lands in a WHERE.
+
+**3. [DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+is paid in 5.5** (item 10, and the review's one question). Amino: *"pay debt-20 in
+5.5."* The review put the alternative up honestly — leave it for the Grounding Step its
+Trigger names — and the ruling takes the earlier one, so the slice does not ship a Gate
+that certifies the arithmetic, the route and the period while saying nothing about the
+rows a filter selects. [5.5](#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
+carries the work and the mutation that proves it; the entry keeps its Trigger unchanged
+and gains a dated status note, because a Trigger is the record of when repayment stops
+being optional and 5.5 is a decision to pay before it fires.
+
+**4. [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+is opened — as debt, where the instruction offered an extension**, because the test the
+instruction named comes out the other way. *"Create an extension for the 3rd left undone
+case if the trigger won't happen in the current project's slice."* It will happen. The
+review's own reason for leaving the item as prose was *"the trigger would be a generator
+that joins one table twice, which does not exist"* — and the generator is not out of
+scope, it is `GENERATE`, step 4 of the
+[Target State's flow](../design/target-state.md#flow), built by a later Step of this
+project. What it takes to reach the hole is one question asking for two metrics that
+convert through `fct_fx_rate` by different routes, and the corpus already holds that pair:
+`Gross Revenue` converts on the Trade's Denomination Currency, `Traded Notional` on the
+Instrument's Quotation Currency through `dim_instrument`, and a statement computing both
+must join the FX Rate table twice under two aliases. `permitted_route` then unions the two
+routes and both readings write columns on base tables before comparing, so the two
+conversions can be swapped over and every rule the Gate has is satisfied. That is the
+current code being **wrong, cheaply**, with a trigger that fires inside this project's
+life — the Ledger's own test — so it goes there, with DEBT-020's first arm as its Trigger
+and the two named as one visit to this rule. The entry says plainly that nothing in the
+repository demonstrates it and that the Sub-step paying it owes a probe, which is the
+state [DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)'s
+date half was in for eight days and the honest way to file a hole found by reading code.
+
+**This makes 5.5 three things in one commit, and that is the live question this ruling
+leaves.** Its title now needs two `and`s, which is `planning-a-step`'s own test for a
+Sub-step that is really two — and 5.5 was already the largest in the Step after
+[R1](#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
+widened it. [R5](#r5--55-is-a-pre-agreed-split-point--approved-by-amino-2026-08-25) is
+the pre-agreed split point and this is the case it was written for. **If it fires, the
+split is: the corpus change and the access predicate in one Sub-step, DEBT-020's filters
+in the next** — they touch the same rule but not the same half of it, the corpus change
+lengthens `permitted_route` while the filter comparison adds a third reading, and Amino
+could reasonably approve either and reject the other. Nothing is split now, because the
+filter half is *"the comparison this rule already performs"* and the estimate is small;
+the point of writing it here is that the decision is Amino's at the top of 5.5 rather
+than a discovery halfway through it.
+
+**What this makes true that was not.** `Route` is registered where a reader naming
+something will look, so the class in `veritas/validation/` matches a Glossary row like
+every other domain name in the codebase. The two holes the Sub-step found are on the
+right register each — DEBT-021 and EXT-010, one because its trigger fires here and one
+because it cannot — and neither is left as prose in a review that nothing re-reads. And 5.5 has a third item, named in the plan before it starts
+rather than added while it runs.
 
 ---
 

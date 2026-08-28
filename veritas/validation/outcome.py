@@ -22,7 +22,9 @@ opened four days earlier and still open.
 **The set is incomplete on purpose.** Sub-step 5.1 shipped the rules that need
 neither the corpus nor the schema and registered four members; Sub-step 5.2 added the
 tracing rule and the three ways it can fail; Sub-step 5.3 added the Restricted Column
-rule and the one way it can. Each later rule of
+rule and the one way it can; and Sub-step 5.4 added the certified-route rule and the
+two ways it can — a route the corpus does not name, and a period filter on a date
+column the metric does not certify. Each later rule of
 [Step 005](../../.claude/docs/plan/step-005-validation-gate.md) adds its own with the
 Sub-step that adds the rule. A member with no rule behind it would be a chart
 category nothing can ever fall into.
@@ -161,6 +163,48 @@ class RejectionReason(StrEnum):
     name beside it — the spike's `net revenue by client` is that statement, and it is why
     the two rules are two rules.
     """
+
+    UNCERTIFIED_ROUTE = "uncertified route"
+    """The statement reaches its rows through joins the Metric Definition does not name.
+
+    [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)'s
+    half of the Gate, and the reason it exists in one sentence: *"a certified expression
+    pins down the arithmetic and not the rows it is computed over."* `Traded Notional`
+    converted out of the Trade's Denomination Currency instead of the Instrument's
+    Quotation Currency projects **identically** to the right one, so `SHADOW_METRIC`
+    cannot fire on it and the number is wrong by a margin
+    `check_validation_feasibility.py` prints on every run. That statement is
+    [DEBT-014](../../.claude/docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject),
+    and this member is what pays it.
+
+    **It fires in both directions, and both are the same failure.** A statement that
+    carries a join no entry certifies is reaching rows the Metric Definition never
+    promised — a cross product, or a hop to a table with an identity in it. A statement
+    that *omits* one of the metric's own joins is computing the expression over rows the
+    conversion or the filter it names was supposed to narrow. The explanation says which
+    it was; the bar says the route was not the certified one.
+    """
+
+    UNCERTIFIED_DATE_COLUMN = "uncertified date column"
+    """The statement's period filter keys on a date column the metric does not certify.
+
+    The other half of C2 and of DEBT-014, which
+    [R4 of Step 003](../../.claude/docs/design/validation-feasibility.md#r4--debt-014-is-amended-to-name-the-date-predicate--approved-by-amino-2026-08-20)
+    settled as *"this entry's question, not a second one"*: Trade Date and Settlement
+    Date are two columns on `fct_trade`, a projection cannot tell them apart, and they
+    are a
+    [Glossary Section C](../../.claude/docs/glossary.md#c-distinctions-we-must-not-blur)
+    pair because choosing between them moves the number. A Metric Definition's
+    `date_column` is what it is certified against; a WHERE clause that keys on any other
+    date column is asking for a period the metric does not define.
+
+    **Its own bar rather than `UNCERTIFIED_ROUTE`'s**, for the reason `SHADOW_METRIC`
+    and `NO_METRIC_EXPRESSION` are two bars: a statement that joined the wrong way and
+    one that filtered on the wrong date are different things to go and fix, and one bar
+    would hide which. They are one **rule** because C2 and DEBT-014 treat them as one
+    question — the rows the certified expression is computed over.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class ValidationGateOutcome:

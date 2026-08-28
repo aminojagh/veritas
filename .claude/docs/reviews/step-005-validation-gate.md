@@ -1761,3 +1761,529 @@ line is printed on every run and no check compares it with anything.
 flip, DEBT-019 is still open and its trigger is still 5.4's route rule, and DEBT-008 is
 still unpaid and still describes an enforcement wider than the one that exists — the
 Access Profile's predicate arrives in 5.5.
+
+---
+
+## Sub-step 5.4 — Pay DEBT-014: the Gate checks the route and the date predicate
+
+**What changed**
+
+The Validation Gate gained its seventh rule and its last one before the Access Profile's
+predicate: **`ValidationGate.routed`**, which asks whether a statement computed its
+certified expression over the rows its Metric Definition describes. Two readings, one
+rule, two `Rejection Reason` members.
+
+- **The route.** `route_of` reads what a statement's rows come from — the tables it
+  starts at, and the joins it reaches the rest through, each join written on base tables
+  and canonicalised so an alias is invisible. `certified_route` builds the same value
+  out of a declaration by assembling the metric's own expression over its own
+  `from_table` along its own Join Paths and reading **that** statement the same way,
+  which is `certified_form`'s argument applied one level out: the corpus goes through the
+  same reader as the query, or the two agree only until a rewrite touches one of them.
+  A `Route` is a frozen pair of frozensets with one method, `joins_beyond`, and both
+  directions of the rule are that one method — called on the statement it names the
+  joins nothing certifies, called on the certified route it names the joins the statement
+  left out. **Permission comes from a list**, which is the shape
+  [the plan fixed](../plan/step-005-validation-gate.md#how-the-five-sub-steps-divide-the-work)
+  for exactly this reason: *"5.4's route rule is written to take its permitted joins from
+  a list, so 5.5 lengthens that list rather than rewriting the rule."*
+  `permitted_route` is that list, and today it has one source.
+- **The date predicate.** `date_columns_filtered` reads every date column a WHERE clause
+  in any scope keys on — a date being what the live catalogue calls `DATE`, not a list of
+  column names — and the rule refuses any that is not the traced metric's `date_column`.
+  It reads the WHERE and not the JOIN conditions, because every Join Path that reaches
+  `fct_fx_rate` keys on a date and a rule that read those would find `trade_date` in
+  every converted metric and have nothing left to say.
+
+**[DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject) is
+paid, on both of its halves and in both of its homes.** The Gate rejects `notional
+through the wrong currency`; `traces.py`'s declared verdict for it moved from `allowed`
+to `rejected · uncertified route`; and the spike's `BLIND_SPOT` kind is gone, its one
+member now an ordinary Shadow Metric. Making the spike's verdict honest meant giving it a
+third pinned declaration — `CERTIFIED_ROUTES`, three routes beside its three expressions —
+and folding the route into claim 1's verdict, so the spike's tracer stops being a tracer
+that reads the projection alone. `check_semantic_layer.py`'s check 9 was widened from the
+expression to the route in the same commit, because a pin nothing compares with
+`semantic/` is the second corpus that check exists to prevent. Claim 4 reads the route
+too, so a round trip that rewrote a join condition and left the projection alone is now
+something the spike would catch.
+
+The date half was the one the Ledger called *"argued rather than measured"*.
+`check_validation_gate/route.py` **executes** `Gross Revenue` over one period keyed on
+`trade_date` and the same period keyed on `settlement_date`, prints both figures and the
+gap, and fails the run if they stop differing. Both boundaries are read from the Snapshot
+calendar, so [DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)'s
+third arm came into reach and stayed unfired.
+
+**[DEBT-019](../debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
+is paid, in the shape it named.** Its Trigger was this Sub-step's route rule — the third
+rule to read the catalogue in one judgement — and the interface it listed first is the one
+built: a per-judgement context, which is `Reading`. `judge` builds one and hands it to
+every rule; the catalogue, the resolved statement and the corpus's canonical forms are
+`cached_property` on it. Four parse-tree rules now read one tree qualified against one
+catalogue, which was the entry's argument — *"a verdict assembled from two views of the
+Warehouse is a verdict about neither"* — rather than the milliseconds. Each public helper
+gained a variant taking an already-resolved tree (`projections_of`,
+`metric_expressions_of`, `columns_reaching_the_answer_of`,
+`restricted_columns_in_projection_of`, `route_of_resolved`), the public signatures the
+spike calls are unchanged, and the one walk that edits a tree copies first — sharing a
+resolution turns a local mutation into a rule judging `answer_column_0` instead of what
+the generator wrote.
+
+**Three declared verdicts moved in checks this Sub-step did not otherwise touch, and one
+is a cost rather than a fix.** `traces.py`'s `net revenue by region` and `restricted.py`'s
+`the name in a comment` and `the name in a filter only` all reach `dim_client` through
+two joins no Semantic Entry names, so the Gate now refuses them. That is
+[R1](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+*"`by region` is a certified axis no query can reach"* said by the Gate instead of by the
+plan, and **Sub-step 5.5 flips all three back** when it certifies those two hops. Each
+carries its new verdict and the reason it will move again, so the flip is a measurement.
+
+Their modules needed one real change to stay honest, and it is
+`probes.rule_verdicts`: **a rule's verdict is not the Gate's**. Until this Sub-step the
+two were the same answer for whichever rule ran last, and each module's positive control
+read `ValidationGateOutcome.allowed`. Reading it now would report the Restricted Column
+rule as having refused two shapes it passed on. `ValidationGateOutcome.rules` is what
+tells them apart — a rule that appears **last** on a rejected outcome is the rule that
+rejected — and it is the field Sub-step 5.1 added for exactly this. `traces.py` gained
+the same reading, because two of its probes now carry a `why` claiming the tracing rule
+allowed a statement the Gate rejects.
+
+**`read_only.py`'s cross-product citation became true and was rewritten.** It said *"a
+cross product that computed a certified one would still be allowed here. Bounding that is
+the certified-route rule's job in Sub-step 5.4."* It is: a join with no condition is a
+join nothing certifies, and `route.py` puts that statement in front of the Gate on every
+run. The blind spot in the **estimate** is unchanged and is still that probe's finding.
+
+**Verification**
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+  the metric's own route, and its own period
+    Snapshot calendar: the period is 2024-08-13 to 2024-11-12, both read from fct_position_snapshot (DEBT-012's third arm stays unfired)
+    Traded Notional: 262266110.69 through the Quotation Currency · 7264542867.58 through the Denomination Currency — 96.39% apart
+    Gross Revenue: 23263.33 keyed on trade_date, 2024-08-13 to 2024-11-12 · 22456.40 keyed on settlement_date, same period — 3.47% apart
+    DEBT-020: Realised P&L is 7573245.41 with its certified filter and 7832146.76 with it dropped — 3.31% apart, and the Gate allows both
+
+    rejected  notional through the wrong currency    uncertified route
+    rejected  a cross product, certified metric      uncertified route
+    rejected  a count with a multiplying join        uncertified route
+    rejected  net revenue by region                  uncertified route
+    allowed   traded notional                        —
+    allowed   a period keyed on Trade Date           —
+    rejected  a period keyed on Settlement Date      uncertified date column
+    allowed   Realised P&L with its filter dropped   —
+    allowed   Realised P&L as its entry says         —
+
+    route     dates     shape                                 what this rule reads
+    OFF       —         notional through the wrong currency   Traded Notional · 1 join(s) nothing certifies · 2 certified join(s) absent
+    OFF       —         a cross product, certified metric     Gross Revenue · 1 join(s) nothing certifies
+    OFF       —         a count with a multiplying join       Trade Count · 1 join(s) nothing certifies
+    OFF       —         net revenue by region                 Net Revenue · 2 join(s) nothing certifies
+    on        —         traded notional                       Traded Notional
+    on        —         a period keyed on Trade Date          Gross Revenue
+    on        STRAY     a period keyed on Settlement Date     Gross Revenue · filtered on fct_trade.settlement_date
+    on        —         Realised P&L with its filter dropped  Realised P&L
+    on        —         Realised P&L as its entry says        Realised P&L
+
+    Account Value       3 certified join(s) · keyed on fct_position_snapshot.snapshot_date · starts at fct_position_snapshot
+    Cash Balance        1 certified join(s) · keyed on fct_balance_snapshot.snapshot_date · starts at fct_balance_snapshot
+    Gross Revenue       1 certified join(s) · keyed on fct_trade.trade_date · starts at fct_trade
+    Net Revenue         1 certified join(s) · keyed on fct_trade.trade_date · starts at fct_trade
+    Position Change     0 certified join(s) · keyed on fct_position_snapshot.snapshot_date · starts at fct_position_snapshot
+    Realised P&L        1 certified join(s) · keyed on fct_accounting_movement.movement_date · starts at fct_accounting_movement
+    Trade Count         0 certified join(s) · keyed on fct_trade.trade_date · starts at fct_trade
+    Traded Notional     2 certified join(s) · keyed on fct_trade.trade_date · starts at fct_trade
+    Unrealised P&L      3 certified join(s) · keyed on fct_position_snapshot.snapshot_date · starts at fct_position_snapshot
+    this rule ran on 9 of 9 Certified Metrics and allowed 9 of them
+    this rule ran on every one of the 9 shapes above and reached the verdict on 5 of them
+
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement, what is not a read, what the planner expects to scan past the ceiling, what computes a metric the Semantic Layer does not certify, what would carry a Restricted Column into the answer, and what computes a certified metric across a route or over a period the corpus does not certify for it; and it allows every Certified Metric
+```
+
+The tracing rule's own section of the same run, which is where the two moved verdicts and
+DEBT-019's payment are visible:
+
+```
+    allowed   bare                                   —
+    allowed   aliased                                —
+    allowed   derived table                          —
+    allowed   common table expression                —
+    allowed   net revenue                            —
+    rejected  net revenue by region                  uncertified route
+    allowed   traded notional                        —
+    rejected  commuted subtraction                   shadow metric
+    rejected  commuted multiplication                shadow metric
+    rejected  open-coded net revenue                 shadow metric
+    rejected  unconverted commission                 shadow metric
+    rejected  rebate silently dropped                shadow metric
+    rejected  notional, wrong currency               uncertified route
+    rejected  certified beside shadow                shadow metric
+    rejected  half-certified union                   not a read
+    rejected  unknown table                          unbounded scan
+    rejected  no metric expression                   no metric expression
+    rejected  unresolvable                           unresolvable
+    this rule ran on 16 of 18 shapes and refused 8; 2 were refused before it and 2 after it — net revenue by region, notional, wrong currency
+
+    one judgement, 7 rules: the catalogue was read 1 time(s), and the Reading holds one of each of corpus, resolved, schema (DEBT-019)
+    one judgement, fastest of 15: schema 4 ms · corpus 22 ms · statement 2 ms · whole Gate 42 ms
+```
+
+and the Restricted Column rule's, where its verdict and the Gate's come apart:
+
+```
+    this rule ran on 7 of 10 shapes, refused 4 and passed 3 on — the other 3 were refused by an earlier rule
+```
+
+The spike's claim 1, where `BLIND_SPOT` has no members:
+
+```
+$ uv run python .claude/scripts/check_validation_feasibility.py
+  claim 1 — does a certified expression survive the shapes a generator writes?
+    ALLOWED   bare                                 Gross Revenue
+    ALLOWED   aliased                              Gross Revenue
+    ALLOWED   derived table                        Gross Revenue
+    ALLOWED   common table expression              Gross Revenue
+    ALLOWED   net revenue                          Net Revenue
+    ALLOWED   net revenue by region                Net Revenue
+    ALLOWED   traded notional                      Traded Notional
+    REJECTED  commuted subtraction                 1 expression(s), none certified
+    REJECTED  commuted multiplication              1 expression(s), none certified
+    REJECTED  open-coded net revenue               1 expression(s), none certified
+    REJECTED  unconverted commission               1 expression(s), none certified
+    REJECTED  rebate silently dropped              1 expression(s), none certified
+    REJECTED  notional through the wrong currency  Traded Notional · off route: 2 pinned join(s) absent
+    REJECTED  half-certified union                 Gross Revenue, plus 1 uncertified
+    REJECTED  unknown table                        1 expression(s), none certified
+    REFUSED   unparseable                          ParseError: Expecting ). Line 1, Col: 48.
+
+    7 certified · 2 form · 6 shadow · 1 refused · 0 blind spot (DEBT-014 paid in Sub-step 5.4)
+```
+
+and the widened check 9, which is what holds the new pin to the corpus:
+
+```
+$ uv run python .claude/scripts/check_semantic_layer.py
+  spike pin — the expressions and routes the Sub-step 3.2 spike measured
+    pinned   Gross Revenue     1 join path(s)
+    pinned   Net Revenue       1 join path(s)
+    pinned   Traded Notional   2 join path(s)
+```
+
+Every committed check, in full:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_data_availability.py
+PASS — every source is obtainable and every distinction separates
+
+$ uv run python .claude/scripts/check_semantic_layer.py
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+
+$ uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+```
+
+**The three figures above are dated evidence, measured 2026-08-28 on the currently
+committed snapshot window** and reproduced by the command that printed them. They move
+when ingestion refreshes: the period is read from the Snapshot calendar, and the two
+notional figures are the whole loaded window. The timing line moves with the machine and
+nothing asserts on it.
+
+**Deliberately left undone**
+
+- **[DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+  — the rule reads two of a Metric Definition's three row-describing fields.** `filters`
+  is the third, and a statement that computes `Realised P&L`'s certified expression across
+  its certified route with `movement_type = 'realised P&L'` dropped is **allowed**, while
+  summing four movement types instead of one. Found while building this rule, recorded
+  rather than fixed, because the plan names what 5.4 builds and Amino approved that scope.
+  It is declared as a passing probe with both numbers printed, which is what the entry's
+  cost paragraph is about and is also the cost DEBT-014 named: this file passes while
+  demonstrating a wrong answer. **This was the question for the ruling below, and
+  [R15](../plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+  answered it: the entry is paid in Sub-step 5.5**, so the probe's `allowed` verdict is
+  one Sub-step old rather than one Step old.
+- **`by region` is unreachable and this Sub-step is what makes that visible.** Three
+  declared verdicts moved to `rejected` and 5.5 moves them back. Nothing is broken that
+  was working — the Gate had no route rule to refuse them with — but between this commit
+  and 5.5 the Gate refuses a legitimate slice by a certified axis.
+- **Two joins to one table under different aliases are not told apart** — now
+  [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart),
+  under [R15](../plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28).
+
+  Ask one statement for `Gross Revenue` **and** `Traded Notional` and it has to join
+  `fct_fx_rate` twice, because the two metrics convert by different routes: Gross Revenue
+  on the Trade's own Denomination Currency, one hop from `fct_trade`; Traded Notional on
+  the Instrument's Quotation Currency, two hops, through `dim_instrument`. Call the two
+  aliases `denom_rate` and `quote_rate`. Then both readings this rule depends on go
+  blind at once:
+
+  * `permitted_route` **unions** the two metrics' routes, so both joins are certified and
+    `joins_beyond` is empty in both directions;
+  * every reading writes columns on their base table before comparing, so
+    `sum(fct_trade.commission * denom_rate.fx_rate)` and
+    `sum(fct_trade.commission * quote_rate.fx_rate)` are the **same string** by the time
+    the tracing rule sees either.
+
+  So the two conversions can be swapped over — Gross Revenue taken at the Instrument's
+  rate — and every rule the Gate has is satisfied. That is `notional through the wrong
+  currency`, the statement DEBT-014 was opened about and this Sub-step closed, in its
+  two-metric form.
+
+  It was left as prose here on the ground that *"the trigger would be a generator that
+  joins one table twice, which does not exist."* That reasoning does not hold: the
+  generator is `GENERATE`, step 4 of the
+  [Target State's flow](../design/target-state.md#flow), and a later Step of this project
+  builds it. The trigger fires inside this project's life, so it is debt rather than an
+  extension, and the entry says plainly that nothing in the repository demonstrates it and
+  that the Sub-step paying it owes a probe.
+- **The rule reads the metric's route and not a Dimension Definition's**, which is 5.5.
+
+**Look at this sceptically**
+
+1. **The route half and the date half are one rule with two reasons, and that is a
+   judgement.** [C2](../design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+   and DEBT-014's 2026-08-20 status note both say the two are one question — *"the same
+   shape: two columns on `fct_trade`, a projection that cannot tell them apart"* — and
+   the plan's flow diagram gives 5.4 one line. The alternative is two rules in
+   `rules()`, which would make the ordering list say what the taxonomy already says.
+   What one rule costs is that a statement wrong in both ways reports only the route.
+2. **The rule compares routes for *equality*, and the spike compares them for
+   *containment*.** The Gate must refuse a join nothing certifies or it permits a cross
+   product; the spike has no Dimension Definitions to certify a slice's extra joins
+   against, and `net revenue by region` is the shape where the two policies differ. The
+   **reading** is shared — one `route_of`, one `certified_route` — and only the
+   comparison differs. It is stated in both files. A reviewer could reasonably say two
+   policies is one too many and that the spike should carry the Gate's.
+3. **`Route` is a new name and it has no Glossary row.** A Term Proposal is below.
+   → **approved and registered in this commit**; see the Language section and
+   [R15](../plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28).
+4. **The route is a set, not a sequence.** A statement writing its two joins in the other
+   order is allowed, which is right — the rows are the same — and the cost is that one
+   table joined twice on the same condition collapses to one element. That is a
+   self-cross-product no generator writes, and the set is what stops the rule refusing
+   punctuation.
+5. **`Reading` lost `slots=True` to gain `cached_property`.** That is a real trade: a
+   slotted class has no `__dict__` and `cached_property` needs one. It is still frozen,
+   and the memo is what `check_one_judgement_reads_once` reads to prove DEBT-019 paid —
+   so the `__dict__` is doing two jobs, one of them as evidence.
+6. **The lazy catalogue is one indirection deep and the check found why.** `judge` passed
+   `self.warehouse.columns_by_table` to the `Reading` and `read_only.py` failed
+   immediately: taking a bound method is already touching the adapter.
+   `ValidationGate.catalogue` is the fix. It is the kind of thing that would have shipped
+   silently without that check, and it is worth knowing it nearly did.
+7. **`DATE_TYPE = "DATE"` is a second copy of `check_semantic_layer.py`'s constant.** Two
+   files ask the catalogue what a date column is and neither reads the other. They are a
+   component and a script, they ask different questions of the answer, and importing a
+   script into `veritas/` is the thing this project does not do — but it is two literals.
+8. **The date rule reads the WHERE clause and every scope of it.** `Position Change`'s
+   correlated subquery carries `snapshot_date` in a WHERE of its own, so that metric has a
+   date-keyed filter whether or not the question had a period — and it passes because the
+   column is its own `date_column`. A metric whose expression filtered on a *different*
+   date column would be refused when computed exactly as its entry says. None does.
+   → **[EXT-010](../extension-register.md#ext-010--a-metric-certified-over-more-than-one-date-column)
+   is opened for it in this commit**: the nine metrics are fixed by Glossary Section B and
+   no Step in this project writes a tenth, so the trigger cannot fire here.
+9. **`route.py` reads two of its statements out of the spike's source text instead of
+   holding literals.** That removes a third copy and keeps the provenance claim checked
+   where it already is, and it costs those two statements being invisible to
+   `check_warehouse.py`'s dialect scan — which reads them in the spike. Five of this
+   module's statements are literals and the scan reads them; no exemption is claimed.
+10. **The DEBT-020 probe is declared `allowed`.** That re-creates, deliberately, the shape
+    DEBT-014's cost paragraph complained about — a check that passes while demonstrating a
+    wrong answer. The alternative is a hole nobody re-reads. It is the same trade the
+    project made for DEBT-014 and it should be made knowingly or not at all.
+    → **made knowingly, and for one Sub-step only**: R15 pays DEBT-020 in 5.5, where the
+    probe pairs off into an allowed statement and a rejected one.
+
+**A question for the ruling** → **answered: pay it in 5.5.** DEBT-020 is one field away
+from what this rule already does, and its repayment is the comparison this rule already
+performs, against the conjuncts of a WHERE clause instead of against a join list. Should
+it be paid **in 5.5**, which already touches this rule to lengthen its permission list,
+or left on the Ledger for the Grounding Step its Trigger names? Paying it in 5.5 makes
+that Sub-step — already the largest in the Step and already the pre-agreed split point —
+larger still. Leaving it means the slice ships with a Gate that certifies the arithmetic,
+the route and the period and not the rows a filter selects.
+
+**Language**
+
+- **No new domain term reached a code identifier**, with one exception below. `route`,
+  `date column` and `period filter` are all words the project already uses:
+  [`Join Path`](../glossary.md#a-the-system) is registered as *"a certified **route**
+  between two warehouse tables"*, [R8 of Step 004](../plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
+  is titled *"the route a Metric Definition carries"*, and `date_column` has been a
+  Metric Definition field since Step 004.
+- **Two `Rejection Reason` members added**: `UNCERTIFIED_ROUTE` (*"uncertified route"*)
+  and `UNCERTIFIED_DATE_COLUMN` (*"uncertified date column"*), ten in the taxonomy. The
+  members are registered in code and deliberately not in the Glossary, which is the
+  `Rejection Reason` row's own decision.
+
+> 🆕 **TERM PROPOSAL** — **`Route`**: where a statement's rows come from — the tables it
+> starts at, and the joins it reaches the rest of them through. Read off a parse tree or
+> built from a Metric Definition's `from_table` and `join_paths`, so that a statement's
+> and a metric's can be compared as values.
+>
+> **Why it is not `Join Path`.** A Join Path is **one certified hop between two tables**,
+> published as a file in `semantic/joins/`. A Route is the **whole chain plus where it
+> starts**, and it is never published: it is read, from a statement or from an entry's
+> fields. `Traded Notional`'s Route is two Join Paths and `fct_trade`; `Trade Count`'s is
+> no Join Paths and `fct_trade`. Registering it separates *what the corpus certifies* from
+> *what a query took*, which is the whole content of the rule this Sub-step added.
+>
+> The word is already in the project's prose — the `Join Path` row's own definition, R8 of
+> Step 004, and this Step's plan — and Sub-step 5.4 made it a class in
+> `veritas/validation/`. Agree, rename, or reject?
+>
+> → **Approved 2026-08-28 and registered in this commit.** The row sits in
+> [Glossary Section A](../glossary.md#a-the-system) directly after `Join Path`, in Title
+> Case, and Section A's amendment block carries the date and the reasoning.
+
+### The ten sceptical items, one Term Proposal and one question → **ruled, and answered in this commit**
+
+**Amino, 2026-08-28:** *"3 → term proposal is approved. 8 → create an extension for this
+if this kind of metric won't happen in the current project's slice. 10 → pay debt-20 in
+5.5. All others approved as is."* — with two clarifications on this review's own prose:
+the `resolved` docstring's un-cached exception paragraph and the third *deliberately left
+undone* item were to be made *"clearer, simpler and more tangible"*, and the second was
+to be filed on the same test as item 8. Recorded as
+[R15](../plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28),
+landing in this commit rather than after it because it arrived before the commit did —
+the shape [R11](../plan/step-005-validation-gate.md#r11--aminos-rulings-on-the-trim--decided-2026-08-26),
+[R12](../plan/step-005-validation-gate.md#r12--aminos-rulings-on-the-51-review--decided-2026-08-26),
+[R13](../plan/step-005-validation-gate.md#r13--aminos-rulings-on-the-52-review--decided-2026-08-27)
+and [R14](../plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)
+set.
+
+**No rule changed and no seam moved**, which is the difference from R14. **Every line of
+code changed by this ruling is inside a docstring** — `gate.py`'s `resolved` and
+`permitted_route`, and `route.py`'s module docstring and `filter_probes` — which is why
+the whole Verification block above came back unchanged. Beyond that: a Glossary row was
+added, each register gained an entry, and the plan's 5.5 gained a third item. The marks
+are inline on items 3, 8 and 10 above.
+
+**Item 3 — `Route` is registered.** The row goes into
+[Glossary Section A](../glossary.md#a-the-system) directly after `Join Path`, in Title
+Case, and Section A's amendment block carries the date and why the case differs from
+`metric expression`'s: no `agreed` document had already fixed a lower-case spelling of
+`Route` as a noun in its own right. `check_language.py` now reads **93** registered terms
+where it read 92, and the `Route` class in `veritas/validation/gate.py` matches a
+Glossary row like every other domain name in the codebase.
+
+**Item 8 — [EXT-010](../extension-register.md#ext-010--a-metric-certified-over-more-than-one-date-column)
+is opened, and the test the instruction named is what put it there.** *"If this kind of
+metric won't happen in the current project's slice"* — it will not: the nine Certified
+Metrics are fixed by [Glossary Section B](../glossary.md#b-the-warehouse), 5.5's corpus
+change adds Join Paths and a `routes` field rather than a metric, and no later Step in
+this project writes a Metric Definition. So the trigger cannot fire inside this project's
+life, which is the Register's own test, and the entry carries a Readiness. It is filed
+with one boundary written down, because two questions about dates are easy to run
+together: [R11's second ruling of Step 004](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
+deferred a `by settlement date` **axis** — what a query may *slice* on, which lands in a
+GROUP BY — while EXT-010 is what a metric's own expression may *filter* on, which lands
+in a WHERE. The rule that refuses `a period keyed on Settlement Date` is unchanged and
+stays right.
+
+**Item 10 and the question — DEBT-020 is paid in 5.5.** The review put both sides up and
+the ruling took the earlier one, so the slice does not ship a Gate that certifies the
+arithmetic, the route and the period while saying nothing about the rows a filter
+selects. The entry gains a dated status note and keeps its Trigger, because a Trigger
+records when repayment stops being optional and this is a decision to pay before it
+fires; the [plan's 5.5](../plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
+gains the work, the flipped probe and the mutation that proves the flip is a rule.
+**What that costs is named rather than absorbed**: 5.5's title now needs two `and`s,
+which is `planning-a-step`'s own test for a Sub-step that is really two, and R15 says
+where the split falls if [R5](../plan/step-005-validation-gate.md#r5--55-is-a-pre-agreed-split-point--approved-by-amino-2026-08-25)
+fires — the corpus change and the access predicate in one Sub-step, the filters in the
+next.
+
+**The third *left undone* item became [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart),
+not an extension**, because the instruction's own test comes out the other way here. The
+item is rewritten above with the statement that reaches it; what the rewrite exposed is
+that the reason for leaving it as prose — *"the trigger would be a generator that joins
+one table twice, which does not exist"* — was reading "does not exist **yet**" as "will
+not exist". `GENERATE` is step 4 of the
+[Target State's flow](../design/target-state.md#flow) and a later Step of this project
+builds it, so the trigger fires inside this project's life and the Ledger is where it
+belongs. The entry says plainly that nothing in the repository demonstrates the hole and
+that the Sub-step paying it owes a probe — the state DEBT-014's date half was in between
+2026-08-20 and this Sub-step. `permitted_route`'s docstring already reasoned about the
+two-metric case — *"a statement computing two metrics genuinely carries both routes"* —
+so the entry is linked from there, where the next person reading that paragraph will meet
+it. **No probe was added**, and that is the same call
+[DEBT-020's own *Why we deferred*](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+made: adding a shape to a check that has been reviewed and staged is the quiet widening
+*"the requested scope is the deliverable"* is about. The ruling's own edits to `route.py`
+are docstrings recording what it decided; a probe is new behaviour, and it belongs to the
+Sub-step that pays the entry.
+
+**The `resolved` docstring's second half was rewritten.** It said the exception is *"not
+cached: a rule that asks twice pays twice, which is the failure path and is the cheapest
+thing here to get wrong in the other direction"* — three claims compressed into one
+sentence, none of them showing its working. It now says the mechanism (`cached_property`
+stores what a property *returns*, and a raise returns nothing), names a statement that
+triggers it (`SELECT a FROM no_such_table`), says who pays (nobody: the first rule to
+reach the refusal turns it into `unresolvable` and `judge` stops at the first rule that
+rejects), and says what the alternative would be (a second, hand-written cache on the
+path that ends in a refusal anyway).
+
+**Verification, after the edits.** Every check was re-run in the same session:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  links      1188 links, 943 anchors 56 documents and python files
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py
+  glossary: 93 registered terms
+  proposed terms: 0 · python files scanned: 27 · identifiers: 1701
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_data_availability.py
+PASS — every source is obtainable and every distinction separates
+
+$ uv run python .claude/scripts/check_semantic_layer.py
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+
+$ uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+
+$ uv run python .claude/scripts/check_validation_gate/
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement, what is not a read, what the planner expects to scan past the ceiling, what computes a metric the Semantic Layer does not certify, what would carry a Restricted Column into the answer, and what computes a certified metric across a route or over a period the corpus does not certify for it; and it allows every Certified Metric
+```
+
+**Every verdict, count and figure in the Verification block above is unchanged**, which is
+the evidence that nothing here touched a rule. The route rule's whole block — the three
+executed figures, the nine declared verdicts, the two reading tables, the nine per-metric
+route lines and both coverage lines — was diffed against the block above and came back
+character for character, and so did the tracing rule's eighteen verdicts, its coverage
+line, the DEBT-019 line and the Restricted Column rule's coverage line. `check_language.py`'s counts are
+printed above where the Verification block showed only its PASS line: **93** registered
+terms and **27** Python files, against the 92 and 26 the
+[5.3 ruling](#the-nine-sceptical-items-and-one-question--ruled-and-answered-in-this-commit)
+recorded — one term added by this ruling, one file added by 5.4's own `route.py`. The
+only other thing that moved is the timing line, which prints a different pair of figures
+on every run of every session and which nothing compares with anything.
+
+**What this does not settle.** DEBT-020 is still open and is paid in 5.5, not here.
+DEBT-021 and EXT-010 are both open, both untouched by 5.5, and neither is demonstrated by
+anything that runs. DEBT-008 is still unpaid and still describes an enforcement wider than
+the one that exists — the Access Profile's predicate arrives in 5.5, which is the last
+Sub-step of this Step.
+
+---

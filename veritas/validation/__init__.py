@@ -11,33 +11,46 @@ Laid out like `veritas/warehouse/` and `veritas/semantic/`: this file re-exports
 the modules behind it hold the work. `outcome.py` is the verdict and the reason
 taxonomy — a data contract three components that import no rule still have to read;
 `profile.py` is the identity a question is run as and the Restricted Columns it may not
-see; and `gate.py` is the rules that produce a verdict, together with the tracer and the
-lineage walk they read a parse tree with — which `check_validation_feasibility.py`
-imports back from here
+see; and `gate.py` is the rules that produce a verdict, together with the tracer, the
+lineage walk and the route reader they read a parse tree with — which
+`check_validation_feasibility.py` imports back from here
 under [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25),
-so that one tracer answers for both corpora and one detector for both declarations of a
-Restricted Column.
+so that one tracer answers for both corpora, one detector for both declarations of a
+Restricted Column, and one route reader for both declarations of a route.
 """
 
 from veritas.validation.gate import (
     ANSWER_COLUMN,
+    DATE_TYPE,
     DIALECT,
     SCAN_CEILING,
     TRUSTED_REWRITES,
+    Join,
     Reading,
+    Route,
     Schema,
     TracerRefused,
     ValidationGate,
+    base_tables,
     canonical,
     certified_form,
     certified_forms,
     certified_metrics_only,
+    certified_route,
     columns_reaching_the_answer,
+    columns_reaching_the_answer_of,
+    date_columns_filtered,
     metric_expressions,
+    metric_expressions_of,
+    on_base_tables,
     projected_expressions,
+    projections_of,
     read,
     resolve,
     restricted_columns_in_projection,
+    restricted_columns_in_projection_of,
+    route_of,
+    route_of_resolved,
     trusted_rewrite_names,
 )
 from veritas.validation.outcome import RejectionReason, ValidationGateOutcome
@@ -46,26 +59,39 @@ from veritas.validation.profile import ANALYST, AccessProfile, RestrictedColumn
 __all__ = [
     "ANALYST",
     "ANSWER_COLUMN",
+    "DATE_TYPE",
     "DIALECT",
     "SCAN_CEILING",
     "TRUSTED_REWRITES",
     "AccessProfile",
+    "Join",
     "Reading",
     "RejectionReason",
     "RestrictedColumn",
+    "Route",
     "Schema",
     "TracerRefused",
     "ValidationGate",
     "ValidationGateOutcome",
+    "base_tables",
     "canonical",
     "certified_form",
     "certified_forms",
     "certified_metrics_only",
+    "certified_route",
     "columns_reaching_the_answer",
+    "columns_reaching_the_answer_of",
+    "date_columns_filtered",
     "metric_expressions",
+    "metric_expressions_of",
+    "on_base_tables",
     "projected_expressions",
+    "projections_of",
     "read",
     "resolve",
     "restricted_columns_in_projection",
+    "restricted_columns_in_projection_of",
+    "route_of",
+    "route_of_resolved",
     "trusted_rewrite_names",
 ]

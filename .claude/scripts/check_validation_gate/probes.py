@@ -136,6 +136,42 @@ def judge_probes(
             )
 
 
+def rule_verdicts(
+    gate: ValidationGate,
+    probes: tuple[Probe, ...],
+    rule: str,
+    access_profile: AccessProfile,
+) -> tuple[list[str], list[str], list[str]]:
+    """Which shapes `rule` refused, which it allowed, and which it never saw.
+
+    **A rule's own verdict is not the Gate's**, and telling them apart is what every rule
+    module needs a positive control for: a rule that refuses everything passes every
+    rejection probe, so each module has to show its rule letting something through. Until
+    Sub-step 5.4 that was read off `ValidationGateOutcome.allowed`, which was the same
+    answer while the rule under test was the last one in the list — and stopped being the
+    same answer the moment a rule was added after it. Three shapes `restricted.py`'s rule
+    allows are refused by the certified-route rule two places later, and reading the
+    Gate's verdict would report them as shapes that rule refused.
+
+    `ValidationGateOutcome.rules` is what makes the distinction answerable, and it is the
+    field 5.1 added for exactly this. A rule that did not appear never ran; a rule that
+    appears **last** on a rejected outcome is the rule that rejected; anything else is a
+    rule that ran and passed the statement on.
+    """
+    refused: list[str] = []
+    allowed: list[str] = []
+    unseen: list[str] = []
+    for probe in probes:
+        outcome = gate.judge(probe.sql, access_profile)
+        if rule not in outcome.rules:
+            unseen.append(probe.name)
+        elif not outcome.allowed and outcome.rules[-1] == rule:
+            refused.append(probe.name)
+        else:
+            allowed.append(probe.name)
+    return refused, allowed, unseen
+
+
 def warehouse() -> WarehouseAdapter:
     """The built Warehouse, or a refusal that says how to build it.
 
