@@ -8,7 +8,7 @@ decision to allow or reject a query."*
 measuring whether that is possible on this schema and this data, and returned **GO**.
 This module is the thing that was measured for.
 
-**Five decisions, and four Sub-steps have shipped.** The
+**Five decisions, and all five have shipped.** The
 [Target State's flow](../../.claude/docs/design/target-state.md#flow) names what
 `VALIDATE` decides; the [Step 005 plan](../../.claude/docs/plan/step-005-validation-gate.md#what-the-gate-must-decide)
 puts them in the order a statement meets them. Sub-step 5.1 shipped everything that
@@ -16,10 +16,19 @@ needs neither the Semantic Layer nor a certified metric — can this be read at 
 it one statement, is it a read, will it stay inside the scan ceiling — Sub-step
 5.2 added the first rule that reads the corpus: does every metric expression trace to
 a Certified Metric; Sub-step 5.3 added the first rule that reads an identity: does
-a Restricted Column reach the answer; and Sub-step 5.4 added the rule that reads the
+a Restricted Column reach the answer; Sub-step 5.4 added the rule that reads the
 rows underneath the projection: is the metric computed across the joins and over the
-period its own Metric Definition names. The Access-Profile-predicate rule is still to
-come.
+period its own Metric Definition names; and Sub-step 5.5 added the last one — is the
+Access Profile's predicate present — while widening 5.4's to admit a slice route and
+to require a Metric Definition's certified filters.
+
+**The widest thing 5.5 changed is not a rule but what an allowed statement looks
+like.** Every statement Veritas runs is now scoped to the identity asking it, so a
+statement carrying no access predicate is refused however certified everything else
+about it is. Every probe written for the four earlier rules predates that and is
+refused at the last rule rather than allowed, which the check reads off
+`ValidationGateOutcome.rules` and reports as *"this rule allowed it and a later one did
+not"*.
 
 **What the Access Profile enforcement here is, and is not.**
 [DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
@@ -53,7 +62,7 @@ lands, warehouse-native security **replaces** this check rather than joining it.
 
   * The tracing rule reads the Semantic Layer and the live schema, so it runs after
     every rule that reads neither. A statement that drops a table is refusable from
-    the parse tree alone, and a Gate that loaded twenty-seven Semantic Entries before
+    the parse tree alone, and a Gate that loaded the whole Semantic Layer before
     refusing it would have made a rule that needs nothing depend on something that
     can fail underneath it.
   * The Restricted Column rule reads all of that **and** the Access Profile the
@@ -62,13 +71,20 @@ lands, warehouse-native security **replaces** this check rather than joining it.
     the rule that needs the most, and a caller who asked *"does this write?"* would be
     told instead that the Warehouse would not open.
   * The certified-route rule reads the corpus twice over — the canonical forms, to learn
-    which metric the statement computes, and then that metric's `join_paths` and
-    `date_column`. It is the only rule that needs a Metric Definition's fields rather
-    than its expression, so it runs last, and the flow's own order
+    which metric the statement computes, and then that metric's `join_paths`,
+    `date_column` and `filters`, and the `routes` of every axis the statement slices by.
+    It is the only rule that needs a Metric Definition's fields rather than its
+    expression, so it runs after the three that do not, and the flow's own order
     ([5.4 after 5.3](../../.claude/docs/plan/step-005-validation-gate.md#what-the-gate-must-decide))
     is the same order. It matters where a statement is wrong in two ways at once: `net
     revenue by client` reaches `dim_client` through uncertified joins **and** projects a
     Client's name, and the leak is the more useful thing to be told about.
+  * The access-predicate rule runs **last**, which the flow's diagram also has, and the
+    reason is the same one every line above gives: it is the only rule that would refuse
+    a statement for something true of every statement written before Sub-step 5.5. A
+    query that computes a Shadow Metric and carries no predicate is better described as
+    a Shadow Metric, and a reader told *"unscoped"* about a query that was never going
+    to be allowed learns nothing they can act on.
 
 **The Gate stops at the first rule that rejects.** A statement that does not parse
 has no tree for a later rule to read, and a rejected outcome names the rules that
@@ -92,9 +108,14 @@ from sqlglot.optimizer.merge_subqueries import merge_subqueries
 from sqlglot.optimizer.qualify import qualify
 from sqlglot.optimizer.scope import Scope, build_scope
 
-from veritas.semantic import SemanticLayer, load_semantic_layer
+from veritas.semantic import (
+    DimensionDefinition,
+    MetricDefinition,
+    SemanticLayer,
+    load_semantic_layer,
+)
 from veritas.validation.outcome import RejectionReason, ValidationGateOutcome
-from veritas.validation.profile import AccessProfile, RestrictedColumn
+from veritas.validation.profile import ACCESS_AXIS, AccessProfile, RestrictedColumn
 from veritas.warehouse import WarehouseAdapter, WarehouseError
 
 # The shape sqlglot's optimizer wants a catalogue in, and the shape
@@ -156,8 +177,8 @@ NO_CERTIFIED_EXPRESSIONS: Mapping[str, str] = MappingProxyType({})
 class Reading:
     """Everything one judgement reads, read at most once each.
 
-    Parsing happens once, here, rather than inside each rule: six rules that each
-    call `sqlglot.parse` are six chances to parse with different settings, and the
+    Parsing happens once, here, rather than inside each rule: eight rules that each
+    call `sqlglot.parse` are eight chances to parse with different settings, and the
     settings are the whole of what a parse tree means.
 
     `statements` is `None` exactly when sqlglot refused the string, and `refusal`
@@ -1038,6 +1059,157 @@ def date_columns_filtered(
     return filtered
 
 
+def where_conjuncts(resolved: exp.Expression) -> set[str]:
+    """The outermost WHERE clause's ANDed parts, each written the way a rule compares
+    them.
+
+    Two rules ask what a statement asserts about its rows — the certified filters a
+    Metric Definition names, and the Access Profile's predicate — and both ask it as
+    *"is this exact predicate one of the things the statement requires"*. A set of
+    canonical conjuncts is that question in one reading.
+
+    **The outermost scope and no other**, which is the one place this reading differs
+    from the three walks above it. `date_columns_filtered` asks which date columns a
+    statement keys on *anywhere*, because a period is a period wherever it is written;
+    this asks what narrows **the rows the answer is computed over**, and a predicate
+    inside a subquery narrows that subquery. `Position Change`'s expression carries a
+    correlated subquery with three conjuncts of its own in a WHERE, and none of them
+    scopes the metric. Pooling every scope would let a statement satisfy the Access
+    Profile by scoping a subquery nobody aggregates and leave the answer unscoped,
+    which is the shape a rule about access must not be wrong about.
+
+    `merge_subqueries` is what makes that affordable: a derived table or a Common Table
+    Expression the generator wrote has already been folded into this statement by the
+    time the rule reads it, so a predicate written one level down is here. One that
+    could not be folded stays where it was written and does not count, which is the
+    fail-closed direction.
+
+    **ANDed parts only.** `a AND b` is two requirements and `a OR b` is one, so an
+    `OR` comes back whole and matches no certified filter — correctly, since a
+    predicate that holds only on some rows is not the predicate that defines a metric.
+    """
+    root = build_scope(resolved)
+    if root is None:
+        raise TracerRefused("sqlglot built no scope for the statement")
+    statement = root.expression
+    if not isinstance(statement, exp.Select):
+        return set()
+    where = statement.args.get("where")
+    if where is None:
+        return set()
+    written = on_base_tables(where.this, base_tables(root))
+    # `flatten()` on an `And` yields the leaves of the whole AND tree, so `a AND b AND
+    # c` is three regardless of how the parser nested it. Every other node is one
+    # requirement and is its own conjunct.
+    parts = written.flatten() if isinstance(written, exp.And) else [written]
+    return {canonical(part) for part in parts}
+
+
+def grouped_columns(resolved: exp.Expression) -> set[tuple[str, str]]:
+    """Every base-table column this statement groups by, as (table, column).
+
+    What a `GROUP BY` names is what the answer is **sliced** by, and a slice is the one
+    thing that earns a statement the joins an axis's `routes` declare —
+    [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+    second source of permission. Reaching an axis is permitted by grouping on it, never
+    by mentioning its table: a statement that joins `dim_instrument` and groups by
+    nothing has added a join for no certified reason, and the route rule refuses it.
+
+    **Every scope**, for the reason `route_of_resolved` and `date_columns_filtered`
+    read every scope: a subquery `merge_subqueries` could not flatten groups its own
+    rows, and the joins it carries are read from that same scope. A reading that took
+    the outermost `GROUP BY` alone would permit joins in one scope on the strength of a
+    grouping in another.
+
+    It is deliberately not *"the columns in the projection that do not aggregate"*. The
+    two readings return the same list for every statement this project writes today —
+    the only builder there is, the check's `certified_statement`, projects the axis it
+    groups by — so the agreement is a habit of the writer and not a property of SQL. The
+    questions differ: a projection is what the answer **shows**, and a grouping is what
+    it is **cut by**.
+
+    `access.py` probes the refusal above as *"a join to a table nothing groups by"* —
+    `Net Revenue`, scoped, with one extra join to `dim_instrument` and no `GROUP BY`.
+    Add the grouping and nothing else, with no label in the projection:
+
+        SELECT sum(...) AS answer FROM fct_trade JOIN ... JOIN dim_instrument ...
+        WHERE dim_client.client_region = 'EU'
+        GROUP BY dim_instrument.instrument_type
+
+    The answer is now one row per instrument type, the join has the certified reason it
+    lacked, and the Gate allows it. The projection still holds nothing but an aggregate,
+    so a reading taken from there would find no axis, `by instrument type` would
+    contribute no `routes`, and that rejection would stand over a statement the corpus
+    certifies.
+    """
+    root = build_scope(resolved)
+    if root is None:
+        raise TracerRefused("sqlglot built no scope for the statement")
+    sliced: set[tuple[str, str]] = set()
+    for scope in root.traverse():
+        if not isinstance(scope.expression, exp.Select):
+            continue
+        group = scope.expression.args.get("group")
+        if group is None:
+            continue
+        base = base_tables(scope)
+        for column in on_base_tables(group, base).find_all(exp.Column):
+            sliced.add((column.table, column.name))
+    return sliced
+
+
+def access_predicate(
+    access_profile: AccessProfile, semantic: SemanticLayer, dialect: str = DIALECT
+) -> str:
+    """The predicate that scopes a statement to one Access Profile, canonicalised.
+
+    **The profile names the axis and the corpus holds everything else**, which is
+    [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
+    and the reason `AccessProfile` carries a region rather than a column and a list of
+    regions: the `by region` Dimension Definition already registers the column, the
+    buckets and — since Sub-step 5.5 — the routes, and a profile restating any of them
+    would be the second registration Non-Negotiable 1 exists to prevent.
+
+    Written through `canonical` for the reason `certified_form` and `certified_route`
+    put the corpus through the same reader as the query: a rule comparing a predicate
+    it built against one the generator wrote is comparing two pieces of text, and two
+    readers is how they come to disagree about quoting.
+
+    **Raises `ValueError` on a profile the corpus cannot certify** — an axis that is not
+    there, an axis over more than one column, or a region that is not one of its
+    buckets. That is a broken installation and not a bad query, so it is the call
+    `certified_form` makes for a corpus that will not yield a metric expression rather
+    than a rejection a user is handed. `ValidationGate.judge` asks for this before it
+    runs a rule, so the refusal arrives when the profile is put to work rather than
+    inside whichever rule happened to read it first.
+    """
+    axis = semantic.dimensions.get(ACCESS_AXIS)
+    if axis is None:
+        raise ValueError(
+            f"the Access Profile is scoped along the {ACCESS_AXIS!r} axis and no "
+            f"Dimension Definition publishes it, so there is no column to scope on"
+        )
+    if len(axis.columns) != 1:
+        raise ValueError(
+            f"the {ACCESS_AXIS!r} axis names {list(axis.columns)} and an Access "
+            f"Profile scopes on one column — a predicate over two columns would be "
+            f"two predicates, and which of them is the boundary is not written anywhere"
+        )
+    if access_profile.permitted_region not in axis.allowed_values:
+        raise ValueError(
+            f"the Access Profile {access_profile.role!r} permits the region "
+            f"{access_profile.permitted_region!r} and the {ACCESS_AXIS!r} axis "
+            f"certifies {list(axis.allowed_values)} — an identity scoped to a bucket "
+            f"the axis does not have is an identity every statement is refused for"
+        )
+    return canonical(
+        sqlglot.parse_one(
+            f"{axis.columns[0]} = '{access_profile.permitted_region}'", dialect=dialect
+        ),
+        dialect,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ValidationGate:
     """The Gate. Built once with what its rules read, then asked for a verdict.
@@ -1302,22 +1474,29 @@ class ValidationGate:
         members because they are two different things to go and fix.
 
         **Permission comes from a list, and a join no entry names is a rejection.** The
-        list this Sub-step gives it has one source, the metric's own `join_paths`;
-        [5.5](../../.claude/docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
-        lengthens it with two more — the `routes` of each axis a statement groups by, and
-        the route the Access Profile's predicate needs. The Gate never searches
-        `semantic/joins/` for a chain that would reach a table, which is
-        [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+        list has three sources and no fourth —
+        [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25):
+        the metric's own `join_paths`, the `routes` of each axis the statement groups
+        by, and the route the Access Profile's predicate needs, which is the `by region`
+        axis's own `routes` read from the same field. The Gate never searches
+        `semantic/joins/` for a chain that would reach a table, which is that ruling's
         decision and the difference between a Gate and a query planner.
 
-        **What that costs until 5.5 lands, stated rather than discovered:** a slice by a
-        certified axis whose column is not already on the metric's route is refused here.
-        `Net Revenue by region` reaches `dim_client` through two joins no Metric
-        Definition names, so it is rejected — which is the same sentence as *"`by region`
-        is a certified axis no query can reach"*, said by the Gate instead of by the
-        plan. `check_validation_gate/route.py` puts that statement in front of the Gate
-        on every run with `rejected` declared, so 5.5 flipping it back is a measurement
-        rather than a hope.
+        **Permitted and required are two lists, and the difference is the whole of what
+        Sub-step 5.5 changed here.** Until 5.5 they were one: the metric's own route was
+        both the most a statement could carry and the least. A slice route and the
+        access route are permission without obligation — a statement need not slice by
+        region, and one that does not must not be told it *omitted* a join its Metric
+        Definition certifies. So a join beyond `permitted_route` is a rejection and a
+        join absent from `required_route` is a rejection, and the two questions are
+        asked of two different Routes.
+
+        **Reachability is asked before the joins are compared**, because the two
+        rejections answer different questions and only one of them is actionable as
+        written. `Cash Balance by instrument type` names an axis with no route from
+        `fct_balance_snapshot`; comparing joins first would refuse it for whichever
+        tables the generator joined trying to get there, and the honest answer is that a
+        Cash Balance has no Instrument.
 
         **A statement that traces to nothing is not this rule's business.** It returns
         `None` — there is no metric whose route to compare against, and the tracing rule
@@ -1327,6 +1506,7 @@ class ValidationGate:
         """
         try:
             hit = self.traced_metrics(reading)
+            sliced = grouped_columns(reading.resolved)
         except TracerRefused as refusal:
             return (RejectionReason.UNRESOLVABLE,), (
                 f"the statement parses but will not resolve against the Warehouse's "
@@ -1335,7 +1515,14 @@ class ValidationGate:
         if not hit:
             return None
 
-        permitted = self.permitted_route(hit, reading.schema)
+        metrics = [self.semantic.metrics[name] for name in hit]
+        axes = self.axes_sliced_by(sliced)
+        unreachable = self.unreachable_axis(metrics, axes)
+        if unreachable is not None:
+            return unreachable
+
+        permitted = self.permitted_route(metrics, axes, reading.schema)
+        required = self.required_route(metrics, reading.schema)
         carried = route_of_resolved(reading.resolved)
 
         uncertified = carried.joins_beyond(permitted)
@@ -1344,17 +1531,25 @@ class ValidationGate:
                 f"this statement computes {', '.join(hit)} across a join no Semantic "
                 f"Entry certifies for it — {'; '.join(uncertified)}"
             )
-        missing = permitted.joins_beyond(carried)
+        missing = required.joins_beyond(carried)
         if missing:
             return (RejectionReason.UNCERTIFIED_ROUTE,), (
                 f"this statement computes {', '.join(hit)} without the join its Metric "
                 f"Definition is certified across — {'; '.join(missing)}"
             )
-        if carried.from_tables != permitted.from_tables:
+        if carried.from_tables != required.from_tables:
             return (RejectionReason.UNCERTIFIED_ROUTE,), (
                 f"this statement computes {', '.join(hit)} starting from "
                 f"{', '.join(sorted(carried.from_tables))}, and its Metric Definition "
-                f"starts from {', '.join(sorted(permitted.from_tables))}"
+                f"starts from {', '.join(sorted(required.from_tables))}"
+            )
+
+        asserted = where_conjuncts(reading.resolved)
+        uncarried = sorted(self.certified_filters(metrics) - asserted)
+        if uncarried:
+            return (RejectionReason.MISSING_CERTIFIED_FILTER,), (
+                f"this statement computes {', '.join(hit)} without the certified "
+                f"predicate that defines it — {'; '.join(uncarried)}"
             )
 
         # `date_column` is written `table.column` in the entry, and the loader keeps it
@@ -1362,7 +1557,7 @@ class ValidationGate:
         # answers in. `check_semantic_layer.py` is what refuses one written any other
         # way, which is why there is no second reading of that shape here.
         certified_dates = {
-            tuple(self.semantic.metrics[name].date_column.split(".", 1)) for name in hit
+            tuple(metric.date_column.split(".", 1)) for metric in metrics
         }
         filtered = date_columns_filtered(reading.resolved, reading.schema)
         stray = sorted(
@@ -1379,15 +1574,117 @@ class ValidationGate:
             )
         return None
 
-    def permitted_route(self, metrics: Iterable[str], schema: Schema) -> Route:
-        """The one Route a statement computing these Certified Metrics may take.
+    def unreachable_axis(
+        self,
+        metrics: Iterable[MetricDefinition],
+        axes: Iterable[DimensionDefinition],
+    ) -> Rejected | None:
+        """The half of the route rule that answers *"can this question be asked at
+        all?"*.
 
-        The union of what each one declares, which for the one-metric statement this
-        project generates is that metric's own route and nothing else. It is a union
-        rather than a per-metric comparison because a statement computing two metrics
-        genuinely carries both routes, and the alternative — asking each metric whether
-        the whole statement matches its route alone — would refuse every such statement
-        on the strength of the joins the other one needed.
+        An axis's `routes` has a key per fact table it can be reached from, and an
+        **absent key** is a real answer rather than an omission: `by instrument type`
+        names `fct_trade` and `fct_position_snapshot` and nothing else, because a Cash
+        Balance has no Instrument. This is the branch that says so by name.
+
+        It is asked before the joins are compared because the two rejections are
+        different news. An uncertified route says the SQL is wrong and the question is
+        fine; this says the **question** is not one this metric can answer, and no
+        rewriting will change that. A reader acting on the first edits a query and a
+        reader acting on the second asks a different one.
+
+        A method of its own rather than four lines inside `routed`, so that
+        `check_validation_gate/access.py` can assemble a Gate without it and measure
+        what it is worth — a rule nobody can delete is a rule nobody has measured.
+        """
+        for axis in axes:
+            for metric in metrics:
+                if metric.from_table not in axis.routes:
+                    return (RejectionReason.UNREACHABLE_AXIS,), (
+                        f"this statement slices {metric.name} by {axis.name!r}, and "
+                        f"that axis declares no route from {metric.from_table} — it is "
+                        f"reachable from "
+                        f"{', '.join(sorted(axis.routes)) or 'no table at all'}, and "
+                        f"the Gate does not go looking for a chain nothing certifies"
+                    )
+        return None
+
+    def certified_filters(self, metrics: Iterable[MetricDefinition]) -> set[str]:
+        """The predicates these Certified Metrics require, written the way a statement's
+        WHERE clause is read.
+
+        The third of the three fields
+        [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+        puts on a Metric Definition to pin down which rows its expression is computed
+        over, and the one Sub-step 5.4 did not read —
+        [DEBT-020](../../.claude/docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters),
+        paid here. `Realised P&L` shares `fct_accounting_movement` with three other
+        movement types and `filters` is the whole difference between them.
+
+        **The corpus goes through the same reader as the query**, which is
+        `certified_form`'s argument and `certified_route`'s applied to the third field:
+        the filter is parsed and canonicalised exactly as the statement's own conjuncts
+        are, so `movement.movement_type = 'realised P&L'` and the entry's
+        `fct_accounting_movement.movement_type = 'realised P&L'` are one predicate
+        written twice. A filter parsed on its own needs no schema — it names its table
+        already, and nothing in it is a star to expand.
+
+        A method of its own for `unreachable_axis`'s reason: `access.py` builds a Gate
+        whose version of this returns nothing, and watches DEBT-020's statement go back
+        to being allowed.
+        """
+        return {
+            canonical(sqlglot.parse_one(predicate, dialect=DIALECT))
+            for metric in metrics
+            for predicate in metric.filters
+        }
+
+    def axes_sliced_by(
+        self, columns: Iterable[tuple[str, str]]
+    ) -> list[DimensionDefinition]:
+        """The certified axes a statement's `GROUP BY` columns belong to.
+
+        A grouping column that belongs to no axis is not an error here and grants no
+        permission: it is a slice by something the corpus does not certify as an axis,
+        and if reaching it needed a join then that join is one nothing names. Which
+        columns may be grouped by **at all** is a question this slice does not ask — the
+        [Target State](../../.claude/docs/design/target-state.md#flow)'s parse-tree
+        checks are about metric expressions, restricted columns and the access
+        predicate, and a fourth about grouping columns would be a rule no ruling asked
+        for.
+
+        Sorted by name so that a rejection naming an axis names the same one on every
+        run, for the reason `RestrictedColumn` is ordered.
+        """
+        grouped = set(columns)
+        return sorted(
+            (
+                axis
+                for axis in self.semantic.dimensions.values()
+                if any(
+                    tuple(column.split(".", 1)) in grouped for column in axis.columns
+                )
+            ),
+            key=lambda axis: axis.name,
+        )
+
+    def required_route(
+        self, metrics: Iterable[MetricDefinition], schema: Schema
+    ) -> Route:
+        """The Route a statement computing these Certified Metrics must carry.
+
+        The metric's own `join_paths` and nothing else: the joins the **expression**
+        needs to compute the number, so dropping one computes it over rows the
+        conversion or the filter it names was supposed to narrow. `Traded Notional`
+        without its hop through `dim_instrument` is not a cheaper Traded Notional, it is
+        a different number.
+
+        The union across metrics, which for the one-metric statement this project
+        generates is one metric's route. It is a union rather than a per-metric
+        comparison because a statement computing two metrics genuinely carries both
+        routes, and asking each metric whether the whole statement matches its route
+        alone would refuse every such statement on the strength of the joins the other
+        one needed.
 
         **What the union cannot say is which metric took which join**, and that is
         [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart).
@@ -1395,32 +1692,141 @@ class ValidationGate:
         that one table in the permitted set, `route_of_resolved` and `projections_of` both
         write columns on their base table before comparing, and so the two conversions can
         be swapped over with every rule here satisfied.
-
-        **This is the list `permission comes from a list` means**, and
-        [5.5](../../.claude/docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
-        lengthens it here: an axis's `routes` and the Access Profile's predicate route
-        are two more sources of joins this method will union in, and the rule above does
-        not change when they arrive.
         """
-        declared = [
-            certified_route(
-                metric.expression,
-                metric.from_table,
-                [
-                    (
-                        self.semantic.join_paths[path].to_table,
-                        self.semantic.join_paths[path].on,
-                    )
-                    for path in metric.join_paths
-                ],
-                schema,
+        return self.assembled_route(metrics, (), schema, access=False)
+
+    def permitted_route(
+        self,
+        metrics: Iterable[MetricDefinition],
+        axes: Iterable[DimensionDefinition],
+        schema: Schema,
+    ) -> Route:
+        """The most a statement computing these metrics and slicing by these axes may
+        carry.
+
+        `required_route`'s joins, plus the `routes` each axis declares from each
+        metric's `from_table`, plus the route the Access Profile's predicate needs. The
+        third is not conditional on anything: every statement must be scoped, so every
+        statement is permitted the joins that scope it, and the rule that notices a
+        statement did not use them is the access rule rather than this one.
+
+        Reachability has already been established by the caller — an axis with no route
+        from a metric's `from_table` is `UNREACHABLE_AXIS`, refused by name — so a
+        missing key here is the access axis's own, which
+        `check_semantic_layer.py`'s check 19 and the reach reading beside it are what
+        keep from happening quietly.
+        """
+        return self.assembled_route(metrics, axes, schema, access=True)
+
+    def assembled_route(
+        self,
+        metrics: Iterable[MetricDefinition],
+        axes: Iterable[DimensionDefinition],
+        schema: Schema,
+        access: bool,
+    ) -> Route:
+        """One Route built from the corpus, read the way a statement's is.
+
+        The shared half of `required_route` and `permitted_route`, and the reason there
+        is one: both build a Route by assembling the metric's own statement and reading
+        it with `route_of`, and the only difference is how long the join list is. Two
+        copies of that assembly would be two chances to canonicalise a join condition
+        differently, which is precisely what `certified_route` exists to prevent one
+        level down.
+
+        **The joins are named once and kept in order.** An axis's route starts at the
+        metric's `from_table`, so appending it after the metric's own joins produces a
+        statement whose every hop extends a route already arrived at its start; and a
+        Join Path already named — `trade_to_instrument`, which `Traded Notional`
+        computes across and `by instrument type` is reached by — is not appended twice,
+        because joining one table twice under one name makes every column that names it
+        ambiguous.
+        """
+        wanted = list(axes)
+        if access:
+            wanted.append(self.semantic.dimensions[ACCESS_AXIS])
+
+        declared = []
+        for metric in metrics:
+            names = list(metric.join_paths)
+            for axis in wanted:
+                for name in axis.routes.get(metric.from_table, ()):
+                    if name not in names:
+                        names.append(name)
+            declared.append(
+                certified_route(
+                    metric.expression,
+                    metric.from_table,
+                    [
+                        (
+                            self.semantic.join_paths[path].to_table,
+                            self.semantic.join_paths[path].on,
+                        )
+                        for path in names
+                    ],
+                    schema,
+                )
             )
-            for metric in (self.semantic.metrics[name] for name in metrics)
-        ]
         return Route(
             frozenset().union(*(route.from_tables for route in declared)),
             frozenset().union(*(route.joins for route in declared)),
         )
+
+    def scoped(
+        self, reading: Reading, access_profile: AccessProfile
+    ) -> Rejected | None:
+        """The statement is scoped to the Access Profile's permitted region, or reject.
+
+        The [Target State](../../.claude/docs/design/target-state.md#flow)'s third
+        parse-tree check, in its own words: *"Access Profile predicate present"*. The
+        last rule the Gate runs and the last one this Step builds.
+
+        **Present on every statement, not absent from the ones that ask for another
+        region.** A statement over `fct_trade` that never joins `dim_client` reads every
+        region's rows and names none of them, so a rule that refused only the statements
+        naming a forbidden region would permit the leak by omission. That is why this
+        rule needs no metric, no route and no projection: it asks one question of the
+        outermost WHERE clause, and the answer is the same for every statement Veritas
+        will ever run.
+
+        **What it makes true, and what it costs**, are the same sentence: after this
+        rule, a Veritas statement is a scoped statement. Every probe written for the
+        four earlier rules was written before it existed and carries no predicate, so
+        each of them is now refused **here** rather than allowed — which is the Gate
+        getting stricter rather than any of those verdicts having been wrong, and is
+        read off `ValidationGateOutcome.rules` by every module of
+        `check_validation_gate`.
+
+        **What this enforcement is and is not** is
+        [DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s
+        sentence, quoted in this module's docstring rather than paraphrased here: the
+        application layer, over synthetic data, demonstrating the mechanism.
+
+        **An unreadable statement is a rejection here too**, and in the assembled Gate
+        the branch is unreached for the reason the Restricted Column rule's is: three
+        earlier rules refuse every statement that cannot be resolved. It is kept because
+        *"nothing found"* and *"could not look"* are the two answers a rule must never
+        confuse, and this is the rule where confusing them would mean running an
+        unscoped query.
+        """
+        try:
+            asserted = where_conjuncts(reading.resolved)
+        except TracerRefused as refusal:
+            return (RejectionReason.UNRESOLVABLE,), (
+                f"the statement parses but what it asserts about its rows cannot be "
+                f"read, so whether it is scoped to the Access Profile is unknown: "
+                f"{refusal}"
+            )
+        predicate = access_predicate(access_profile, self.semantic)
+        if predicate not in asserted:
+            return (RejectionReason.MISSING_ACCESS_PREDICATE,), (
+                f"the Access Profile {access_profile.role!r} may only see "
+                f"{access_profile.permitted_region} and this statement does not say so "
+                f"— its rows are narrowed by "
+                f"{'; '.join(sorted(asserted)) or 'nothing at all'}, and every "
+                f"statement Veritas runs carries {predicate}"
+            )
+        return None
 
     def rules(self, access_profile: AccessProfile) -> tuple[tuple[str, Rule], ...]:
         """The rules, in the order a statement meets them, under one identity.
@@ -1448,6 +1854,10 @@ class ValidationGate:
                 partial(self.no_restricted_column, access_profile=access_profile),
             ),
             ("a certified route", self.routed),
+            (
+                "the access predicate",
+                partial(self.scoped, access_profile=access_profile),
+            ),
         )
 
     def judge(self, sql: str, access_profile: AccessProfile) -> ValidationGateOutcome:
@@ -1468,7 +1878,22 @@ class ValidationGate:
         whose own argument for this was never speed: *"a verdict assembled from two views
         of the Warehouse is a verdict about neither."* Nothing is read here, only made
         reachable — see `Reading` for why that distinction is the Gate's rule order.
+
+        **The identity is checked against the corpus before any rule runs**, and it
+        raises rather than rejecting. A profile scoped to a region the `by region` axis
+        does not certify is a broken installation and not a bad query — the call
+        `certified_form` makes for a corpus that yields no metric expression — and
+        catching it here is
+        [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+        *"refused where it is loaded rather than where it is used"* as close as this
+        design allows: a profile is a constant in `profile.py` and the corpus is not in
+        scope there, so the first moment the two meet is a judgement, and a judgement
+        under an uncertifiable identity ends before it reaches a rule rather than
+        rejecting every statement with an explanation about the statement. It reads the
+        corpus, which is loaded, and never the Warehouse, which is why the rules that
+        need nothing still answer on a day the Warehouse will not open.
         """
+        access_predicate(access_profile, self.semantic)
         reading = read(
             sql,
             catalogue=self.catalogue,

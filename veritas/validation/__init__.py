@@ -10,8 +10,8 @@ registered when the Gate made them code identifiers: `Validation Gate outcome` a
 Laid out like `veritas/warehouse/` and `veritas/semantic/`: this file re-exports, and
 the modules behind it hold the work. `outcome.py` is the verdict and the reason
 taxonomy — a data contract three components that import no rule still have to read;
-`profile.py` is the identity a question is run as and the Restricted Columns it may not
-see; and `gate.py` is the rules that produce a verdict, together with the tracer, the
+`profile.py` is the identity a question is run as — its role, the region it may see, and
+the Restricted Columns it may not; and `gate.py` is the rules that produce a verdict, together with the tracer, the
 lineage walk and the route reader they read a parse tree with — which
 `check_validation_feasibility.py` imports back from here
 under [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25),
@@ -31,6 +31,7 @@ from veritas.validation.gate import (
     Schema,
     TracerRefused,
     ValidationGate,
+    access_predicate,
     base_tables,
     canonical,
     certified_form,
@@ -40,6 +41,7 @@ from veritas.validation.gate import (
     columns_reaching_the_answer,
     columns_reaching_the_answer_of,
     date_columns_filtered,
+    grouped_columns,
     metric_expressions,
     metric_expressions_of,
     on_base_tables,
@@ -52,11 +54,18 @@ from veritas.validation.gate import (
     route_of,
     route_of_resolved,
     trusted_rewrite_names,
+    where_conjuncts,
 )
 from veritas.validation.outcome import RejectionReason, ValidationGateOutcome
-from veritas.validation.profile import ANALYST, AccessProfile, RestrictedColumn
+from veritas.validation.profile import (
+    ACCESS_AXIS,
+    ANALYST,
+    AccessProfile,
+    RestrictedColumn,
+)
 
 __all__ = [
+    "ACCESS_AXIS",
     "ANALYST",
     "ANSWER_COLUMN",
     "DATE_TYPE",
@@ -73,6 +82,7 @@ __all__ = [
     "TracerRefused",
     "ValidationGate",
     "ValidationGateOutcome",
+    "access_predicate",
     "base_tables",
     "canonical",
     "certified_form",
@@ -82,6 +92,7 @@ __all__ = [
     "columns_reaching_the_answer",
     "columns_reaching_the_answer_of",
     "date_columns_filtered",
+    "grouped_columns",
     "metric_expressions",
     "metric_expressions_of",
     "on_base_tables",
@@ -94,4 +105,5 @@ __all__ = [
     "route_of",
     "route_of_resolved",
     "trusted_rewrite_names",
+    "where_conjuncts",
 ]

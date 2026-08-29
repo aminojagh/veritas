@@ -1,0 +1,7 @@
+name: balance_snapshot_to_account
+version: 1
+kind: join_path
+from_table: fct_balance_snapshot
+to_table: dim_account
+on: >
+  dim_account.account_id = fct_balance_snapshot.account_id

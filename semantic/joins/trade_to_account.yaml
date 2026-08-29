@@ -1,0 +1,12 @@
+# The first hop of the route from the trade side to the Client, and the reason it
+# is a hop rather than a column: a Trade names an Account and an Account names a
+# Client, so nothing on fct_trade says whose money it is. dim_account.account_id is
+# a primary key, so this join pairs each Trade with exactly one row and multiplies
+# nothing underneath an aggregate.
+name: trade_to_account
+version: 1
+kind: join_path
+from_table: fct_trade
+to_table: dim_account
+on: >
+  dim_account.account_id = fct_trade.account_id

@@ -2287,3 +2287,681 @@ the one that exists — the Access Profile's predicate arrives in 5.5, which is 
 Sub-step of this Step.
 
 ---
+
+## Sub-step 5.5 — The Gate requires the Access Profile's predicate, admits a slice route, and pays DEBT-020
+
+**What changed**
+
+The last rule, the only Sub-step that changed `semantic/`, and the one that finishes what
+the [Target State's flow](../design/target-state.md#flow) says `VALIDATE` decides. Three
+things in one commit, which is what
+[R15](../plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+put up and what Amino chose on 2026-08-28: *"start substep 5.5 + no need to split it. do
+it all in a single substep."*
+[R5](../plan/step-005-validation-gate.md#r5--55-is-a-pre-agreed-split-point--approved-by-amino-2026-08-25)'s
+split point was therefore not taken, and this section is the whole of 5.5.
+
+**1. The corpus learned where its axes can be reached from.** Five new Join Paths —
+`trade_to_account`, `position_snapshot_to_account`, `balance_snapshot_to_account`,
+`accounting_movement_to_account` and the shared `account_to_client` — one per distinct
+`from_table` across the nine Metric Definitions plus the hop they share. Five and not
+[R11 of Step 004](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)'s
+two, because four of the nine metrics start somewhere other than `fct_trade`.
+
+Each of the five Dimension Definitions gained a **`routes`** field: the map from a
+metric's `from_table` to the Join Paths that reach the axis's columns from there. Three
+shapes and each is a different answer — an empty list says the column is already on that
+table, a list says what reaching it costs, and an **absent key** says the axis cannot be
+reached from there at all. `veritas/semantic/loader.py` reads it as a
+`MappingProxyType`, for the reason its list fields are tuples: a loaded entry is frozen,
+and a plain `dict` inside a frozen dataclass is a field any reader can edit.
+
+**2. The route rule stopped having one source of permission and started having three.**
+[R1](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+design, unchanged: the metric's own `join_paths`, the `routes` of each axis the statement
+**groups by**, and the route the Access Profile's predicate needs — which is the
+`by region` axis's own `routes`, read from the same field rather than declared a second
+time. The Gate still never searches `semantic/joins/` for a chain that would reach a
+table.
+
+What that forced is the one structural change 5.4 did not predict: **permitted and
+required became two Routes.** Until this Sub-step they were one — the metric's route was
+both the most a statement could carry and the least. A slice route and the access route
+are permission without obligation, so a join *beyond* `permitted_route` is a rejection
+and a join *absent from* `required_route` is a rejection, and the two questions are now
+asked of two different values. Reading both against one Route would have refused every
+scoped statement for omitting joins its Metric Definition never named.
+
+**3. `Cash Balance by instrument type` is refused by name.** `ValidationGate.unreachable_axis`
+runs before the joins are compared, because the two rejections are different news: an
+uncertified route says the SQL is wrong and the question is fine, and an unreachable axis
+says the **question** is not one that metric can answer. New `Rejection Reason` member,
+`UNREACHABLE_AXIS`. It is also what makes R11's fourth ruling enforceable rather than
+argued — a Snapshot metric sliced by Trade Date is now an absent key the Gate reads.
+
+**4. The Access Profile is complete, and every statement is scoped.**
+`AccessProfile.permitted_region` carries a value of the `by region` axis — the axis
+named by `ACCESS_AXIS`, never the column and never a second list of buckets — and
+`ValidationGate.scoped` refuses any statement whose outermost WHERE clause does not
+require it. `access_predicate` builds the predicate from the axis entry and the profile
+and raises `ValueError` on a region the axis does not certify.
+
+**Present on every statement, not absent from the ones asking for another region**, which
+is the Target State's *"Access Profile predicate present"* read literally. A statement
+over `fct_trade` that never joins `dim_client` reads every region's rows and names none of
+them, so a rule refusing only the statements that *name* a forbidden region would permit
+the leak by omission.
+
+**5. [DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+is paid**, one Sub-step after it was opened and before either Trigger arm fired, under
+R15. `ValidationGate.certified_filters` canonicalises each metric's `filters` exactly as
+`where_conjuncts` canonicalises the statement's own, and `routed` refuses a statement
+missing any of them as `MISSING_CERTIFIED_FILTER`. It cost what the entry predicted: the
+statement side is the reading the access rule needed anyway.
+
+**What this closes, in the terms R11 of Step 004 set.** `by region` has stopped being
+certified-and-unreachable. The route exists and the rule that lets a query group by it
+exists, which are the two halves that ruling named — so **the first of the three questions
+Step 004 handed to the Grounding Step is answered here rather than narrowed**. The reach
+count `check_semantic_layer.py` prints stopped printing zero for that axis; it now prints
+nine, and it prints them from the `routes` field rather than from what a metric's own
+route happens to pass through. R11's other two questions are untouched: no `by settlement
+date` axis, and check 17's foreclosure stands. Both ask what the corpus may **certify**,
+and this Sub-step certified no axis — it gave certified ones a route.
+
+**Six declared probe verdicts moved and each was declared before it moved**, which is what
+the declarations were for. `net revenue by region` in `traces.py` and in `route.py`, and
+`the name in a comment` and `the name in a filter only` in `restricted.py`, were all four
+refused by the route rule on joins nothing certified; that rule now allows all four, and
+what refuses them is the access predicate they do not carry. `Realised P&L with its filter
+dropped` moved from `allowed` to `rejected`. And `a period keyed on Trade Date` stayed
+`allowed` because its statement gained the access route and the predicate in the same
+commit.
+
+**Nineteen more verdicts moved that nothing had declared**, and that is the widest thing
+this Sub-step did: every statement written before it carries no access predicate, so every
+`allowed` probe in `traces.py`, `restricted.py` and `route.py` is now refused at the last
+rule. Six of the spike's statements and one of `restricted.py`'s cannot be given a
+predicate — `probes.check_the_statements_are_the_spikes` fails the run on a statement that
+moved, and it is right to, because they are a dated measurement — so their declared
+verdicts changed to `rejected` for `missing access predicate`, and each module's `why`
+says which rule allowed it. The probes built **from the corpus** did gain the predicate:
+`probes.certified_statement` is now shared by `traces.py`, `route.py` and `access.py`, and
+it writes the access route and the access predicate into every statement it builds,
+because *"the simplest statement that computes this metric"* and *"the simplest statement
+that computes this metric and is allowed to run"* stopped being the same string this
+Sub-step. All nine Certified Metrics are still allowed by the Gate, which is what keeps
+the run's PASS line true.
+
+**`check_semantic_layer.py` gained check 19** — every route an axis declares is a route
+and arrives at the axis: each Join Path exists, the chain starts at the key, each hop
+extends a route already arrived at its own `from_table`, no hop lands where the route
+already is, no condition reaches forward, and the chain ends at a table the axis lives in.
+Check 8 for a Dimension Definition, with the last clause only an axis can get wrong. Five
+mutation probes give it teeth. An empty route is checked too: `[]` claims the column is
+already on that table, which is a claim like any other.
+
+**Two Glossary rows were amended.** The `Dimension Definition` row gained the sentence
+that an axis also declares the routes that reach it, which R1 pre-approved on 2026-08-25;
+the routes themselves stayed out of the cell, for
+[DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)'s
+own reason. The `Route` row gained the second place a Route is built from — a Dimension
+Definition's `routes` — and that amendment is **not** pre-approved and is the first thing
+to look at sceptically below.
+
+**Verification**
+
+```
+$ uv run python .claude/scripts/check_validation_gate/
+  Warehouse: /home/amino/Projects/veritas/data/veritas.duckdb
+
+  read-only, single, parseable, bounded
+    trusted rewrites: qualify, merge_subqueries — sqlglot's optimize() runs fourteen
+    rejected  drop a table                           not a read
+    rejected  write to a table                       not a read
+    rejected  write to the filesystem                not a read
+    rejected  engine introspection                   not a read
+    rejected  a second database                      not a read
+    rejected  two statements                         not a single statement
+    rejected  a union                                not a read
+    rejected  not sql at all                         unparseable
+    rejected  over the ceiling                       unbounded scan, ceiling 10
+    rejected  engine will not plan it                unbounded scan
+    rejected  a cross product                        no metric expression
+    rejected  an ordinary question                   shadow metric
+    all 4 rules here ran on `SELECT * FROM fct_trade AS left_side, fct_tr…` and none rejected it — refused later by traces
+    all 4 rules here ran on `SELECT count(*) FROM fct_trade WHERE fct_tra…` and none rejected it — refused later by traces
+    8 probe(s) reached the same verdict through a Warehouse that raises on contact
+    asking the engine to plan a two-statement string dropped the table — so the single-statement rule runs before it or not at all
+    planner estimate 61907 against 61907 rows actually in fct_position_snapshot
+    scan ceiling 1000000 against a largest table of 61907 rows — headroom 16x
+    a cross product of fct_trade with itself estimates 3340 scanned against 2788900 rows returned — the estimate counts what is read, not what a join makes from it
+    SELECT count(*) FROM fct_trade estimates 0 — a real answer off a table of 1670 rows, and the same number an unread plan would give
+    the engine refusing a caller's SQL raises WarehouseError, caused by BinderException
+    a Warehouse that will not open raises IOException from the constructor, which no rule catches
+
+  every metric expression traces to a Certified Metric
+    15 of the spike's 16 claim-1 statements are here character for character (1 renamed); 3 added by Sub-step 5.2
+    'notional, wrong currency' is the spike's 'notional through the wrong currency', character for character, under a shorter name
+    the spike's 'unparseable' is not judged here — the Gate refuses it at `parses`, three rules earlier, and `read_only.py` measures that shape with a statement of its own
+    corpus: 9 Certified Metrics, read from semantic/metrics/ through veritas.semantic.loader — not Python literals (R2)
+    corpus canonicalised through the Gate's own reader: 1 of 9 Certified Metrics would not trace if it were parsed alone — Position Change
+    rejected  bare                                   missing access predicate
+    rejected  aliased                                missing access predicate
+    rejected  derived table                          missing access predicate
+    rejected  common table expression                missing access predicate
+    rejected  net revenue                            missing access predicate
+    rejected  net revenue by region                  missing access predicate
+    rejected  traded notional                        missing access predicate
+    rejected  commuted subtraction                   shadow metric
+    rejected  commuted multiplication                shadow metric
+    rejected  open-coded net revenue                 shadow metric
+    rejected  unconverted commission                 shadow metric
+    rejected  rebate silently dropped                shadow metric
+    rejected  notional, wrong currency               uncertified route
+    rejected  certified beside shadow                shadow metric
+    rejected  half-certified union                   not a read
+    rejected  unknown table                          unbounded scan
+    rejected  no metric expression                   no metric expression
+    rejected  unresolvable                           unresolvable
+    this rule ran on 16 of 18 shapes and refused 8; 2 were refused before it and 8 after it — bare, aliased, derived table, common table expression, net revenue, net revenue by region, traded notional, notional, wrong currency
+    
+    one probe per Certified Metric, built from semantic/metrics/:
+    allowed   Account Value                          —
+    allowed   Cash Balance                           —
+    allowed   Gross Revenue                          —
+    allowed   Net Revenue                            —
+    allowed   Position Change                        —
+    allowed   Realised P&L                           —
+    allowed   Trade Count                            —
+    allowed   Traded Notional                        —
+    allowed   Unrealised P&L                         —
+    
+    one judgement, 8 rules: the catalogue was read 1 time(s), and the Reading holds one of each of corpus, resolved, schema (DEBT-019)
+    one judgement, fastest of 15: schema 2 ms · corpus 15 ms · statement 2 ms · whole Gate 29 ms
+    the catalogue in one query against one query per table: 2 ms against 28 ms, same mapping: True
+
+  no Restricted Column reaches the answer
+    Access Profile: role 'analyst', 1 Restricted Column(s) — dim_client.client_name
+    9 of the spike's 9 claim-2 statements are here character for character; 1 added by Sub-step 5.3
+    rejected  net revenue by client                  restricted column
+    rejected  star over a join to dim_client         no metric expression
+    rejected  aliased to a benign name               restricted column
+    rejected  hidden behind a derived table          restricted column
+    rejected  a union branch that names the Client   not a read
+    rejected  the name in a comment                  missing access predicate
+    rejected  the name in a string literal           missing access predicate
+    rejected  the name in a filter only              missing access predicate
+    rejected  projected inside, aggregated away      shadow metric
+    rejected  star beside a certified metric         restricted column
+    
+    tree      text      shape                                 reaching the answer
+    FOUND     matched   net revenue by client                 dim_client.client_name
+    FOUND     missed    star over a join to dim_client        dim_client.client_name
+    FOUND     matched   aliased to a benign name              dim_client.client_name
+    FOUND     matched   hidden behind a derived table         dim_client.client_name
+    FOUND     matched   a union branch that names the Client  dim_client.client_name
+    —         matched   the name in a comment                 —
+    —         matched   the name in a string literal          —
+    —         matched   the name in a filter only             —
+    —         matched   projected inside, aggregated away     —
+    FOUND     missed    star beside a certified metric        dim_client.client_name
+    text matching and the parse tree disagree on 6 of 10 shapes: 2 the text cannot see, 4 it would reject with no Restricted Column reaching the answer at all
+    
+    this rule ran on 7 of 10 shapes, refused 4 and passed 3 on — the other 3 were refused by an earlier rule
+    the optimizer will not resolve it: the Gate refuses it at 'traces', and asked directly the detector raises OptimizeError rather than reporting nothing found
+    sqlglot asserts rather than raising its own error: the Gate refuses it at 'bounded', and asked directly the detector raises AssertionError rather than reporting nothing found
+
+  the metric's own route, and its own period
+    Snapshot calendar: the period is 2024-08-13 to 2024-11-12, both read from fct_position_snapshot (DEBT-012's third arm stays unfired)
+    Traded Notional: 262266110.69 through the Quotation Currency · 7264542867.58 through the Denomination Currency — 96.39% apart
+    Gross Revenue: 7885.33 keyed on trade_date, 2024-08-13 to 2024-11-12 · 7306.66 keyed on settlement_date, same period — 7.34% apart
+    DEBT-020: Realised P&L is 1542753.76 with its certified filter and 1632342.60 with it dropped — 5.49% apart, and the Gate now allows only the first
+    
+    rejected  notional through the wrong currency    uncertified route
+    rejected  a cross product, certified metric      uncertified route
+    rejected  a count with a multiplying join        uncertified route
+    rejected  net revenue by region                  missing access predicate
+    rejected  traded notional                        missing access predicate
+    allowed   a period keyed on Trade Date           —
+    rejected  a period keyed on Settlement Date      uncertified date column
+    rejected  Realised P&L with its filter dropped   missing certified filter
+    allowed   Realised P&L as its entry says         —
+    
+    route     dates     shape                                 what this rule reads
+    OFF       —         notional through the wrong currency   Traded Notional · 1 join(s) nothing certifies · 2 certified join(s) absent
+    OFF       —         a cross product, certified metric     Gross Revenue · 1 join(s) nothing certifies
+    OFF       —         a count with a multiplying join       Trade Count · 1 join(s) nothing certifies
+    on        —         net revenue by region                 Net Revenue
+    on        —         traded notional                       Traded Notional
+    on        —         a period keyed on Trade Date          Gross Revenue
+    on        STRAY     a period keyed on Settlement Date     Gross Revenue · filtered on fct_trade.settlement_date
+    on        —         Realised P&L with its filter dropped  Realised P&L
+    on        —         Realised P&L as its entry says        Realised P&L
+    
+    Account Value       3 required · 5 permitted join(s) · keyed on fct_position_snapshot.snapshot_date · 0 certified filter(s) · starts at fct_position_snapshot
+    Cash Balance        1 required · 3 permitted join(s) · keyed on fct_balance_snapshot.snapshot_date · 0 certified filter(s) · starts at fct_balance_snapshot
+    Gross Revenue       1 required · 3 permitted join(s) · keyed on fct_trade.trade_date · 0 certified filter(s) · starts at fct_trade
+    Net Revenue         1 required · 3 permitted join(s) · keyed on fct_trade.trade_date · 0 certified filter(s) · starts at fct_trade
+    Position Change     0 required · 2 permitted join(s) · keyed on fct_position_snapshot.snapshot_date · 0 certified filter(s) · starts at fct_position_snapshot
+    Realised P&L        1 required · 3 permitted join(s) · keyed on fct_accounting_movement.movement_date · 1 certified filter(s) · starts at fct_accounting_movement
+    Trade Count         0 required · 2 permitted join(s) · keyed on fct_trade.trade_date · 0 certified filter(s) · starts at fct_trade
+    Traded Notional     2 required · 4 permitted join(s) · keyed on fct_trade.trade_date · 0 certified filter(s) · starts at fct_trade
+    Unrealised P&L      3 required · 5 permitted join(s) · keyed on fct_position_snapshot.snapshot_date · 0 certified filter(s) · starts at fct_position_snapshot
+    this rule ran on 9 of 9 Certified Metrics and allowed 9 of them
+    this rule ran on every one of the 9 shapes above and reached the verdict on 5 of them
+
+  the Access Profile's predicate, on every statement
+    Access Profile: role 'analyst', permitted region 'EU' of the 'by region' axis; the predicate is "dim_client"."client_region" = 'EU'
+    Net Revenue by region: the axis registers 3 bucket(s) and the query returns 3; the Access Profile 'analyst' sees 1 — APAC 42651.44 · EU 46282.79 · UK 42684.70
+    Net Revenue: 131618.93 over every region · 46282.79 over EU — 64.84% apart, and the Gate allows only the second
+    refuses  a region the axis does not certify — the Access Profile 'analyst' permits the region 'LATAM' and the 'by region' axis certifies ['EU', 'UK', 'APAC'] — an identity scoped to a bucket the axis does not have is an identity every statement is refused for
+    refuses  an axis the corpus does not publish — the Access Profile is scoped along the 'by region' axis and no Dimension Definition publishes it, so there is no column to scope on
+    
+    allowed   net revenue by region                  —
+    rejected  cash balance by instrument type        unreachable axis
+    rejected  a join to a table nothing groups by    uncertified route
+    allowed   Account Value, scoped                  —
+    rejected  Account Value, unscoped                missing access predicate
+    allowed   Cash Balance, scoped                   —
+    rejected  Cash Balance, unscoped                 missing access predicate
+    allowed   Gross Revenue, scoped                  —
+    rejected  Gross Revenue, unscoped                missing access predicate
+    allowed   Net Revenue, scoped                    —
+    rejected  Net Revenue, unscoped                  missing access predicate
+    allowed   Position Change, scoped                —
+    rejected  Position Change, unscoped              missing access predicate
+    allowed   Realised P&L, scoped                   —
+    rejected  Realised P&L, unscoped                 missing access predicate
+    allowed   Trade Count, scoped                    —
+    rejected  Trade Count, unscoped                  missing access predicate
+    allowed   Traded Notional, scoped                —
+    rejected  Traded Notional, unscoped              missing access predicate
+    allowed   Unrealised P&L, scoped                 —
+    rejected  Unrealised P&L, unscoped               missing access predicate
+    
+    scoped    shape                                   sliced by · narrowed by
+    YES       net revenue by region                   by region · 1 conjunct(s)
+    YES       cash balance by instrument type         by instrument type · 1 conjunct(s)
+    YES       a join to a table nothing groups by     nothing · 1 conjunct(s)
+    YES       Account Value, scoped                   nothing · 1 conjunct(s)
+    no        Account Value, unscoped                 nothing · 0 conjunct(s)
+    YES       Cash Balance, scoped                    nothing · 1 conjunct(s)
+    no        Cash Balance, unscoped                  nothing · 0 conjunct(s)
+    YES       Gross Revenue, scoped                   nothing · 1 conjunct(s)
+    no        Gross Revenue, unscoped                 nothing · 0 conjunct(s)
+    YES       Net Revenue, scoped                     nothing · 1 conjunct(s)
+    no        Net Revenue, unscoped                   nothing · 0 conjunct(s)
+    YES       Position Change, scoped                 nothing · 1 conjunct(s)
+    no        Position Change, unscoped               nothing · 0 conjunct(s)
+    YES       Realised P&L, scoped                    nothing · 2 conjunct(s)
+    no        Realised P&L, unscoped                  nothing · 1 conjunct(s)
+    YES       Trade Count, scoped                     nothing · 1 conjunct(s)
+    no        Trade Count, unscoped                   nothing · 0 conjunct(s)
+    YES       Traded Notional, scoped                 nothing · 1 conjunct(s)
+    no        Traded Notional, unscoped               nothing · 0 conjunct(s)
+    YES       Unrealised P&L, scoped                  nothing · 1 conjunct(s)
+    no        Unrealised P&L, unscoped                nothing · 0 conjunct(s)
+    
+    delete the 'the access predicate' rule: 9 of 9 unscoped statements are allowed to run
+    delete the absent-key branch: 'cash balance by instrument type' is refused as uncertified route instead of 'unreachable axis'
+    delete the certified-filter comparison: `Realised P&L` with its filter dropped goes from missing certified filter to allowed (DEBT-020)
+    this rule ran on 19 of the 21 shapes above and reached the verdict on 9 of them; 2 were refused before it
+
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement, what is not a read, what the planner expects to scan past the ceiling, what computes a metric the Semantic Layer does not certify, what would carry a Restricted Column into the answer, what computes a certified metric across a route or over a period or without a filter the corpus does not certify for it, what slices a metric by an axis no route reaches, and what is not scoped to the Access Profile asking; and it allows every Certified Metric, sliced by an axis that reaches it
+```
+
+The `dimensions` block of the Semantic Layer check, which is where check 19 and the reach
+reading are:
+
+```
+$ uv run python .claude/scripts/check_semantic_layer.py
+  dimensions — the certified axes a metric can be sliced by
+    Glossary Section A's `Dimension Definition` row names 5 axis(es); semantic/dimensions/ publishes 5
+    'by accounting movement date' — fct_accounting_movement.movement_date (DATE) — daily — 497 value(s), not enumerated
+    'by instrument type' — dim_instrument.instrument_type (VARCHAR) — one Instrument — equity · ETF · future · currency pair
+    'by region' — dim_client.client_region (VARCHAR) — one Client — EU · UK · APAC
+    'by snapshot date' — fct_position_snapshot.snapshot_date · fct_balance_snapshot.snapshot_date (DATE) — daily — 453 value(s), not enumerated
+    'by trade date' — fct_trade.trade_date (DATE) — daily — 497 value(s), not enumerated
+    reach — the metrics each axis declares a route from, of 9 Certified Metric(s)
+      by accounting movement date:     1 — Realised P&L — 0 hop(s) from fct_accounting_movement
+      by instrument type:              6 — Gross Revenue, Net Revenue, Position Change, Trade Count, Traded Notional, Unrealised P&L — 1 hop(s) from fct_position_snapshot; 1 hop(s) from fct_trade
+      by region:                       9 — Account Value, Cash Balance, Gross Revenue, Net Revenue, Position Change, Realised P&L, Trade Count, Traded Notional, Unrealised P&L — 2 hop(s) from fct_accounting_movement; 2 hop(s) from fct_balance_snapshot; 2 hop(s) from fct_position_snapshot; 2 hop(s) from fct_trade
+      by snapshot date:                4 — Account Value, Cash Balance, Position Change, Unrealised P&L — 0 hop(s) from fct_balance_snapshot; 0 hop(s) from fct_position_snapshot
+      by trade date:                   4 — Gross Revenue, Net Revenue, Trade Count, Traded Notional — 0 hop(s) from fct_trade
+    probes — run against 'by instrument type' and 'by accounting movement date', which are real entries
+      refuses  a column the live schema does not hold
+      refuses  a bucket the Warehouse has never held
+      refuses  a held value the axis does not name
+      refuses  an enumeration written where the data mints the values
+      refuses  no enumeration where the Glossary registers the buckets
+    route probes — run against 'by region', whose own route is the longest in the corpus
+      refuses  a route out of a table the schema does not hold
+      refuses  a Join Path no file publishes
+      refuses  a hop that starts where the route has not reached
+      refuses  a hop into a table the route already holds
+      refuses  a chain that stops before the axis
+
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+```
+
+The other four checks, each run in full; the whole of each one's output is its PASS line
+plus the counts it prints above it, and neither moved except where named:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py
+  proposed terms: 0 · python files scanned: 28 · identifiers: 1826
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+```
+
+**Three figures in that output are dated evidence**, measured on **2026-08-28** against
+the Warehouse `uv run python -m veritas.ingestion` builds, and each is reproduced by the
+command above it:
+
+- **the access control is worth 64.84%** — `Net Revenue` is 131,618.93 over every region
+  and 46,282.79 over `EU`, and the Gate allows only the second. The `by region` axis
+  registers three buckets, the unscoped slice returns three, and the analyst sees one;
+  `access.py` fails the run if the scoped figure stops being smaller;
+- **DEBT-020 is worth 5.49%** — `Realised P&L` is 1,542,753.76 with its certified filter
+  and 1,632,342.60 with it dropped, both now scoped to `EU`, which is why both figures
+  differ from the 5.4 review's. `route.py` fails the run if they converge;
+- **the date pair is worth 7.34%** over the period 2024-08-13 to 2024-11-12, both dates
+  read from the Snapshot calendar. It was 3.47% in the 5.4 review over the same period,
+  because both halves of the pair are now scoped to `EU` as well.
+
+**Deliberately left undone**
+
+- **[DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
+  is opened.** A Route holds *(table, canonical condition)*, so `LEFT JOIN dim_account ON
+  …` and `JOIN dim_account ON …` are one join, and `certified_route` always assembles an
+  inner one. A statement can therefore reach rows the Metric Definition did not certify
+  through a join the Gate believes it did. Found by reading `route_of_resolved` while
+  lengthening the permission list, not by a probe — and **not fixed here**, for the reason
+  DEBT-020 was not fixed in 5.4: a fourth reading added to this rule after approval and
+  before review is the quiet widening that entry was opened rather than committed for. It
+  is put up for a ruling below. Nothing in the repository demonstrates a moved number and
+  the entry says why: every Certified Metric that joins anything multiplies by a column
+  from the table it joins, so a row an outer join keeps contributes `NULL` and `sum` skips
+  it. That is a property of these nine expressions, not of the rule.
+- **[DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+  stays open and its Location moved.** The union across metrics now happens in
+  `assembled_route`, which `required_route` and `permitted_route` share; the hole is
+  unchanged, including the probe the paying Sub-step owes. Its Trigger and DEBT-022's are
+  the same Sub-step and the same method, which is the cheapest place to pay both.
+- **[DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+  is not paid, and the mechanism is now exactly as wide as the entry describes.** Its
+  Trigger is the first access-control claim in `README.md`, the App or a demo script, and
+  none of the three exists. A working one-role demonstration makes the unqualified claim
+  more tempting rather than less, which the entry now says.
+- **[DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)
+  came into reach and did not fire.** Its second arm is *"the first time that cell is
+  reworded and the run fails for it"*; the cell was reworded and the run did not fail,
+  because check 18 parses only a bold axis name followed by a parenthetical and the new
+  sentence adds neither. Both arms stay open.
+- **[DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)
+  stays unfired.** No probe added in this Sub-step names a date at all — an access
+  predicate narrows rows by region, and a period would be a second question.
+- **A second Access Profile role, and a second permitted region.** One of each exists;
+  both are a row added rather than a field changed, which the plan files as a scope
+  boundary.
+- **The three flat check scripts are still flat.** [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
+  decided the shape of the check this Step writes and nothing about the ones already
+  written.
+
+**Look at this sceptically**
+
+1. **The `Route` Glossary amendment is not pre-approved and is the one row worth
+   rejecting on its own.** That row was registered three days ago by R15 and says a Route
+   is *"built from a Metric Definition's `from_table` and `join_paths`"* and *"never
+   published"*. After this Sub-step it is also built from a Dimension Definition's
+   `routes`, so the row was amended to say so and to keep *"never published"* on the
+   reading that no **file is** a Route while entries publish the fields one is built from.
+   The alternative readings are that `routes` publishes a Route and the row is now false,
+   or that the field should have been called something other than the plural of a
+   registered term. R1 approved the field name on 2026-08-25, before `Route` was a term,
+   so the collision is real and this is my resolution of it rather than a ruling.
+   → **approved in this commit**: the amendment stands, `routes` keeps the plural of the
+   registered term, and the row carries its approval date — see the Language section and
+   [R16](../plan/step-005-validation-gate.md#r16--aminos-rulings-on-the-55-review--decided-2026-08-29).
+2. **Every statement in the Gate's world is now scoped, and nineteen probe verdicts moved
+   because of it.** That is the strict reading of *"Access Profile predicate present"* and
+   I believe it is the only safe one — the alternative permits a cross-region aggregate by
+   omission. But it is a large change to what the check suite says: `restricted.py` now
+   declares **no** `allowed` verdict at all, and its positive control is entirely
+   `ValidationGateOutcome.rules`. If the reading is wrong, almost everything in this commit
+   is differently shaped.
+3. **The plan predicted `Net Revenue by region` would be *"allowed and return three
+   buckets"*, and it returns one.** Both halves cannot be true under a mandatory
+   predicate: the statement the Gate allows is scoped to `EU`. `access.py` executes the
+   unscoped statement through the adapter to show the three buckets exist and the scoped
+   one to show the analyst sees one, and prints both — which I think is the better
+   demonstration, but it is a correction to the plan and not an implementation of it.
+4. **DEBT-022 was recorded rather than fixed, and the fix is about ten lines.** The
+   `recording-debt` skill says *"if it is faster to fix than to document, fix it"*, and
+   documenting it was slower. I followed DEBT-020's precedent instead — scope was approved
+   without it, and the same rule was the subject. Ruling either way is cheap now and the
+   entry says exactly what the fix is.
+   → **left recorded**: the entry is paid at its Trigger beside
+   [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart),
+   on one visit to `route_of_resolved`, and it gains a dated note saying it was offered
+   and deferred rather than unread.
+5. **`access_predicate` validates the profile at the first judgement, not at load.** R1
+   asks for a profile naming an uncertified region to be *"refused where it is loaded
+   rather than where it is used"*. A profile is a constant in `profile.py` and the corpus
+   is not in scope there; importing `semantic/` into that module would make a data
+   contract read the whole corpus at import. So `judge` asks for the predicate
+   before it runs a rule and raises `ValueError`. `access.py` gives it two probes. It is
+   as close to R1's words as this design allows and it is not those words.
+6. **The unreachable-axis rejection fires on the axis, before the joins are compared, and
+   that ordering is a judgement.** A statement that slices `Cash Balance` by
+   `by instrument type` **and** carries three uncertified joins is told about the axis
+   only. I think that is the more useful sentence — the question is unanswerable and the
+   joins are a symptom — but a reader who wanted to fix the SQL learns one problem at a
+   time.
+7. **`where_conjuncts` reads the outermost WHERE and no other scope**, where the three
+   readings beside it walk every scope. A predicate inside a subquery `merge_subqueries`
+   could not flatten does not count, which is fail-closed and is also why `Position
+   Change`'s correlated subquery does not accidentally satisfy anything. If a generator
+   ever writes a legitimate scoping predicate one level down, the Gate refuses it.
+8. **The certified-filter and access-predicate comparisons are text.** A statement that
+   writes `'EU' = dim_client.client_region`, or `movement_type IN ('realised P&L')`, is
+   refused. That is
+   [C1](../design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)'s
+   choice applied to two more fields — the same reason a commuted operand is a Shadow
+   Metric — and it is a choice a generator has to be told about.
+9. **Three near-copies of `rule_name` became one `probes.rule_named`**, which touched
+   `restricted.py` and `route.py` for a reason that is not this Sub-step's scope. The
+   fourth copy was the alternative. Both existing functions kept their names and now
+   delegate.
+10. **`certified_statement` writes an `ORDER BY` beside its `GROUP BY`** so the printed
+    buckets are the same line on every run. No Gate rule reads an `ORDER BY`, so it
+    changes no verdict — but it is a statement built by a check being shaped for the
+    check's output, and it is worth knowing that is why it is there.
+11. **Check 19 does not ask whether a `routes` key is a table any metric starts from.** A
+    key naming a fact table no Metric Definition begins at would be dead certification and
+    would pass. The reach reading prints enough to notice it by eye — nine metrics for
+    `by region`, four for `by trade date` — and I did not turn that into a rule, because a
+    key added ahead of a tenth metric is a reasonable thing to write.
+
+**Language**
+
+No Term Proposals. Every domain noun this Sub-step made an identifier is already
+registered: `Route` and its plural on the `routes` field,
+[`Join Path`](../glossary.md#a-the-system) for the five new files,
+[`Access Profile`](../glossary.md#a-the-system) and its *"permitted region"* for
+`AccessProfile.permitted_region`, and
+[`Dimension Definition`](../glossary.md#a-the-system) for the field's home.
+`check_language.py` reports **0 proposed terms** across 28 Python files and 1,826
+identifiers.
+
+**Two amendments to `agreed` rows**, both listed above and one of them needing a ruling
+when this section was written:
+
+- **`Dimension Definition`** — an axis also declares the routes that reach it, and
+  `semantic/dimensions/` holds them. **Pre-approved** by R1 on 2026-08-25, which is also
+  where the constraint that the cell must not list the routes was set.
+- **`Route`** — a Route is built from a Metric Definition's fields **or** from a Dimension
+  Definition's `routes`, and the Route the Gate permits is the union of the two plus the
+  access route. **Not pre-approved** when this section was written; item 1 above is the
+  argument. → **Approved 2026-08-29** ([R16](../plan/step-005-validation-gate.md#r16--aminos-rulings-on-the-55-review--decided-2026-08-29)),
+  and [Glossary Section A](../glossary.md#a-the-system) carries the date.
+
+Three `Rejection Reason` members were registered in code and not in the Glossary, which is
+[R3](../plan/step-005-validation-gate.md#r3--validation-gate-outcome-and-rejection-reason-get-glossary-rows--approved-by-amino-2026-08-25)'s
+decision applied for the fourth time: `UNREACHABLE_AXIS`, `MISSING_CERTIFIED_FILTER` and
+`MISSING_ACCESS_PREDICATE`. Each is its own bar because each is a different thing to go and
+fix — a question that cannot be asked of this metric, a WHERE clause dropped, and a
+population nobody narrowed.
+
+---
+
+### The eleven sceptical items → **ruled, and answered in this commit**
+
+**Amino, 2026-08-29:** *"regarding the sceptical points: all approved. all other changes
+all approved."* — with one clarification on the code's own prose: the paragraph of
+`grouped_columns` that says why a slice is read off the `GROUP BY` and not off the
+projection was to be made *"clearer, simpler and more tangible using example"*, the same
+instruction the 5.4 ruling gave the `resolved` docstring. Recorded as
+[R16](../plan/step-005-validation-gate.md#r16--aminos-rulings-on-the-55-review--decided-2026-08-29),
+landing in this commit rather than after it because it arrived before the commit did —
+the shape [R11](../plan/step-005-validation-gate.md#r11--aminos-rulings-on-the-trim--decided-2026-08-26)
+through [R15](../plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+set.
+
+**No rule changed and no seam moved**, and every line of code this ruling touched is
+inside a docstring — which is why every check below comes back with the verdicts the
+Verification block above recorded. Two of the eleven items cost an edit and the marks are
+inline on them; the other nine are declared limits rather than offers, so approval records
+them as known.
+Two of those nine are worth naming again because the rest of the Step now rests on them:
+the strict reading of *"Access Profile predicate present"* stands (item 2), so **every**
+statement in the Gate's world is scoped and the nineteen moved verdicts are the shape of
+the check from here on; and the certified-filter and access-predicate comparisons stay
+**text** (item 8), which is a constraint the component that generates SQL has to be
+told rather than one it can discover.
+
+**Item 1 — the `Route` amendment is approved, and the collision is resolved rather than
+renamed.** The row was three days old and this Sub-step changed it without pre-approval,
+which is why it led the list. The ruling keeps all three of the things that were in
+tension: the field goes on being called `routes`, the row goes on saying *"never
+published"*, and the row stops being false. What makes them compatible is the reading the
+amendment states — a Dimension Definition's `routes` publishes **the fields a Route is
+built from**, the way a Metric Definition's `from_table` and `join_paths` do, and no file
+is a Route. The two alternatives the item put up are declined: `routes` is not renamed
+away from the registered term, and the row is not left describing only the Metric
+Definition half. [Glossary Section A](../glossary.md#a-the-system) now carries the
+amendment with its approval date, which makes **every Glossary edit in this Step ruled** —
+`Dimension Definition` pre-approved inside R1, `metric expression` and `Route` registered
+by ruling, and this row.
+
+**Item 4 — [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
+stays recorded.** The item offered the ten-line fix against the entry and the ruling takes
+the entry, so the outer-join hole is paid at its Trigger — the Sub-step that builds
+Grounding — beside [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart),
+on one visit to `route_of_resolved`, with the probe each entry already owes. The entry
+gains a dated status note recording that it was put up and deferred, because an entry
+somebody read and kept is a different thing from one nobody has looked at. **What this
+settles is a rule 5.4 started**: a hole found by reading code *after* a Sub-step's scope
+was approved goes on the Ledger and into the review's sceptical list rather than into the
+same commit. DEBT-021 was filed that way under R15 and DEBT-022 followed the precedent;
+this ruling is what makes the precedent a decision.
+
+**The `grouped_columns` docstring's last paragraph was rewritten.** It said the reading is
+deliberately not *"the columns in the projection that do not aggregate"* because those are
+*"the same list in every statement this project writes and are not the same question"* —
+two claims compressed into one sentence, with the working for neither. It now says **why**
+the two lists coincide today (the only statement builder there is,
+`probes.certified_statement`, projects the axis it groups by, so the agreement is the
+writer's habit and not a property of SQL) and then shows where they part, in a statement
+the run above already contains. `access.py`'s probe *"a join to a table nothing groups
+by"* is `Net Revenue`, scoped, with one extra join to `dim_instrument` and no `GROUP BY`,
+and the Gate refuses it as an uncertified route. **Add the grouping and nothing else — no
+label in the projection — and the same statement is allowed**, because the join now has
+the certified reason it lacked. A reading taken from the projection would find no axis
+there, `by instrument type` would contribute no `routes`, and the refusal would stand over
+a statement the corpus certifies. The example is one clause away from a declared probe,
+which is what makes it something a reader can try rather than take on trust.
+
+**One stale figure was fixed in passing, and one copy of it is left for a ruling.** The
+rule-ordering argument in `gate.py`'s module docstring read *"a Gate that loaded
+twenty-seven Semantic Entries before refusing it"* — the corpus held twenty-seven entries
+when Sub-step 5.2 wrote that sentence and holds thirty-two after this Sub-step's five Join
+Paths, so **the Sub-step under review is what made it false**. It now says *"the whole
+Semantic Layer"*, which is the rule the sentence was always making rather than a count of
+the corpus on one day, and which is what the writing conventions ask code to do with a
+figure a later Step can move. Sceptical item 5's copy of the same number is corrected the
+same way. **The third copy is in the plan** —
+[What the Gate must decide](../plan/step-005-validation-gate.md#what-the-gate-must-decide)
+argues the rule order in those words — and it is left untouched, because editing the body
+of an approved plan without being asked is what item 1 above exists to flag.
+
+**Verification, after the edits.** Every check was re-run in the same session:
+
+```
+$ uv run python .claude/scripts/verify_framework.py
+  links      1295 links, 1049 anchors 57 documents and python files
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py
+  glossary: 93 registered terms
+  proposed terms: 0 · python files scanned: 28 · identifiers: 1826
+  abbreviations: 24 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+
+$ uv run python .claude/scripts/check_warehouse.py
+PASS — the star schema matches Glossary Section B and the adapter seam holds
+
+$ uv run python .claude/scripts/check_data_availability.py
+PASS — every source is obtainable and every distinction separates
+
+$ uv run python .claude/scripts/check_semantic_layer.py
+PASS — every published expression executes against the Warehouse, every figure with a second opinion agrees with it, every registered ambiguity resolves to metrics that exist, and every certified axis names buckets the Warehouse holds
+
+$ uv run python .claude/scripts/check_validation_feasibility.py
+PASS — every probe's verdict, every probe's number and every detector's reading is the one this spike recorded
+
+$ uv run python .claude/scripts/check_validation_gate/
+PASS — the Validation Gate refuses what it cannot read, what is more than one statement, what is not a read, what the planner expects to scan past the ceiling, what computes a metric the Semantic Layer does not certify, what would carry a Restricted Column into the answer, what computes a certified metric across a route or over a period or without a filter the corpus does not certify for it, what slices a metric by an axis no route reaches, and what is not scoped to the Access Profile asking; and it allows every Certified Metric, sliced by an axis that reaches it
+```
+
+**The `check_validation_gate/` run above was diffed against the Verification block of this
+Sub-step, line by line, and differs on the timing line alone** — `one judgement, fastest
+of 15` and the catalogue comparison beside it, which print different figures on every run
+of every session and which nothing compares with anything. Every probe verdict, every
+reason, every executed figure, both reading tables and every coverage line came back
+character for character. **`verify_framework.py`'s counts are printed above where the
+Verification block showed only its PASS line**: 1,295 links and 1,049 anchors across 57
+documents and Python files, all of them resolving, against the 1,188 and 943 the
+[5.4 ruling](#the-ten-sceptical-items-one-term-proposal-and-one-question--ruled-and-answered-in-this-commit)
+recorded — Sub-step 5.5 and this section are themselves documents full of links.
+**`check_language.py`'s counts did not move**: 93 registered terms, 28 Python files and
+1,826 identifiers, the same figures the Verification block above printed, because this
+ruling added no identifier, no term and no file.
+
+**What this does not settle.** DEBT-021 and DEBT-022 are both open, both live in
+`route_of_resolved`, and **neither is demonstrated by anything that runs** — each owes a
+probe from the Sub-step that pays it, and that Sub-step is the same one for both.
+[DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+is unpaid and its Trigger has still not fired; a working one-role demonstration makes the
+unqualified claim more tempting rather than less. The two questions
+[R11 of Step 004](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
+handed to Grounding stay handed to it, and Step 004's open question about the `resolution`
+field name is untouched. **What it does settle is the Step**: all five Sub-steps and the
+trim before them are built and ruled, and the next thing this project does is plan Step
+006.
+
+---

@@ -15,13 +15,20 @@ omission"*: restriction is a property of the identity asking, and putting it on 
 Definition would make one column restricted or not depending on which entry happened to
 retrieve it.
 
-**Half of the registered row, in this Sub-step.** A profile carries a **role** and its
-**Restricted Columns** here; the **permitted region** arrives with Sub-step 5.5, which
-is where the Access Profile's predicate becomes a rule and where
-[R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
-settles its shape — *"a permitted value of the `by region` axis"*, refused at load if
-the axis does not certify it, rather than a second registration of the column and its
-buckets. A field with no rule behind it would be a promise this module cannot keep.
+**The registered row entire, as of Sub-step 5.5.** A profile carries a **role**, its
+**Restricted Columns** and its **permitted region**, which is the Glossary row's own
+*"role and permitted region"* read literally. The third field arrived with the rule
+that reads it, never before it: a field with no rule behind it would be a promise this
+module cannot keep.
+
+**The permitted region is a value of the `by region` axis, not a column and a string.**
+That is
+[R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25):
+the axis already registers `dim_client.client_region`, its grain and its three buckets,
+and a profile carrying the column and its own list of regions would be a second
+registration of both — the synonym Non-Negotiable 1 exists to prevent. So this module
+names the **axis** and the Gate resolves the column and the route from the entry.
+`ACCESS_AXIS` below is that name.
 
 **What this enforcement is and is not** is stated where the rule that reads this module
 lives, in `gate.py`'s module docstring, and it is
@@ -30,6 +37,21 @@ own sentence rather than a paraphrase of it.
 """
 
 from dataclasses import dataclass
+
+# The certified axis an Access Profile's permitted region is a value of.
+#
+# A name rather than a column, for the reason in this module's docstring: the
+# `by region` Dimension Definition registers `dim_client.client_region`, the grain, the
+# three buckets **and** — since Sub-step 5.5 — the routes that reach it from each fact
+# table. Everything the Gate needs to turn `permitted_region` into a predicate and into
+# the joins that predicate requires is in that one entry, and naming the entry is how
+# this module refers to all four without copying any of them.
+#
+# It is a constant rather than a field on the profile because there is one region axis
+# and the Glossary row says so: *"role and permitted region"*. A profile free to pick
+# its own axis would be a profile that could scope questions by something nobody
+# certified as an access boundary.
+ACCESS_AXIS = "by region"
 
 
 @dataclass(frozen=True, slots=True, order=True)
@@ -68,9 +90,18 @@ class AccessProfile:
     `restricted_columns` is a `frozenset` because it is a set of things, membership is
     the only question ever asked of it, and a mutable default on a frozen dataclass is
     not one.
+
+    `permitted_region` has **no default**, unlike `restricted_columns`, and the
+    asymmetry is the difference between the two fields. A profile that restricts no
+    column is an identity that may see everything a query can project, which is a
+    coherent thing to be; a profile that permits no region is an identity every
+    statement is refused for, which is not an identity but a mistake. The Gate reads
+    this as a value of the `ACCESS_AXIS` entry and refuses a value that axis does not
+    certify — see `gate.access_predicate`, which is where the corpus is in reach.
     """
 
     role: str
+    permitted_region: str
     restricted_columns: frozenset[RestrictedColumn] = frozenset()
 
     def restricted(self) -> list[RestrictedColumn]:
@@ -94,7 +125,14 @@ class AccessProfile:
 # system. Veritas has no user concept yet — the App Step is where one arrives — and
 # registering a vocabulary of roles before anything reads a second one would be
 # registering a guess.
+#
+# **`EU` is a choice and not a finding.** It is one of the three buckets the `by region`
+# axis registers, and which of the three this profile permits changes only which rows
+# the analyst sees — the rule, the route and the predicate are identical for all three.
+# A second role permitting a second region is a file edit rather than a field change,
+# which is why the Step 005 plan files it as a scope boundary rather than as debt.
 ANALYST = AccessProfile(
     role="analyst",
+    permitted_region="EU",
     restricted_columns=frozenset({RestrictedColumn("dim_client", "client_name")}),
 )

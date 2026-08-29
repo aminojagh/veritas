@@ -25,11 +25,16 @@ different order would be checking a different Gate.
   * `restricted` — Sub-step 5.3. No Restricted Column reaches the answer, under the
     Access Profile the statement is judged under.
   * `route` — Sub-step 5.4. The metric is computed across the joins its own Metric
-    Definition names, over the period its own `date_column` keys.
+    Definition names, over the period its own `date_column` keys — widened in 5.5 to
+    admit an axis's slice route and to require the metric's certified filters.
+  * `access` — Sub-step 5.5. The Access Profile's predicate is present, on every
+    statement.
 
-The one still to come is `access` (5.5).
+All five modules are here, which is the whole of what the
+[Target State's flow](../../docs/design/target-state.md#flow) says `VALIDATE` decides.
 """
 
+import access
 import read_only
 import restricted
 import route
@@ -45,6 +50,7 @@ def main() -> int:
             traces.check(adapter),
             restricted.check(adapter),
             route.check(adapter),
+            access.check(adapter),
         ]
 
     for report in reports:
@@ -60,9 +66,11 @@ def main() -> int:
         "PASS — the Validation Gate refuses what it cannot read, what is more than "
         "one statement, what is not a read, what the planner expects to scan past "
         "the ceiling, what computes a metric the Semantic Layer does not certify, "
-        "what would carry a Restricted Column into the answer, and what computes a "
-        "certified metric across a route or over a period the corpus does not "
-        "certify for it; and it allows every Certified Metric"
+        "what would carry a Restricted Column into the answer, what computes a "
+        "certified metric across a route or over a period or without a filter the "
+        "corpus does not certify for it, what slices a metric by an axis no route "
+        "reaches, and what is not scoped to the Access Profile asking; and it allows "
+        "every Certified Metric, sliced by an axis that reaches it"
     )
     return 0
 

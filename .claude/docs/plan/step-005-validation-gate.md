@@ -1332,6 +1332,93 @@ rather than added while it runs.
 
 ---
 
+### R16 — Amino's rulings on the 5.5 review → **decided 2026-08-29**
+
+Rulings on the eleven sceptical items of
+[the 5.5 review entry](../reviews/step-005-validation-gate.md#sub-step-55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020),
+two of which asked for a decision rather than an opinion. Amino: *"regarding the
+sceptical points: all approved. all other changes all approved."* One clarification came
+with them, on the code's own prose rather than on a rule: the paragraph of
+`grouped_columns` that says why a slice is read off the `GROUP BY` and not off the
+projection was to be made *"clearer, simpler and more tangible using example"* — the same
+instruction [R15](#r15--aminos-rulings-on-the-54-review--decided-2026-08-28) gave the
+`resolved` docstring. They land **in the 5.5 commit itself** rather than after it, for
+the reason [R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26) through R15 did:
+the ruling arrived before the commit did.
+
+**No rule changed and no seam moved.** Two items cost an edit — one to a Glossary row
+and one to a Ledger entry — the clarification costs one docstring, and the other nine are
+declared limits rather than offers, so approval records them as known: the strict reading
+of *"Access Profile predicate present"* stands and with it the nineteen probe verdicts it
+moved (item 2); `access.py` prints the unscoped three buckets beside the scoped one
+rather than implementing the plan's prediction of *"allowed and returns three buckets"*
+(item 3); `access_predicate` validates a profile at the first judgement rather than at
+load, which is as close to R1's words as a data contract that must not read the whole
+corpus at import can get (item 5); the unreachable-axis rejection goes on
+firing before the joins are compared, so a statement wrong in both ways is told about the
+axis alone (item 6); `where_conjuncts` goes on reading the outermost WHERE and no other
+scope, which is the fail-closed direction and refuses a legitimate predicate written one
+level down (item 7); the certified-filter and access-predicate comparisons stay **text**,
+which is [C1](../design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)'s
+choice applied to two more fields and a thing a generator has to be told (item 8);
+`probes.rule_named` stays one function three modules share rather than a fourth near-copy
+(item 9); `certified_statement` keeps the `ORDER BY` that makes a printed slice the same
+line on every run (item 10); and check 19 goes on not asking whether a `routes` key is a
+table some metric starts from, so a key added ahead of a tenth metric is writable and dead
+certification would pass (item 11).
+
+**1. The `Route` row's amendment is approved, and the field keeps the plural of the term**
+(item 1). The row was registered by [R15](#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+three days ago and 5.5 amended it without pre-approval, which is why it was the first
+thing put up. The ruling settles the collision the review named: a Dimension Definition's
+`routes` field **publishes the fields a Route is built from**, not a Route, so *"never
+published"* stays true on the reading that no file is a Route — and the two alternatives
+are declined. `routes` is not renamed away from the registered term, and the row is not
+left saying a Route comes only from a Metric Definition, which after this Sub-step would
+be false. [Glossary Section A](../glossary.md#a-the-system) carries the amendment with its
+approval date, so **nothing this Step wrote into the Glossary is provisional**: the
+`Dimension Definition` amendment was pre-approved inside
+[R1](#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25),
+`Route` and `metric expression` were registered by ruling, and this is the last row the
+Step touched.
+
+**2. [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
+stays recorded rather than fixed** (item 4). The review put the ten-line fix up against
+the entry and the ruling takes the entry, so the outer-join hole is paid at its Trigger —
+the Sub-step that builds Grounding — beside
+[DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart),
+on one visit to `route_of_resolved`, with the probe each entry already owes. The entry
+gains a dated status note saying it was put up and deferred by ruling, because an entry
+that was offered and kept is a different thing from one nobody has read. **What this
+settles is the second half of a rule 5.4 started**: a hole found by reading code after the
+Sub-step's scope was approved goes on the Ledger and is put up in the review, rather than
+being fixed in the same commit — DEBT-021 was filed that way under R15, DEBT-022 followed
+the precedent, and this ruling is what makes the precedent a decision rather than a habit.
+
+**One correction was made while finalising, and one copy of it is left open.**
+`gate.py`'s rule-ordering docstring counted the corpus — *"a Gate that loaded twenty-seven
+Semantic Entries"* — and this Sub-step's five Join Paths made the count wrong; the
+sentence now names the Semantic Layer instead of counting it, which is what the writing
+conventions ask of a figure a later Step can move.
+[What the Gate must decide](#what-the-gate-must-decide) above argues the same rule order
+in the same words and is **not** edited: it is approved text, and correcting it is a
+ruling rather than a finalisation.
+
+**What this makes true that was not.** **Step 005 is fully ruled**: all five Sub-steps,
+the Current State trim before them, and the fifteen rulings the plan carried are settled,
+so every one of the five things the [Target State's flow](../design/target-state.md#flow)
+says `VALIDATE` decides is built and approved rather than built and pending.
+[R5](#r5--55-is-a-pre-agreed-split-point--approved-by-amino-2026-08-25)'s split point is
+spent unused for the second time in two Steps. The route rule's **three sources of
+permission** are load-bearing rather than provisional, which is what the next Step builds
+a generator against: a statement's joins come from a Metric Definition, from an axis it
+groups by, or from the access predicate, and the Gate never searches for a fourth. And
+the two questions [R11 of Step 004](step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
+handed to Grounding stay exactly two — this ruling certifies no axis and defers no new
+one.
+
+---
+
 ## Which Debt Ledger triggers this Step fires
 
 Checked before planning, per `planning-a-step` step 3. **Two fire and both are paid

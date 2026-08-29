@@ -27,6 +27,7 @@ REPO_ROOT = SCRIPTS_DIR.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from veritas.validation import (  # noqa: E402 — after sys.path, like the checks beside it
+    ACCESS_AXIS,
     AccessProfile,
     RejectionReason,
     ValidationGate,
@@ -170,6 +171,95 @@ def rule_verdicts(
         else:
             allowed.append(probe.name)
     return refused, allowed, unseen
+
+
+def rule_named(
+    gate: ValidationGate, method: object, access_profile: AccessProfile
+) -> str:
+    """One rule's name, read off the Gate's own rule list rather than typed here.
+
+    A name typed into a rule module is a second copy of it and the first thing to go
+    stale when the rule is renamed, so every module asks the Gate instead. There were
+    three near-copies of this by Sub-step 5.4 and `access.py` would have been the
+    fourth, which is when one function became cheaper than four.
+
+    Two unwrappings, and each is for a different reason. `func` gets past the `partial`
+    the Gate uses to bind an Access Profile into the two rules that judge against an
+    identity — `no_restricted_column` and `scoped` — and a rule that takes no profile is
+    not wrapped at all, so `getattr(rule, "func", rule)` covers both. `__func__` then
+    gets past the binding to `self`, which is what makes the comparison about the
+    function on the class rather than about this Gate instance.
+
+    An empty string when the Gate does not run the rule at all, so that deleting a rule
+    from `rules()` — every module's first mutation — is reported as the probes it breaks
+    rather than as a traceback.
+    """
+    for name, rule in gate.rules(access_profile):
+        if getattr(getattr(rule, "func", rule), "__func__", None) is method:
+            return name
+    return ""
+
+
+def certified_statement(
+    gate: ValidationGate,
+    name: str,
+    access_profile: AccessProfile,
+    with_filters: bool = True,
+    sliced_by: str = "",
+) -> str:
+    """The simplest statement that computes one Certified Metric and is allowed to run.
+
+    Built from the entry's own fields rather than written out, which is what makes the
+    metric probes nine probes and not nine more literals to keep in step with
+    `semantic/`: a tenth Metric Definition is a tenth probe with no edit to any module.
+    Three modules build this statement and they build one statement, because two
+    builders is two chances to disagree about what the corpus says a metric is.
+
+    **Since Sub-step 5.5 it carries the access route and the access predicate**, and
+    that is not a decoration on the probe — it is what a Veritas statement now is. The
+    Access-Profile-predicate rule refuses an unscoped statement however certified
+    everything else about it is, so *"the simplest statement that computes this metric"*
+    and *"the simplest statement that computes this metric and is allowed"* stopped
+    being the same string, and this is the second. The route that scopes it is the
+    `by region` axis's own `routes` for the metric's `from_table` — the same field the
+    Gate reads, so a corpus that could not scope a metric would fail here rather than
+    being worked around.
+
+    `with_filters=False` builds the statement the corpus does **not** certify, and it
+    exists for
+    [DEBT-020](../../docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)'s
+    pair alone. `sliced_by` names an axis to group by, and adds that axis's own route
+    for the same `from_table`.
+    """
+    layer = gate.semantic
+    metric = layer.metrics[name]
+    axis = layer.dimensions[ACCESS_AXIS]
+    joins = list(metric.join_paths)
+    for reached in ((layer.dimensions[sliced_by],) if sliced_by else ()) + (axis,):
+        for join_path in reached.routes[metric.from_table]:
+            if join_path not in joins:
+                joins.append(join_path)
+    route = " ".join(
+        f"JOIN {layer.join_paths[join_path].to_table} "
+        f"ON {layer.join_paths[join_path].on}"
+        for join_path in joins
+    )
+    predicates = [
+        *(metric.filters if with_filters else ()),
+        f"{axis.columns[0]} = '{access_profile.permitted_region}'",
+    ]
+    # `ORDER BY` as well as `GROUP BY`, and it is not decoration: a slice printed in
+    # whatever order the engine happens to return is a different line of output on each
+    # run, and a review quoting it would be quoting something a reader cannot reproduce.
+    # No Gate rule reads an `ORDER BY`.
+    axis_column = layer.dimensions[sliced_by].columns[0] if sliced_by else ""
+    group = f" GROUP BY {axis_column} ORDER BY {axis_column}" if sliced_by else ""
+    sliced = f"{axis_column} AS slice, " if sliced_by else ""
+    return (
+        f"SELECT {sliced}{metric.expression} AS answer "
+        f"FROM {metric.from_table} {route} "
+        f"WHERE {' AND '.join(predicates)}{group}"
+    )
 
 
 def warehouse() -> WarehouseAdapter:

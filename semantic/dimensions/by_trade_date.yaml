@@ -14,3 +14,11 @@ description: >
 columns: [fct_trade.trade_date]
 grain: daily
 allowed_values: []
+# `routes` names where the axis can be reached from, and this axis is reachable
+# from one place only: the column is on fct_trade, so the route from there is the
+# empty list — reaching it costs no join — and every other fact table is an absent
+# key. That is what makes R11's fourth ruling enforceable rather than argued: a
+# Snapshot metric sliced by Trade Date is refused by name rather than joined to a
+# column its route never reaches.
+routes:
+  fct_trade: []

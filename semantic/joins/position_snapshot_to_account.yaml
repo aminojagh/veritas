@@ -1,0 +1,10 @@
+# The Position Snapshot's own first hop to the Account. One per fact table rather
+# than one shared join, because a Join Path names the table it starts from and the
+# four fact tables are four starts.
+name: position_snapshot_to_account
+version: 1
+kind: join_path
+from_table: fct_position_snapshot
+to_table: dim_account
+on: >
+  dim_account.account_id = fct_position_snapshot.account_id

@@ -27,15 +27,22 @@ fourth, `projected inside, aggregated away`, this rule allows and an earlier one
 refuses — counting Clients is not a Certified Metric — and two rules disagreeing about
 one statement is the clearest evidence they are asking different questions.
 
-**Since Sub-step 5.4 the Gate's verdict and this rule's verdict come apart on two of
-those three**, and that is why the first bullet above is not the last word on any of
-them. `the name in a comment` and `the name in a filter only` reach `dim_client` through
-two joins no Semantic Entry certifies, so the certified-route rule two places later
-refuses what this rule passed. Their declared verdict is `rejected` and their declared
-`reaches` is False, and both are checked — `check_this_rules_verdicts` reads
-`ValidationGateOutcome.rules` so that *"this rule refused it"* and *"the Gate refused
-it"* stay two different statements. Sub-step 5.5 certifies those two joins and their
-Gate verdict goes back to `allowed`.
+**Since Sub-step 5.5 the Gate allows none of the ten**, and the first bullet above is
+therefore not the last word on any of them. Every statement here is the spike's or this
+Sub-step's and none carries an Access Profile's predicate, because the rule that requires
+one is two Sub-steps younger than the statements — so the four this rule passes on are
+refused at the last rule instead. It happened in two moves and both were declared before
+they happened: 5.4 refused `the name in a comment` and `the name in a filter only` on the
+joins that reach `dim_client`, and 5.5 certified those joins as the `by region` axis's own
+route and then refused all four for being unscoped.
+
+**So this module's positive control is `ValidationGateOutcome.rules` and nothing else**,
+which is what `check_this_rules_verdicts` reads: *"this rule refused it"* and *"the Gate
+refused it"* are two different statements, and after 5.5 the second is true of every
+shape here while the first is true of six. The spike's statements cannot be given a
+predicate to keep them allowed — `probes.check_the_statements_are_the_spikes` fails the
+run on a statement that moved, and it is right to, because they are a dated
+measurement.
 
 **Nine of the ten statements are the spike's, character for character**, and
 `probes.check_the_statements_are_the_spikes` reads them out of
@@ -49,13 +56,13 @@ not to reach this rule inside the assembled Gate.
 from dataclasses import dataclass
 
 from probes import (
-    ALLOWED,
     REJECTED,
     Probe,
     Report,
     check_the_statements_are_the_spikes,
     judge_probes,
     problems,
+    rule_named,
     rule_verdicts,
 )
 
@@ -253,18 +260,19 @@ PROBES = (
             "GROUP BY client.client_region "
             "ORDER BY client.client_region",
         verdict=REJECTED,
-        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         reaches=False,
         found_by_text=True,
         why="a generator that was told the column is restricted, said so in a "
             "comment, and grouped by region instead. **This rule allows it**, and that "
             "is the false positive this rule is measured on: the query obeys the rule "
-            "and names the rule while obeying it. The rejection arrives from Sub-step "
-            "5.4's certified-route rule two places later, because the joins that reach "
-            "`dim_client` are certified by nothing until 5.5 — so the Gate's verdict "
-            "and this rule's verdict come apart here, which is what "
-            "`check_this_rules_verdicts` reads `ValidationGateOutcome.rules` to tell "
-            "apart",
+            "and names the rule while obeying it. Sub-step 5.4's certified-route rule "
+            "refused it on the joins that reach `dim_client`; Sub-step 5.5 certified "
+            "those joins as the `by region` axis's own route, so that rule allows it "
+            "too, and what refuses it now is the access predicate it does not carry. "
+            "The Gate's verdict and this rule's verdict still come apart here, which "
+            "is what `check_this_rules_verdicts` reads `ValidationGateOutcome.rules` "
+            "to tell apart",
     ),
     RestrictedProbe(
         name="the name in a string literal",
@@ -276,13 +284,17 @@ PROBES = (
             "  ON rate.rate_date = billed.trade_date "
             " AND rate.from_currency = billed.denomination_currency "
             " AND rate.to_currency = 'EUR'",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         reaches=False,
         found_by_text=True,
         why="the restricted name as data rather than as a column — a label "
             "saying which column was left out. A string is not an identifier, "
             "and the difference is one a parse tree makes and a substring "
-            "search cannot",
+            "search cannot. **This rule allows it** and has since Sub-step 5.3; "
+            "Sub-step 5.5 added the rule that requires an Access Profile's "
+            "predicate, which this spike statement predates and cannot be given "
+            "without moving a dated measurement",
     ),
     RestrictedProbe(
         name="the name in a filter only",
@@ -299,7 +311,7 @@ PROBES = (
             " AND rate.to_currency = 'EUR' "
             "WHERE client.client_name = 'Northwind Asset Management'",
         verdict=REJECTED,
-        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         reaches=False,
         found_by_text=True,
         why="one Client's revenue, with the name in the WHERE clause and out "
@@ -309,8 +321,10 @@ PROBES = (
             "a comment, in a string literal, or in a filter is not a "
             "projection of it\"*. Whether a filter on a column nobody reads "
             "should be allowed is a different question, and this Step does "
-            "not widen into it. The rejection is Sub-step 5.4's, on the two joins that "
-            "reach `dim_client` and that nothing certifies until 5.5",
+            "not widen into it. Sub-step 5.4 refused it on the two joins that reach "
+            "`dim_client`; 5.5 certified them as the access route, and what refuses it "
+            "now is the predicate that route exists for — this statement narrows rows "
+            "by a Client's name and not by the region the profile permits",
     ),
     RestrictedProbe(
         name="projected inside, aggregated away",
@@ -403,22 +417,13 @@ def rule_name(gate: ValidationGate, access_profile: AccessProfile) -> str:
     into this file would be a second copy of it, and the first thing to go stale when the
     rule is renamed — so the name is found by the method it belongs to.
 
-    `rules()` binds this one rule to the identity `judge` was called with, so the entry
-    in the list is a `partial` around the bound method rather than the bound method.
-    `func` unwraps that; `__func__` unwraps the binding to `self`; and what is left is
-    the function on the class, which is the only thing here that cannot be renamed
-    without this comparison failing.
-
-    An empty string when the Gate does not run the rule at all. That is not defensive:
-    dropping the rule from `rules()` is this module's first mutation, and a check that
-    raised there would report the mutation as a traceback instead of as the probes it
-    breaks.
+    `probes.rule_named` is where the reading lives, as of Sub-step 5.5 — the unwrapping
+    of the `partial` that binds an identity into this rule, and of the binding to `self`,
+    with the reason for each. This file, `route.py` and `access.py` each need it, and
+    three near-copies of one lookup is three things to keep in step. What is left here is
+    which rule this module is about.
     """
-    for name, rule in gate.rules(access_profile):
-        bound = getattr(rule, "func", rule)
-        if getattr(bound, "__func__", None) is ValidationGate.no_restricted_column:
-            return name
-    return ""
+    return rule_named(gate, ValidationGate.no_restricted_column, access_profile)
 
 
 def found_by_text(sql: str, profile: AccessProfile) -> list[str]:

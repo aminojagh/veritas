@@ -24,8 +24,10 @@ YAML keys against the Glossary, which the Sub-step 4.1 review states plainly.
 """
 
 import re
+from collections.abc import Mapping
 from dataclasses import MISSING, dataclass, fields
 from pathlib import Path
+from types import MappingProxyType
 
 import yaml
 
@@ -226,21 +228,41 @@ class DimensionDefinition(SemanticEntry):
                        dates into the corpus would be a measurement dressed as a
                        definition.
 
-    **It publishes no SQL**, for the reason an Ambiguous Term does not: `columns`
-    holds identifiers rather than an expression, and what checks them is the live
-    schema rather than a parse. `SQL_FIELDS` below therefore has no row for it.
+    **`routes` is the fourth field, added in Sub-step 5.5** under
+    [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25),
+    and it is what makes an axis applicable rather than merely certified: the map
+    from a metric's `from_table` to the Join Paths that reach this axis's columns
+    from there. Three shapes and each is a different answer:
 
-    **It is a leaf.** Nothing in the corpus references a Dimension Definition — a
-    Metric Definition names its Join Paths and the metrics it derives from, and an
-    Ambiguous Term names the metrics it disambiguates between, but no field
-    anywhere names an axis. What joins an axis to a metric is a query, which is
-    the Grounding Step's subject and not this corpus's.
+      `fct_trade: []`             the column is already on the table the query
+                                  starts from, so reaching the axis costs no join.
+      `fct_trade: [a, b]`         the chain that reaches it, in the order it is
+                                  joined.
+      no key for `fct_trade`      the axis is **not reachable** from that fact
+                                  table, and a slice by it is refused by name
+                                  rather than by joining two tables that share no
+                                  meaning. A Cash Balance has no Instrument.
+
+    Which route reaches an axis depends on where the query starts, which is why
+    this is a map rather than one list, and why it lives on the axis rather than
+    once per metric–axis pair on nine Metric Definitions.
+
+    **It publishes no SQL**, for the reason an Ambiguous Term does not: `columns`
+    holds identifiers and `routes` holds Join Path names, and what checks them is
+    the live schema and the rest of the corpus rather than a parse. `SQL_FIELDS`
+    below therefore has no row for it.
+
+    **It stopped being a leaf in Sub-step 5.5.** Until then nothing in the corpus
+    referenced a Dimension Definition and nothing an axis said referenced anything
+    else; `routes` names Join Paths, so an axis now has an edge like every other
+    entry type, and `check_semantic_layer.py`'s check 19 is what walks it.
     """
 
     description: str
     columns: tuple[str, ...]
     grain: str
     allowed_values: tuple[str, ...]
+    routes: Mapping[str, tuple[str, ...]]
 
 
 # Directory -> the `kind` files in it must declare, and the type they load as. The
@@ -270,6 +292,12 @@ STRING_LISTS = frozenset({
     "aliases", "derives_from", "join_paths", "filters", "disambiguates",
     "columns", "allowed_values"
 })
+
+# Fields whose value is a map from a table name to a list of Join Path names. One
+# member, and it is a set rather than an `if key == "routes"` for the reason above:
+# the three field kinds are the file format, and a reader that spells one of them as
+# a special case is where a second copy of the format starts.
+ROUTE_MAPS = frozenset({"routes"})
 
 # Fields whose value is SQL — text pasted into a query and therefore text that
 # reaches the engine. Here rather than in whatever happens to need it, for the
@@ -387,6 +415,7 @@ def read_entry(path: Path) -> SemanticEntry:
     return entry_type(**{
         key: (
             _strings(path, key, value) if key in STRING_LISTS
+            else _routes(path, key, value) if key in ROUTE_MAPS
             else _text(path, key, value)
         )
         for key, value in document.items()
@@ -506,3 +535,35 @@ def _strings(path: Path, key: str, value: object) -> tuple[str, ...]:
             f"it is empty"
         )
     return tuple(item.strip() for item in value)
+
+
+def _routes(path: Path, key: str, value: object) -> Mapping[str, tuple[str, ...]]:
+    """One route map, as a read-only mapping of table -> Join Path names.
+
+    `MappingProxyType` for the reason `_strings` returns a tuple: a loaded entry is
+    frozen, and a plain `dict` inside a frozen dataclass is a field any reader can
+    edit. It is a read-only **view**, so the dict it wraps is built here and dropped,
+    leaving nothing with a writable handle on it.
+
+    An **empty list is a value and an absent key is a different value**, so neither
+    is normalised away: `[]` says the axis is already on that table and the absent key
+    says it cannot be reached from there at all. Whether the names resolve to Join
+    Paths that exist, and whether the chain arrives where the axis lives, are claims
+    about the corpus rather than about this file — `check_semantic_layer.py`'s check
+    19 is where they are made.
+    """
+    if not isinstance(value, dict) or not all(
+        isinstance(table, str)
+        and isinstance(names, list)
+        and all(isinstance(name, str) for name in names)
+        for table, names in value.items()
+    ):
+        raise SemanticEntryError(
+            f"{_here(path)}: {key} is {value!r} — it is a mapping of a table name to "
+            f"the list of Join Paths that reach this axis from it, written `[]` "
+            f"where the axis is already on that table"
+        )
+    return MappingProxyType({
+        table.strip(): tuple(name.strip() for name in names)
+        for table, names in value.items()
+    })

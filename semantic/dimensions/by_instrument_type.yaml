@@ -13,3 +13,10 @@ description: >
 columns: [dim_instrument.instrument_type]
 grain: one Instrument
 allowed_values: [equity, ETF, future, currency pair]
+# Two fact tables carry an Instrument and two do not, which is the case an absent
+# key exists for: a Cash Balance has no Instrument, so "Cash Balance by instrument
+# type" is refused by naming the missing key rather than by joining two tables that
+# share no meaning.
+routes:
+  fct_trade: [trade_to_instrument]
+  fct_position_snapshot: [position_snapshot_to_instrument]

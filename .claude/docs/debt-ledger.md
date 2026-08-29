@@ -47,10 +47,11 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-017](#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) | The certified axes are registered inside one Glossary cell | S | A sixth certified axis, or a rewording of that cell failing the run | open |
 | [DEBT-018](#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus) | Six Certified Metrics have no expression text pinned outside the corpus | S | The first edit to a Certified Metric's `expression` | open |
 | [DEBT-019](#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again) | Every parse-tree rule reads the catalogue and resolves the statement again | S | The next Gate rule that reads the catalogue — Sub-step 5.4's route rule — **🔴 fired** | **paid** (Sub-step 5.4) |
-| [DEBT-020](#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters) | The Gate checks a metric's route and not its certified filters | S | Whichever lands first: the Sub-step that builds Grounding, or the one that builds the Gold Question Set | open |
+| [DEBT-020](#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters) | The Gate checks a metric's route and not its certified filters | S | Whichever lands first: the Sub-step that builds Grounding, or the one that builds the Gold Question Set — **paid ahead of both, by ruling** | **paid** (Sub-step 5.5) |
 | [DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart) | Two joins to one table under different aliases are not told apart | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding | open |
+| [DEBT-022](#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one) | The Gate compares joins without their kind, so an outer join passes as an inner one | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding | open |
 
-**Open debt:** 11 · **Paid:** 7 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 11 · **Paid:** 8 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -577,6 +578,24 @@ instead of reconstructing it. The half the Gate does **not** yet have is the Acc
 Profile's predicate — the permitted region — which Sub-step 5.5 adds; until then the
 mechanism this entry is honest about is narrower again than the entry describes, and the
 Step Review says so.
+
+**Status note, Sub-step 5.5 (2026-08-28) — the mechanism is now exactly as wide as this
+entry describes, and the entry is still open.** The other half landed:
+`AccessProfile.permitted_region` carries a value of the `by region` axis, and
+`ValidationGate.scoped` refuses any statement whose outermost WHERE clause does not
+require that region. So the sentence in the paragraph above — *"the Gate inspects the
+parse tree, refuses restricted columns in the projection, **and requires the Access
+Profile's predicate to be present**"* — describes what the code does rather than what it
+will do, and `check_validation_gate/access.py` prints what it is worth on every run: the
+`by region` axis has three buckets, the analyst sees one, and the two totals are far
+enough apart that the run fails if they converge.
+
+**That makes the claim more tempting, not less, which is why nothing is paid.** The
+Trigger is still a claim in `README.md`, the App or a demo script, none of which exists,
+and the wording this entry asks for is unchanged and now more necessary: a working
+one-role demonstration over synthetic data is exactly the thing a reader would over-read.
+[EXT-001](extension-register.md#ext-001--warehouse-native-security-and-concurrency) still
+**replaces** this check rather than joining it.
 
 **Trigger**
 
@@ -1513,6 +1532,20 @@ Whichever lands first:
 2. **The first time that cell is reworded and the run fails for it.** That is the
    cost arriving as an interruption, and repaying it then is cheaper than working
    around it twice.
+
+**Status note, Sub-step 5.5 (2026-08-28) — the cell was reworded and the run did not
+fail, so the second arm came into reach and did not fire.** The
+`Dimension Definition` row gained the sentence that an axis also declares the routes
+that reach it, which
+[R1 of Step 005](plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
+pre-approved on 2026-08-25. It survived because of how the amendment was written rather
+than by luck: `check_semantic_layer.py`'s check 18 parses only a **bold axis name
+followed immediately by a parenthetical**, and the new sentence adds neither. The
+routes stayed out of the cell for this entry's own reason — five axes' worth of
+`from_table` keys inside a prose parse would be this shortcut four times larger — so the
+Glossary gained the definition and `semantic/dimensions/` kept the data, where check 19
+reads it. Both arms stay open, and the first is unchanged: 5.5 added no axis.
+
 ### DEBT-018 — Six Certified Metrics have no expression text pinned outside the corpus
 
 - **Status:** open
@@ -1703,10 +1736,10 @@ this entry was paid.
 
 ### DEBT-020 — The Gate checks a metric's route and not its certified filters
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 5.5 (`.claude/docs/reviews/step-005-validation-gate.md`)
 - **Opened:** Sub-step 5.4 (`.claude/docs/reviews/step-005-validation-gate.md`)
 - **Size:** S
-- **Location:** `veritas/validation/gate.py` — `ValidationGate.routed`, which reads a
+- **Location:** `veritas/validation/gate.py` — `ValidationGate.routed`, which read a
   Metric Definition's `join_paths` and `date_column` and not its `filters`
 
 **What we did**
@@ -1776,6 +1809,26 @@ against the conjuncts of a WHERE clause instead of against a join list. The Trig
 above is unchanged and stays as written: it is what would force repayment if 5.5 did
 not, and it is the honest record of when this stops being affordable.
 
+**Paid, Sub-step 5.5 (2026-08-28), one Sub-step after it was opened and neither Trigger
+arm fired.** `ValidationGate.certified_filters` parses each metric's `filters` and
+canonicalises them exactly as `where_conjuncts` canonicalises the statement's own, and
+`routed` refuses a statement missing any of them as
+`RejectionReason.MISSING_CERTIFIED_FILTER` — its own bar rather than
+`UNCERTIFIED_ROUTE`'s, because a dropped WHERE clause and a wrong join are different
+things to go and fix. It cost what the entry predicted: the certified side is assembled
+by machinery that already existed, and the statement side is one reading the access rule
+needed anyway.
+
+**The evidence stays after the payment rather than being deleted with it.**
+`check_validation_gate/route.py`'s `check_the_filter_gap` goes on executing `Realised
+P&L` with and without its certified predicate and printing both figures, and fails the
+run if they stop being apart; its `Realised P&L with its filter dropped` probe moved
+from `allowed` to `rejected` and its control stayed `allowed`.
+`check_validation_gate/access.py`'s third mutation assembles a Gate whose
+`certified_filters` returns nothing and watches the statement come back — which is what
+makes the payment a rule rather than a renamed probe. The Sub-step 5.5 review carries
+the two numbers, the date and the command.
+
 ---
 
 ### DEBT-021 — Two joins to one table under different aliases are not told apart
@@ -1785,8 +1838,9 @@ not, and it is the honest record of when this stops being affordable.
 - **Size:** S
 - **Location:** `veritas/validation/gate.py` — `route_of_resolved` and
   `projections_of`, both of which write a column on its base table before comparing, and
-  `ValidationGate.permitted_route`, which unions the routes of every metric a statement
-  traces to
+  `ValidationGate.assembled_route`, which unions the routes of every metric a statement
+  traces to and which `required_route` and `permitted_route` both go through since
+  Sub-step 5.5
 
 **What we did**
 
@@ -1855,5 +1909,105 @@ prints the two numbers it and the uncrossed statement return.
 
 **The Sub-step that builds Grounding** — the first component that assembles a statement
 out of Metric Definitions rather than a person writing one out, and therefore the first
-thing that can put two metrics in one statement without a reviewer choosing to. It is
-DEBT-020's first arm, and the two are one visit to this rule.
+thing that can put two metrics in one statement without a reviewer choosing to. It was
+DEBT-020's first arm too, and the two were expected to be one visit to this rule.
+
+**Status note, Sub-step 5.5 (2026-08-28) — DEBT-020 was paid ahead of the Trigger and
+this was not, so the two are no longer one visit.** Sub-step 5.5 reopened
+`ValidationGate.routed` to lengthen its permission list and to read `filters`, and it
+did not narrow this: `permitted_route` and `required_route` both union across the
+metrics a statement computes, and both still write a column on its base table before
+comparing. What 5.5 changed here is only the Location — the union now happens in
+`assembled_route`, which the two methods share — and the shape of the hole is
+unchanged, including the obligation the entry already carries: **the Sub-step that pays
+this owes a probe** that writes the crossed statement and prints the two numbers.
+Nothing in the repository demonstrates it yet.
+
+---
+
+### DEBT-022 — The Gate compares joins without their kind, so an outer join passes as an inner one
+
+- **Status:** open
+- **Opened:** Sub-step 5.5 (`.claude/docs/reviews/step-005-validation-gate.md`)
+- **Size:** S
+- **Location:** `veritas/validation/gate.py` — the `Join` type and
+  `route_of_resolved`, which record a join as `(table, canonical condition)` and drop
+  everything else the parse tree says about it
+
+**What we did**
+
+Read a statement's Route as a set of *(table joined, join condition)* pairs, which is
+what makes `rate.rate_date = billed.trade_date` and
+`fct_fx_rate.rate_date = fct_trade.trade_date` one join written twice — the reading the
+whole rule rests on. What it also does is make `JOIN dim_account ON …` and
+`LEFT JOIN dim_account ON …` one join. `certified_route` assembles the corpus side with
+a plain `JOIN`, so the certified route is always an inner join, and a statement that
+writes any outer join over a certified condition matches it.
+
+Found in Sub-step 5.5 by reading `route_of_resolved` while lengthening the permission
+list, not by a probe.
+
+**What we should have done**
+
+Carry the join's kind in the pair the Route holds — `Join` becomes
+*(table, kind, condition)*, `route_of_resolved` reads `join.args` for the side and kind
+sqlglot already parses, and `certified_route`'s assembled statement supplies the inner
+join the corpus means. `Route.joins_beyond` then spells the kind in the rejection, so a
+reader is told *"LEFT JOIN dim_account"* rather than *"dim_account"*.
+
+**Why we deferred**
+
+Scope, and the precedent is one Sub-step old. The
+[Step 005 plan](plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
+names what 5.5 builds — the access predicate, the slice route, and DEBT-020's filters —
+and [R15](plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+already made that three things in one commit. Adding a fourth reading to the route rule
+after approval and before review is the quiet widening
+[DEBT-020](#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters) was
+opened rather than committed for, and that entry's deferral paragraph is the sentence
+this one is following. It is put up for a ruling in the Sub-step 5.5 review instead.
+
+It also passes the seam test: `Join` is a shape inside `veritas/validation/`, not a
+Glossary name, an adapter boundary or a data contract another component reads, so
+widening it later moves no name, no interface and no flow.
+
+**Cost while unpaid**
+
+**A statement can reach rows the Metric Definition did not certify, through a join the
+Gate believes it did certify.** An outer join keeps fact rows the certified inner join
+would drop, so the population underneath the aggregate is larger than the one the
+corpus describes.
+
+**Nothing in the repository demonstrates a moved number, and the reason is worth
+writing down because it is the reason the entry is small today.** Every Certified Metric
+that joins anything multiplies by a column from the table it joins — `fx_rate`,
+`market_price` — so a row an outer join keeps contributes `NULL`, and `sum` skips it.
+The two metrics that join nothing, `Trade Count` and `Position Change`, have no
+certified join to make outer. So on this corpus the hole changes which rows are read
+without changing the figure that comes back.
+
+That is a property of these nine expressions and not of the rule. A tenth metric whose
+expression does not reference every table it joins — a `count` over a joined table, a
+`coalesce` around a converted term — moves a number through this hole on the day it is
+written, and the Gate says nothing. **The Sub-step that pays this owes a probe**: an
+outer join over a certified condition, declared, with the two numbers printed, which is
+the state
+[DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+is in and the state DEBT-014's date half was in for eight days.
+
+**Trigger**
+
+**The Sub-step that builds Grounding** — the first component that assembles a statement
+out of Metric Definitions rather than a person writing one out. `LEFT JOIN` is what a
+model writes when it has been told a join might not match, and no reviewer chooses it
+then. It is DEBT-021's Trigger, and paying both on one visit to `route_of_resolved` is
+cheaper than two.
+
+**Status note, ruling of 2026-08-29 ([R16](plan/step-005-validation-gate.md#r16--aminos-rulings-on-the-55-review--decided-2026-08-29)) — put up, and deferred rather than unread.** The
+[Sub-step 5.5 review](reviews/step-005-validation-gate.md#sub-step-55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
+put the ten-line fix in *What we should have done* against this entry and asked for a
+ruling either way; the ruling kept the entry. So repayment stays at the Trigger above,
+beside [DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+and on one visit to `route_of_resolved`, and the probe this entry owes is owed by that
+Sub-step. Nothing about the hole changed — this note records that it was read and left,
+which is a different state from one nobody has weighed.

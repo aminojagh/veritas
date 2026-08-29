@@ -15,3 +15,9 @@ description: >
 columns: [fct_position_snapshot.snapshot_date, fct_balance_snapshot.snapshot_date]
 grain: daily
 allowed_values: []
+# Two empty routes and no others. The column is already on both Snapshot tables,
+# so slicing a Snapshot metric by it costs no join; a trade-side or movement-side
+# metric has no key here and cannot be sliced by it at all.
+routes:
+  fct_position_snapshot: []
+  fct_balance_snapshot: []

@@ -5,7 +5,7 @@ Run with:  uv run python .claude/scripts/check_semantic_layer.py
 Needs a filled Warehouse — `uv run python -m veritas.ingestion` first — because a
 published expression that has never been executed is a claim rather than a metric.
 
-A corpus cannot be proved by running it, only by running what it claims. Eighteen
+A corpus cannot be proved by running it, only by running what it claims. Nineteen
 checks do that. Five are the ones
 [Sub-step 4.1](../docs/plan/step-004-semantic-layer.md#41--publish-the-semantic-entry-format-on-one-metric-definition)
 names; the sixth is Non-Negotiable #1 applied to the one place this corpus can coin
@@ -137,12 +137,25 @@ a Dimension Definition is a leaf, so nothing above it would notice if one were w
      for the same reason — the row and the corpus hold one list twice, and the
      `Instrument` sweep of 2026-08-05 is what a duplicated list nobody compares does.
 
+ 19. Every route an axis declares is a route, and it **arrives at the axis**: each
+     Join Path it names exists, the chain starts at the table the key names, each hop
+     extends a route that has already reached its own `from_table`, no hop arrives
+     somewhere the route already holds, no condition reaches forward to a table
+     nobody joined, and the chain ends at a table one of the axis's columns lives in.
+     Check 8 for a Dimension Definition, with the last clause that only an axis can
+     get wrong. It arrived with
+     [Sub-step 5.5](../docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020),
+     which gave an axis a `routes` field and so gave it an edge to the rest of the
+     corpus for the first time. An empty route is checked too — `[]` claims the
+     column is already on that table, which is a claim like any other. Five probes
+     give it teeth on every run, for check 6's reason.
+
 Exits non-zero if any check fails.
 """
 
 import re
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
@@ -332,6 +345,12 @@ UNREGISTERED_METRIC = "Gross Margin"
 # `dim_client` to carry. It does not, and an axis over it would be certified over
 # nothing.
 UNREGISTERED_COLUMN = "dim_client.client_segment"
+
+# The table check 19's first probe declares a route out of, chosen the same way:
+# `fct_position` is what a reader would expect a Position to live in — the Warehouse
+# holds `fct_position_snapshot`, because a Position is registered as a state at a
+# point in time rather than a row that changes.
+UNREGISTERED_TABLE = "fct_position"
 
 # The declared type of a column whose values the data mints rather than the Glossary
 # registering them, and therefore the one type of column an axis may decline to
@@ -1307,6 +1326,118 @@ def axis_problem(
     return None
 
 
+def axis_route_problem(
+    axis: DimensionDefinition,
+    from_table: str,
+    layer: SemanticLayer,
+    schema: Mapping[str, Mapping[str, str]],
+) -> str | None:
+    """Check 19 — one of an axis's routes is a route, and it arrives where the axis is.
+
+    Check 8 for a Dimension Definition, and it has to be a second function rather
+    than a call into `route_problem`: a metric's route is a list of Join Paths
+    starting at its own `from_table` and its job is to make the **expression**
+    computable, where an axis's route starts at a key in `routes` and its job is to
+    make the axis's **columns** reachable. The three ways a chain can be incoherent
+    are the same three, and the fourth — arriving somewhere the axis does not live —
+    is the one only an axis can get wrong.
+
+    The route is walked in the order it is written, because a route is joined in
+    order and a chain that arrives before it has started is not a chain:
+
+      * a key the live schema has no table for, which is a typo that would otherwise
+        surface as an engine error inside a generated query;
+      * a named Join Path no file publishes;
+      * a hop that starts at a table the route has not reached, or arrives at one it
+        already holds;
+      * a join condition naming a table the route has not joined — legal reaching
+        **back**, nonsense reaching forward, exactly as check 8 has it;
+      * a chain that never reaches a table one of the axis's columns lives in, which
+        is the whole point of the field: an empty list is only a real answer when the
+        column is already there.
+
+    `[]` is therefore not a free pass. `by trade date` declares `fct_trade: []` and
+    the check still asks whether `fct_trade` holds one of the axis's columns.
+    """
+    if from_table not in schema:
+        return (
+            f"Dimension Definition {axis.name!r} declares a route from "
+            f"{from_table!r}, which the live schema has no table for — a route out of "
+            f"a table nobody has can never be taken, and the failure would arrive "
+            f"inside a generated query rather than here"
+        )
+    joined = [from_table]
+    for name in axis.routes[from_table]:
+        join = layer.join_paths.get(name)
+        if join is None:
+            return (
+                f"Dimension Definition {axis.name!r} reaches itself from "
+                f"{from_table!r} through Join Path {name!r}, which no file under "
+                f"semantic/joins/ publishes — so the route a slice would take is one "
+                f"the corpus does not certify"
+            )
+        if join.from_table not in joined:
+            return (
+                f"Dimension Definition {axis.name!r} joins {name!r} on the way from "
+                f"{from_table!r}, which starts at {join.from_table!r}, but its route "
+                f"has only reached {joined} — a Join Path can only extend a route "
+                f"that has already arrived at the table it starts from"
+            )
+        if join.to_table in joined:
+            return (
+                f"Dimension Definition {axis.name!r} joins {name!r} on the way from "
+                f"{from_table!r}, which arrives at {join.to_table!r} — already in the "
+                f"route. A table joined twice under one name makes every column that "
+                f"names it ambiguous"
+            )
+        reachable = [*joined, join.to_table]
+        unreached = sorted(tables_named_in(join.on) - set(reachable))
+        if unreached:
+            return (
+                f"Dimension Definition {axis.name!r} joins {name!r} on the way from "
+                f"{from_table!r}, whose condition names {unreached} — tables its "
+                f"route has not joined. A join condition may reach back to a table "
+                f"already in the route and never forward to one that is not"
+            )
+        joined = reachable
+
+    lives_in = {column.partition(".")[0] for column in axis.columns}
+    if not lives_in & set(joined):
+        return (
+            f"Dimension Definition {axis.name!r} declares a route from "
+            f"{from_table!r} that reaches {joined} and none of "
+            f"{sorted(lives_in)}, where its columns live — a route that does not "
+            f"arrive at the axis is a slice by a column the query never has"
+        )
+    return None
+
+
+def axis_route_probes(
+    axis: DimensionDefinition,
+) -> tuple[tuple[str, DimensionDefinition, str], ...]:
+    """The teeth of check 19: five routes that must all be refused.
+
+    Built by mutating a real axis's own route, for the reason `axis_probes` and
+    `ambiguity_probes` are built that way — a probe written as a literal goes on
+    probing the corpus of the day it was written. The axis handed in is the one with
+    the longest chain, so a mutation has something to break.
+    """
+    key = max(axis.routes, key=lambda table: len(axis.routes[table]))
+    chain = axis.routes[key]
+    return (
+        ("a route out of a table the schema does not hold",
+         replace(axis, routes={UNREGISTERED_TABLE: chain}), UNREGISTERED_TABLE),
+        ("a Join Path no file publishes",
+         replace(axis, routes={key: (*chain, "no_such_join_path")}), key),
+        ("a hop that starts where the route has not reached",
+         replace(axis, routes={key: tuple(reversed(chain))}), key),
+        ("a hop into a table the route already holds",
+         replace(axis, routes={key: (*chain, chain[-1])}), key),
+        ("a chain that stops before the axis",
+         replace(axis, routes={key: chain[:-1]}), key),
+    )
+
+
 def axis_probes(
     enumerated: DimensionDefinition, dated: DimensionDefinition
 ) -> tuple[tuple[str, DimensionDefinition], ...]:
@@ -1331,28 +1462,15 @@ def axis_probes(
     )
 
 
-def route_tables(metric: MetricDefinition, layer: SemanticLayer) -> set[str]:
-    """Every Warehouse table a metric's assembled query reaches.
-
-    Its own route and the route of each metric it derives from, because
-    `query_parts` puts every part in the statement and a slice applies to all of
-    them: `Account Value` sliced by instrument type has to reach `dim_instrument`
-    from the Positions half, and its Cash Balance half never arrives there.
-    """
-    reached: set[str] = set()
-    for part in [metric, *(layer.metrics[name] for name in metric.derives_from)]:
-        reached.add(part.from_table)
-        reached.update(layer.join_paths[name].to_table for name in part.join_paths)
-    return reached
-
-
 def check_dimensions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None:
-    """Checks 15 to 18 — the certified axes, and the Glossary row that registers them.
+    """Checks 15 to 19 — the certified axes, and the Glossary row that registers them.
 
-    The last entry type, and the only one that is a **leaf**: nothing in the corpus
-    names an axis, so nothing above would notice if one were wrong. That is what
-    these checks are for, and it is why they read the Warehouse rather than the rest
-    of the corpus — an axis's claim is about the data, not about the other entries.
+    Checks 15 to 18 arrived with Sub-step 4.5, when nothing in the corpus named an
+    axis: a Dimension Definition was a **leaf**, so nothing above it would notice if
+    one were wrong, which is why they read the **Warehouse** rather than the rest of
+    the corpus. Check 19 arrived with Sub-step 5.5 and reads both, because `routes`
+    gave an axis an edge: it names Join Paths, so an axis can now be wrong about the
+    corpus as well as about the data.
     """
     print()
     print("  dimensions — the certified axes a metric can be sliced by")
@@ -1425,27 +1543,46 @@ def check_dimensions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None:
                     f"registered axis and the retrievable one are not the same axis"
                 )
 
-    # A reading rather than an assertion, and the distinction is deliberate. An axis
-    # whose table no metric route reaches is certified, true, and not yet applicable:
-    # what would make it applicable is a Join Path added for a *grouping* rather than
-    # for an expression, and the rule that lets a query add one. Both belong to the
-    # Step that grounds a query, so this prints the count on every run rather than
-    # failing a corpus that is exactly what this Sub-step set out to write. The
-    # Sub-step 4.5 review names what it costs.
-    reachable = {
-        metric.name: route_tables(metric, layer)
-        for metric in layer.metrics.values() if assembles(metric, layer)
-    }
-    print(f"    reach — the metric routes an axis already sits inside, of "
-          f"{len(reachable)} that assemble")
+    # Check 19, and the reading that goes with it. Until Sub-step 5.5 this was a
+    # reading and nothing else: an axis whose table no metric route reached was
+    # certified, true, and not yet applicable, and the count printed zero for
+    # `by region` on every run. `routes` is the half the Sub-step 4.5 review said was
+    # missing, so what is printed now is what each axis **declares** it is reachable
+    # from, and each declaration is walked rather than believed.
+    schema = warehouse.columns_by_table()
     for axis in layer.dimensions.values():
-        tables = {column.partition(".")[0] for column in axis.columns}
+        for from_table in axis.routes:
+            broken = axis_route_problem(axis, from_table, layer, schema)
+            if broken:
+                problems.append(broken)
+
+    print(f"    reach — the metrics each axis declares a route from, of "
+          f"{len(layer.metrics)} Certified Metric(s)")
+    for axis in layer.dimensions.values():
+        # Every part of a composed metric, because a slice applies to all of them:
+        # `Account Value` sliced by region has to reach `dim_client` from the
+        # Positions half *and* from the Cash Balance half it derives from, and the
+        # two start at different tables.
         arriving = sorted(
-            name for name, reached in reachable.items() if reached & tables
+            metric.name
+            for metric in layer.metrics.values()
+            if assembles(metric, layer)
+            and all(
+                part.from_table in axis.routes
+                for part in (
+                    metric,
+                    *(layer.metrics[name] for name in metric.derives_from),
+                )
+            )
+        )
+        hops = "; ".join(
+            f"{len(names)} hop(s) from {table}"
+            for table, names in sorted(axis.routes.items())
         )
         how = (
-            ", ".join(arriving) if arriving
-            else f"no route arrives at {' or '.join(sorted(tables))}"
+            f"{', '.join(arriving)} — {hops}"
+            if arriving
+            else f"no metric starts at {' or '.join(sorted(axis.routes)) or 'anything'}"
         )
         print(f"      {axis.name + ':':<32} {len(arriving)} — {how}")
 
@@ -1465,6 +1602,17 @@ def check_dimensions(warehouse: WarehouseAdapter, layer: SemanticLayer) -> None:
         if verdict is None:
             problems.append(
                 f"the certified-axis rule accepted {description}, pasted into a real "
+                f"entry — so it is not the rule this check reports it to be"
+            )
+    routed = max(layer.dimensions.values(), key=lambda axis: len(axis.routes))
+    print(f"    route probes — run against {routed.name!r}, whose own route is the "
+          f"longest in the corpus")
+    for description, mutated, from_table in axis_route_probes(routed):
+        verdict = axis_route_problem(mutated, from_table, layer, schema)
+        print(f"      {'refuses' if verdict else 'ACCEPTS'}  {description}")
+        if verdict is None:
+            problems.append(
+                f"the axis-route rule accepted {description}, pasted into a real "
                 f"entry — so it is not the rule this check reports it to be"
             )
 

@@ -30,17 +30,27 @@ the way [R7 of Step 004](../../docs/plan/step-004-semantic-layer.md#r7--the-date
 did — and it means the period moves when the loaded window moves, so the figures printed
 here are a dated measurement rather than a constant.
 
-**One hole is declared rather than closed.** A Metric Definition carries three fields
-that say which rows its expression is computed over, and this rule reads two of them —
+**The hole this module declared is closed, and the pair that declared it stays.** A
+Metric Definition carries three fields that say which rows its expression is computed
+over; Sub-step 5.4 read two of them and
 [DEBT-020](../../docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
-is the third, `filters`. `Realised P&L` with its `movement_type` predicate dropped is
-allowed here, and `check_the_filter_gap` runs both halves and prints what the omission
-costs. Declaring it as a passing probe carries the cost DEBT-014 was opened about — this
-file passes while demonstrating a wrong answer — and the alternative is a hole nobody
-re-reads. It is declared for **one** Sub-step:
+was the third, `filters`. For one Sub-step `Realised P&L` with its `movement_type`
+predicate dropped was declared **allowed** here on purpose, which carried the cost
+DEBT-014 was opened about — this file passed while demonstrating a wrong answer — and
 [R15](../../docs/plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
-rules that Sub-step 5.5 pays the entry, where this probe's verdict flips to `rejected`
-and the statement carrying its certified filter stays the control.
+ruled that Sub-step 5.5 pays it rather than the Grounding Step the Trigger names. It
+does: the probe is `rejected`, its control is still `allowed`, and
+`check_the_filter_gap` goes on running both halves so the entry stays a measurement
+after it is paid.
+
+**What Sub-step 5.5 moved in this module, and why the moves are the finding.** The route
+rule gained two more sources of permission — an axis's `routes` and the Access Profile's
+route — and one more reading, the certified filters. So `net revenue by region` is
+allowed **by this rule** where 5.4 refused it, which is `by region` becoming an axis a
+query can reach; and the three probes that are on their metric's route are refused by the
+**Gate** where 5.4 allowed them, because they carry no access predicate and nothing here
+can give them one without moving the spike's dated statements. Every one of those is a
+declared verdict rather than a discovery, which is what the declarations were for.
 
 **Two statements are the spike's and are read out of its text rather than copied.**
 `probes.spike_statements` parses `check_validation_feasibility.py` with `ast` and takes
@@ -62,8 +72,10 @@ from probes import (
     REJECTED,
     Probe,
     Report,
+    certified_statement,
     judge_probes,
     problems,
+    rule_named,
     spike_statements,
 )
 
@@ -74,8 +86,8 @@ from veritas.validation import (
     Reading,
     TracerRefused,
     ValidationGate,
-    certified_route,
     date_columns_filtered,
+    grouped_columns,
     read,
     resolve,
     route_of,
@@ -132,16 +144,16 @@ def from_the_spike(name: str) -> str:
 
 
 # The route probes. Statements whose route is wrong first, then the shapes that are on
-# their metric's route and must stay allowed.
+# their metric's route.
 #
-# `net revenue by region` is here as a **rejection**, and that is the state Sub-step 5.5
-# ends. The statement reaches `dim_client` through two joins no Metric Definition names,
-# and nothing in the corpus certifies them yet, so the Gate refuses it — which is
-# [R1](../../docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
-# *"`by region` is a certified axis no query can reach"* said by the Gate rather than by
-# the plan. 5.5 adds the Join Paths and the `routes` field that certify those two joins,
-# and this probe's declared verdict flips back. Declaring it here is what makes that flip
-# a measurement instead of a memory.
+# **None of these five is scoped**, because none of them was written to be: they are the
+# spike's statements and this Sub-step's, and both predate the rule that requires an
+# Access Profile's predicate. Since Sub-step 5.5 that rule refuses every one of them that
+# gets past this one, so the three on their metric's route are declared `rejected` for
+# `missing access predicate` — the Gate's verdict, not this rule's, and
+# `check_this_rule_ran` and `check_the_route_reading` below are what keep the two
+# separate. Rewriting them to carry the predicate is not available: two are read out of
+# the spike's source text, where they are a dated measurement that must not move.
 PROBES = (
     RouteProbe(
         name="notional through the wrong currency",
@@ -212,110 +224,107 @@ PROBES = (
             "GROUP BY client.client_region "
             "ORDER BY client.client_region",
         verdict=REJECTED,
-        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
-        off_route=True,
-        why="the Glossary's own worked example, and the price this Sub-step pays. Two "
-            "joins reach `dim_client.client_region`, no Metric Definition names them, "
-            "and the Gate does not search for a chain that would — so a legitimate "
-            "slice by a certified axis is refused. **Sub-step 5.5 flips this back**, by "
-            "adding the Join Paths and the `routes` field that certify the two hops; "
-            "the same statement is `traces.py`'s `net revenue by region`, which this "
-            "Sub-step moved from `allowed` to `rejected` for the same reason",
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
+        why="the Glossary's own worked example, and the probe Sub-step 5.4 declared "
+            "here so that 5.5 moving it would be a measurement. It was refused by "
+            "**this** rule, on two joins to `dim_client` no entry named; 5.5 added the "
+            "Join Paths and the `routes` field that certify them, and this rule now "
+            "allows it — `check_the_route_reading` prints `on` for it and "
+            "`check_this_rule_ran` counts it as passed on. What refuses it now is the "
+            "access predicate it does not carry, which is a different rule and a "
+            "different sentence",
     ),
     RouteProbe(
         name="traded notional",
         sql=from_the_spike("traded notional"),
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="the same metric as the first probe, converted the way its Metric "
             "Definition says: through `dim_instrument` to the Quotation Currency. The "
-            "positive control the first probe needs — one join different, and the "
-            "opposite verdict",
+            "positive control the first probe needs — one join different, and **this "
+            "rule** reaches the opposite verdict on it, which `check_the_route_reading` "
+            "and `check_this_rule_ran` are what show now that the Gate does not. It is "
+            "the spike's statement, read out of the spike's source, so it cannot be "
+            "given the access predicate Sub-step 5.5 requires without moving a dated "
+            "measurement",
     ),
 )
 
 
 def statement_for(gate: ValidationGate, name: str, with_filters: bool) -> str:
-    """The simplest statement that computes one Certified Metric, out of its own entry.
+    """The simplest statement that computes one Certified Metric and is allowed to run.
 
-    The same construction `traces.py` uses, and the one
-    `check_every_certified_metric_stays_on_its_route` repeats below: the metric's
-    expression over its `from_table`, joined along its own Join Paths, with its own
-    certified filters ANDed into the WHERE. Built from the corpus rather than written
-    out, so a tenth Metric Definition needs no edit here.
+    `probes.certified_statement` is where the construction lives, as of Sub-step 5.5:
+    this file, `traces.py` and `access.py` all build it, and it stopped being three
+    lines the day a statement also had to carry the access route and the access
+    predicate. What is left here is the name this module calls it by.
 
     `with_filters=False` is the one caller that wants the statement the corpus does
-    **not** certify, and it exists for `check_the_filter_gap` alone.
+    **not** certify, and it exists for DEBT-020's pair alone.
     """
-    metric = gate.semantic.metrics[name]
-    route = " ".join(
-        f"JOIN {gate.semantic.join_paths[path].to_table} "
-        f"ON {gate.semantic.join_paths[path].on}"
-        for path in metric.join_paths
-    )
-    where = (
-        " WHERE " + " AND ".join(metric.filters)
-        if with_filters and metric.filters
-        else ""
-    )
-    return (
-        f"SELECT {metric.expression} AS answer "
-        f"FROM {metric.from_table} {route}{where}"
-    )
+    return certified_statement(gate, name, ANALYST, with_filters=with_filters)
 
 
 def filter_probes(gate: ValidationGate) -> tuple[RouteProbe, ...]:
-    """The hole this Sub-step found and did not close:
+    """The hole Sub-step 5.4 found and Sub-step 5.5 closed:
     [DEBT-020](../../docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters).
 
     A Metric Definition carries **three** fields that pin down which rows its expression
-    is computed over — `join_paths`, `date_column` and `filters` — and this rule reads
-    two of them. So `Realised P&L` with its certified `movement_type` predicate dropped
-    computes the certified expression, across the certified route, over four movement
-    types instead of one, and is **allowed**.
+    is computed over — `join_paths`, `date_column` and `filters` — and 5.4 read two of
+    them. So `Realised P&L` with its certified `movement_type` predicate dropped computed
+    the certified expression, across the certified route, over four movement types
+    instead of one, and was **allowed**.
 
-    The probe declares `allowed` on purpose, which is the same thing `traces.py`'s
-    `notional, wrong currency` declared while DEBT-014 stood open — and it carries the
-    same cost, stated rather than hidden: this file passes while demonstrating a wrong
-    answer. That is what makes the entry a measurement rather than a memory, and the
-    verdict flips in the Sub-step that pays it — **5.5**, under
-    [R15](../../docs/plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28),
-    which is one Sub-step and not the Grounding Step the entry's Trigger names.
+    **The pair is kept and its first half flipped**, which is what the entry was declared
+    for. For one Sub-step the probe below declared `allowed` on purpose and this file
+    passed while demonstrating a wrong answer — the cost DEBT-014 was opened about,
+    carried openly under
+    [R15](../../docs/plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28).
+    It is now `rejected`, its control is still `allowed`, and `check_the_filter_gap`
+    goes on printing the two numbers so the entry stays a measurement after it is paid.
+    `access.py`'s third mutation is what shows the flip is a rule rather than a renamed
+    probe: delete the comparison and the statement comes back.
     """
     return (
         RouteProbe(
             name="Realised P&L with its filter dropped",
             sql=statement_for(gate, "Realised P&L", with_filters=False),
-            verdict=ALLOWED,
-            why="**DEBT-020, declared.** The certified expression across the certified "
-                "route, with `movement_type = 'realised P&L'` left out — so it sums "
-                "commission, fee, rebate and realised P&L and calls the total Realised "
-                "P&L. Every rule the Gate has passes it, and this rule is the one that "
-                "should not: `filters` is the third field C2 put on a Metric Definition "
-                "and the only one this Sub-step's rule does not read. "
-                "`check_the_filter_gap` prints what the omission is worth",
+            verdict=REJECTED,
+            reasons=(RejectionReason.MISSING_CERTIFIED_FILTER,),
+            why="**DEBT-020, paid.** The certified expression across the certified "
+                "route, scoped to the permitted region, with "
+                "`movement_type = 'realised P&L'` left out — so it would sum "
+                "commission, fee, rebate and realised P&L and call the total Realised "
+                "P&L. Every other rule the Gate has passes it, and this rule is the one "
+                "that refuses it: `filters` is the third field C2 put on a Metric "
+                "Definition, and reading it is the whole of the repayment",
         ),
         RouteProbe(
             name="Realised P&L as its entry says",
             sql=statement_for(gate, "Realised P&L", with_filters=True),
             verdict=ALLOWED,
             why="the same metric with its certified filter in place — the control that "
-                "makes the probe above a finding rather than a statement about "
-                "`Realised P&L` being unjudgeable. Both are allowed, which is exactly "
-                "the problem",
+                "makes the probe above a rule rather than a statement about "
+                "`Realised P&L` being unjudgeable. One conjunct apart, opposite "
+                "verdicts",
         ),
     )
 
 
 def check_the_filter_gap(gate: ValidationGate, report: Report) -> None:
-    """Execute both halves of DEBT-020 and print what the missing rule is worth.
+    """Execute both halves of DEBT-020 and print what the rule that reads `filters` is
+    worth.
 
-    The same method as `check_the_numbers_differ` and the opposite conclusion: there the
-    two numbers justify a rejection the Gate makes, here they measure one it does not.
-    Printed rather than argued for the reason the Ledger asks — a gap nobody has run is a
-    claim, and the entry's cost is only real while the two figures are apart.
+    The same method as `check_the_numbers_differ` and, since Sub-step 5.5, the same
+    conclusion: two numbers that justify a rejection the Gate makes. While the entry
+    stood open these two measured a rejection it did **not** make, and the figures are
+    the reason it had to start — a rule is only worth having if the thing it refuses
+    returns a different answer, and a gap nobody has run is a claim.
 
-    It fails the run if they stop being apart, which would mean the entry has stopped
-    costing anything and should be closed rather than carried.
+    It goes on running after the payment rather than being deleted with it, and it fails
+    the run if the two stop being apart. A paid entry whose evidence was thrown away is
+    an entry nobody can re-check, and this rule's probe would then be a name rather than
+    a measurement.
     """
     certified = total(
         gate.warehouse.query(statement_for(gate, "Realised P&L", with_filters=True))
@@ -327,7 +336,7 @@ def check_the_filter_gap(gate: ValidationGate, report: Report) -> None:
     report.say(
         f"DEBT-020: Realised P&L is {certified:.2f} with its certified filter and "
         f"{unfiltered:.2f} with it dropped — {difference:.2f}% apart, and the Gate "
-        f"allows both"
+        f"now allows only the first"
     )
     if difference < MIN_GAP:
         problems.append(
@@ -363,6 +372,15 @@ def period_probes(warehouse: WarehouseAdapter) -> tuple[RouteProbe, ...]:
     the string literal it will become. The dates cannot be bound parameters, because the
     bounded-read rule hands the statement to the planner and an unbound placeholder is a
     statement the planner will not plan.
+
+    **Both halves carry the access route and the access predicate**, added in Sub-step
+    5.5 along with the rule that requires them. The pair is the only one in this module
+    whose positive half has to stay allowed by the **Gate** rather than only by this
+    rule — it is what says the date rule is not refusing every question that names a
+    period — so the two statements gained one join pair and one conjunct each, and go on
+    differing in exactly one identifier. It moves the two figures printed below, because
+    they are now the region the Access Profile permits rather than every region; both
+    are read from the same run and the gap between them is the same gap.
     """
     start, end = snapshot_period(warehouse)
     template = (
@@ -372,8 +390,14 @@ def period_probes(warehouse: WarehouseAdapter) -> tuple[RouteProbe, ...]:
         "  ON rate.rate_date = billed.trade_date "
         " AND rate.from_currency = billed.denomination_currency "
         " AND rate.to_currency = 'EUR' "
-        "WHERE billed.{keyed_on} BETWEEN '{start}' AND '{end}'"
+        "JOIN dim_account AS account "
+        "  ON account.account_id = billed.account_id "
+        "JOIN dim_client AS client "
+        "  ON client.client_id = account.client_id "
+        "WHERE client.client_region = '{region}' "
+        "  AND billed.{keyed_on} BETWEEN '{start}' AND '{end}'"
     )
+    template = template.replace("{region}", ANALYST.permitted_region)
     return (
         RouteProbe(
             name="a period keyed on Trade Date",
@@ -433,20 +457,11 @@ def snapshot_period(warehouse: WarehouseAdapter) -> tuple[date, date]:
 def rule_name(gate: ValidationGate, access_profile: AccessProfile) -> str:
     """This rule's name, read off the Gate's own rule list rather than typed here.
 
-    The same method, and the same reason, as `restricted.py`'s: a name typed into this
-    file is a second copy of it and the first thing to go stale when the rule is renamed.
-    This rule takes no Access Profile, so there is no `partial` to unwrap — the entry in
-    the list is the bound method, and `__func__` is what makes the comparison about the
-    function on the class rather than about this Gate instance.
-
-    An empty string when the Gate does not run the rule at all, so that deleting the rule
-    from `rules()` — this module's first mutation — is reported as the probes it breaks
-    rather than as a traceback.
+    `probes.rule_named` is where the reading lives, as of Sub-step 5.5: this file,
+    `restricted.py` and `access.py` each need it and three near-copies of one lookup is
+    three things to keep in step. What is left here is which rule this module is about.
     """
-    for name, rule in gate.rules(access_profile):
-        if getattr(rule, "__func__", None) is ValidationGate.routed:
-            return name
-    return ""
+    return rule_named(gate, ValidationGate.routed, access_profile)
 
 
 def total(rows: list[tuple[object, ...]]) -> Decimal:
@@ -566,17 +581,27 @@ def check_the_route_reading(gate: ValidationGate, report: Report) -> None:
             )
             continue
 
-        permitted = gate.permitted_route(hit, schema) if hit else None
+        metrics = [gate.semantic.metrics[name] for name in hit]
+        axes = gate.axes_sliced_by(grouped_columns(resolved))
+        # **Permitted and required are two Routes since Sub-step 5.5**, and this reading
+        # asks each of them the question it can answer: a join beyond what the corpus
+        # permits — the metric's own route, the axes the statement slices by, and the
+        # access route — is a join nothing certifies, and a join absent from what the
+        # metric *requires* is one the statement dropped. Reading both against one Route
+        # would report every scoped statement as missing the joins it was never obliged
+        # to carry.
+        permitted = gate.permitted_route(metrics, axes, schema) if hit else None
+        required = gate.required_route(metrics, schema) if hit else None
         certified_dates = {
-            tuple(gate.semantic.metrics[name].date_column.split(".", 1)) for name in hit
+            tuple(metric.date_column.split(".", 1)) for metric in metrics
         }
         beyond = carried.joins_beyond(permitted) if permitted else []
-        absent = permitted.joins_beyond(carried) if permitted else []
+        absent = required.joins_beyond(carried) if required else []
         stray = sorted(
             f"{table}.{column}" for table, column in filtered - certified_dates
         )
         off_route = bool(beyond or absent) or (
-            permitted is not None and carried.from_tables != permitted.from_tables
+            required is not None and carried.from_tables != required.from_tables
         )
 
         detail = f"{', '.join(hit) or 'no certified metric'}"
@@ -632,28 +657,27 @@ def check_every_certified_metric_stays_on_its_route(
 
     The positive control this rule needs: a rule that rejects everything passes every
     rejection probe above. Each metric's statement is built from its own `from_table`,
-    its own `join_paths` and its own `filters` — the same construction `traces.py` uses,
-    which is what makes this nine probes rather than nine more literals to keep in step
-    with `semantic/`.
+    its own `join_paths` and its own `filters` — `probes.certified_statement`, the same
+    construction `traces.py` and `access.py` use, which is what makes this nine probes
+    rather than nine more literals to keep in step with `semantic/`.
+
+    **Since Sub-step 5.5 the statement is also scoped**, and that is what keeps this a
+    control at the Gate's level rather than only at this rule's: an unscoped statement is
+    refused one rule later, so nine unscoped probes would say nothing about whether *this*
+    rule allows a certified metric. What is compared against them is `required_route` —
+    the metric's own joins — because the access route is permission the statement takes
+    and not an obligation the Metric Definition carries.
 
     What is printed is this rule's own reading rather than the verdict: how many joins
-    each statement carries. `Position Change` is the one worth looking at — it carries no
-    joins at all and its expression holds a correlated subquery with a `FROM` and a
-    `WHERE` of its own, so it is the metric that proves the route and the date readings
-    walk every scope rather than only the outermost one.
+    each statement is required to carry, and how many it is permitted. `Position Change`
+    is the one worth looking at — its own route is no joins at all and its expression
+    holds a correlated subquery with a `FROM` and a `WHERE` of its own, so it is the
+    metric that proves the route and the date readings walk every scope rather than only
+    the outermost one.
     """
     ran = allowed = 0
     for name, metric in sorted(gate.semantic.metrics.items()):
-        route = " ".join(
-            f"JOIN {gate.semantic.join_paths[path].to_table} "
-            f"ON {gate.semantic.join_paths[path].on}"
-            for path in metric.join_paths
-        )
-        where = " WHERE " + " AND ".join(metric.filters) if metric.filters else ""
-        sql = (
-            f"SELECT {metric.expression} AS answer "
-            f"FROM {metric.from_table} {route}{where}"
-        )
+        sql = certified_statement(gate, name, ANALYST)
         outcome = gate.judge(sql, ANALYST)
         if rule in outcome.rules:
             ran += 1
@@ -663,22 +687,14 @@ def check_every_certified_metric_stays_on_its_route(
                 f"{name} computed the way its own Metric Definition says is rejected by "
                 f"the Gate at {outcome.rules[-1]!r}: {outcome.explanation}\n      {sql}"
             )
-        declared = certified_route(
-            metric.expression,
-            metric.from_table,
-            [
-                (
-                    gate.semantic.join_paths[path].to_table,
-                    gate.semantic.join_paths[path].on,
-                )
-                for path in metric.join_paths
-            ],
-            gate.warehouse.columns_by_table(),
-        )
+        schema = gate.warehouse.columns_by_table()
+        required = gate.required_route([metric], schema)
+        permitted = gate.permitted_route([metric], (), schema)
         report.say(
-            f"{name:<20}{len(declared.joins)} certified join(s) · keyed on "
-            f"{metric.date_column} · starts at "
-            f"{', '.join(sorted(declared.from_tables))}"
+            f"{name:<20}{len(required.joins)} required · {len(permitted.joins)} "
+            f"permitted join(s) · keyed on {metric.date_column} · "
+            f"{len(metric.filters)} certified filter(s) · starts at "
+            f"{', '.join(sorted(required.from_tables))}"
         )
     report.say(
         f"this rule ran on {ran} of {len(gate.semantic.metrics)} Certified Metrics and "

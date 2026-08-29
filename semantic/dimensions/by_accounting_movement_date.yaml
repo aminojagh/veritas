@@ -14,3 +14,5 @@ description: >
 columns: [fct_accounting_movement.movement_date]
 grain: daily
 allowed_values: []
+routes:
+  fct_accounting_movement: []

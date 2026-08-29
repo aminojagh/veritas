@@ -27,6 +27,18 @@ a single `SELECT`, and a statement over a table the Warehouse does not have is a
 statement the planner will not size. Both are declared with the reason they actually
 return. Judging the rule in isolation would have hidden that, and what a caller gets
 is the Gate's verdict, not the rule's.
+
+**Since Sub-step 5.5 the spike's shapes are refused by a rule two places *after* this
+one**, and that is the same principle read the other way. Every statement in `PROBES` is
+the spike's, character for character, and none of them carries an Access Profile
+predicate, because none of them could have: the rule that requires one is three
+Sub-steps younger than the statements. Six that this rule traces are therefore declared
+`rejected` for `missing access predicate`, and `check_this_rules_verdicts` is what goes
+on saying that **this** rule allowed them. Giving them the predicate is not available —
+`probes.check_the_statements_are_the_spikes` fails the run on a statement that moved,
+and it is right to: they are a dated measurement. The nine metric probes below are built
+from the corpus rather than pinned, so those are scoped and those are what the Gate still
+allows.
 """
 
 import time
@@ -37,6 +49,7 @@ from probes import (
     REJECTED,
     Probe,
     Report,
+    certified_statement,
     check_the_statements_are_the_spikes,
     judge_probes,
     problems,
@@ -45,6 +58,7 @@ from probes import (
 
 from veritas.semantic import load_semantic_layer
 from veritas.validation import (
+    ACCESS_AXIS,
     ANALYST,
     RejectionReason,
     ValidationGate,
@@ -87,9 +101,13 @@ PROBES = (
             "  ON fct_fx_rate.rate_date = fct_trade.trade_date "
             " AND fct_fx_rate.from_currency = fct_trade.denomination_currency "
             " AND fct_fx_rate.to_currency = 'EUR'",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="the Metric Definition's own expression, with no rewriting at all — if "
-            "this does not trace, nothing else can",
+            "this does not trace, nothing else can. **This rule traces it**, which is "
+            "what `check_this_rules_verdicts` reports; the Gate refuses it two rules "
+            "later because it carries no Access Profile predicate, which every "
+            "statement written before Sub-step 5.5 does not",
     ),
     Probe(
         name="aliased",
@@ -99,9 +117,11 @@ PROBES = (
             "  ON rate.rate_date = billed.trade_date "
             " AND rate.from_currency = billed.denomination_currency "
             " AND rate.to_currency = 'EUR'",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="table aliases and an output alias — what a generator writes by default, "
-            "and what defeats matching the text",
+            "and what defeats matching the text. Traced by this rule and unscoped, so "
+            "the Gate refuses it at the access predicate",
     ),
     Probe(
         name="derived table",
@@ -114,10 +134,12 @@ PROBES = (
             "   AND rate.from_currency = billed.denomination_currency "
             "   AND rate.to_currency = 'EUR' "
             ") AS converted",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="the conversion done in a subquery and aggregated outside it, so the "
             "certified expression is split across a boundary — merge_subqueries is "
-            "the trusted rewrite that puts it back together",
+            "the trusted rewrite that puts it back together. Traced by this rule and "
+            "unscoped, so the Gate refuses it at the access predicate",
     ),
     Probe(
         name="common table expression",
@@ -131,9 +153,11 @@ PROBES = (
             ") "
             "SELECT sum(converted.commission * converted.fx_rate) AS revenue "
             "FROM converted",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="the same split, written the way a model that has read a style guide "
-            "writes it",
+            "writes it. Traced by this rule and unscoped, so the Gate refuses it at "
+            "the access predicate",
     ),
     Probe(
         name="net revenue",
@@ -144,9 +168,11 @@ PROBES = (
             "  ON rate.rate_date = billed.trade_date "
             " AND rate.from_currency = billed.denomination_currency "
             " AND rate.to_currency = 'EUR'",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="a second certified expression over the same tables, so the Gate is "
-            "shown to pick between metrics rather than to recognise one",
+            "shown to pick between metrics rather than to recognise one. Traced by "
+            "this rule and unscoped, so the Gate refuses it at the access predicate",
     ),
     Probe(
         name="net revenue by region",
@@ -165,18 +191,19 @@ PROBES = (
             "GROUP BY client.client_region "
             "ORDER BY client.client_region",
         verdict=REJECTED,
-        reasons=(RejectionReason.UNCERTIFIED_ROUTE,),
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="a Dimension Definition applied to a metric — a grouping column sitting "
             "beside the metric in the projection. **This rule allows it**, and that is "
             "still what the probe is here to show: a projection with no aggregate in it "
             "is not a metric expression, so the grouping column does not have to trace. "
-            "The rejection arrives from Sub-step 5.4's certified-route rule, two rules "
-            "later, because the two joins that reach `dim_client` are named by no entry "
-            "in `semantic/` — `by region` is a certified axis no query can reach until "
+            "Sub-step 5.4's certified-route rule refused it on two joins to `dim_client` "
+            "no entry named; "
             "[5.5](../../docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020) "
-            "adds the Join Paths and the `routes` field that certify them, and this "
-            "verdict flips back there. `check_this_rules_verdicts` below is what says "
-            "this rule allowed it",
+            "added the Join Paths and the `routes` field that certify them, so that rule "
+            "allows it too and `by region` is an axis a query can reach. What refuses it "
+            "now is the access predicate it does not carry — the third rule to reach a "
+            "verdict on this one statement, and each of the three moves was declared "
+            "before it happened",
     ),
     Probe(
         name="traded notional",
@@ -189,10 +216,12 @@ PROBES = (
             "  ON rate.rate_date = billed.trade_date "
             " AND rate.from_currency = instrument.quotation_currency "
             " AND rate.to_currency = 'EUR'",
-        verdict=ALLOWED,
+        verdict=REJECTED,
+        reasons=(RejectionReason.MISSING_ACCESS_PREDICATE,),
         why="the widening cast survives the round trip through the optimizer, and "
             "the metric converts out of the Instrument's Quotation Currency — a "
-            "different route through fct_fx_rate for the same table",
+            "different route through fct_fx_rate for the same table. Traced by this "
+            "rule and unscoped, so the Gate refuses it at the access predicate",
     ),
     Probe(
         name="commuted subtraction",
@@ -371,27 +400,27 @@ def certified_probes(gate: ValidationGate) -> tuple[Probe, ...]:
     out here, which is what makes this nine probes and not nine more literals to keep
     in step with `semantic/`. A tenth Metric Definition is a tenth probe with no edit
     to this file.
+
+    **Since Sub-step 5.5 it is also scoped to the Access Profile**, because *"the
+    simplest statement that computes this metric"* and *"the simplest statement that
+    computes this metric and is allowed to run"* stopped being the same string that
+    Sub-step. These nine are the only probes in this module the Gate still allows, and
+    they are what makes *"a Gate that recognises three of nine rejects two thirds of the
+    questions Veritas exists to answer"* a claim about the Gate's verdict rather than
+    only about this rule's. The construction is `probes.certified_statement`, shared with
+    `route.py` and `access.py` so the three ask the corpus one question.
     """
-    layer = gate.semantic
-    built = []
-    for name, metric in sorted(layer.metrics.items()):
-        route = " ".join(
-            f"JOIN {layer.join_paths[join_path].to_table} "
-            f"ON {layer.join_paths[join_path].on}"
-            for join_path in metric.join_paths
+    return tuple(
+        Probe(
+            name=name,
+            sql=certified_statement(gate, name, ANALYST),
+            verdict=ALLOWED,
+            why=f"{name} is certified, so the statement that computes it the way its "
+                f"own Metric Definition says — reached through the `{ACCESS_AXIS}` "
+                f"route and narrowed to the permitted region — has to be allowed",
         )
-        where = " WHERE " + " AND ".join(metric.filters) if metric.filters else ""
-        built.append(
-            Probe(
-                name=name,
-                sql=f"SELECT {metric.expression} AS answer "
-                    f"FROM {metric.from_table} {route}{where}",
-                verdict=ALLOWED,
-                why=f"{name} is certified, so the statement that computes it the way "
-                    f"its own Metric Definition says has to be allowed",
-            )
-        )
-    return tuple(built)
+        for name in sorted(gate.semantic.metrics)
+    )
 
 
 def check_the_corpus_is_the_one_on_disk(gate: ValidationGate, report: Report) -> None:
@@ -531,8 +560,9 @@ def check_one_judgement_reads_once(gate: ValidationGate, report: Report) -> None
       * the catalogue, counted by an adapter that tallies the calls the Gate makes to it;
       * the resolution and the corpus, read off the `Reading`'s own memo after every rule
         has run. A `cached_property` puts its answer in the instance's `__dict__` the
-        first time it is asked, so a key that is present after six rules is a key that
-        was computed once and reused five times.
+        first time it is asked, so a key that is present after every rule has run is a
+        key that was computed once and reused. The count the run prints is the rule
+        count, which grows with the Step; what it is checked against is 1.
 
     The rules are run by hand over one `Reading` rather than through `judge`, for the one
     reason that `judge` does not hand its `Reading` back — and the point here is what

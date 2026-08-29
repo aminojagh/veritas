@@ -1,0 +1,7 @@
+name: accounting_movement_to_account
+version: 1
+kind: join_path
+from_table: fct_accounting_movement
+to_table: dim_account
+on: >
+  dim_account.account_id = fct_accounting_movement.account_id

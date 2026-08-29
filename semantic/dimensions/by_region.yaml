@@ -1,7 +1,8 @@
 # The axis the Glossary's own worked example uses — "Net Revenue by region last
-# quarter" — and the one no metric can currently reach: nothing under
-# semantic/joins/ routes a fact table to dim_client. The Sub-step 4.5 review says
-# what that costs and where it lands.
+# quarter" — and the axis the Access Profile's permitted region is a value of, so
+# every question Veritas answers is scoped along it whether or not it slices by it.
+# It was certified-and-unreachable between Sub-steps 4.5 and 5.5; the routes below
+# are the half of that the Sub-step 4.5 review said was missing.
 name: by region
 version: 1
 kind: dimension_definition
@@ -13,3 +14,13 @@ description: >
 columns: [dim_client.client_region]
 grain: one Client
 allowed_values: [EU, UK, APAC]
+# Reachable from all four fact tables, by two hops each: the fact table's own hop
+# to dim_account, then the shared account_to_client. Four keys rather than one list
+# because which route reaches the axis depends on where the query starts, and a
+# Gate that enforced the Access Profile on the trade-side metrics alone would
+# enforce it on four questions out of nine.
+routes:
+  fct_trade: [trade_to_account, account_to_client]
+  fct_position_snapshot: [position_snapshot_to_account, account_to_client]
+  fct_balance_snapshot: [balance_snapshot_to_account, account_to_client]
+  fct_accounting_movement: [accounting_movement_to_account, account_to_client]

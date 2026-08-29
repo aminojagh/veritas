@@ -1,0 +1,12 @@
+# The shared last hop: whichever fact table a question starts from, the Client is
+# one join past the Account. It is the only Join Path in the corpus that starts at
+# a dimension table, which is what makes it shared — the four hops above each reach
+# dim_account from their own fact table, and this one carries all four the rest of
+# the way.
+name: account_to_client
+version: 1
+kind: join_path
+from_table: dim_account
+to_table: dim_client
+on: >
+  dim_client.client_id = dim_account.client_id

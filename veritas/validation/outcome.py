@@ -19,21 +19,28 @@ read by a prose parse is
 [DEBT-017](../../.claude/docs/debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell),
 opened four days earlier and still open.
 
-**The set is incomplete on purpose.** Sub-step 5.1 shipped the rules that need
-neither the corpus nor the schema and registered four members; Sub-step 5.2 added the
-tracing rule and the three ways it can fail; Sub-step 5.3 added the Restricted Column
-rule and the one way it can; and Sub-step 5.4 added the certified-route rule and the
-two ways it can — a route the corpus does not name, and a period filter on a date
-column the metric does not certify. Each later rule of
-[Step 005](../../.claude/docs/plan/step-005-validation-gate.md) adds its own with the
-Sub-step that adds the rule. A member with no rule behind it would be a chart
-category nothing can ever fall into.
+**The set is complete for the slice, and was built one rule at a time.** Sub-step 5.1
+shipped the rules that need neither the corpus nor the schema and registered four
+members; Sub-step 5.2 added the tracing rule and the three ways it can fail; Sub-step
+5.3 added the Restricted Column rule and the one way it can; Sub-step 5.4 added the
+certified-route rule and the two ways it can — a route the corpus does not name, and a
+period filter on a date column the metric does not certify; and Sub-step 5.5 added
+three, two of them to that same rule as it widened — an axis no route reaches from the
+metric, a certified filter the statement dropped, and the Access Profile's own
+predicate absent. Every member arrived with the rule that can produce it, because a
+member with no rule behind it would be a chart category nothing can ever fall into.
+The next member arrives with the next rule, and nothing in
+[Step 005](../../.claude/docs/plan/step-005-validation-gate.md) is left to add one.
 
 **A rule may register more than one member.** Four rules and four members made them
 look paired; the tracing rule is one rule with three distinct failures behind it, and
 they are separate members because they are separate bars a reader would act on
 differently — a statement the optimizer cannot resolve, a Shadow Metric, and a
-statement that aggregates nothing are three different things to go and fix.
+statement that aggregates nothing are three different things to go and fix. The
+certified-route rule ended the Step with four of its own, which is the same test applied
+four times: a route nothing certifies, a period on the wrong date column, an axis the
+metric cannot reach, and a certified filter dropped are four different things to go and
+fix, and one bar would hide which.
 """
 
 from dataclasses import dataclass
@@ -203,6 +210,78 @@ class RejectionReason(StrEnum):
     one that filtered on the wrong date are different things to go and fix, and one bar
     would hide which. They are one **rule** because C2 and DEBT-014 treat them as one
     question — the rows the certified expression is computed over.
+    """
+
+    UNREACHABLE_AXIS = "unreachable axis"
+    """The statement slices a metric by a certified axis no route reaches from it.
+
+    Sub-step 5.5's, and the one the `routes` field exists to make sayable. An axis
+    declares the Join Paths that reach it from each fact table; an **absent key** says
+    it cannot be reached from that one at all, and *"Cash Balance by instrument type"*
+    is the case — a Cash Balance has no Instrument, so the honest refusal names the
+    missing key rather than pointing at whichever two tables the generator joined
+    trying to get there.
+
+    **A different bar from `UNCERTIFIED_ROUTE`, because it is a different thing to go
+    and fix.** An uncertified route says the statement's joins are wrong and the
+    question is fine; this says the **question** cannot be asked of that metric, and no
+    rewriting of the SQL will make it answerable. A reader acting on the first edits a
+    query and a reader acting on the second asks a different one, which is exactly the
+    distinction
+    [ADR-0003](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md)
+    sold determinism on a stable taxonomy to preserve.
+
+    It is also what makes
+    [R11 of Step 004](../../.claude/docs/plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)'s
+    fourth ruling enforceable rather than argued. That ruling defends three date axes
+    where the Glossary had one, on the grounds that *"an axis named `fct_trade.trade_date`
+    applied to a Snapshot metric is a certified axis whose route never reaches the
+    column."* Under `routes` that sentence stops being an argument in a plan and becomes
+    this member.
+    """
+
+    MISSING_CERTIFIED_FILTER = "missing certified filter"
+    """The statement computes a metric without the certified predicate that defines it.
+
+    [DEBT-020](../../.claude/docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+    paid. A Metric Definition carries **three** fields that pin down which rows its
+    expression is computed over — `join_paths`, `date_column` and `filters` — and
+    Sub-step 5.4 read two of them. `Realised P&L` shares `fct_accounting_movement` with
+    three other movement types and `filters` is the whole difference between them, so a
+    statement that drops `movement_type = 'realised P&L'` computes the certified
+    expression across the certified route over four movement types and calls the total
+    Realised P&L.
+
+    **Its own bar rather than `UNCERTIFIED_ROUTE`'s**, on the same test the two members
+    above are separated by: a statement that joined the wrong way, one that filtered on
+    the wrong date, and one that dropped a WHERE clause are three different things to go
+    and fix, and a generator that forgets a filter is the most ordinary failure of the
+    three. One **rule** with the other two, because C2 treats all of them as one
+    question — the rows the certified expression is computed over.
+    """
+
+    MISSING_ACCESS_PREDICATE = "missing access predicate"
+    """The statement is not scoped to the Access Profile's permitted region.
+
+    The [Target State](../../.claude/docs/design/target-state.md#flow)'s third check on
+    the parse tree, in its own words: *"Access Profile predicate present"*. Present, on
+    every statement — not *"absent from statements that ask for another region"*. A
+    statement over `fct_trade` that never joins `dim_client` reads every region's rows,
+    and a rule that only refused the ones naming a region it may not see would be a rule
+    that permits the leak by omission.
+
+    So this is the member every question written before Sub-step 5.5 falls into, which
+    is what makes it the widest change the Gate has made to what it allows: after 5.5, a
+    statement is a Veritas statement when it is scoped, and the route that scopes it is
+    the `by region` axis's own.
+
+    Separate from `RESTRICTED_COLUMN` because the Glossary's Access Profile row names
+    two powers and they fail differently: *"Determines which **rows** and **columns** the
+    Validation Gate allows"*. A projected identity and an unscoped population are two
+    bars a reader acts on differently, and
+    [DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+    is honest about what both are worth: application-layer enforcement over synthetic
+    data, demonstrating the mechanism.
     """
 
 
