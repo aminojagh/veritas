@@ -12,8 +12,8 @@ trimmed this file to on 2026-08-25, and
 wrote the rule that keeps it short into step 5 of the `closing-a-substep` skill: a
 Sub-step adds what is now true, and the story of how it got there stays in the review.
 
-**Last updated:** 2026-08-29 — **Step 005 — Build the Validation Gate — is `active`,
-and all five of its Sub-steps are built.** `veritas/validation/` refuses anything that
+**Last updated:** 2026-08-29 — **Step 005 — Build the Validation Gate — is `done`, and
+all five of its Sub-steps are built, ruled and committed.** `veritas/validation/` refuses anything that
 is not a single, parseable, bounded `SELECT`, refuses any statement whose expressions do
 not all trace to a Certified Metric, refuses any statement whose answer would carry a
 Restricted Column the Access Profile forbids, refuses any statement that computes a
@@ -25,7 +25,7 @@ Semantic Layer is complete: all four entry types, thirty-two entries. The Wareho
 full, every Certified Metric can return a number, and the sqlglot spike's verdict is
 **GO** on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md). All five
 Sub-steps are ruled, the last of them on 2026-08-29; nothing in the Step is waiting on a
-decision.
+decision, and **no Step is `active`** — the next move is to plan Step 006.
 
 ---
 
@@ -40,9 +40,11 @@ decision.
   which is where the two that needed a decision are answered — the `Route` Glossary row's
   amendment is approved, and
   [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
-  is left for the Sub-step its Trigger names. **Sub-step 5.5 is built, ruled and staged;
-  the commit is Amino's**, and the four Sub-steps before it are already committed.
-- **The [Step 005 plan](../plan/step-005-validation-gate.md) is `active`**, written and
+  is left for the Sub-step its Trigger names. **All five Sub-steps are committed** — 5.5
+  in `1c96281`, the four before it in `d98fe7f`, `7522ad8`, `fce9248` and `faba544`.
+- **The [Step 005 plan](../plan/step-005-validation-gate.md) is `done`** — closed
+  2026-08-29 at Amino's instruction, before Step 006 is planned rather than by its
+  planning commit the way the three Steps before it were closed. Written and
   approved 2026-08-25 with **sixteen rulings**, the last of them
   [R16](../plan/step-005-validation-gate.md#r16--aminos-rulings-on-the-55-review--decided-2026-08-29)
   of 2026-08-29. Read the plan for what each decided.
@@ -495,7 +497,7 @@ its dated review.
 | 002 | The Warehouse and Ingestion — the ten-table star schema, four real sources, the seeded simulator, and the adapter seam scan | [plan](../plan/step-002-warehouse-and-ingestion.md) | [review](../reviews/step-002-warehouse-and-ingestion.md) |
 | 003 | The sqlglot spike — all four parse-tree claims measured on real data, and the **GO** recorded in [validation-feasibility.md](validation-feasibility.md) with six constraints | [plan](../plan/step-003-validation-feasibility.md) | [review](../reviews/step-003-validation-feasibility.md) |
 | 004 | The Semantic Layer — all four entry types, twenty-seven entries, and eighteen checks over them | [plan](../plan/step-004-semantic-layer.md) | [review](../reviews/step-004-semantic-layer.md) |
-| 005 | The Validation Gate — **active**. 5.1 built: the outcome, the reason taxonomy, and the four rules that judge a statement's shape. 5.2 built: the tracer, and the rule that every metric expression traces to a Certified Metric. 5.3 built: the Access Profile, and the rule that no Restricted Column reaches the answer. 5.4 built: the route reader, and the rule that a metric is computed across its own joins and over its own date column. 5.5 built: the five Join Paths and the `routes` field that make an axis reachable, the slice route and the certified filters inside the route rule, and the rule that every statement carries the Access Profile's predicate | [plan](../plan/step-005-validation-gate.md) | [review](../reviews/step-005-validation-gate.md) |
+| 005 | The Validation Gate — **done**. 5.1 built: the outcome, the reason taxonomy, and the four rules that judge a statement's shape. 5.2 built: the tracer, and the rule that every metric expression traces to a Certified Metric. 5.3 built: the Access Profile, and the rule that no Restricted Column reaches the answer. 5.4 built: the route reader, and the rule that a metric is computed across its own joins and over its own date column. 5.5 built: the five Join Paths and the `routes` field that make an axis reachable, the slice route and the certified filters inside the route rule, and the rule that every statement carries the Access Profile's predicate | [plan](../plan/step-005-validation-gate.md) | [review](../reviews/step-005-validation-gate.md) |
 
 **Commits, in order.** Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`,
 Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the
@@ -505,7 +507,9 @@ planning in `40d72d8`, Sub-step 3.1 in `d840fa8`, Sub-step 3.2 in `89fee55`, Sub
 in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`, Step 004 planning in
 `5d95393`, Sub-step 4.1 in `6c15736`, Sub-step 4.2 in `333d6fc`, Sub-step 4.3 in
 `ae75f0e`, Sub-step 4.4 in `71ce677`, Sub-step 4.5 in `7ddd96c`, **Step 005 planning in
-`aa42205`**, the Current State trim in `aa918fb`. A Step's planning commit is what writes
-the previous Step's last hash into this list and turns that plan from `in review` to
-`done`. Sub-step 5.1's own hash is not here for the same reason the trim's was not: this
-file is part of that commit, and the next one fills it in.
+`aa42205`**, the Current State trim in `aa918fb`, Sub-step 5.1 in `d98fe7f`, Sub-step 5.2
+in `7522ad8`, Sub-step 5.3 in `fce9248`, Sub-step 5.4 in `faba544`, **Sub-step 5.5 in
+`1c96281`**. A Step's planning commit is normally what writes the previous Step's last
+hash into this list and turns that plan from `in review` to `done`; Step 005 was closed
+ahead of that, by the commit carrying this line, so all five of its hashes are written
+here at once and none is left for Step 006's planning commit to fill in.

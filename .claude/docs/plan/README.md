@@ -16,7 +16,7 @@ attempted versus what shipped, which is where the Step Review gets its honesty.
 | [002](step-002-warehouse-and-ingestion.md) | Build the Warehouse and fill it | 6 | done |
 | [003](step-003-validation-feasibility.md) | Prove the Validation Gate's parse-tree claim | 5 | done |
 | [004](step-004-semantic-layer.md) | Build the Semantic Layer | 5 | done |
-| [005](step-005-validation-gate.md) | Build the Validation Gate | 5 | active |
+| [005](step-005-validation-gate.md) | Build the Validation Gate | 5 | done |
 
 Statuses: `proposed` (written, not yet approved — no implementation may begin) ·
 `active` · `in review` · `done` · `abandoned` (with a note on why — an abandoned

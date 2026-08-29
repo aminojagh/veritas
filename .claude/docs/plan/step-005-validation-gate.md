@@ -1,6 +1,14 @@
 # Step 005 — Build the Validation Gate
 
-- **Status:** **active** — written 2026-08-25 and **approved by Amino the same day**,
+- **Status:** **done** — every Sub-step is built, ruled and **committed**: 5.1
+  (`d98fe7f`), 5.2 (`7522ad8`), 5.3 (`fce9248`), 5.4 (`faba544`) and **5.5
+  (`1c96281`)**, whose review Amino approved on 2026-08-29 as
+  [R16](#r16--aminos-rulings-on-the-55-review--decided-2026-08-29). **Closed
+  2026-08-29 by the commit that carries this line** — at Amino's instruction, and so
+  *before* Step 006 is planned rather than by its planning commit, which is how the
+  three Steps before this one were closed. The status therefore turned from `active`
+  straight to `done` without passing through `in review`.
+  Written 2026-08-25 and **approved by Amino the same day**,
   together with all seven questions the plan itself asked, in
   [Questions for Amino](#questions-for-amino).
   Each rewrote its own heading on approval, the way
@@ -25,9 +33,12 @@
   [R11](#r11--aminos-rulings-on-the-trim--decided-2026-08-26), of 2026-08-26, approves
   how far the trim went and writes the rule it leaves behind into `closing-a-substep`.
   It changes nothing about what gets built.
-  **Nothing is built yet**: `veritas/validation/` does not exist, this commit is the
-  plan and the three documents around it, and the two commits after it are the Current
-  State trim and then 5.1.
+  **Everything the plan describes is built**: `veritas/validation/` is `gate.py`,
+  `outcome.py` and `profile.py`, and the Step's check is the package
+  `.claude/scripts/check_validation_gate/` — one module per rule, as
+  [R8](#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
+  required. The commit before 5.1 was the Current State trim (`aa918fb`), and the plan
+  itself is `aa42205`.
 - **Goal:** Build `veritas/validation/` — the deterministic, non-Large-Language-Model
   (non-LLM) checks a generated query must pass before it executes — so that a
   statement reaching the Warehouse has been shown, on its parse tree, to compute a
