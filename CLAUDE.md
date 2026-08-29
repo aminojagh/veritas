@@ -4,11 +4,44 @@
 Zoomcamp, and a deliberately minimal slice of a larger system proposed in
 `final_proposal_target.md`.
 
-> **Design in progress.** The Glossary's Domain Language is `agreed`
-> (2026-07-23). The Target State is written and its terms are settled, but stays
-> `proposed` until the data-availability check confirms its sources
-> ([Step 001, Sub-step 1.2](.claude/docs/plan/step-001-target-state-design.md)).
-> Implementation Steps begin once it is `agreed`.
+> **Design settled, building against a deadline.** The Glossary's Domain Language
+> and the Target State are both `agreed`. Steps 000–005 are built and committed:
+> Warehouse, Ingestion, Semantic Layer, Validation Gate.
+
+---
+
+## Delivery Mode — until 2026-09-09
+
+**The capstone is due 2026-09-09.** Five of the nine Target State components are
+unbuilt and the remaining build is ~2,000 lines of product code. That is
+achievable; the overhead around it is not. Steps 002–005 wrote **2.5× to 14×
+more check-script and prose than product code** — see the
+[Step 006 plan](.claude/docs/plan/step-006-retrieval-and-orchestrator.md#why-delivery-mode-exists)
+for the per-Step figures and the estimate they drive.
+
+So these rules are suspended until 2026-09-09, and **only** these:
+
+| Suspended | Replaced by |
+|---|---|
+| New check scripts in `.claude/scripts/` | `tests/` — pytest. `uv run pytest` |
+| Step Review as narrative | ≤ 40 lines per Sub-step, template in `closing-a-substep` |
+| Plan as argued case | ≤ 120 lines, template in `planning-a-step` |
+| "Why this is built this way" in docstrings | The ADR, the plan, or nothing |
+| Links from code into `plan/` or `reviews/` | Nothing — code cites the Glossary, the Ledger, ADRs, and Target State only |
+
+**Existing check scripts are frozen, not deleted.** They still run and still
+prove what they proved. Nothing new goes into them and nothing is ported out of
+them — porting costs days and buys nothing before the deadline
+([DEBT-023](.claude/docs/debt-ledger.md#debt-023--two-proving-systems-run-side-by-side)).
+
+**Nothing in the Four Non-Negotiables is suspended.** Shared language, recorded
+shortcuts, true state documents, and evidence before claims all hold exactly as
+written. Evidence only changes *shape*: a committed test is a committed script.
+
+**This section expires by its own date, not by decision.** After 2026-09-09 it is
+deleted and [DEBT-023](.claude/docs/debt-ledger.md#debt-023--two-proving-systems-run-side-by-side)
+and [DEBT-024](.claude/docs/debt-ledger.md#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit)
+come due. Until then, when a rule below and this section disagree, this section wins.
 
 ---
 
@@ -62,6 +95,7 @@ one trivial implementation. See `recording-debt`.
 
 | Phase | Skill | Produces |
 |---|---|---|
+| Prove behaviour | — | `tests/test_<component>.py`, run by `uv run pytest` |
 | Plan a Step | `planning-a-step` | `.claude/docs/plan/step-NNN-<slug>.md` |
 | Close a Sub-step | `closing-a-substep` | Step Review entry + state updates |
 | Take a shortcut | `recording-debt` | `.claude/docs/debt-ledger.md` entry |
@@ -132,14 +166,15 @@ in the Step Review and record it as debt. A failed Sub-step honestly reported is
 worth more than a green one that lies.
 
 **Evidence in a document comes from a committed script.** If a check is worth
-putting in a Step Review, it is worth committing to `.claude/scripts/`. Never
-paste the output of a throwaway inline script into a permanent document: the
-reader cannot re-run it, the transcription can be wrong, and a summary count
+putting in a Step Review, it is worth committing — to `tests/` under Delivery
+Mode, or to `.claude/scripts/` for the frozen checks and the framework verifier.
+Never paste the output of a throwaway inline script into a permanent document:
+the reader cannot re-run it, the transcription can be wrong, and a summary count
 (*"checked 37 links, 0 broken"*) hides what was actually covered. **Before
-writing any new check, look in `.claude/scripts/` for one that already does it** —
-`verify_framework.py` already validates document links **and the headings their
-anchors point at**, skills, and the interpreter. A review shows the command a reader can run and the output that
-command produced, nothing else.
+writing any new check, look for one that already does it** — `verify_framework.py`
+already validates document links **and the headings their anchors point at**,
+skills, and the interpreter. A review shows the command a reader can run and the
+output that command produced, nothing else.
 
 **Citations quote.** Any claim about what another document says must include the
 words it relies on. A bare link is not evidence — it is an invitation to assume
@@ -183,12 +218,28 @@ cold session must be able to resume from the files alone. The contract:
 | [`.claude/docs/adr/`](.claude/docs/adr/) | Decisions that are expensive to reverse | As decided |
 | `.claude/docs/plan/step-NNN-*.md` | The one active Step | Once per Step |
 | `.claude/docs/reviews/step-NNN-*.md` | Handoff notes for Amino's review | Every Sub-step |
+| `tests/` | What each component must do, as executable claims | Every Sub-step with behaviour |
 
 `README.md` is the public face for Zoomcamp reviewers. The `.claude/docs/` tree is the
 working record. Keep them separate — do not turn the README into a changelog.
 
 ### Writing conventions
 
+- **One explanation, one home.** A decision is explained in exactly one place —
+  the ADR if it was expensive, the plan if it was a route choice, the Glossary if
+  it was a name. Everywhere else links to it. A second copy of the reasoning is a
+  defect even when it is accurate, because the two copies drift and the reader
+  pays for both.
+- **A docstring says what this is and how it works.** Never why it was built this
+  way — that is the ADR's or the plan's, and code that argues its own case cannot
+  be edited without re-litigating it. Never a link into `plan/` or `reviews/`: a
+  ruling is a transcript of a conversation, and code that cites one makes that
+  conversation permanent.
+- **The reader's time is the scarcest thing here.** Amino reads every line. A
+  sentence that restates the one before it, a paragraph justifying a decision
+  already recorded, a review narrating what a diff already shows — each is a
+  withdrawal from the same account. Say it once, in the shortest form that stays
+  exact.
 - **Expand every abbreviation on first use in each document**, then use the short
   form freely: "Data Definition Language (DDL)", "Mean Reciprocal Rank (MRR)".
   This applies to domain and technical shorthand alike. The reader of these
@@ -221,7 +272,8 @@ working record. Keep them separate — do not turn the README into a changelog.
 Check the framework is wired up correctly at any time:
 
 ```bash
-uv run python .claude/scripts/verify_framework.py
+uv run pytest                                          # what the code does
+uv run python .claude/scripts/verify_framework.py      # that the docs hang together
 ```
 
 It checks structure, not content — that documents exist, links resolve, skills

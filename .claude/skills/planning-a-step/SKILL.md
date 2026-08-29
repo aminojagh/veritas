@@ -63,6 +63,17 @@ by**, the numbered Sub-steps each with its **verification command**, and a
 goes to be recorded instead of enacted. Anything cut there that would leave the
 system worse must also become a Debt Ledger entry.
 
+**Delivery Mode: 120 lines, hard ceiling.** A plan is a route, not a case. State
+the decision and move on — a paragraph defending a choice against alternatives
+nobody proposed is the single biggest source of plan length, and it costs Amino
+reading time twice: once here and again when the review cites it. If a choice is
+genuinely expensive to reverse it is an ADR, and the plan links to it in one line.
+
+**Do not carry a ruling into code.** Rulings recorded here are for Amino and for
+the next planning session. A source file that links to `#rN--…` makes this plan
+permanent API and pins its headings forever; cite the Glossary, the Ledger, an
+ADR, or Target State instead.
+
 ## Common mistakes
 
 | Mistake | Why it hurts |
@@ -72,3 +83,5 @@ system worse must also become a Debt Ledger entry.
 | Silently widening scope mid-Step | The plan stops describing the work; write it into the plan or a later Step |
 | Planning around debt instead of firing its Trigger | The Ledger becomes decorative |
 | Introducing new nouns in the plan | Every domain term must clear the Glossary first — use `registering-language` |
+| Arguing the Step's case at length | The Step is approved or it is not; the argument is not re-read. State the route |
+| A Sub-step with no test named | Under Delivery Mode a behavioural Sub-step names the `tests/` file that proves it, in the plan, before it is built |

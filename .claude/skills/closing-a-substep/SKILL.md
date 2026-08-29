@@ -29,10 +29,13 @@ Do these in order. Later items depend on earlier ones being honest.
 
 1. **Verify.** Run the Sub-step's verification command from the plan, in full.
    Read the whole output and the exit code. Not a subset, not a previous run.
-   Evidence must come from a **committed script** — check `.claude/scripts/` for
-   one that already covers the check before writing anything new. Never
-   transcribe the output of a throwaway inline script into the review; the
-   reader cannot re-run it.
+   Evidence must come from a **committed script**: `uv run pytest` for behaviour,
+   `verify_framework.py` for documents. Never transcribe the output of a throwaway
+   inline script into the review; the reader cannot re-run it.
+
+   **Under Delivery Mode, behaviour is proven in `tests/` and nowhere else.** No
+   new file goes into `.claude/scripts/`; the checks already there are frozen and
+   still run. A behavioural claim with no test is not verified.
 2. **If verification failed** and you cannot fix it inside this Sub-step: stop.
    Say so plainly, record it, and hand over anyway. Do not quietly reduce the
    claim to something that passes.
@@ -61,22 +64,25 @@ Do these in order. Later items depend on earlier ones being honest.
 
 ## Step Review section
 
+**Delivery Mode: 40 lines, hard ceiling.** The diff is in git and the behaviour is
+in `tests/`; the review exists for what neither of those shows. Do not narrate the
+diff, do not re-argue a decision, do not quote a document back. If a Sub-step needs
+more than 40 lines to hand over, the extra belongs in an ADR or in a test name.
+
 ```markdown
 ## Sub-step N.M — <title>
 
-**What changed** — the diff in prose, by intent not by file list.
+**Changed** — 2–4 lines. Intent, not a file list.
 
-**Verification** — the command, and its actual output. Paste it; do not
-characterise it.
+**Verified** — the command and its real output, pasted. Trim only passing
+noise; never a failure, never a count in place of the lines.
 
-**Deliberately left undone** — with DEBT-NNN references.
+**Debt** — DEBT-NNN references, or `none`.
 
-**Look at this sceptically** — the judgement calls, the places a reviewer
-would reasonably disagree, the things I am least sure about. Never write
-"nothing" here; if a Sub-step truly had no judgement calls it was probably
-too small to need a review.
+**Sceptically** — the judgement calls, ranked. Never "nothing"; a Sub-step with
+no judgement calls was too small to review.
 
-**Language** — terms added, renamed, or proposed this Sub-step.
+**Language** — terms added, renamed, or proposed. Or `none`.
 ```
 
 ## Rationalization prevention
@@ -84,7 +90,10 @@ too small to need a review.
 | Excuse | Reality |
 |---|---|
 | "It's a docs-only change, no need to verify" | Run `verify_framework.py` — it already checks links, skills, and paths. Do not hand-roll a second link checker |
-| "I'll write a quick inline script to check this" | If it is worth showing Amino, it is worth committing to `.claude/scripts/`. Check what is already there first |
+| "I'll write a quick inline script to check this" | If it is worth showing Amino, it is worth committing to `tests/`. Check what is already there first |
+| "This check doesn't fit pytest, I'll add a check script" | It fits. A check script is a test with a worse runner and no assertion. `.claude/scripts/` is frozen |
+| "The reviewer needs the background to judge this" | The background is in the plan and the ADR. The review says what a reader of both still would not know |
+| "40 lines isn't enough for this Sub-step" | Then the extra is a decision, and decisions live in ADRs. Or it is narration, and narration is in the diff |
 | "The output is long, I'll summarise the count" | A count hides what was covered. Show the command and its real output |
 | "I ran it a few messages ago" | Run it again; the code changed since |
 | "The debt is obvious from the code" | It is obvious to you today and to nobody in a month |

@@ -50,8 +50,11 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-020](#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters) | The Gate checks a metric's route and not its certified filters | S | Whichever lands first: the Sub-step that builds Grounding, or the one that builds the Gold Question Set — **paid ahead of both, by ruling** | **paid** (Sub-step 5.5) |
 | [DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart) | Two joins to one table under different aliases are not told apart | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding | open |
 | [DEBT-022](#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one) | The Gate compares joins without their kind, so an outer join passes as an inner one | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding | open |
+| [DEBT-023](#debt-023--two-proving-systems-run-side-by-side) | Two proving systems run side by side | L | Delivery Mode ends, 2026-09-09 | open |
+| [DEBT-024](#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit) | Source and Step documents carry prose Delivery Mode would not admit | L | Delivery Mode ends, 2026-09-09 | open |
+| [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) | The nine Certified Metrics are implemented twice | M | Any change to a Certified Metric's expression | open |
 
-**Open debt:** 11 · **Paid:** 8 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 14 · **Paid:** 8 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2011,3 +2014,120 @@ beside [DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-
 and on one visit to `route_of_resolved`, and the probe this entry owes is owed by that
 Sub-step. Nothing about the hole changed — this note records that it was read and left,
 which is a different state from one nobody has weighed.
+
+---
+
+### DEBT-023 — Two proving systems run side by side
+
+- **Status:** open
+- **Opened:** Delivery Mode, 2026-08-29
+- **Size:** L
+- **Location:** `.claude/scripts/` (6,421 lines of check code) against `tests/`
+
+**What we did**
+Froze every existing check script and put all new behavioural claims in `tests/`,
+rather than porting the checks over. `tests/test_delivery_mode.py` enforces the
+freeze. The spike's three-way coupling is frozen with them: it imports
+`veritas.validation`, `check_semantic_layer.py` imports *it*, and
+`check_validation_gate/probes.py` parses its **source text** to assert its SQL
+literals match character for character.
+
+**What we should have done**
+One proving system. The check scripts' probe tables are already test data — the
+probe tuple in `restricted.py` is a parametrized case list with a bespoke runner —
+so the port is mechanical: fixtures to `conftest.py`, probe tuples to
+`pytest.mark.parametrize`, report lines to assertions. Then the spike's SQL
+corpus is owned by tests, and the spike itself becomes deletable.
+
+**Why we deferred**
+Porting was estimated at 4.5–6 days against a deadline 11 days away, and it buys
+1–2 days back before then. It is the correct change and the wrong week.
+
+**Cost while unpaid**
+Two places to look for "what does this component guarantee", and they use
+different idioms. A contributor cannot tell which system owns a claim. The
+frozen scripts cannot be refactored, because `probes.py` asserts on another
+script's source text — so a rename in the spike breaks a check that never
+imports it. The coupling is invisible to every tool.
+
+**Trigger**
+Delivery Mode ends, 2026-09-09. Not observable-in-code on purpose: the condition
+really is the date, because the reason to defer was the deadline and nothing else.
+
+---
+
+### DEBT-024 — Source and Step documents carry prose Delivery Mode would not admit
+
+- **Status:** open
+- **Opened:** Delivery Mode, 2026-08-29
+- **Size:** L
+- **Location:** `veritas/validation/gate.py` (1,058 docstring lines to 503 code
+  lines) most acutely; `.claude/docs/plan/` and `.claude/docs/reviews/` generally
+
+**What we did**
+Applied the new writing conventions forward only. Existing docstrings still argue
+why they were built as they are, and 73 links from code still point into `plan/`
+and `reviews/`, pinning those documents' headings as permanent API.
+`tests/test_delivery_mode.py` freezes the link inventory per file so it can only
+shrink, but does not shrink it.
+
+**What we should have done**
+Move the reasoning to the ADR that owns each decision, or delete it where no
+decision is being recorded, and cut every code link into Step history. `gate.py`
+would fall to roughly a third of its size without losing a claim, because the
+claims move to `tests/` where they execute.
+
+**Why we deferred**
+Estimated 2–3 days to do the tree, returning about half a day before the
+deadline. Forward-only costs nothing and captures most of the benefit for the
+five components still to build.
+
+**Cost while unpaid**
+The resume path — Current State plus the active plan plus the latest review — is
+about 95,000 tokens, so a session cannot hold the project and reasons from
+fragments instead. Amino reads it all: 264,183 words in 37 days. Steps 002–005
+wrote 2.5× to 14× more check-script and prose than product code. The reading
+rate, not the build rate, is what sets this project's pace.
+
+**Trigger**
+Delivery Mode ends, 2026-09-09.
+
+---
+
+### DEBT-025 — The nine Certified Metrics are implemented twice
+
+- **Status:** open
+- **Opened:** Delivery Mode, 2026-08-29 (the shortcut itself dates from Sub-steps
+  2.5 and 4.2 and went unrecorded)
+- **Size:** M
+- **Location:** `.claude/scripts/check_warehouse.py:1339–1667` against
+  `semantic/metrics/*.yaml`
+
+**What we did**
+`check_warehouse.py` defines `gross_revenue`, `net_revenue`, `traded_notional`,
+`trade_count`, `cash_balance`, `account_value`, `unrealised_pnl`, `realised_pnl`
+and `position_change` as Python functions computing expected values, while
+`semantic/metrics/` defines the same nine as certified SQL expressions. Neither
+is derived from the other; the check predates the Semantic Layer by two Steps.
+
+**What we should have done**
+Compute the expected value *from* the Metric Definition's `expression`, so the
+corpus is the single definition and the check tests that the Warehouse agrees
+with it. The Semantic Layer is the certified source of a metric's meaning — a
+second Python implementation is exactly the Shadow Metric this project exists to
+prevent, inside the project's own tooling.
+
+**Why we deferred**
+It is frozen under [DEBT-023](#debt-023--two-proving-systems-run-side-by-side)
+and nothing in the remaining Steps recomputes a metric, so repaying it before
+2026-09-09 buys nothing.
+
+**Cost while unpaid**
+Changing a Certified Metric's expression silently leaves the check computing the
+old one, and the check still passes — it is comparing the Warehouse against
+`check_warehouse.py`, not against the corpus. That is a green run that lies, and
+it is the one failure mode Non-Negotiable 4 exists to prevent.
+
+**Trigger**
+Any change to a Certified Metric's `expression` field — or repayment of
+[DEBT-023](#debt-023--two-proving-systems-run-side-by-side), whichever is first.

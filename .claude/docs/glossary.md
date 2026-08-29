@@ -367,6 +367,7 @@ Vocabulary of how we work. Settled — this is the framework described in
 | **Step Review** | The handoff note Claude writes at the close of each Sub-step, for Amino to review before committing. | `.claude/docs/reviews/step-NNN-*.md` | agreed |
 | **ADR** | Architecture Decision Record — a decision that is expensive to reverse, with its context, alternatives, and consequences. | `.claude/docs/adr/` | agreed |
 | **Term Proposal** | A flagged request to admit a new word into the Glossary, raised the moment an unregistered term is needed. | this file | agreed |
+| **Delivery Mode** | The operating mode from 2026-08-29 until the 2026-09-09 deadline. Behaviour is proven in `tests/`; `.claude/scripts/` is frozen; plans, reviews and docstrings are held to stated ceilings. Suspends nothing in the Four Non-Negotiables. Expires by its own date. | `CLAUDE.md` | agreed |
 
 ---
 
