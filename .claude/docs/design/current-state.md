@@ -25,103 +25,43 @@ Semantic Layer is complete: all four entry types, thirty-two entries. The Wareho
 full, every Certified Metric can return a number, and the sqlglot spike's verdict is
 **GO** on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md). All five
 Sub-steps are ruled, the last of them on 2026-08-29; nothing in the Step is waiting on a
-decision, and **no Step is `active`** — the next move is to plan Step 006.
+decision, and **no Step is `active`** — Step 006 is planned and `proposed`.
+**`tests/` exists** and holds Delivery Mode's two guards; `uv run pytest` is the
+command that proves behaviour from here on.
 
 ---
 
 ## Resume here
 
-- **Next: plan Step 006.** All five Sub-steps of Step 005 are built and ruled, and the
-  Gate decides all five of the things the
-  [Target State's flow](target-state.md#flow) says `VALIDATE` decides. The
-  [5.5 review entry](../reviews/step-005-validation-gate.md#sub-step-55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
-  is the handoff detail; its eleven sceptical items were all approved on 2026-08-29 as
-  [R16](../plan/step-005-validation-gate.md#r16--aminos-rulings-on-the-55-review--decided-2026-08-29),
-  which is where the two that needed a decision are answered — the `Route` Glossary row's
-  amendment is approved, and
-  [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
-  is left for the Sub-step its Trigger names. **All five Sub-steps are committed** — 5.5
-  in `1c96281`, the four before it in `d98fe7f`, `7522ad8`, `fce9248` and `faba544`.
-- **The [Step 005 plan](../plan/step-005-validation-gate.md) is `done`** — closed
-  2026-08-29 at Amino's instruction, before Step 006 is planned rather than by its
-  planning commit the way the three Steps before it were closed. Written and
-  approved 2026-08-25 with **sixteen rulings**, the last of them
-  [R16](../plan/step-005-validation-gate.md#r16--aminos-rulings-on-the-55-review--decided-2026-08-29)
-  of 2026-08-29. Read the plan for what each decided.
-  [R5](../plan/step-005-validation-gate.md#r5--55-is-a-pre-agreed-split-point--approved-by-amino-2026-08-25)'s
-  pre-agreed split point was **not taken**: Amino ruled on 2026-08-28 that 5.5 ships as
-  one Sub-step. [R1](../plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25),
-  [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
-  and [R9](../plan/step-005-validation-gate.md#r9--no-test-framework-in-this-step-and-step-002s-prediction-is-set-aside--approved-by-amino-2026-08-25)
-  are now all discharged, along with
-  [R2](../plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
-  and [R7](../plan/step-005-validation-gate.md#r7--the-bounded-read-uses-the-engines-estimate-if-the-adapter-can-reach-it--approved-by-amino-2026-08-25).
-  **Nothing in the plan is left unbuilt.**
-- **The Step's Ledger entries: four settled, three open.**
-  [DEBT-016](../debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)
-  was paid in 5.1;
-  [DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
-  and
-  [DEBT-019](../debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
-  in 5.4; and
-  [DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
-  in 5.5, ahead of both its Trigger arms and by ruling.
+- **Next: Sub-step 6.1, once Amino approves the Step 006 plan.** The
+  [Step 006 plan](../plan/step-006-retrieval-and-orchestrator.md) is `proposed` —
+  no implementation may begin until it is approved. It builds Retrieval, the
+  Orchestrator and the App in five Sub-steps, taking the project from four of nine
+  Target State components to seven.
+- **The project is under [Delivery Mode](../../../CLAUDE.md) until 2026-09-09**,
+  the capstone deadline. Behaviour is proven in `tests/` (`uv run pytest`);
+  `.claude/scripts/` is frozen and `tests/test_delivery_mode.py` enforces both that
+  freeze and the ban on new links from code into Step history. Plans are capped at
+  120 lines and Step Review sections at 40. Nothing in the Four Non-Negotiables is
+  suspended.
+- **Three refactors were costed and deferred**, each losing days before the
+  deadline: porting the frozen checks to tests
+  ([DEBT-023](../debt-ledger.md#debt-023--two-proving-systems-run-side-by-side)),
+  cutting the prose and link overhang
+  ([DEBT-024](../debt-ledger.md#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit)),
+  and de-duplicating the nine Certified Metrics
+  ([DEBT-025](../debt-ledger.md#debt-025--the-nine-certified-metrics-are-implemented-twice)).
+  All three come due on 2026-09-09.
+- **Two Ledger Triggers fire inside Step 006** and are scheduled in the plan:
   [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
   and [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
-  are both open, both name the Grounding Sub-step as their Trigger, both live in
-  `route_of_resolved`, and **neither is demonstrated by anything that runs** — each owes
-  a probe from the Sub-step that pays it.
+  in Sub-step 6.4, and
   [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-  is unpaid and its Trigger has still not fired; the mechanism it is honest about is now
-  exactly as wide as the entry describes, which makes the unqualified claim more
-  tempting rather than less.
-  [DEBT-012](../debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)
-  and [DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell)
-  both came into reach in this Step and neither fired.
-- **Any session resuming here runs `uv run python -m veritas.ingestion` first**, because
-  the Warehouse is gitignored and the Semantic Layer, Warehouse and Validation Gate
-  checks execute against real data.
-
-## Open questions
-
-Everything awaiting a ruling, and nothing else. Each is recorded in full where it was
-raised; this list exists so a cold session does not have to find them.
-
-| Question | Where it is argued | Blocks |
-|---|---|---|
-| Does the `resolution` field name want a Glossary row? | [Step 004 R10](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24) left it open, and R11 did not reach it | Nothing — no file changes either way. The one question Step 004 closes without answering |
-
-**Two questions travel on to [Retrieval](../glossary.md#a-the-system)**, both ruled
-2026-08-24 as
-[R10](../plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24)
-and neither a defect in anything built:
-
-1. **A partial alias match can resolve an Ambiguous Term silently.** `Unrealised P&L`
-   claims the alias *"paper profit and loss"* and `Realised P&L` claims *"booked profit
-   and loss"*, so a user who types **"profit and loss"** is a short hop from either
-   metric while matching the `P&L` Ambiguous Term by no name at all — check 14 compares
-   whole strings. The two candidate fixes are an `aliases` field on the Ambiguous Term
-   entry or a Retrieval rule that an Ambiguous Term outranks a metric it disambiguates
-   to; choosing between them without Retrieval to measure is speculation.
-2. **The five Ambiguous Term `description` fields are unchecked prose, and they are what
-   Retrieval will embed.** Text written to be embedded is tuned against a measurement or
-   not at all.
-
-**Two travel on to [Grounding](../glossary.md#a-the-system)**, both ruled 2026-08-25 as
-[R11](../plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25).
-R11 handed it three; **Sub-step 5.5 answered the first** under R1's widening — `by
-region` has a route and the Gate has the rule that lets a `GROUP BY` use it — so two
-remain:
-
-1. **There is no `by settlement date` axis, and it is deferred rather than rejected.**
-   The column exists and holds real dates, but every Metric Definition keys its period
-   filter on `trade_date`, so certifying it would let one question be *sliced* on one
-   date while being *filtered* on another — a
-   [Section C](../glossary.md#c-distinctions-we-must-not-blur) pair blurred by an axis.
-2. **Check 17 forecloses an axis whose values are data but not dates.** A
-   `by denomination currency` axis would have to enumerate codes ingestion minted, and
-   an enumeration of minted values is a measurement living in the corpus. The rule is
-   not loosened; what is open is **where** such an axis gets decided.
+  in 6.5.
+- **Step 005 is `done`** — all five Sub-steps built, ruled and committed (`d98fe7f`,
+  `7522ad8`, `fce9248`, `faba544`, `1c96281`). The
+  [5.5 review entry](../reviews/step-005-validation-gate.md#sub-step-55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
+  holds its handoff detail.
 
 ---
 
