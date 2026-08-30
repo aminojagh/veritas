@@ -1,6 +1,6 @@
 # Step 006 — Ask a question, get a Grounded Answer
 
-**Status:** `proposed`
+**Status:** `active`
 
 **Goal.** Make Veritas answer a question end-to-end in a browser — Retrieval,
 Orchestrator and App — so the four built components become a working system.
