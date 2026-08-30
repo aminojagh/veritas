@@ -149,6 +149,7 @@ What Veritas is made of.
 | **Warehouse Adapter** | The single boundary through which all Warehouse access passes. Holds the connection and the engine's dialect; nothing DuckDB-specific exists outside it. The seam an engine swap lands on. | `veritas/warehouse/` | agreed |
 | **Ingestion** | The pipeline that fills the Warehouse: real FX Rates, Market Prices and instrument reference data from key-free public sources, snapshotted into the repository and replayed by default; synthetic Trades, Cash Movements and Positions from a seeded simulator. **Market data real, client activity synthetic — never the reverse.** | `veritas/ingestion/` | agreed |
 | **Retrieval** | The step that turns a question into the Semantic Entries needed to answer it. Searches the Semantic Layer **only** — never Warehouse schema, never free text. Hybrid text + vector, re-ranked. | `veritas/retrieval/` | agreed |
+| **Retrieval Strategy** | Which search one call of Retrieval runs over the corpus — the thing an Evaluation Measure is grouped by when Retrieval's hit rate and MRR are compared, as a Validation Gate outcome is grouped by its Rejection Reason. Not a second word for **Retrieval**: Retrieval is the step, and a Retrieval Strategy is which of its searches that step ran, so two of them over one corpus return different entries for one question and are comparable by measure. The **members** are registered in `veritas/retrieval/`, where `RetrievalStrategy` enumerates them, and deliberately not in this cell for the reason [DEBT-017](debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) is open about. **Registered 2026-08-30** ([Sub-step 6.2](reviews/step-006-retrieval-and-orchestrator.md#sub-step-62--retrieve-semantic-entries-for-a-question)), where Sub-step 6.2 made the word a class and gave a call a parameter Step 007 must measure the arms of — the same trigger that registered `Route` in 5.4. `Retrieval Approach` was considered and rejected: one concept, one word. | `veritas/retrieval/` — as an enumeration (no file publishes one) | agreed |
 | **Orchestrator** | The component that runs a question through the seven-step flow: rewrite, retrieve, ground, generate, validate, execute, answer. Owns the sequence and the failure paths; owns none of the steps' logic. Renamed from `Copilot` on 2026-08-04 — Veritas *is* a copilot, so the word could not also name one component inside it. | `veritas/orchestrator/` | agreed |
 | **App** | Where a person asks a question and reads a Grounded Answer — with its SQL, its Lineage and its Validation Gate outcome. **Never renders a bare number.** Renamed from `Interface` on 2026-08-04, so the name matches the directory and does not collide with the rubric's own "Interface" criterion. | `veritas/app/` | agreed |
 | **Observability** | Records what happened at runtime: every question, Grounded Answer, Validation Gate outcome, cost, latency and feedback. Produces Operational Measures. **Records; never judges.** Live traffic, no ground truth. | `veritas/observability/` | agreed |
@@ -384,6 +385,7 @@ domain meaning belongs in a section above, with a definition and a status.
 | Short | Expanded | Note |
 |---|---|---|
 | **ADR** | Architecture Decision Record | Also a Process Language term |
+| **BAAI** | Beijing Academy of Artificial Intelligence | Publishes `bge-small-en-v1.5`, the sentence-embedding model `Retrieval` searches with |
 | **BI** | Business Intelligence | The dashboard layer metric logic is being moved *out* of |
 | **CIK** | Central Index Key | Securities and Exchange Commission's issuer identifier |
 | **CUSIP** | Committee on Uniform Securities Identification Procedures | North American security identifier |
@@ -403,6 +405,7 @@ domain meaning belongs in a section above, with a definition and a status.
 | **MVP** | Minimum Viable Product | The full system in `product-brief.md` |
 | **NYSE** | New York Stock Exchange | Lists traded Instruments absent from `nasdaqlisted.txt`, which is why NASDAQ Trader's second file is read |
 | **OHLCV** | Open, High, Low, Close, Volume | The daily price bar fields |
+| **ONNX** | Open Neural Network Exchange | The runtime format both of `Retrieval`'s models ship in — no PyTorch, no key |
 | **RAG** | Retrieval-Augmented Generation | |
 | **SEC** | Securities and Exchange Commission | Source of issuer reference data |
 | **UI** / **UX** | User Interface / User Experience | |

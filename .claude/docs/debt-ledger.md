@@ -53,8 +53,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-023](#debt-023--two-proving-systems-run-side-by-side) | Two proving systems run side by side | L | Delivery Mode ends, 2026-09-09 | open |
 | [DEBT-024](#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit) | Source and Step documents carry prose Delivery Mode would not admit | L | Delivery Mode ends, 2026-09-09 | open |
 | [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) | The nine Certified Metrics are implemented twice | M | Any change to a Certified Metric's expression | open |
+| [DEBT-026](#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted) | The retrieval models are downloaded rather than snapshotted | S | The Step that containerizes Veritas, or any offline claim in `README.md` | open |
+| [DEBT-027](#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) | The searchable text is one flat field, so a name match cannot outrank a description match | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank for Retrieval | open |
 
-**Open debt:** 14 · **Paid:** 8 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 16 · **Paid:** 8 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2131,3 +2133,85 @@ it is the one failure mode Non-Negotiable 4 exists to prevent.
 **Trigger**
 Any change to a Certified Metric's `expression` field — or repayment of
 [DEBT-023](#debt-023--two-proving-systems-run-side-by-side), whichever is first.
+
+### DEBT-026 — The retrieval models are downloaded rather than snapshotted
+
+- **Status:** open
+- **Opened:** Sub-step 6.2 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** S
+- **Location:** `veritas/retrieval/search.py` — `EMBEDDING_MODEL`, `RERANKER_MODEL`
+
+**What we did**
+Named the sentence-embedding model and the cross-encoder re-ranker by their
+Hugging Face identifiers and let `fastembed` fetch them on first use, into the
+user's own cache directory. Nothing in the repository pins a file, a size or a
+digest, and nothing fails early when the fetch cannot happen — the first call to
+a vector-using strategy raises whatever the download raised.
+
+**What we should have done**
+Fetch both in the container build, so the image carries them and a run never
+reaches the network; and check for them at start-up rather than at first search,
+so a machine without them says so before a person has typed a question.
+
+**Why we deferred**
+The container does not exist yet — it is Step 008 — and there is nowhere for a
+pre-fetch step to live until it does. Snapshotting the weights into the
+repository the way `data/snapshots/` holds the price and rate files is the wrong
+repayment for the same reason: they are two orders of magnitude larger than
+everything else in the tree.
+
+**Cost while unpaid**
+The [Target State's reproducibility claim](design/target-state.md#zoomcamp-criteria-map)
+is that data sources are *"snapshotted into the repo (so a clone reproduces even
+if a source disappears)"*, and that now covers less of Veritas than it reads as
+covering: a clone reproduces the Warehouse offline and cannot retrieve offline.
+A reviewer on a restricted network gets a stack trace from the first question,
+after bring-up appeared to succeed.
+
+**Trigger**
+The Step that containerizes Veritas — Step 008 — or any claim in `README.md` that
+Veritas runs without network access, whichever comes first.
+
+### DEBT-027 — The searchable text is one flat field, so a name match cannot outrank a description match
+
+- **Status:** open
+- **Opened:** Sub-step 6.2 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** S
+- **Location:** `veritas/retrieval/searchable.py` — `searchable_text`
+
+**What we did**
+Joined every searchable field of an entry into one string and indexed that, so a
+Semantic Entry is a single document with a single score. Which field a query
+matched is not recorded and cannot be weighed: a hit on `name` counts for exactly
+what a hit on `description`, `grain` or `unit` counts for.
+
+**What we should have done**
+Returned one string per field and let the index carry them as separate text
+fields, so a weighting is a parameter rather than a rewrite — and then **chosen
+the weights on measured hit rate and Mean Reciprocal Rank rather than on
+intuition**, which is the part that is actually missing. Nothing in the
+repository has yet shown that a name match *should* outrank a description match.
+
+**Why we deferred**
+Splitting the fields is cheap; picking the weights is not, and nothing before
+Step 007 can tell whether any weighting beats the flat field. Guessing a boost
+now would ship an unmeasured number that later evidence would have to argue
+against, which is worse than shipping the flat field the evidence will be
+measured over.
+
+**Cost while unpaid**
+Retrieval ranks an entry that *is* the thing asked about no higher than one that
+merely mentions it. The worked example is in the
+[Sub-step 6.1 review](reviews/step-006-retrieval-and-orchestrator.md#sub-step-61--index-the-semantic-layer-for-retrieval):
+*"Ask 'gross revenue': that phrase is the Gross Revenue entry's own `name` — and it
+also sits in Net Revenue's description ... Three entries match the same words, so
+the one actually named that can rank third."* Every downstream component inherits
+that order, because Grounding builds from what Retrieval returned.
+
+**Trigger**
+The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank for
+Retrieval over the Gold Question Set — the first thing in the project that can
+settle this on evidence. Repayment is the measurement, not the split: run the
+Retrieval Strategies against a per-field index as well as the flat one, and keep
+whichever the numbers support, recording the losing arm in the Step Review so the
+decision stays checkable.

@@ -46,9 +46,16 @@ SEARCHABLE_FIELDS: dict[type[SemanticEntry], tuple[str, ...]] = {
 def searchable_text(entry: SemanticEntry) -> str:
     """Everything about one entry a search may match, as one block of text.
 
-    One block rather than one field per source field: the index this feeds is built
-    over field names, and splitting them out only pays once something weighs the
-    fields differently. Nothing does yet.
+    `Gross Revenue` comes back as its name, then its aliases — `gross commission`,
+    `revenue before rebates`, `commission income` — then its description, its grain
+    and its unit, in the order `SEARCHABLE_FIELDS` lists them. A search that matches
+    any one of them matches the entry, which is how *"how much did we bill in
+    commission"* reaches a metric whose own name says neither word.
+
+    One block rather than one field per source field, so a hit on the name counts
+    for exactly what a hit on the unit counts for and nothing can weigh them apart.
+    Whether anything should is
+    [DEBT-027](../../.claude/docs/debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match).
 
     A list-valued field contributes its items, and an empty one contributes
     nothing — `aliases: []` and a missing `reporting_currency` both leave no trace,

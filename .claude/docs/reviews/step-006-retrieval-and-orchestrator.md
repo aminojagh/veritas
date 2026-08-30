@@ -47,3 +47,45 @@ tests/test_retrieval.py ......                                           [100%]
 
 **Language** — none added, and one not coined: `RetrievalDocument` or `Corpus` would be
 a second name for `Semantic Entry`, *"one retrievable document in the Semantic Layer"*.
+
+---
+
+## Sub-step 6.2 — Retrieve Semantic Entries for a question
+
+**Changed.** `veritas/retrieval/search.py` puts `retrieve(question)` in front of 6.1's text, under four
+Retrieval Strategies chosen per call so Step 007 can measure them; `minsearch` and `fastembed` arrive
+with it. `retrieve` is `rank` plus **reference closure**, the only way a Join Path reaches an answer.
+
+**Verified.** `uv run pytest` is 82 passed; `verify_framework.py` and `check_language.py` PASS.
+
+```
+$ uv run pytest tests/test_retrieval.py -q
+........................................................................ [ 91%]
+.......                                                                  [100%]
+79 passed in 41.12s
+```
+
+**Debt** — [DEBT-026](../debt-ledger.md#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted): both models download on first use, so a clone builds the Warehouse
+offline and cannot retrieve offline. [DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match): the flat `text` field, triggered on Step 007's
+hit rate and MRR — see 4 below.
+
+**Sceptically**, hardest first.
+
+1. **`reranked` is the default on authority, not evidence** — Target State's *"Hybrid text + vector,
+   re-ranked"*. The set proves only that the entry lands within `TOP_K`; Step 007 is what orders them.
+2. **Closure is retrieval's job because 6.1 made it so.** The [flow](../design/target-state.md#flow)
+   has RETRIEVE *"Returns ... Join Paths"*, unsearchable since 6.1. Two costs, both on *"break the
+   answer down by where the client is based"* at `top_k=5`: `retrieve` returns more than `rank`, so hit
+   rate and MRR are computed over `rank` — `test_retrieve_is_not_bounded_by_top_k_where_rank_is` holds
+   the counts. And `by region` declares a route from each of the four fact tables, so closure takes all
+   five of their Join Paths where a `fct_trade` question needs two; which route applies is not settled
+   until SQL is generated, so retrieval cannot narrow it.
+3. **The text index departs from scikit-learn twice, tuned against my own questions.** Stop words
+   dropped; `&` admitted, without which `P&L` is not indexed at all. The fifteen questions are mine.
+4. **6.1's flat `text` field is still flat.** Nothing measured says `name` must outrank `description`,
+   and I have not guessed a boost — [DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) makes Step 007 measure a per-field index against
+   this one and keep whichever the numbers support.
+
+**Language** — `BAAI` and `ONNX` registered as abbreviations, and **`Retrieval Strategy`** proposed
+here and **agreed 2026-08-30**: the row is in the [Glossary](../glossary.md), members stay in code
+per [DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell).

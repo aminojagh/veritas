@@ -33,3 +33,11 @@ def semantic():
     from veritas.semantic import load_semantic_layer
 
     return load_semantic_layer(ROOT / "semantic")
+
+
+@pytest.fixture(scope="session")
+def retriever(semantic):
+    """The Semantic Layer indexed for search, built once for the whole session."""
+    from veritas.retrieval import Retriever
+
+    return Retriever(semantic)
