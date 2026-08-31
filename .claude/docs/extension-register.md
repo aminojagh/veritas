@@ -47,8 +47,9 @@ reason) · `superseded`.
 | [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration) | The data checks run in continuous integration | `check_warehouse.py` · `check_data_availability.py` · the one-command bring-up | M | open |
 | [EXT-009](#ext-009--the-join-path-entry-type-at-warehouse-scale) | The Join Path entry type at Warehouse scale | `semantic/joins/` file format · a Metric Definition's `join_paths` | M | open |
 | [EXT-010](#ext-010--a-metric-certified-over-more-than-one-date-column) | A metric certified over more than one date column | `ValidationGate.routed`'s date half · a Metric Definition's `date_column` | S | open |
+| [EXT-011](#ext-011--more-large-language-model-providers-behind-the-seam) | More Large Language Model providers behind the seam | `veritas/llm/`'s `PROVIDERS` registry · the `LanguageModel` seam | S | open |
 
-**Open:** 10 · **Built:** 0 · **Dropped:** 0
+**Open:** 11 · **Built:** 0 · **Dropped:** 0
 
 ### Target State extension path, mapped
 
@@ -754,3 +755,62 @@ Any one of:
 3. The date half of the route rule is widened for any other reason and gains the list
    shape `permitted_route` already has, at which point this costs one more source rather
    than a new mechanism.
+
+### EXT-011 — More Large Language Model providers behind the seam
+
+- **Status:** open
+- **Opened:** Sub-step 6.3 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Seam it lands against:** the `PROVIDERS` registry in `veritas/llm/model.py` ·
+  the `LanguageModel` seam it sits behind
+- **Size:** S
+- **Motivated by:** [ADR-0005](adr/0005-one-openai-compatible-endpoint-for-every-provider.md)'s
+  last stated cost, and Amino's ruling of 2026-08-30 that closed the list:
+  *"we should restrict the supported LLM providers to these two for now and make
+  it an extension to support more options."*
+
+**What the full system needs**
+
+Veritas talks to two providers: OpenAI, and Groq for the second model the
+evaluation criterion needs. A system serving people who are not this project's
+graders reaches more of them — Anthropic and Google are the two named most often,
+and a deployment inside a bank reaches whichever one its procurement approved and
+no other. Some of those are one more row in `PROVIDERS`; Anthropic's own
+Application Programming Interface (API) is not, and needs a second class behind
+`LanguageModel` speaking the Messages API — around thirty lines, and no caller
+changes, because the seam is what the callers hold.
+
+**What the slice does instead, and why that is correct here**
+
+A closed two-row registry, and an environment variable naming anything else raises
+`LanguageModelError` listing the two. That is not a narrowing of something wider —
+it is the whole of what the credential rule permits. The
+[Target State](design/target-state.md#what-credential-free-means) allows *"a
+credential the grader already has by virtue of taking the course"*, which is the
+OpenAI key and nothing else; Groq rides along because its free tier costs a
+reviewer nothing and the *"≥2 models"* criterion cannot be met with one provider's
+default alone.
+
+**Why this is an extension and not debt**
+
+The trigger test settles it. A third provider can only be wanted by someone who is
+not a Zoomcamp grader — every grader has the OpenAI key by construction, and the
+free Groq key is the second. Nothing inside this project's life fires it. Filing
+it as debt would put *"when Veritas serves someone else"* on the Ledger, which the
+framework itself calls a wish.
+
+It also lands as pure addition. `PROVIDERS` is a table of four fields, `model_for`
+reads it, and every caller holds `LanguageModel` — so a fourth provider is a row,
+and a provider that does not speak Chat Completions is a class beside
+`ChatCompletions` with no caller edit. That is the *addition, not rewrite* test.
+
+**Readiness**
+
+Any one of:
+
+1. Veritas is run by someone who is not a Zoomcamp grader and holds a key for a
+   provider that is not one of the two — the direct case, and the one the closed
+   registry currently refuses by name.
+2. Either provider stops being reachable on a free or already-held key, at which
+   point the second row has to be replaced rather than added to.
+3. A model capability Veritas needs is served by neither — the case that also
+   forces the second class behind the seam rather than a third row.

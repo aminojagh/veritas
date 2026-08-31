@@ -67,8 +67,9 @@ the entry a human names, under each strategy.
 ### 6.3 — Resolve Ambiguous Terms before retrieval
 
 The first LLM call. "Revenue" resolves to Gross or Net by asking, never by
-guessing. Provider and model are chosen in this Sub-step, not here — Target State
-allows OpenAI, Anthropic or Groq with an Ollama fallback.
+guessing. Provider and model are chosen in this Sub-step, not here — settled by
+[ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) on
+Amino's ruling of 2026-08-30: OpenAI and Groq, and no third.
 
 *Verify:* `uv run pytest tests/test_rewrite.py` — each of the five Ambiguous Terms
 either resolves against the question's own words or returns a question back.

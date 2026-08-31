@@ -89,3 +89,47 @@ hit rate and MRR — see 4 below.
 **Language** — `BAAI` and `ONNX` registered as abbreviations, and **`Retrieval Strategy`** proposed
 here and **agreed 2026-08-30**: the row is in the [Glossary](../glossary.md), members stay in code
 per [DEBT-017](../debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell).
+
+
+---
+
+## Sub-step 6.3 — Resolve Ambiguous Terms before retrieval
+
+**Changed.** `veritas/llm/` is the one place a provider, a model or a key is named — a `LanguageModel` seam over a
+**closed two-row registry**, OpenAI at `gpt-4o-mini` and Groq at `openai/gpt-oss-120b`, anything else a
+`LanguageModelError`. `veritas/orchestrator/rewrite.py` is step 1 of the flow: it matches the Ambiguous Terms a
+question says, shows the model only those entries' own words, and takes an answer only if the term `disambiguates` it.
+
+**Approved 2026-08-31, and it moved a settled document.** Your ruling of 2026-08-30 narrowed the Target State's credential
+table to *"OpenAI"* required and *"Groq"* free-and-optional; [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) quotes it and is written around it, `VERITAS_LLM_BASE_URL` is gone, a third provider is [EXT-011](../extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam), and `.env.example` is the committed template for both keys.
+
+**Verified.** Both keys are in `.env` as of 2026-08-31, so the live path is now measured on both providers.
+```
+$ uv run pytest -q                      # what a reviewer runs: no key, no call made
+125 passed, 1 skipped in 62.62s (0:01:02)
+$ VERITAS_LIVE_MODEL=1 uv run pytest tests/test_rewrite.py tests/test_llm.py -q          # OpenAI, gpt-4o-mini
+44 passed in 8.60s
+$ VERITAS_LIVE_MODEL=1 VERITAS_LLM_PROVIDER=groq uv run pytest tests/test_rewrite.py -k configured -q
+1 passed, 29 deselected in 4.02s
+```
+
+**Debt** — [DEBT-028](../debt-ledger.md#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server) opened and **paid here**: the second run is two `gpt-4o-mini` calls against real OpenAI, and the model
+answers `Gross Revenue` to *"our gross revenue in March"* while leaving *"our revenue last quarter"* unresolved — the pair
+that tells reading from guessing. Your two points below opened [DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) and [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it); the Anthropic entry drafted here is **withdrawn** before it took a number, so 029 is free.
+
+**Sceptically**, hardest first.
+
+1. **The Groq model name was wrong, and one call was all it cost to find out.** `llama-3.3-70b-versatile` 404s on a new
+   free key — *"does not exist or you do not have access to it"* — so the row reads `openai/gpt-oss-120b`, the largest Groq
+   lists as production rather than preview. **Both defaults are now OpenAI-authored**; the family-diverse arm on that key is preview-only, so it is a Step 007 `VERITAS_LLM_MODEL` and not the default. Reversing me is one string.
+2. **Only a docstring enforces "one place a provider is named."** `check_language.py` scans for Glossary terms, not
+   for the string `openai` outside `veritas/llm/`. True today by inspection, not by a check.
+3. **Detection is literal, and it is four classes of miss rather than two words** — morphology, orthography, an
+   unregistered synonym, and a rewording of the one phrase row, each pinned by a test that asserts today's miss. Not fixed
+   here: the phrasings are Glossary content, and an alias that fires too easily answers what Section D asks about. [DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently).
+4. **The rewritten question appends rather than splices** — *"…gross revenue last quarter (revenue means Gross Revenue)"*.
+   Which of the two retrieves better is unmeasured: [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) is one more arm on the Step 007 run DEBT-027 already forces.
+
+**Language** — none added; `veritas/llm/` is plumbing, so no `Language Model Adapter` row. 🆕 **TERM PROPOSAL** — **`Clarifying
+Question`**: what Veritas returns when an Ambiguous Term is unresolved, rendered by the App and counted by Observability
+as a `Validation Gate outcome` is. Code says `clarification`; agreeing it renames one field.

@@ -55,8 +55,11 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) | The nine Certified Metrics are implemented twice | M | Any change to a Certified Metric's expression | open |
 | [DEBT-026](#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted) | The retrieval models are downloaded rather than snapshotted | S | The Step that containerizes Veritas, or any offline claim in `README.md` | open |
 | [DEBT-027](#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) | The searchable text is one flat field, so a name match cannot outrank a description match | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank for Retrieval | open |
+| [DEBT-028](#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server) | No test reaches a real provider, so the live path is proven only by a stub server | S | Sub-step 6.4, or the first key available | **paid** (6.3, 2026-08-30) |
+| [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set | open |
+| [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 | open |
 
-**Open debt:** 16 · **Paid:** 8 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 18 · **Paid:** 9 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2215,3 +2218,181 @@ settle this on evidence. Repayment is the measurement, not the split: run the
 Retrieval Strategies against a per-field index as well as the flat one, and keep
 whichever the numbers support, recording the losing arm in the Step Review so the
 decision stays checkable.
+
+### DEBT-028 — No test reaches a real provider, so the live path is proven only by a stub server
+
+- **Status:** **paid** (Sub-step 6.3, 2026-08-30)
+- **Opened:** Sub-step 6.3 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** S
+- **Location:** `tests/test_llm.py`, `tests/test_rewrite.py` — `test_the_configured_model_reads_the_corpus_rule`
+
+**What we did**
+Proved the model boundary against a stub server on `127.0.0.1` that speaks the
+OpenAI Chat Completions API, and left the one test that calls the configured
+provider skipping unless a key is in the environment. No key was available in the
+session that built this, so that test has never run.
+
+**What we should have done**
+Run the live test once against a real provider and put its output in the Step
+Review, the way every other behavioural claim in this project is evidenced.
+
+**Why we deferred**
+The Sub-step had no key to run it with, and the alternative — claiming the live
+path works because the stub server path does — is the thing this framework
+forbids. Everything that can be proven without a key is proven: the request
+Veritas builds, the reply it reads, the three ways a call comes back empty, and
+the whole rewrite step over a socket.
+
+**Cost while unpaid**
+Two claims stand unverified. That a real provider accepts what
+`ChatCompletions` sends — `temperature`, `response_format`, and the two message
+roles — which the stub server accepts by construction because it accepts
+anything. And that a real model, reading the corpus's own resolution rule, answers
+`Gross Revenue` to *"what was our gross revenue"* and `null` to *"what was our
+revenue"*: the prompt is unmeasured, and a model that guesses instead of asking
+would be the exact failure Ambiguous Terms exist to prevent.
+
+**Trigger**
+The first Sub-step that needs a real answer out of a model — 6.4, which generates
+SQL — or the first time a key is available, whichever comes first. Repayment is
+running `uv run pytest tests/test_rewrite.py tests/test_llm.py` with a key set and
+pasting the output into the Step Review.
+
+**Paid, Sub-step 6.3, 2026-08-30 — the key arrived inside the Sub-step that opened
+this.** Amino put an `OPENAI_API_KEY` in `.env` while 6.3 was under review, which is
+the second half of the Trigger, so the entry was opened and paid in the same
+Sub-step. `VERITAS_LIVE_MODEL=1 uv run pytest tests/test_rewrite.py tests/test_llm.py`
+is 40 passed, output in the
+[Sub-step 6.3 review](reviews/step-006-retrieval-and-orchestrator.md#sub-step-63--resolve-ambiguous-terms-before-retrieval).
+Both unverified claims are now measured against `gpt-4o-mini`: the request
+`ChatCompletions` builds is one a real provider accepts, and the model reading the
+corpus's own resolution rule answers `Gross Revenue` to *"what was our gross revenue
+in March"* and leaves *"what was our revenue last quarter"* unresolved — the pair
+that separates a model reading the rule from one guessing the common meaning.
+
+**What is still true and is not this entry.** The live test is opt-in
+(`VERITAS_LIVE_MODEL`), so a plain `uv run pytest` still skips it: a key sitting in
+`.env` for the App is not consent to spend it on every run. And Groq's default model
+has never been called, because no Groq key exists yet — that is
+[ADR-0005](adr/0005-one-openai-compatible-endpoint-for-every-provider.md)'s first
+accepted cost, and Step 007's two-model comparison is what forces it.
+
+### DEBT-029 — Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently
+
+- **Status:** open
+- **Opened:** Sub-step 6.3 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** M
+- **Location:** `veritas/orchestrator/rewrite.py` — `said_as`, `ambiguous_terms_in`
+
+**What we did**
+Detected an Ambiguous Term by searching the question for the term's registered
+name as a whole-word, case-insensitive literal, with one placeholder form for the
+one Section D row that is a phrase. That is the whole of detection: an Ambiguous
+Term entry has no `aliases` field, nothing normalises a word to its stem, and
+nothing maps a synonym onto a registered name.
+
+**What we should have done**
+Detected the term the way a person says it, by one of the two fixes the
+[Sub-step 4.4 review](reviews/step-004-semantic-layer.md#sub-step-44--write-the-ambiguous-terms)
+named — *"an `aliases` field on the entry, or a Retrieval rule that an Ambiguous
+Term outranks a metric it disambiguates to"* — chosen on measurement rather than
+on taste, and with the phrasings themselves agreed into the Glossary rather than
+invented in code.
+
+**Why we deferred**
+Amino ruled on 2026-08-24 that this is
+[a named question the Retrieval Step inherits](plan/step-004-semantic-layer.md#r10--aminos-rulings-on-the-44-review--decided-2026-08-24)
+rather than a register entry: *"it's correct to register it as a named question
+for the retrieval component"*. Sub-step 6.3 is where it came due, and it is put on
+the Ledger here rather than fixed because both halves of the fix are still
+missing. **The words are not ours to coin** — which spellings of a registered term
+a broker actually says is Glossary content, and Non-Negotiable #1 forbids
+inventing it in a matcher. **And the fix is unmeasured** — an alias that fires too
+easily turns a question that should be asked back into one that is answered
+confidently, which is the failure Section D exists to prevent, running the other
+way.
+
+**What was rejected, and why it is not a partial payment.** The cheapest class —
+plurals, by matching a trailing `s` — is four lines and fixes one of the four
+classes below. It was not taken because a matcher that handles plurals and nothing
+else reads, to the next person, as a matcher that handles phrasing.
+
+**Cost while unpaid**
+A question that says an Ambiguous Term in any spelling but the registered one is
+not detected, no model call is made for it, and it goes to Retrieval as though it
+had been unambiguous. **Not a refusal and not a clarification — silence.** Four
+classes, each pinned by
+`tests/test_rewrite.py::test_a_phrasing_that_is_not_the_registered_spelling_is_missed`,
+which asserts today's misses so that repayment breaks it:
+
+| Class | Registered | The question the test asks | Result |
+|---|---|---|---|
+| Morphology | `revenue` | *"what were our revenues last quarter"* | undetected |
+| Orthography | `P&L` | *"what is our PnL on tech positions"* | undetected |
+| Synonym | `volume` | *"what was turnover last month"* | undetected |
+| Phrasing | `how much does X have` | *"how much is in account 41"* | undetected |
+
+One question per class rather than per phrasing: `volume` and `balance` lose their
+plurals the same way `revenue` does, and *"P & L"* misses the same way *"PnL"*
+does.
+
+The last two are the expensive ones, because both name a meaning the Semantic
+Layer holds: *"turnover"* is Trade Count or Traded Notional and *"how much is in"*
+is Cash Balance or Account Value, and the question runs on whichever one Retrieval
+happens to rank first.
+
+**Trigger**
+The Sub-step of Step 007 that writes the Gold Question Set — the first place the
+project commits to *which questions a person asks*, which is exactly the content
+this entry is missing. Repayment is: agree the phrasings into
+[Glossary Section D](glossary.md#d-ambiguous-terms) as the registered terms'
+spellings, carry them on the entry, and measure — a Gold Question that says
+*"turnover"* must reach the same outcome as the one that says *"volume"*, and no
+question that names its meaning may become one Veritas asks back about.
+
+### DEBT-030 — The resolved meaning is appended to the question, and nothing has measured that against splicing it
+
+- **Status:** open
+- **Opened:** Sub-step 6.3 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** S
+- **Location:** `veritas/orchestrator/rewrite.py` — `rewritten_with`
+
+**What we did**
+Wrote the rewritten question as the question plus a parenthesis naming what was
+resolved — *"what was our gross revenue last quarter (revenue means Gross
+Revenue)"* — rather than splicing the certified name over the ambiguous word.
+
+**What we should have done**
+Chosen between the two on what Retrieval scores, not on how the string reads. The
+rewritten question is the text every Retrieval Strategy searches with, so the
+choice is a retrieval parameter that arrived undefended.
+
+**Why we deferred**
+Both forms are defensible and the difference is not arguable from a desk.
+Appending keeps the person's words intact and adds the certified name, which is
+what a text index wants and what makes the rewrite auditable in the App;
+splicing produces the shorter, more natural sentence but doubles the cue when the
+question already carries it — *"our gross revenue"* splices to *"our gross Gross
+Revenue"*. Which one retrieves better is a measurement, and Step 007 is where the
+measurement lives.
+
+**Cost while unpaid**
+Retrieval searches a string that repeats terms: *"revenue"* appears twice and
+*"Gross Revenue"* twice in the worked example above, which moves term frequency in
+the text Strategies and lengthens the text the vector Strategies embed, in a
+direction nobody has checked. The effect is bounded — the appended clause is one
+short parenthesis, and every rewritten question carries it, so it is a constant
+rather than a bias between questions — which is why this is `S` and not `M`.
+
+**Trigger**
+The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank —
+**the same run as
+[DEBT-027](#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match)**,
+which already forces a two-arm comparison over the Gold Question Set. Repayment is
+one more arm: score the resolved questions appended and spliced, keep whichever
+the numbers support, and record the losing arm in the Step Review.
+
+**If it is not worth measuring, that is a decision to record rather than a thing
+to leave silent.** The marginal cost is one arm on a sweep that is being run
+anyway; if Step 007 drops it for time, this entry closes as *accepted* with that
+reason and the appended form becomes the deliberate one.
