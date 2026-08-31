@@ -20,7 +20,7 @@ from veritas.llm import LanguageModelError
 from veritas.orchestrator import (
     Rewrite,
     ambiguous_terms_in,
-    instruction,
+    resolution_instruction,
     rewrite,
     said_as,
 )
@@ -205,13 +205,13 @@ def test_the_model_is_asked_for_json_and_given_the_question_verbatim(semantic):
     [(system, user, json_object)] = model.calls
     assert user == ASKED["revenue"]
     assert json_object is True
-    assert system == instruction(ambiguous_terms_in(ASKED["revenue"], semantic))
+    assert system == resolution_instruction(ambiguous_terms_in(ASKED["revenue"], semantic))
 
 
 def test_the_instruction_carries_the_terms_own_words(semantic):
     """The rule the model applies is the corpus's, not one written into this package."""
     term = semantic.ambiguous_terms["revenue"]
-    said = instruction([term])
+    said = resolution_instruction([term])
     assert "Ask, unless the question names one" in said
     assert "Gross Revenue is Commission before Rebate and Fee" in said
     for meaning in term.disambiguates:
@@ -220,7 +220,7 @@ def test_the_instruction_carries_the_terms_own_words(semantic):
 
 def test_the_instruction_offers_no_metric_the_question_did_not_ask_about(semantic):
     """The options are closed: only the terms said, and only their own meanings."""
-    said = instruction(ambiguous_terms_in(ASKED["revenue"], semantic))
+    said = resolution_instruction(ambiguous_terms_in(ASKED["revenue"], semantic))
     named = {
         metric
         for metric in semantic.metrics
@@ -233,7 +233,7 @@ def test_the_instruction_carries_no_warehouse_schema(semantic):
     """[ADR-0001](../.claude/docs/adr/0001-semantic-layer-as-the-retrieval-corpus.md)'s
     corpus claim reaches the prompt: the model is grounded in Semantic Entries.
     """
-    said = instruction(list(semantic.ambiguous_terms.values()))
+    said = resolution_instruction(list(semantic.ambiguous_terms.values()))
     assert "fct_" not in said
     assert "dim_" not in said
 

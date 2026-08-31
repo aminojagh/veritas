@@ -133,3 +133,44 @@ that tells reading from guessing. Your two points below opened [DEBT-029](../deb
 **Language** — none added; `veritas/llm/` is plumbing, so no `Language Model Adapter` row. 🆕 **TERM PROPOSAL** — **`Clarifying
 Question`**: what Veritas returns when an Ambiguous Term is unresolved, rendered by the App and counted by Observability
 as a `Validation Gate outcome` is. Code says `clarification`; agreeing it renames one field.
+
+
+---
+
+## Sub-step 6.4 — Answer a question end-to-end
+
+**Changed.** `veritas/orchestrator/` gained the flow's other six steps — `generate.py` grounds a model in retrieved entries and asks for SQL, `answer.py` is the `GroundedAnswer` and its `Lineage`, `flow.py` is the sequence and its five ways out — with `GROUNDED_FIELDS` as the prompt's whitelist, parallel to `SEARCHABLE_FIELDS`. In the Gate, `Join` gained the join's kind and `metric_expressions_through` keeps the alias each expression reads through: the two readings [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one) and [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart) were missing.
+
+**Verified.** `verify_framework.py`, `check_language.py` and `check_validation_gate` PASS. Run 1 is all a reviewer without a key proves; `-s` on runs 3 and 4 prints the five statements, and both providers write the same five and return the same figures — the generated `Gross Revenue` is 67,935.82, the number run 2 prints for the statement a person wrote.
+```
+$ uv run pytest -q                                        # no key, no call made, 3 live tests skipped
+152 passed, 3 skipped in 36.26s
+$ uv run pytest tests/test_gate.py -s -q                  # the two probes the Ledger entries owed
+  certified   Gross Revenue              67,935.82   Traded Notional          89,203,984.78
+  crossed     Gross Revenue              49,327.82   Traded Notional       4,001,630,547.61
+  JOIN        Gross Revenue              67,935.82   over    582 rows
+  LEFT JOIN   Gross Revenue              67,935.82   over    582 rows
+8 passed in 0.52s
+$ VERITAS_LIVE_MODEL=1 uv run pytest tests/test_orchestrator.py -k configured -q          # gpt-4o-mini
+2 passed, 19 deselected in 25.00s
+$ VERITAS_LIVE_MODEL=1 VERITAS_LLM_PROVIDER=groq uv run pytest … -k configured -q  # openai/gpt-oss-120b
+2 passed, 19 deselected in 83.65s (0:01:23)
+```
+
+**Debt** — **021 and 022 paid**, each with the probe it owed. 021 moves both numbers, by 27% and by 45×; 022 moves nothing, which its own entry predicted — every Trade has a rate, so the outer join reads the same 582 rows. Opened: [DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names) (rows carry no column names, due 6.5), [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) (a non-Gate refusal is prose, due in 007), and [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) on your ruling on 2 below.
+
+**Sceptically**, hardest first.
+
+1. **The Orchestrator writes the route into the prompt, so the model no longer picks it.** Each metric block carries its own joins *and* the access joins as pasteable clauses, after `gpt-4o-mini` failed four ways on the indirection — `route_text`'s docstring records them. Left to the model: which metric, whether to slice and by what, whether to filter a period, whether to refuse. That is less generation than "text-to-SQL" implies, and Step 007 measures Execution Accuracy on a generator handed the plumbing.
+2. **The live set is five questions and they are mine.** They reach all four fact tables, never generate for four of the nine metrics, and **none carries a period** — so `UNCERTIFIED_DATE_COLUMN` is the one Gate rule no generated statement has met. I also mis-filed *"which instrument did we trade most often"* as uncovered: Groq answered it with `Trade Count` by `by instrument type` and the Gate allowed it, correctly.
+3. **`crossed_conversion` is wider than DEBT-021 asked for** — every metric expression must read only through its own metric's joins, always, rather than only where one table is joined twice. It refuses nothing the corpus certifies, and costs one `certified_route` resolve per traced metric per judgement.
+
+**Approved 2026-08-31, on all three.** 1 stands as built — *"totally fine for now if the model can't handle correct
+join paths given only the name"* — and the extension it implies, **how much freedom the model is given and in what
+abstraction and domain language its context is put to it**, is deliberately **not registered**: its scale and scope are
+not known yet, and the [Extension Register](../extension-register.md)'s load-bearing field is the seam — *"An extension
+with no seam is a rewrite nobody has admitted to yet."* 2 goes to the Gold Question Set, which is
+[DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
+— *"this must be handled when we create the gold question set"*. 3 approved as is.
+
+**Language** — no new terms; `Grounded Answer` and `Lineage` were registered 2026-08-04 and are now code. Two renames, both collisions this Sub-step created: `rewrite.py`'s rules constant and its `instruction` became `RESOLUTION_RULES` and `resolution_instruction`, one word naming two steps being Non-Negotiable 1 inverted; and the code-fence pattern moved to `veritas/llm/` with `json_reply` beside it, a fence being a difference between providers rather than between steps. 6.3's **`Clarifying Question`** proposal stays open and now names a second field, `GroundedAnswer.clarification`.

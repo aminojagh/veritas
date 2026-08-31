@@ -15,7 +15,9 @@ the model produced out. `ChatCompletions` is the one implementation that reaches
 provider, and a caller that wants a different model passes its own.
 """
 
+import json
 import os
+import re
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -71,6 +73,20 @@ TEMPERATURE = 0.0
 
 # One question at a time, in front of a person watching a browser tab.
 TIMEOUT_SECONDS = 30.0
+
+
+# A reply wrapped in a Markdown code fence. A provider asked for a JSON object mostly
+# returns one bare; an open model behind the same endpoint may fence it instead, and the
+# fence is the whole of the difference. Group 1 of
+# '```json\n{"revenue": "Net Revenue"}\n```' is what `json.loads` is given;
+# `(?:json)?` because the language tag is optional, `re.DOTALL` so `.` crosses the
+# newlines of a multi-line object, and the anchors so the fence has to wrap the whole
+# reply rather than merely appear somewhere in it.
+#
+# It is here rather than beside a caller because it is a **provider** difference: two
+# endpoints Veritas supports answer the same request in two shapes, and this package is
+# where that is the whole subject.
+FENCED = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
 
 
 class LanguageModelError(RuntimeError):
@@ -194,3 +210,24 @@ def default_model() -> ChatCompletions:
         os.environ.get(PROVIDER_VARIABLE) or DEFAULT_PROVIDER,
         os.environ.get(MODEL_VARIABLE) or None,
     )
+
+
+def json_reply(reply: str) -> dict[str, object]:
+    """The JSON object a reply carries, fence or no fence.
+
+    Every caller that sets `json_object` has to read what came back, because the flag is
+    a request rather than a guarantee, and all of them want the same thing from a reply
+    that is not one object: to stop. A reply that is valid JSON and not an object — a
+    list, a bare string — is the same failure as one that is not JSON at all.
+
+    Raises `LanguageModelError`, because this is the provider failing rather than the
+    question being unanswerable, and a caller must be able to tell those apart.
+    """
+    fenced = FENCED.match(reply)
+    try:
+        answer = json.loads(fenced.group(1) if fenced else reply)
+    except json.JSONDecodeError as error:
+        raise LanguageModelError(f"reply is not JSON: {reply!r}") from error
+    if not isinstance(answer, dict):
+        raise LanguageModelError(f"reply is not a JSON object: {reply!r}")
+    return answer

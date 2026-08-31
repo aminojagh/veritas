@@ -1,19 +1,32 @@
 """The Orchestrator — the sequence a question runs through, and the failure paths.
 
-It owns none of the steps that have a component of their own: Retrieval searches,
-the Validation Gate judges, the Warehouse Adapter executes. `rewrite.py` holds the
-one step that has no other home — resolving Ambiguous Terms, which is where a
-question either becomes answerable or turns into a question back.
+It owns none of the steps that have a component of their own: Retrieval searches, the
+Validation Gate judges, the Warehouse Adapter executes. `flow.py` is the sequence;
+`rewrite.py` and `generate.py` hold the two steps that have no other home — resolving
+Ambiguous Terms, and grounding a model in retrieved entries to compose SQL out of
+certified expressions; and `answer.py` is the Grounded Answer the whole flow returns.
 """
 
+from veritas.orchestrator.answer import GroundedAnswer, Lineage
+from veritas.orchestrator.flow import Orchestrator
+from veritas.orchestrator.generate import (
+    GENERATION_RULES,
+    GROUNDED_FIELDS,
+    Generated,
+    entry_text,
+    field_text,
+    generate,
+    generation_instruction,
+    grounding,
+    scope_text,
+)
 from veritas.orchestrator.rewrite import (
-    FENCED,
     PLACEHOLDER,
-    RULES,
+    RESOLUTION_RULES,
     Rewrite,
     ambiguous_terms_in,
     clarification_for,
-    instruction,
+    resolution_instruction,
     resolutions_in,
     rewrite,
     rewritten_with,
@@ -21,15 +34,26 @@ from veritas.orchestrator.rewrite import (
 )
 
 __all__ = [
-    "FENCED",
+    "GENERATION_RULES",
+    "GROUNDED_FIELDS",
+    "Generated",
+    "GroundedAnswer",
+    "Lineage",
+    "Orchestrator",
     "PLACEHOLDER",
-    "RULES",
+    "RESOLUTION_RULES",
     "Rewrite",
     "ambiguous_terms_in",
     "clarification_for",
-    "instruction",
+    "entry_text",
+    "field_text",
+    "generate",
+    "generation_instruction",
+    "grounding",
+    "resolution_instruction",
     "resolutions_in",
     "rewrite",
     "rewritten_with",
     "said_as",
+    "scope_text",
 ]

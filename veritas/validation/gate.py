@@ -95,7 +95,7 @@ actually ran, so nothing has to be inferred from a verdict's silence.
 query it just approved is a Gate with no boundary.
 """
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cached_property, partial
 from types import MappingProxyType
@@ -554,6 +554,79 @@ def on_base_tables(
     return written
 
 
+# One join, as the Gate compares joins: the table joined, the kind of join it is, and
+# the condition it is joined on written the one way `canonical` writes an expression. A
+# triple rather than a type, for the reason `columns_reaching_the_answer` returns
+# `(table, column)` pairs — it is a coordinate, and the thing with a name is the `Route`
+# it belongs to.
+#
+# The middle element is
+# [DEBT-022](../../.claude/docs/debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
+# paid: without it `JOIN dim_account ON …` and `LEFT JOIN dim_account ON …` are one
+# join, and a statement that keeps the fact rows the certified inner join drops matches
+# the corpus.
+Join = tuple[str, str, str]
+
+# What a Metric Definition's route is assembled from: the table one Join Path reaches
+# and the condition it reaches it on, straight off the entry. Two elements and not three
+# because the corpus declares no kind — every certified route is an inner join, which is
+# what `certified_route` writes.
+Hop = tuple[str, str]
+
+
+def join_kind(join: exp.Join) -> str:
+    """How a join joins, spelled the one way the Gate compares two of them.
+
+    sqlglot keeps the side and the kind as two arguments, and SQL lets three spellings
+    mean one thing: `JOIN`, `INNER JOIN` and an empty pair are the same join, and
+    `LEFT JOIN` and `LEFT OUTER JOIN` are the same join. Collapsing the spellings here
+    is what keeps the comparison about which rows survive rather than about how the
+    generator typed it.
+    """
+    side = (join.text("side") or "").upper()
+    kind = (join.text("kind") or "").upper()
+    if side and kind in ("", "OUTER"):
+        return f"{side} OUTER"
+    return f"{side} {kind}".strip() or "INNER"
+
+
+def joins_in(scope: Scope) -> dict[str, Join]:
+    """One scope's joins, by the name its columns are written with.
+
+    The key is the alias the generator chose, or the table's own name where it chose
+    none, which is what a column in that scope carries in front of the dot. The value is
+    the join written the way `Route` holds one — on base tables and canonicalised, so
+    `rate.rate_date = billed.trade_date` and
+    `fct_fx_rate.rate_date = fct_trade.trade_date` are one join written twice.
+
+    **Keeping both readings is what tells two joins to one table apart.** The alias is
+    the only thing that separates `fct_fx_rate` reached on the Trade's Denomination
+    Currency from `fct_fx_rate` reached on the Instrument's Quotation Currency, and
+    [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+    is what happens when only the base-table reading survives.
+
+    A join with no condition — `FROM fct_trade AS left_side, fct_trade AS right_side` —
+    is kept with an empty condition rather than skipped: it is a cross product, no Metric
+    Definition certifies one, and recording it is what makes it a rejection.
+    """
+    base = base_tables(scope)
+    found: dict[str, Join] = {}
+    for join in scope.expression.args.get("joins", []):
+        condition = join.args.get("on")
+        found[join.this.alias_or_name] = (
+            join.this.name,
+            join_kind(join),
+            "" if condition is None else canonical(on_base_tables(condition, base)),
+        )
+    return found
+
+
+def spelled(join: Join) -> str:
+    """One join as a person reads it in a rejection: `LEFT OUTER JOIN dim_account ON …`."""
+    table, kind, on = join
+    return f"{kind} JOIN {table} ON {on}" if on else f"{kind} JOIN {table} (no condition)"
+
+
 def projected_expressions(
     statement: exp.Expression | str, schema: Schema, dialect: str = DIALECT
 ) -> list[exp.Expression]:
@@ -575,14 +648,20 @@ def projected_expressions(
     return projections_of(resolve(statement, schema, dialect))
 
 
-def projections_of(resolved: exp.Expression) -> list[exp.Expression]:
-    """`projected_expressions`, given the resolved tree rather than resolving one.
+def written_projections(
+    resolved: exp.Expression,
+) -> Iterator[tuple[exp.Expression, frozenset[Join]]]:
+    """Every projection in every scope, written on base tables, with the joins the
+    aliases it was written with stand for.
 
-    The half of `projected_expressions` that reads a tree, split out in Sub-step 5.4 so
-    that a judgement resolves once and every rule reads the same tree — see `Reading`,
-    and [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
-    which the split pays. The public function above keeps the signature the spike and
-    the checks call it by.
+    **The one walk both projection readers are built on**, so there is one definition of
+    what a projection is and of what "written on base tables" means. `projections_of`
+    takes the first half of each pair and `metric_expressions_through` takes both; two
+    walks would be two chances to disagree about a node type or a scope.
+
+    The joins are read **before** the aliases are dropped, because dropping them is what
+    loses the distinction: two joins to `fct_fx_rate` are told apart by the alias each
+    column names and by nothing else.
     """
     # `build_scope` returns one `Scope` per SELECT: the SELECT itself in
     # `scope.expression`, and in `scope.sources` what each name in its FROM and JOIN
@@ -593,7 +672,6 @@ def projections_of(resolved: exp.Expression) -> list[exp.Expression]:
     if root is None:
         raise TracerRefused("sqlglot built no scope for the statement")
 
-    found: list[exp.Expression] = []
     # `traverse()` yields every scope in the tree, innermost first and the root last,
     # so each branch of a union is read on its own turn round this loop.
     for scope in root.traverse():
@@ -602,14 +680,33 @@ def projections_of(resolved: exp.Expression) -> list[exp.Expression]:
         if not isinstance(scope.expression, exp.Select):
             continue
         base = base_tables(scope)
+        joined = joins_in(scope)
         # `scope.expression.selects` is the projection list: one node per selected
         # item, in the order they were written.
         for projection in scope.expression.selects:
             # `unalias()` strips an `AS revenue` wrapper and leaves the expression
-            # that computes. `billed.commission` then becomes `fct_trade.commission`,
-            # so whatever alias the generator chose is gone by the time it is read.
-            found.append(on_base_tables(projection.unalias(), base))
-    return found
+            # that computes.
+            written = projection.unalias()
+            through = frozenset(
+                joined[column.table]
+                for column in written.find_all(exp.Column)
+                if column.table in joined
+            )
+            # `billed.commission` becomes `fct_trade.commission`, so whatever alias the
+            # generator chose is gone by the time the expression is compared.
+            yield on_base_tables(written, base), through
+
+
+def projections_of(resolved: exp.Expression) -> list[exp.Expression]:
+    """`projected_expressions`, given the resolved tree rather than resolving one.
+
+    The half of `projected_expressions` that reads a tree, split out in Sub-step 5.4 so
+    that a judgement resolves once and every rule reads the same tree — see `Reading`,
+    and [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
+    which the split pays. The public function above keeps the signature the spike and
+    the checks call it by.
+    """
+    return [written for written, _ in written_projections(resolved)]
 
 
 def metric_expressions(
@@ -640,10 +737,40 @@ def metric_expressions_of(
     The same split as `projections_of`, and for the same reason: two of the Gate's rules
     ask this question of one judgement's tree.
     """
+    return [form for form, _ in metric_expressions_through(resolved, dialect)]
+
+
+def metric_expressions_through(
+    resolved: exp.Expression, dialect: str = DIALECT
+) -> list[tuple[str, frozenset[Join]]]:
+    """Every metric expression, and the joins its own columns are read through.
+
+    Two readings of one projection, which is
+    [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+    paid. The **form** is the projection written on base tables and canonicalised, which
+    is what the corpus is keyed by and what makes the tracing rule blind to the alias a
+    generator chose. The **joins** are read off those same aliases before they are
+    dropped: a column written `denom_rate.fx_rate` says which of two joins to
+    `fct_fx_rate` this expression converts through, and nothing else in the statement
+    does.
+
+    Both are needed and neither replaces the other. Without the form the corpus cannot be
+    asked which metric this is; without the joins, one statement computing `Gross
+    Revenue` at the Instrument's Quotation Currency and `Traded Notional` at the Trade's
+    Denomination Currency reads exactly like the statement that computes them the right
+    way round.
+
+    A column whose name is not a join in its scope — the table the scope starts from, or
+    an alias the expression binds inside itself, like `Position Change`'s
+    `previous_snapshot` — contributes nothing. What a statement starts from is
+    `route_of_resolved`'s question.
+
+    Raises `TracerRefused` if sqlglot built no scope for the statement.
+    """
     return [
-        canonical(expression, dialect)
-        for expression in projections_of(resolved)
-        if list(expression.find_all(exp.AggFunc))
+        (canonical(written, dialect), through)
+        for written, through in written_projections(resolved)
+        if list(written.find_all(exp.AggFunc))
     ]
 
 
@@ -867,13 +994,6 @@ def restricted_columns_in_projection_of(
     )
 
 
-# One join, as the Gate compares joins: the table joined, and the condition it is joined
-# on written the one way `canonical` writes an expression. A pair rather than a type, for
-# the reason `columns_reaching_the_answer` returns `(table, column)` pairs — it is a
-# coordinate, and the thing with a name is the `Route` it belongs to.
-Join = tuple[str, str]
-
-
 @dataclass(frozen=True, slots=True)
 class Route:
     """Where a statement's rows come from: the tables it starts at, and the joins it
@@ -906,11 +1026,13 @@ class Route:
         statement it names the joins nothing certifies, and called on the certified route
         it names the joins the statement left out. Sorted, so a rejection explanation is
         the same string on every run.
+
+        The kind is spelled as well as the table, so a reader told a join is not
+        certified is told **which** join: an outer join over a certified condition reads
+        as `LEFT OUTER JOIN dim_account ON …` beside the `INNER JOIN dim_account ON …`
+        the corpus means.
         """
-        return sorted(
-            f"{table} ON {on}" if on else f"{table} (no join condition)"
-            for table, on in self.joins - other.joins
-        )
+        return sorted(spelled(join) for join in self.joins - other.joins)
 
 
 def route_of(
@@ -932,15 +1054,9 @@ def route_of_resolved(resolved: exp.Expression) -> Route:
     from the outermost scope alone would be a route with a hole in it exactly where a
     generator would hide one.
 
-    A join with no condition — `FROM fct_trade AS left_side, fct_trade AS right_side` —
-    comes back with an empty condition rather than being skipped. It is a cross product,
-    it is the one shape `read_only.py` measured the bounded rule cannot see, and no
-    Metric Definition certifies one, so recording it is what makes it a rejection.
-
-    The condition is written on base tables and then canonicalised, which is what makes
-    the comparison about the join and not about the alias the generator happened to
-    choose: `rate.rate_date = billed.trade_date` and
-    `fct_fx_rate.rate_date = fct_trade.trade_date` are one join written twice.
+    Each scope's joins are read by `joins_in`, which is also what the crossed-conversion
+    reading asks for the alias each one was written under — one reading of a scope's
+    joins, so the two can never disagree about what a statement joined.
     """
     root = build_scope(resolved)
     if root is None:
@@ -952,18 +1068,8 @@ def route_of_resolved(resolved: exp.Expression) -> Route:
         if not isinstance(scope.expression, exp.Select):
             continue
         base = base_tables(scope)
-        joined: set[str] = set()
-        for join in scope.expression.args.get("joins", []):
-            joined.add(join.this.alias_or_name)
-            condition = join.args.get("on")
-            joins.add(
-                (
-                    join.this.name,
-                    ""
-                    if condition is None
-                    else canonical(on_base_tables(condition, base)),
-                )
-            )
+        joined = joins_in(scope)
+        joins.update(joined.values())
         # What is left is what the scope starts at. Read as "the sources that were not
         # joined" rather than off the FROM node, because sqlglot has moved that node's
         # argument name between releases and `scope.sources` is the library's own answer
@@ -977,7 +1083,7 @@ def route_of_resolved(resolved: exp.Expression) -> Route:
 def certified_route(
     expression: str,
     from_table: str,
-    joins: Iterable[Join],
+    joins: Iterable[Hop],
     schema: Schema,
     dialect: str = DIALECT,
 ) -> Route:
@@ -1006,9 +1112,14 @@ def certified_route(
     applied to the third of the Gate's parse-tree rules.
 
     A Metric Definition's `filters` are deliberately **not** assembled in. They are
-    certified predicates on the rows, not a route to them, and nothing in this Sub-step
-    checks that a statement carries them — see the Sub-step 5.4 review, which says what
-    that costs.
+    certified predicates on the rows, not a route to them; the rule that requires them
+    reads `where_conjuncts` instead.
+
+    **Every hop is written `JOIN`, which is an inner join, and that is the corpus's own
+    meaning rather than a default.** A Join Path is *"a certified route between two
+    warehouse tables"* — the rows on both sides — so a statement writing an outer join
+    over a certified condition keeps rows the route does not certify, and since the
+    `Join` this returns carries its kind, it no longer matches.
 
     Raises `TracerRefused` if the assembled statement will not resolve, which is a corpus
     defect rather than a caller's bad query.
@@ -1543,6 +1654,9 @@ class ValidationGate:
                 f"{', '.join(sorted(carried.from_tables))}, and its Metric Definition "
                 f"starts from {', '.join(sorted(required.from_tables))}"
             )
+        crossed = self.crossed_conversion(reading)
+        if crossed is not None:
+            return crossed
 
         asserted = where_conjuncts(reading.resolved)
         uncarried = sorted(self.certified_filters(metrics) - asserted)
@@ -1573,6 +1687,50 @@ class ValidationGate:
                 f"certified over is keyed on {keyed}"
             )
         return None
+
+    def crossed_conversion(self, reading: Reading) -> Rejected | None:
+        """Each metric expression reads only through the joins its **own** Metric
+        Definition names, or reject.
+
+        [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+        paid, and the hole it was opened for in one sentence: the three comparisons
+        above union every metric's route before comparing, so a statement asking for two
+        metrics that convert through `fct_fx_rate` by different routes certifies **both**
+        joins for **both** metrics, and the two conversions can be swapped over. `Gross
+        Revenue` converts on the Trade's Denomination Currency and `Traded Notional` on
+        the Instrument's Quotation Currency; crossed, every rule above is satisfied and
+        both numbers are wrong.
+
+        The union is right and stays: a statement computing two metrics genuinely carries
+        both routes. What was missing is that a **projection** is one metric's, so its
+        joins are that metric's alone — which is only askable because
+        `metric_expressions_through` keeps the alias each column was read through.
+
+        `UNCERTIFIED_ROUTE` rather than a member of its own, because it is that member's
+        own sentence — *"a join no Semantic Entry certifies **for it**"* — reached one
+        reading deeper. A reader acting on it edits the query, which is what separates
+        that member from `UNREACHABLE_AXIS`.
+
+        A metric expression the corpus cannot place is not this rule's business: the
+        tracing rule one place earlier has already refused the statement.
+        """
+        crossed: list[str] = []
+        for form, through in metric_expressions_through(reading.resolved):
+            name = reading.corpus.get(form)
+            if name is None:
+                continue
+            own = self.required_route(
+                [self.semantic.metrics[name]], reading.schema
+            ).joins
+            crossed.extend(
+                f"{name} through {spelled(join)}" for join in sorted(through - own)
+            )
+        if not crossed:
+            return None
+        return (RejectionReason.UNCERTIFIED_ROUTE,), (
+            f"this statement computes a Certified Metric through a join its own Metric "
+            f"Definition does not name — {'; '.join(sorted(crossed))}"
+        )
 
     def unreachable_axis(
         self,
@@ -1686,12 +1844,10 @@ class ValidationGate:
         alone would refuse every such statement on the strength of the joins the other
         one needed.
 
-        **What the union cannot say is which metric took which join**, and that is
-        [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart).
-        Two metrics converting through `fct_fx_rate` by different routes put two joins to
-        that one table in the permitted set, `route_of_resolved` and `projections_of` both
-        write columns on their base table before comparing, and so the two conversions can
-        be swapped over with every rule here satisfied.
+        **What the union cannot say is which metric took which join**, which is why
+        `crossed_conversion` asks that of each projection separately. Called with one
+        metric — which is how that rule calls it — this is that metric's own route and
+        nothing else.
         """
         return self.assembled_route(metrics, (), schema, access=False)
 

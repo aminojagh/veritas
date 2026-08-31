@@ -48,8 +48,8 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-018](#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus) | Six Certified Metrics have no expression text pinned outside the corpus | S | The first edit to a Certified Metric's `expression` | open |
 | [DEBT-019](#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again) | Every parse-tree rule reads the catalogue and resolves the statement again | S | The next Gate rule that reads the catalogue — Sub-step 5.4's route rule — **🔴 fired** | **paid** (Sub-step 5.4) |
 | [DEBT-020](#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters) | The Gate checks a metric's route and not its certified filters | S | Whichever lands first: the Sub-step that builds Grounding, or the one that builds the Gold Question Set — **paid ahead of both, by ruling** | **paid** (Sub-step 5.5) |
-| [DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart) | Two joins to one table under different aliases are not told apart | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding | open |
-| [DEBT-022](#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one) | The Gate compares joins without their kind, so an outer join passes as an inner one | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding | open |
+| [DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart) | Two joins to one table under different aliases are not told apart | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding — **🔴 fired** | **paid** (6.4, 2026-08-31) |
+| [DEBT-022](#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one) | The Gate compares joins without their kind, so an outer join passes as an inner one | S | The first component that generates SQL from Metric Definitions — the Sub-step that builds Grounding — **🔴 fired** | **paid** (6.4, 2026-08-31) |
 | [DEBT-023](#debt-023--two-proving-systems-run-side-by-side) | Two proving systems run side by side | L | Delivery Mode ends, 2026-09-09 | open |
 | [DEBT-024](#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit) | Source and Step documents carry prose Delivery Mode would not admit | L | Delivery Mode ends, 2026-09-09 | open |
 | [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) | The nine Certified Metrics are implemented twice | M | Any change to a Certified Metric's expression | open |
@@ -58,8 +58,11 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-028](#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server) | No test reaches a real provider, so the live path is proven only by a stub server | S | Sub-step 6.4, or the first key available | **paid** (6.3, 2026-08-30) |
 | [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set | open |
 | [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 | open |
+| [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown | open |
+| [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 007 that charts refusals | open |
+| [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set | open |
 
-**Open debt:** 18 · **Paid:** 9 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 19 · **Paid:** 11 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -1841,7 +1844,7 @@ the two numbers, the date and the command.
 
 ### DEBT-021 — Two joins to one table under different aliases are not told apart
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Opened:** Sub-step 5.4 (`.claude/docs/reviews/step-005-validation-gate.md`)
 - **Size:** S
 - **Location:** `veritas/validation/gate.py` — `route_of_resolved` and
@@ -1920,6 +1923,21 @@ out of Metric Definitions rather than a person writing one out, and therefore th
 thing that can put two metrics in one statement without a reviewer choosing to. It was
 DEBT-020's first arm too, and the two were expected to be one visit to this rule.
 
+**How it was paid, Sub-step 6.4 (2026-08-31).** `metric_expressions_through` keeps two
+readings of one projection where `projections_of` kept one: the canonical form on base
+tables, which the corpus is keyed by, **and** the joins whose aliases the expression's
+own columns are written with. `ValidationGate.crossed_conversion` then asks of each
+projection separately what the union above it cannot — that a metric expression reads
+only through the joins its own Metric Definition names — and refuses as
+`UNCERTIFIED_ROUTE`, which is that member's own sentence reached one reading deeper.
+The narrower fix this entry proposed was not needed: the reading is unconditional, so it
+does not first have to notice that a table was joined twice.
+
+The probe the entry owed is `tests/test_gate.py`, run with `-s`. The two-metric statement
+converting each metric through its own rate is allowed; the same statement with the two
+rates swapped is refused, and the numbers it returns are in the
+[Sub-step 6.4 review](reviews/step-006-retrieval-and-orchestrator.md#sub-step-64--answer-a-question-end-to-end).
+
 **Status note, Sub-step 5.5 (2026-08-28) — DEBT-020 was paid ahead of the Trigger and
 this was not, so the two are no longer one visit.** Sub-step 5.5 reopened
 `ValidationGate.routed` to lengthen its permission list and to read `filters`, and it
@@ -1935,7 +1953,7 @@ Nothing in the repository demonstrates it yet.
 
 ### DEBT-022 — The Gate compares joins without their kind, so an outer join passes as an inner one
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Opened:** Sub-step 5.5 (`.claude/docs/reviews/step-005-validation-gate.md`)
 - **Size:** S
 - **Location:** `veritas/validation/gate.py` — the `Join` type and
@@ -2002,6 +2020,23 @@ outer join over a certified condition, declared, with the two numbers printed, w
 the state
 [DEBT-021](#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
 is in and the state DEBT-014's date half was in for eight days.
+
+**How it was paid, Sub-step 6.4 (2026-08-31).** `Join` is `(table, kind, condition)`,
+`joins_in` reads the side and kind sqlglot already parses through `join_kind` — which
+collapses the spellings that mean one thing, so a bare `JOIN` and an explicit inner join
+are one join and a `LEFT JOIN` written either way is the other — and `Route.joins_beyond`
+spells the kind through `spelled`, so a rejection names the kind as well as the table
+rather than saying *"fct_fx_rate"* and leaving a reader to guess what to fix.
+`certified_route` still assembles the corpus side with a plain `JOIN`, which is the inner
+join a Join Path means.
+
+The probe the entry owed is in `tests/test_gate.py`. It **moves nothing**, exactly as
+this entry predicted: `Gross Revenue` multiplies by `fct_fx_rate.fx_rate`, and on this
+Warehouse every Trade has a rate on its own Trade Date, so the outer join reads the same
+rows and returns the same figure. The two numbers and the two row counts are in the
+[Sub-step 6.4 review](reviews/step-006-retrieval-and-orchestrator.md#sub-step-64--answer-a-question-end-to-end).
+What the payment buys is not a number that moved but a hole that is shut before the tenth
+metric opens it.
 
 **Trigger**
 
@@ -2106,7 +2141,12 @@ Delivery Mode ends, 2026-09-09.
   2.5 and 4.2 and went unrecorded)
 - **Size:** M
 - **Location:** `.claude/scripts/check_warehouse.py:1339–1667` against
-  `semantic/metrics/*.yaml`
+  `semantic/metrics/*.yaml`, and — since Sub-step 6.4 — `tests/test_gate.py`, which
+  writes `Gross Revenue`'s and `Traded Notional`'s expressions out with the rate they
+  convert through left open, because crossing two conversions means writing a form the
+  corpus does not publish. That copy fails loudly rather than quietly: the certified
+  half of the pair asserts the Gate **allows** it, so an expression that moved in
+  `semantic/` breaks the test instead of passing beside it.
 
 **What we did**
 `check_warehouse.py` defines `gross_revenue`, `net_revenue`, `traded_notional`,
@@ -2396,3 +2436,143 @@ the numbers support, and record the losing arm in the Step Review.
 to leave silent.** The marginal cost is one arm on a sweep that is being run
 anyway; if Step 007 drops it for time, this entry closes as *accepted* with that
 reason and the appended form becomes the deliberate one.
+
+---
+
+### DEBT-031 — A Grounded Answer carries rows with no column names
+
+- **Status:** open
+- **Opened:** Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** S
+- **Location:** `veritas/orchestrator/answer.py` — `GroundedAnswer.rows`, and
+  `veritas/warehouse/adapter.py` — `WarehouseAdapter.query`, which returns rows and
+  nothing about their shape
+
+**What we did**
+
+Returned the engine's rows as bare tuples. A one-number answer reads fine; a breakdown
+comes back as `(('EU', Decimal('46282.79')),)` with nothing saying which position is the
+axis and which is the metric. The Orchestrator knows, because the generation rules make
+the model alias the slice `slice` and the metric `answer` — but that is knowledge in a
+prompt, not a field on the answer.
+
+**What we should have done**
+
+Read the column names off the engine, through the adapter, and carry them on the Grounded
+Answer beside `rows`. A cursor's description is dialect, which is exactly why it belongs
+behind [ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md)'s seam rather
+than in the caller.
+
+**Why we deferred**
+
+Nothing reads a Grounded Answer yet. The App is Sub-step 6.5 and is the first thing that
+renders one, so the field would have been added, unused, one Sub-step before its only
+reader — and the shape it should have is a question about what the App shows.
+
+**Cost while unpaid**
+
+A caller that wants to label a breakdown has to know the aliases the prompt asked for,
+which is a second copy of the generation rules living wherever the rendering does.
+
+**Trigger**
+
+**Sub-step 6.5**, where the App renders a breakdown. Adding a field to a frozen
+dataclass is additive, so this moves no seam — it is a field, on the day something needs
+to read it.
+
+---
+
+### DEBT-032 — A refusal that is not the Gate's carries no reason a chart can group by
+
+- **Status:** open
+- **Opened:** Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** S
+- **Location:** `veritas/orchestrator/answer.py` — `GroundedAnswer.refusal`, a sentence;
+  and `veritas/orchestrator/flow.py`, which writes four different sentences into it
+
+**What we did**
+
+Gave the Validation Gate's refusals a closed taxonomy —
+[`RejectionReason`](../../veritas/validation/outcome.py) — and gave the Orchestrator's
+own refusals a string. A question can end without a number in four ways this component
+decides: nothing retrieved defines a metric, the model refused, the model wrote nothing
+readable, or the engine refused a statement the Gate allowed. All four arrive as prose.
+
+**What we should have done**
+
+Whatever
+[ADR-0003](adr/0003-validation-gate-is-deterministic-code.md) argued for the Gate's
+taxonomy applies here the moment anything groups by it: *"an LLM validator cannot produce
+the stable taxonomy of rejection reasons that 'Validation-Gate rejections by reason' needs
+to be a real chart."* The Orchestrator's four are decided in code and could be members.
+
+**Why we deferred**
+
+Nothing charts them. The Target State's monitoring row names *"Validation-Gate rejections
+by reason and metric-usage frequency"*, and both are already available — the Gate's own
+taxonomy and Lineage. A member with no chart behind it is the mistake `RejectionReason`'s
+own docstring warns against from the other side: *"a member with no rule behind it would
+be a chart category nothing can ever fall into."*
+
+**Cost while unpaid**
+
+Two questions refused for the same reason produce two different strings if the wording
+ever varies, and nothing can count them. The App can still tell a clarification from a
+refusal and a Gate refusal from an Orchestrator one, because `clarification` and
+`outcome` are separate fields — so what is missing is counting, not distinguishing.
+
+**Trigger**
+
+**The Sub-step of Step 007 that charts refusals.** If that Step charts only the Gate's
+reasons, this closes as *accepted* with that as the reason.
+
+---
+
+### DEBT-033 — The generator's live evidence is five self-written questions, and four Certified Metrics never reach it
+
+- **Status:** open
+- **Opened:** Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** S
+- **Location:** `tests/test_orchestrator.py` — `COVERED`, and the two live tests it drives
+
+**What we did**
+
+Proved the generation step on five questions written by the same person who wrote the
+prompt they are answered through, chosen so that between them they ground a Certified
+Metric rooted at each of the four fact tables. They ask for `Trade Count`, `Gross
+Revenue`, `Cash Balance`, `Realised P&L` and `Net Revenue`; `Account Value`, `Unrealised
+P&L`, `Position Change` and `Traded Notional` are never generated for. **None of the five
+names a period**, so no generated statement has yet met the Gate's date rule —
+`UNCERTIFIED_DATE_COLUMN` is refused only for statements a person wrote, in
+`.claude/scripts/check_validation_gate/route.py`.
+
+**What we should have done**
+
+Measure the generator against a question set written apart from the prompt — the Gold
+Question Set the [Target State](design/target-state.md) names — carrying the metric and
+the result each question expects, and sized so every Certified Metric and every Gate rule
+a generated statement can meet appears in it at least once.
+
+**Why we deferred**
+
+The Gold Question Set is Step 007's, and writing it inside 6.4 would have written it
+against the generator it exists to judge. Five questions are what this Sub-step needed to
+show the flow runs end to end against a real provider; they are evidence for that claim
+and were never evidence of coverage.
+
+**Cost while unpaid**
+
+Execution Accuracy has nothing to be measured on. The four metrics no live run generates
+for could be ungeneratable today and no test would say so, and nothing knows what a model
+handed a period writes — which is the one Gate rule a generated statement has never met,
+so it is also the rule with the least evidence that the rules-as-instructions in the
+prompt keep a model on the certified side of it.
+
+**Trigger**
+
+**The Sub-step of Step 007 that writes the Gold Question Set** — Amino's ruling on the
+[Sub-step 6.4 review](reviews/step-006-retrieval-and-orchestrator.md#sub-step-64--answer-a-question-end-to-end),
+2026-08-31: *"this must be handled when we create the gold question set"*. The same
+Sub-step [DEBT-004](#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
+and [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level)
+already wait on.

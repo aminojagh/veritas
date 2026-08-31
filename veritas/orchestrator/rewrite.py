@@ -15,13 +15,12 @@ the `disambiguates` the term stands between is not a resolution, and an
 unresolved term is asked back rather than guessed at.
 """
 
-import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import cache
 
-from veritas.llm import LanguageModel, LanguageModelError, default_model
+from veritas.llm import LanguageModel, default_model, json_reply
 from veritas.semantic import AmbiguousTerm, SemanticLayer, load_semantic_layer
 
 # The placeholder inside a registered term name. `how much does X have` is the one
@@ -30,18 +29,9 @@ from veritas.semantic import AmbiguousTerm, SemanticLayer, load_semantic_layer
 # placeholder: a term spelled with an `X` inside a word keeps its letters.
 PLACEHOLDER = re.compile(r"\bX\b")
 
-# A reply wrapped in a Markdown code fence. A provider asked for a JSON object
-# mostly returns one bare; an open model behind the same endpoint may fence it
-# instead, and the fence is the whole of the difference. Group 1 of
-# '```json\n{"revenue": "Net Revenue"}\n```' is what `json.loads` is given;
-# `(?:json)?` because the language tag is optional, `re.DOTALL` so `.` crosses the
-# newlines of a multi-line object, and the anchors so the fence has to wrap the
-# whole reply rather than merely appear somewhere in it.
-FENCED = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
-
 # What the model is told to do, ahead of the terms themselves. The rules are
 # Veritas's; every word about a *meaning* below them comes out of the corpus.
-RULES = """\
+RESOLUTION_RULES = """\
 You resolve ambiguous words in questions about a brokerage, against a registry of
 certified metrics. You never answer the question itself and you never compute
 anything.
@@ -117,7 +107,7 @@ def ambiguous_terms_in(question: str, layer: SemanticLayer) -> list[AmbiguousTer
     return [term for _, _, term in sorted(said, key=lambda found: found[:2])]
 
 
-def instruction(terms: list[AmbiguousTerm]) -> str:
+def resolution_instruction(terms: list[AmbiguousTerm]) -> str:
     """The system instruction: the rules, then the terms the question said.
 
     Only the terms this question said, so the meanings on offer are the ones it
@@ -134,7 +124,7 @@ def instruction(terms: list[AmbiguousTerm]) -> str:
         ])
         for term in terms
     ]
-    return "\n\n".join([RULES, *blocks])
+    return "\n\n".join([RESOLUTION_RULES, *blocks])
 
 
 def resolutions_in(
@@ -145,17 +135,10 @@ def resolutions_in(
     A term the reply leaves out, nulls, or answers with a name outside its
     `disambiguates` is absent from the result — the three ways a term stays
     unresolved, and none of them is a reason to invent one. A reply that is not a
-    JSON object at all raises, because that is the provider failing rather than the
-    question being ambiguous.
+    JSON object at all raises through `json_reply`, because that is the provider
+    failing rather than the question being ambiguous.
     """
-    fenced = FENCED.match(reply)
-    try:
-        answer = json.loads(fenced.group(1) if fenced else reply)
-    except json.JSONDecodeError as error:
-        raise LanguageModelError(f"reply is not JSON: {reply!r}") from error
-    if not isinstance(answer, dict):
-        raise LanguageModelError(f"reply is not a JSON object: {reply!r}")
-
+    answer = json_reply(reply)
     resolved: dict[str, tuple[str, ...]] = {}
     for term in terms:
         chosen = answer.get(term.name)
@@ -207,7 +190,8 @@ def rewrite(
 
     model = default_model() if model is None else model
     resolved = resolutions_in(
-        model.complete(instruction(terms), question, json_object=True), terms
+        model.complete(resolution_instruction(terms), question, json_object=True),
+        terms,
     )
     unresolved = [term for term in terms if term.name not in resolved]
     if unresolved:

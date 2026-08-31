@@ -8,6 +8,7 @@ client behind both.
 from veritas.llm.model import (
     DEFAULT_PROVIDER,
     ENV_FILE,
+    FENCED,
     MODEL_VARIABLE,
     PROVIDER_VARIABLE,
     PROVIDERS,
@@ -18,12 +19,14 @@ from veritas.llm.model import (
     LanguageModelError,
     Provider,
     default_model,
+    json_reply,
     model_for,
 )
 
 __all__ = [
     "DEFAULT_PROVIDER",
     "ENV_FILE",
+    "FENCED",
     "MODEL_VARIABLE",
     "PROVIDERS",
     "PROVIDER_VARIABLE",
@@ -34,5 +37,6 @@ __all__ = [
     "LanguageModelError",
     "Provider",
     "default_model",
+    "json_reply",
     "model_for",
 ]
