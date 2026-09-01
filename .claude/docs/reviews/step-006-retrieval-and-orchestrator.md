@@ -174,3 +174,43 @@ with no seam is a rewrite nobody has admitted to yet."* 2 goes to the Gold Quest
 — *"this must be handled when we create the gold question set"*. 3 approved as is.
 
 **Language** — no new terms; `Grounded Answer` and `Lineage` were registered 2026-08-04 and are now code. Two renames, both collisions this Sub-step created: `rewrite.py`'s rules constant and its `instruction` became `RESOLUTION_RULES` and `resolution_instruction`, one word naming two steps being Non-Negotiable 1 inverted; and the code-fence pattern moved to `veritas/llm/` with `json_reply` beside it, a fence being a difference between providers rather than between steps. 6.3's **`Clarifying Question`** proposal stays open and now names a second field, `GroundedAnswer.clarification`.
+
+---
+
+## Sub-step 6.5 — Ask a question in the browser
+
+**Changed.** `veritas/app/` is the ninth-to-seventh component: `render.py` turns a Grounded Answer into strings and imports no Streamlit, `page.py` places them and is the only module allowed to import one. `WarehouseAdapter.query_with_columns` reads the engine's column names beside the rows and `GroundedAnswer.columns` carries them, which is [DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names); the sidebar states what Access Profile enforcement is worth in [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s own words, which is that one.
+
+**Verified.** Run 1 is all a reviewer without a key proves. Run 2 asks OpenAI a question through the page itself and prints what the page showed — the same `Gross Revenue` figure runs 2–4 of Sub-step 6.4 print for a statement a person wrote.
+```
+$ uv run pytest -q                                            # no key, no call made, 4 live tests skipped
+168 passed, 4 skipped in 55.25s
+$ VERITAS_LIVE_MODEL=1 uv run pytest tests/test_app.py -k end_to_end -q -s     # gpt-4o-mini
+  answer 67,935.82
+  SELECT sum(fct_trade.commission * fct_fx_rate.fx_rate) AS answer
+FROM fct_trade
+JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_trade.trade_date AND fct_fx_rate.from_currency = fct_trade.denomination_currency AND fct_fx_rate.to_currency = 'EUR'
+JOIN dim_account ON dim_account.account_id = fct_trade.account_id
+JOIN dim_client ON dim_client.client_id = dim_account.client_id
+WHERE dim_client.client_region = 'EU'
+1 passed, 15 deselected in 16.51s
+$ uv run python .claude/scripts/verify_framework.py           # 1433 links, 1156 anchors
+PASS — framework is wired up correctly
+$ uv run python .claude/scripts/check_language.py             # 41 files, 2114 identifiers, 0 proposed
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+**The two screenshots are illustrations, not evidence.** `uv run streamlit run veritas/app/page.py`, driven by a throwaway Playwright script in a temporary environment: Playwright is not a dependency, nothing in the repository reproduces them, and everything they show is asserted in `tests/test_app.py`, which anyone can run. [Answered](images/step-006-app-answered.png) — *"what was our gross revenue by region"*, `revenue` resolved, the breakdown under `slice` and `answer`, the statement, eleven Lineage entries, `allowed — 8 rules ran`. [Refused](images/step-006-app-refused.png) — *"what columns are in fct_trade"*, the model's refusal, no SQL, and `no statement reached the Validation Gate`.
+
+**Debt** — **008 and 031 paid.** Opened [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used), point 1 below.
+
+**Sceptically**, hardest first.
+
+1. **The Lineage is what the model was shown, and the page presents it as an audit trail.** Eleven entries under a `Gross Revenue` answer, `Net Revenue` among them; the same eleven under a refusal that produced nothing. 6.4 chose that deliberately — one list read twice — and 6.5 is where a *person* reads it and would conclude both metrics were involved. Narrowing it means the `Validation Gate outcome` carrying the metrics and Join Paths a statement traced to, which is a change to a contract three components read, so it is [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) against the Step 007 logger rather than a widening taken here. It is also why the figure has no unit or currency beside it: the metric whose `unit` would label it is not identifiable from a list naming two.
+2. **The page is tested by running its source, not by importing it.** `AppTest.from_function` executes the source of the test's `driven` wrapper as the script, so that wrapper imports what it needs itself and takes the Orchestrator as an argument. It is why `page(orchestrator=…)` takes its dependency rather than reaching for one — the real page passes nothing and builds one under `st.cache_resource`. A reader who adds a module-level reference to that wrapper will get a `NameError` from a test that looks like it should work.
+3. **`query` is now `query_with_columns` with the names dropped.** The alternative was changing `query`'s return type at eleven call sites, or a result record every caller unpacks; this leaves the eleven untouched and puts the cursor's description — dialect, and therefore the adapter's — in one place. The cost is two read methods where the seam had one.
+4. **The App opens its own Warehouse connection and never closes it.** One per server process, held by `st.cache_resource` for its life. DuckDB takes one writer, so `uv run python -m veritas.ingestion` while the page is running will fail to open the file; nothing says so yet.
+
+**Approved 2026-09-01, on all four, and this commit closes Step 006.** [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) is `accepted` with it, the Groq row stands at `openai/gpt-oss-120b`, and the Target State's narrowed credential table is confirmed rather than re-opened — the three things the Step was holding. **6.3's `Clarifying Question` Term Proposal was approved the same day**, and is registered in [Section A](../glossary.md#a-the-system) as the second of the two ways a Grounded Answer carries no number. The rename it carried is in this commit: `clarification` is `clarifying_question` on `Rewrite` and `GroundedAnswer`, and `clarification_for` is `clarifying_question_for`. Nothing carries into Step 007.
+
+**Language** — no new terms; `App` was registered 2026-08-04 with `veritas/app/` as its path, and the directory now exists. 6.3's **`Clarifying Question`** proposal stays open and now has a third home: the page renders `GroundedAnswer.clarification` as the question Veritas asks back.

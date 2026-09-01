@@ -1,6 +1,6 @@
 # ADR-0005 — Every model call goes through one OpenAI-compatible endpoint
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-08-30
 - **Decided in:** Step 006, Sub-step 6.3
 

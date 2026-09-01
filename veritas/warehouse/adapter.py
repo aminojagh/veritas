@@ -337,7 +337,27 @@ class WarehouseAdapter:
         a caller with a value to interpolate has a bound parameter available, so
         there is never a reason to build the string.
         """
+        return self.query_with_columns(sql, parameters)[1]
+
+    def query_with_columns(
+        self, sql: str, parameters: list[object] | None = None
+    ) -> tuple[tuple[str, ...], list[tuple[object, ...]]]:
+        """Run a read query and return the names of its columns beside its rows.
+
+        The names are the engine's, read off the cursor the rows come from, so a
+        statement is executed once and the labels belong to the values they stand
+        over. A cursor's description is dialect — its shape, and the fact that the
+        name is its first field — which is why reading it is in this file and a
+        caller only ever sees the names.
+
+        A statement that returns no rows still returns its column names, because
+        what the answer would have been called does not depend on there being one.
+        """
         try:
-            return self._connection.execute(sql, parameters or []).fetchall()
+            cursor = self._connection.execute(sql, parameters or [])
+            return (
+                tuple(column[0] for column in cursor.description or ()),
+                cursor.fetchall(),
+            )
         except duckdb.Error as refusal:
             raise WarehouseError(str(refusal)) from refusal

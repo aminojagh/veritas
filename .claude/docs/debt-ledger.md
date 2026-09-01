@@ -35,7 +35,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-005](#debt-005--moved-to-ext-002) | Nothing detects Semantic Layer drift from the Warehouse | M | — | moved → [EXT-002](extension-register.md#ext-002--semantic-layer-drift-detection) |
 | [DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently) | No ad-hoc exploration | — | — | **accepted** (permanent) |
 | [DEBT-007](#debt-007--moved-to-ext-003) | Metric authoring does not scale beyond a hand-written corpus | L | — | moved → [EXT-003](extension-register.md#ext-003--metric-authoring-at-scale) |
-| [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers) | The access-control story promises more than it delivers | S | Any access-control claim in `README.md` or the App | open |
+| [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers) | The access-control story promises more than it delivers | S | Any access-control claim in `README.md` or the App — **🔴 fired** | **paid** (6.5, 2026-08-31) |
 | [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL — **🔴 fired** | **paid** (Sub-step 2.6) |
 | [DEBT-010](#debt-010--movement_type-has-no-registered-value-vocabulary) | `movement_type` has no registered value vocabulary | S | The first Cash Movement row is generated | **paid** (Sub-step 2.1) |
 | [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level) | Execution Price against Market Price cancels at book level | S | Building the Gold Question Set | open |
@@ -58,11 +58,12 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-028](#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server) | No test reaches a real provider, so the live path is proven only by a stub server | S | Sub-step 6.4, or the first key available | **paid** (6.3, 2026-08-30) |
 | [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set | open |
 | [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 | open |
-| [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown | open |
+| [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown — **🔴 fired** | **paid** (6.5, 2026-08-31) |
 | [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 007 that charts refusals | open |
 | [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set | open |
+| [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 007 that logs Lineage or charts metric usage | open |
 
-**Open debt:** 19 · **Paid:** 11 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 18 · **Paid:** 13 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -505,7 +506,7 @@ The identifier is retained so it is never reused and existing links resolve.
 
 ### DEBT-008 — The access-control story promises more than it delivers
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 6.5 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Opened:** Sub-step 1.3 · **Narrowed:** 2026-08-04, on Amino's review
 - **Size:** S
 - **Location:** `README.md` (not yet written) and the App's rendering of the
@@ -613,6 +614,18 @@ one-role demonstration over synthetic data is exactly the thing a reader would o
 The first access-control claim made anywhere a reader will see it: `README.md`,
 the App, or a demo script. Whichever comes first — and it will come during the
 App Step, not at the end.
+
+**How it was paid, Sub-step 6.5 (2026-08-31).** The App makes the claim and carries the
+qualification in the same place. `veritas/app/render.py` holds the paragraph above as
+`ENFORCEMENT_NOTE`, character for character rather than as a paraphrase, and
+`veritas/app/page.py` renders it in the sidebar directly beneath the identity a question
+is asked as — so the role, the region, the Restricted Column and what enforcing them is
+worth are read together. `tests/test_app.py` reads the sentence out of this entry and
+fails if the two ever differ.
+
+**`README.md` is still unwritten, and this entry no longer waits for it.** The Trigger
+was *"whichever comes first"*, and the App came first; the README will make the same
+claim in Step 008 and has this sentence to make it with.
 
 ---
 
@@ -2360,7 +2373,7 @@ else reads, to the next person, as a matcher that handles phrasing.
 **Cost while unpaid**
 A question that says an Ambiguous Term in any spelling but the registered one is
 not detected, no model call is made for it, and it goes to Retrieval as though it
-had been unambiguous. **Not a refusal and not a clarification — silence.** Four
+had been unambiguous. **Not a refusal and not a Clarifying Question — silence.** Four
 classes, each pinned by
 `tests/test_rewrite.py::test_a_phrasing_that_is_not_the_registered_spelling_is_missed`,
 which asserts today's misses so that repayment breaks it:
@@ -2441,7 +2454,7 @@ reason and the appended form becomes the deliberate one.
 
 ### DEBT-031 — A Grounded Answer carries rows with no column names
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 6.5 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Opened:** Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** S
 - **Location:** `veritas/orchestrator/answer.py` — `GroundedAnswer.rows`, and
@@ -2480,6 +2493,15 @@ which is a second copy of the generation rules living wherever the rendering doe
 dataclass is additive, so this moves no seam — it is a field, on the day something needs
 to read it.
 
+**How it was paid, Sub-step 6.5 (2026-08-31).** `WarehouseAdapter.query_with_columns`
+reads the names off the cursor the rows come from, so one execution returns both and the
+labels belong to the values they stand over; `query` is now that method with the names
+dropped, which leaves every existing caller unchanged. `GroundedAnswer.columns` carries
+them, and a Grounded Answer whose names do not label its values cannot be built — the
+fourth check in `__post_init__`. The App reads that field and nothing else:
+`render.labels` is what a breakdown's two columns are headed by, and no copy of the
+generation rules lives in the rendering.
+
 ---
 
 ### DEBT-032 — A refusal that is not the Gate's carries no reason a chart can group by
@@ -2517,8 +2539,8 @@ be a chart category nothing can ever fall into."*
 **Cost while unpaid**
 
 Two questions refused for the same reason produce two different strings if the wording
-ever varies, and nothing can count them. The App can still tell a clarification from a
-refusal and a Gate refusal from an Orchestrator one, because `clarification` and
+ever varies, and nothing can count them. The App can still tell a Clarifying Question from a
+refusal and a Gate refusal from an Orchestrator one, because `clarifying_question` and
 `outcome` are separate fields — so what is missing is counting, not distinguishing.
 
 **Trigger**
@@ -2576,3 +2598,61 @@ prompt keep a model on the certified side of it.
 Sub-step [DEBT-004](#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
 and [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level)
 already wait on.
+
+---
+
+### DEBT-034 — Lineage records what the model was shown, not what the statement used
+
+- **Status:** open
+- **Opened:** Sub-step 6.5 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
+- **Size:** M
+- **Location:** `veritas/orchestrator/flow.py` — `Orchestrator.lineage_of`, and
+  `veritas/app/page.py`, which is the first thing that shows one to a person
+
+**What we did**
+
+Built the Lineage out of every grounded entry.
+[`Lineage`](glossary.md#a-the-system) is registered as *"the record of which Semantic
+Entries and which Metric Definition versions produced a Grounded Answer. What makes an
+answer auditable"*, and what `lineage_of` records is what the prompt contained: the
+Ambiguous Terms that were resolved, then every retrieved entry that grounds anything.
+
+A question answered with `Gross Revenue` therefore comes back citing eleven entries,
+`Net Revenue` among them, because both were retrieved and both were in front of the
+model. A **refused** question cites the same eleven, having produced nothing at all.
+
+**What we should have done**
+
+Record what the statement used. The Gate already resolves it: the tracing rule knows
+which Certified Metrics a statement's expressions trace to, and `certified_route` knows
+which Join Paths its joins are certified by. A `Validation Gate outcome` that carried
+those names would let the Orchestrator build a Lineage of what the statement was
+composed from, and leave what was *retrieved* to Evaluation, which is the thing that
+actually wants it.
+
+**Why we deferred**
+
+The seam is the outcome's contract, and widening it is a change every reader of a
+verdict follows — the Grounded Answer, the App, and the logger Step 007 has not built
+yet. Sub-step 6.4 wrote `lineage_of` off `GROUNDED_FIELDS` deliberately, so that what
+Lineage claims and what the model saw are one list read twice; replacing that with a
+second, narrower list is a decision about which of the two an auditor is owed, and it is
+worth taking with the logger in hand rather than a Sub-step before it.
+
+**Cost while unpaid**
+
+An answer cites entries that did not produce it, which is the failure mode Veritas
+exists to prevent wearing an audit trail's clothes: a reader who checks `Net Revenue`
+against a `Gross Revenue` answer finds a number that does not reconcile and no way to
+tell which entry was actually used. It also blocks the smaller thing the App wants —
+**the figure is shown without its unit or its reporting currency**, because the metric
+whose `unit` and `reporting_currency` would label it is not identifiable from a list
+that names two.
+
+**Trigger**
+
+**The Sub-step of Step 007 that logs a Grounded Answer or charts metric-usage
+frequency.** The [Target State](design/target-state.md#zoomcamp-criteria-map)
+puts *"metric-usage frequency"* on the Monitoring scorecard, and a chart of it built on
+this Lineage counts every retrieved metric as used — so the chart is wrong the day it is
+drawn, and it is wrong in the direction that flatters the corpus.

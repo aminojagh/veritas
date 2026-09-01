@@ -19,7 +19,12 @@ Debt Ledger entries or just code.
 | [0002](0002-duckdb-as-the-warehouse-behind-an-adapter.md) | DuckDB is the Warehouse, reached only through an adapter | accepted |
 | [0003](0003-validation-gate-is-deterministic-code.md) | The Validation Gate is deterministic code, not an Large Language Model (LLM) self-check | accepted |
 | [0004](0004-snapshot-and-replay-and-where-dlt-stops.md) | Every real source is snapshot-and-replayed, and dlt stops at `raw` | accepted |
-| [0005](0005-one-openai-compatible-endpoint-for-every-provider.md) | Every model call goes through one OpenAI-compatible endpoint | proposed |
+| [0005](0005-one-openai-compatible-endpoint-for-every-provider.md) | Every model call goes through one OpenAI-compatible endpoint | accepted |
+
+ADR-0005 was written in Sub-step 6.3 and **accepted by Amino on 2026-09-01**, with
+the review that closes Step 006. It was rewritten before acceptance around Amino's
+ruling of 2026-08-30, which closed the supported set to OpenAI and Groq and made a
+third provider [EXT-011](../extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam).
 
 ADR-0004 was written in Sub-step 2.2 and **accepted by Amino on 2026-08-11**, with
 Sub-step 2.3's review — the Sub-step that first built on both of its decisions.

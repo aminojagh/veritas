@@ -59,37 +59,46 @@ class Lineage:
 class GroundedAnswer:
     """What a question comes back as, answered or not.
 
-    `rows` is what the Warehouse returned, `sql` is the statement it returned it for,
-    `lineage` is what that statement was built from and `outcome` is the verdict it was
-    allowed under. `refusal` is the sentence a person reads when there is no number, and
-    `clarification` is the question Veritas asks back when the question said an
+    `rows` is what the Warehouse returned and `columns` is what the engine calls each
+    position in them, `sql` is the statement they came back for, `lineage` is what that
+    statement was built from and `outcome` is the verdict it was allowed under.
+    `refusal` is the sentence a person reads when there is no number, and
+    `clarifying_question` is the question Veritas asks back when the question said an
     Ambiguous Term and did not say which meaning.
+
+    **A row is unreadable without its column names.** A breakdown comes back as
+    `(('EU', Decimal('46282.79')),)`, and which position is the axis and which is the
+    metric is knowledge the generation rules put in a prompt. `columns` is that
+    knowledge as a field, so a caller labels an answer by reading it rather than by
+    knowing what the prompt asked for.
 
     **`rows` being empty is an answer.** A certified statement over a period the
     Warehouse holds no rows for returns nothing and has still been answered, which is
     why `answered` reads the refusal and not the rows.
 
-    The three checks below are the contract rather than caution. A Grounded Answer that
+    The four checks below are the contract rather than caution. A Grounded Answer that
     both refuses and asks back says two different things about one question; one that
-    answers without SQL is the bare number the Glossary says Veritas never returns; and
-    one that answers under a verdict that is not an allowing verdict is a number that
-    reached a person past the Validation Gate.
+    answers without SQL is the bare number the Glossary says Veritas never returns; one
+    that answers under a verdict that is not an allowing verdict is a number that
+    reached a person past the Validation Gate; and one whose names do not label its
+    values is a table whose headings belong to a different query.
     """
 
     question: str
     rewritten: str = ""
     sql: str = ""
+    columns: tuple[str, ...] = ()
     rows: tuple[tuple[object, ...], ...] = ()
     lineage: Lineage = field(default_factory=Lineage)
     outcome: ValidationGateOutcome | None = None
     refusal: str = ""
-    clarification: str | None = None
+    clarifying_question: str | None = None
 
     def __post_init__(self) -> None:
-        if self.refusal and self.clarification is not None:
+        if self.refusal and self.clarifying_question is not None:
             raise ValueError(
                 f"this answer both refuses ({self.refusal!r}) and asks back "
-                f"({self.clarification!r}), and a question gets one of the two"
+                f"({self.clarifying_question!r}), and a question gets one of the two"
             )
         if self.answered and not self.sql:
             raise ValueError(
@@ -101,8 +110,14 @@ class GroundedAnswer:
                 f"an answered question carries the Validation Gate outcome that let it "
                 f"run, and this one carries {self.outcome!r}"
             )
+        if any(len(row) != len(self.columns) for row in self.rows):
+            raise ValueError(
+                f"every value in a row is labelled by the column it came back under, "
+                f"and these {len(self.columns)} names do not label "
+                f"{[len(row) for row in self.rows]}"
+            )
 
     @property
     def answered(self) -> bool:
         """Whether a number came back, as opposed to a refusal or a question."""
-        return not self.refusal and self.clarification is None
+        return not self.refusal and self.clarifying_question is None

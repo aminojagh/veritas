@@ -113,7 +113,7 @@ def test_a_phrasing_that_is_not_the_registered_spelling_is_missed(name, semantic
     the question goes to Retrieval as though it had been unambiguous.
 
     Asserts what Veritas does today rather than what it should do — no term found,
-    no model called, no clarification asked — so paying the debt breaks this test
+    no model called, no Clarifying Question asked — so paying the debt breaks this test
     instead of passing quietly beside it.
     """
     question = UNSAID[name]
@@ -127,7 +127,7 @@ def test_a_question_that_names_a_meaning_resolves_to_it(semantic):
     model = StubModel({"revenue": "Gross Revenue"})
     resolved = rewrite("what was our gross revenue last quarter", model, semantic)
     assert resolved.resolutions == {"revenue": ("Gross Revenue",)}
-    assert resolved.clarification is None
+    assert resolved.clarifying_question is None
     assert resolved.resolved
     assert "Gross Revenue" in resolved.rewritten
     assert resolved.rewritten.startswith(resolved.question)
@@ -141,9 +141,9 @@ def test_a_term_the_question_leaves_open_is_asked_back(name, semantic):
     assert not asked.resolved
     assert asked.resolutions == {}
     assert asked.rewritten == asked.question
-    assert name in asked.clarification
+    assert name in asked.clarifying_question
     for meaning in semantic.ambiguous_terms[name].disambiguates:
-        assert meaning in asked.clarification
+        assert meaning in asked.clarifying_question
 
 
 def test_a_meaning_the_term_does_not_stand_between_is_not_a_resolution(semantic):
@@ -151,7 +151,7 @@ def test_a_meaning_the_term_does_not_stand_between_is_not_a_resolution(semantic)
     asked = rewrite(ASKED["revenue"], StubModel({"revenue": "Traded Notional"}), semantic)
     assert asked.resolutions == {}
     assert not asked.resolved
-    assert "Traded Notional" not in asked.clarification
+    assert "Traded Notional" not in asked.clarifying_question
 
 
 def test_an_invented_meaning_is_not_a_resolution(semantic):
@@ -180,8 +180,8 @@ def test_two_terms_in_one_question_are_asked_about_in_the_order_asked(semantic):
     asked = rewrite(question, model, semantic)
     assert asked.resolutions == {"revenue": ("Net Revenue",)}
     assert not asked.resolved
-    assert "volume" in asked.clarification
-    assert '"revenue" could mean' not in asked.clarification
+    assert "volume" in asked.clarifying_question
+    assert '"revenue" could mean' not in asked.clarifying_question
 
 
 def test_a_reply_that_is_not_a_json_object_is_the_provider_failing(semantic):

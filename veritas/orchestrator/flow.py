@@ -119,7 +119,7 @@ class Orchestrator:
             return GroundedAnswer(
                 question=question,
                 rewritten=resolved.rewritten,
-                clarification=resolved.clarification,
+                clarifying_question=resolved.clarifying_question,
             )
 
         entries = self.grounded_entries(resolved.rewritten)
@@ -154,7 +154,7 @@ class Orchestrator:
             )
 
         try:
-            rows = self.warehouse.query(written.sql)
+            columns, rows = self.warehouse.query_with_columns(written.sql)
         except WarehouseError as refused:
             return GroundedAnswer(
                 question=question,
@@ -169,6 +169,7 @@ class Orchestrator:
             question=question,
             rewritten=resolved.rewritten,
             sql=written.sql,
+            columns=columns,
             rows=tuple(rows),
             lineage=lineage,
             outcome=outcome,

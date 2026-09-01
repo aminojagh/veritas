@@ -55,6 +55,19 @@ CERTIFIED = (
     "WHERE dim_client.client_region = 'EU'"
 )
 
+# The same question with a breakdown in it: the axis aliased `slice` and the metric
+# aliased `answer`, which is the shape the generation rules ask for and the names the
+# engine hands back with the rows.
+BREAKDOWN = (
+    "SELECT dim_instrument.instrument_type AS slice, count(fct_trade.trade_id) AS answer "
+    "FROM fct_trade "
+    "JOIN dim_account ON dim_account.account_id = fct_trade.account_id "
+    "JOIN dim_client ON dim_client.client_id = dim_account.client_id "
+    "JOIN dim_instrument ON dim_instrument.instrument_id = fct_trade.instrument_id "
+    "WHERE dim_client.client_region = 'EU' "
+    "GROUP BY dim_instrument.instrument_type"
+)
+
 # The same question answered with arithmetic of the model's own — the failure Veritas
 # exists to prevent, and the one the Gate calls a Shadow Metric.
 SHADOW = (
@@ -222,13 +235,37 @@ def test_a_question_the_corpus_covers_returns_a_number_and_its_lineage(orchestra
     print(f"\n  {UNAMBIGUOUS!r} -> {trades}\n  lineage: {answer.lineage}")
 
 
+def test_an_answered_breakdown_carries_the_names_its_values_came_back_under(
+    orchestrator, semantic
+):
+    """[DEBT-031](../.claude/docs/debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names)
+    paid: the labels come off the engine, beside the rows they label.
+
+    A breakdown is a tuple of an axis value and a number, and which position is which
+    was knowledge in a prompt. It is now a field, read from the cursor the rows came
+    from, so a reader of a Grounded Answer never has to know what the model was asked
+    to alias.
+    """
+    answer = orchestrator(wrote(BREAKDOWN)).answer(
+        "how many trades did we make by instrument type"
+    )
+    assert answer.answered, answer.refusal
+    assert answer.columns == ("slice", "answer")
+    assert all(len(row) == len(answer.columns) for row in answer.rows)
+    buckets = {row[0] for row in answer.rows}
+    assert buckets and buckets <= set(
+        semantic.dimensions["by instrument type"].allowed_values
+    )
+    print(f"\n  {dict(answer.rows)}")
+
+
 def test_an_unresolved_ambiguous_term_asks_back_and_generates_nothing(orchestrator):
     """The first way out. `revenue` is two Certified Metrics, and Veritas asks which."""
     orchestra = orchestrator({"revenue": None})
     answer = orchestra.answer("what was our revenue last quarter")
     assert not answer.answered
-    assert answer.clarification is not None
-    assert "Gross Revenue" in answer.clarification
+    assert answer.clarifying_question is not None
+    assert "Gross Revenue" in answer.clarifying_question
     assert answer.sql == ""
     assert len(orchestra.model.calls) == 1, "the generation step ran on an open question"
 
@@ -321,7 +358,7 @@ def test_a_question_no_metric_is_retrieved_for_costs_no_model_call(
 def test_an_answer_cannot_both_refuse_and_ask_back():
     """A question gets one of the two."""
     with pytest.raises(ValueError, match="asks back"):
-        GroundedAnswer("q", refusal="no", clarification="which?")
+        GroundedAnswer("q", refusal="no", clarifying_question="which?")
 
 
 def test_an_answered_question_carries_the_statement_that_answered_it():

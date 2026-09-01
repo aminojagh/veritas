@@ -1,6 +1,9 @@
 # Step 006 — Ask a question, get a Grounded Answer
 
-**Status:** `active`
+**Status:** **done** — all five Sub-steps built, ruled and committed: 6.1 (`827fca3`),
+6.2 (`e0a69bc`), 6.3 (`40a6f94`), 6.4 (`d374f8d`), and **6.5 by the commit that carries
+this line**, whose review Amino approved on 2026-09-01. As with Step 005 the Step closes
+by its own last commit, so the status turns from `active` straight to `done`.
 
 **Goal.** Make Veritas answer a question end-to-end in a browser — Retrieval,
 Orchestrator and App — so the four built components become a working system.

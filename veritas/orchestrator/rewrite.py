@@ -58,19 +58,19 @@ class Rewrite:
     — the question plus the meanings that were resolved, and the question itself
     where nothing was. `resolutions` maps an Ambiguous Term's name to the Certified
     Metrics it resolved to, in the order the question says the terms.
-    `clarification` is the question Veritas asks back, and is `None` exactly when
+    `clarifying_question` is the question Veritas asks back, and is `None` exactly when
     the question is ready to be retrieved for.
     """
 
     question: str
     rewritten: str
     resolutions: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
-    clarification: str | None = None
+    clarifying_question: str | None = None
 
     @property
     def resolved(self) -> bool:
         """Whether the flow may continue to Retrieval."""
-        return self.clarification is None
+        return self.clarifying_question is None
 
 
 @cache
@@ -96,7 +96,7 @@ def said_as(name: str) -> re.Pattern[str]:
 def ambiguous_terms_in(question: str, layer: SemanticLayer) -> list[AmbiguousTerm]:
     """The Ambiguous Terms a question says, in the order it says them.
 
-    Question order rather than corpus order, so a clarification asks about the
+    Question order rather than corpus order, so a Clarifying Question asks about the
     words in the order the person wrote them.
     """
     said = [
@@ -150,7 +150,7 @@ def resolutions_in(
     return resolved
 
 
-def clarification_for(terms: list[AmbiguousTerm]) -> str:
+def clarifying_question_for(terms: list[AmbiguousTerm]) -> str:
     """The question Veritas asks back about the terms that stayed unresolved."""
     asked = "; ".join(
         f'"{term.name}" could mean ' + " or ".join(term.disambiguates)
@@ -195,7 +195,7 @@ def rewrite(
     )
     unresolved = [term for term in terms if term.name not in resolved]
     if unresolved:
-        return Rewrite(question, question, resolved, clarification_for(unresolved))
+        return Rewrite(question, question, resolved, clarifying_question_for(unresolved))
     return Rewrite(question, rewritten_with(question, resolved), resolved)
 
 

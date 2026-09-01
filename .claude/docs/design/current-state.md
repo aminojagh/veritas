@@ -12,8 +12,10 @@ trimmed this file to on 2026-08-25, and
 wrote the rule that keeps it short into step 5 of the `closing-a-substep` skill: a
 Sub-step adds what is now true, and the story of how it got there stays in the review.
 
-**Last updated:** 2026-08-31 — **Step 005 — Build the Validation Gate — is `done`, and
-all five of its Sub-steps are built, ruled and committed.** `veritas/validation/` refuses anything that
+**Last updated:** 2026-09-01 — **Step 006 — Ask a question, get a Grounded Answer — is
+`done`, and so is every Step before it. Seven of the nine Target State components are
+built, and a question typed into a browser comes back as a Grounded Answer.**
+`veritas/validation/` refuses anything that
 is not a single, parseable, bounded `SELECT`, refuses any statement whose expressions do
 not all trace to a Certified Metric, refuses any statement whose answer would carry a
 Restricted Column the Access Profile forbids, refuses any statement that computes a
@@ -23,9 +25,9 @@ slices a metric by an axis no route reaches from it, and refuses any statement t
 not scoped to the permitted region of the Access Profile it is judged under. The
 Semantic Layer is complete: all four entry types, thirty-two entries. The Warehouse is
 full, every Certified Metric can return a number, and the sqlglot spike's verdict is
-**GO** on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md). All five
-Sub-steps are ruled, the last of them on 2026-08-29; nothing in the Step is waiting on a
-decision. **Step 006 is `active` and Retrieval is built**: `veritas/retrieval/` renders
+**GO** on [ADR-0003](../adr/0003-validation-gate-is-deterministic-code.md). All five of
+Step 005's Sub-steps are ruled, the last of them on 2026-08-29. **Retrieval is
+built**: `veritas/retrieval/` renders
 every Semantic Entry as the text a search may match, indexes those records under four
 Retrieval Strategies — text, vector, their fusion, and the fusion re-ranked — and returns the entries a question
 scores plus every entry those name, which is how a Join Path reaches an answer at all.
@@ -42,39 +44,52 @@ and the identity asking, generate SQL, judge it, execute it, and return a
 or as a question asked back, in the same object. The Gate gained the two readings its
 last two open holes needed, so an outer join over a certified condition and a statement
 that computes two metrics through each other's currency conversion are both refused.
+**Sub-step 6.5 put the flow in a browser.** `veritas/app/` is a Streamlit page over
+`Orchestrator.answer`: a question box, the identity it is asked as, and the Grounded
+Answer laid out with its SQL, its Lineage and its Validation Gate outcome shown rather
+than hidden — a refusal and a question asked back included. It says, beside the identity
+and in
+[DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s
+own words, what enforcing an Access Profile in the application layer is and is not, which
+is what paid that entry. A Grounded Answer now carries the names the engine gave its
+columns
+([DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names)
+paid), so a breakdown is labelled by the query it came from rather than by the prompt
+that asked for it.
 **`tests/` holds Delivery Mode's two guards, the six corpus checks, the search checks,
-the rewrite and boundary checks, the flow checks and the two route probes**;
-`uv run pytest` is the command that proves behaviour from here on, and no test in it
-needs a key or a network — the three that call a real provider run only when
-`VERITAS_LIVE_MODEL` is set.
+the rewrite and boundary checks, the flow checks, the two route probes and the App's
+rendering and page checks**; `uv run pytest` is the command that proves behaviour from
+here on, and no test in it needs a key or a network — the four that call a real provider
+run only when `VERITAS_LIVE_MODEL` is set.
 
 ---
 
 ## Resume here
 
-- **Next: Sub-step 6.5 — ask a question in the browser.** The
-  [Step 006 plan](../plan/step-006-retrieval-and-orchestrator.md) is `active`, and
-  Sub-step 6.4 is built, approved on 2026-08-31 and waiting on Amino's commit. 6.5 is a
-  Streamlit page over `Orchestrator.answer`, showing the SQL, the Lineage and the Gate
-  outcome rather than hiding them, and it pays
-  [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-  in wording. It also comes due for
-  [DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names),
-  since a Grounded Answer's rows carry no column names and a breakdown is the first
-  thing that needs them.
-- **Two things await Amino.**
+- **Next: plan Step 007 — Evaluation and Observability.** The
+  [Step 006 plan](../plan/step-006-retrieval-and-orchestrator.md) is `done`: all five
+  Sub-steps built, ruled and committed. Step 007 is the
+  Gold Question Set, hit rate, Mean Reciprocal Rank, Execution Accuracy and
+  LLM-as-judge, then Postgres logging and Grafana — and it is where five entries come
+  due at once:
+  [DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match),
+  [DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently),
+  [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it),
+  [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
+  and
+  [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used).
+  The Step 006 plan reserves ~3.5 days for it against the 2026-09-09 deadline.
+- **Nothing in Step 006 awaits Amino.** 6.3's `Clarifying Question` Term Proposal was
+  approved on 2026-09-01 and is registered in Section A of the
+  [Glossary](../glossary.md#a-the-system); `clarification` is now `clarifying_question`
+  on both `Rewrite` and `GroundedAnswer`, and `clarification_for` is
+  `clarifying_question_for`. The rest was already settled:
   [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) is
-  `proposed` — the provider decision 6.3 had to take, rewritten around Amino's
-  ruling of 2026-08-30 that closes the supported set to OpenAI and Groq and makes a
-  third an extension
-  ([EXT-011](../extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam)).
-  That ruling also narrowed the Target State's credential table, which is a settled
-  document and so is flagged for confirmation rather than folded in. And **the Groq
-  row now names a different model than the ADR was written with**: `GROQ_API_KEY`
-  arrived on 2026-08-31, `llama-3.3-70b-versatile` 404'd on the first call, and the
-  registry now reads `openai/gpt-oss-120b` — a name change Amino can reverse in one
-  string, with the run behind it in the
-  [Sub-step 6.3 review](../reviews/step-006-retrieval-and-orchestrator.md#sub-step-63--resolve-ambiguous-terms-before-retrieval).
+  `accepted` as of 2026-09-01, the closed two-row registry stands at OpenAI
+  `gpt-4o-mini` and Groq `openai/gpt-oss-120b`, a third provider is
+  [EXT-011](../extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam),
+  and the Target State's credential table carries the narrowing of 2026-08-30 as a
+  confirmed change rather than a flagged one.
 - **The project is under [Delivery Mode](../../../CLAUDE.md) until 2026-09-09**,
   the capstone deadline. Behaviour is proven in `tests/` (`uv run pytest`);
   `.claude/scripts/` is frozen and `tests/test_delivery_mode.py` enforces both that
@@ -91,19 +106,21 @@ needs a key or a network — the three that call a real provider run only when
   All three come due on 2026-09-09.
 - **[DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
   and [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
-  are paid**, each with the probe its entry owed, in `tests/test_gate.py`.
+  are paid**, each with the probe its entry owed, in `tests/test_gate.py`, and so are
   [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-  is the Trigger left inside this Step, and it fires in 6.5.
-- **Step 005 is `done`** — all five Sub-steps built, ruled and committed (`d98fe7f`,
-  `7522ad8`, `fce9248`, `faba544`, `1c96281`). The
-  [5.5 review entry](../reviews/step-005-validation-gate.md#sub-step-55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020)
-  holds its handoff detail.
+  and [DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names),
+  both in 6.5. No Trigger is left inside Step 006.
+- **The handoff detail for Step 006 is in its
+  [6.5 review entry](../reviews/step-006-retrieval-and-orchestrator.md#sub-step-65--ask-a-question-in-the-browser)**,
+  which also carries the ruling that closed the Step. Step 005's is in its
+  [5.5 entry](../reviews/step-005-validation-gate.md#sub-step-55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020).
 
 ---
 
 ## Summary
 
-A fully designed project with four of its nine components built.
+A fully designed project with seven of its nine components built, and a question
+asked in a browser comes back as a Grounded Answer.
 The framework is in place and the Target State is `agreed`, so there is a fixed point
 to build toward: a natural-language analytics copilot over a brokerage warehouse, whose
 answers are grounded in a certified Semantic Layer and checked by a deterministic
@@ -208,7 +225,7 @@ verdict survives retargeting to BigQuery and one type does not.
 | Product brief | ✅ working | `.claude/docs/design/product-brief.md` — the full system Veritas slices, captured so the job description can be removed. |
 | Data-availability check | ✅ working | `.claude/docs/design/data-availability.md` + `.claude/scripts/check_data_availability.py`. Verdict GO. Runs offline from `data/snapshots/` or live with `--refresh`; exits non-zero if a source dies, a wrong-number trap vanishes, or a distinction collapses. |
 | Data snapshots | ✅ working | `data/snapshots/` — real 2025 FX Rates and three real price series, plus the dated probe record, owned by `check_data_availability.py`. `data/snapshots/ingestion/` beside it is the pipeline's own, one file per source and one per traded Instrument, rewritten only by `--refresh`. Both committed on purpose: they are what make the checks reproduce without network access. |
-| Founding ADRs | ✅ working | **Five ADRs** in `.claude/docs/adr/`; the four founding ones are **`accepted`** and [0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md), which sends every model call through one OpenAI-compatible endpoint, is **`proposed`**: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code, 0004 snapshot-and-replay and where dlt stops. Every cost in each is classified *accepted* / *debt* / *extension*. ADR-0002 carries a dated clarification on what its sqlglot commitment forbids, and both 0002 and 0003 carry a dated status note pointing at [validation-feasibility.md](validation-feasibility.md); no status changed. |
+| Founding ADRs | ✅ working | **Five ADRs** in `.claude/docs/adr/`, all **`accepted`** — the four founding ones, and [0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md), which sends every model call through one OpenAI-compatible endpoint and was accepted on 2026-09-01: 0001 Semantic Layer as the retrieval corpus, 0002 DuckDB behind an adapter, 0003 Validation Gate as deterministic code, 0004 snapshot-and-replay and where dlt stops. Every cost in each is classified *accepted* / *debt* / *extension*. ADR-0002 carries a dated clarification on what its sqlglot commitment forbids, and both 0002 and 0003 carry a dated status note pointing at [validation-feasibility.md](validation-feasibility.md); no status changed. |
 | Warehouse | ✅ working | `veritas/warehouse/schema.sql` — the ten tables of [Glossary Section B](../glossary.md#b-the-warehouse), **all ten populated**. Monetary columns are `DECIMAL(18, 6)`, FX Rates `DECIMAL(18, 8)`; **no floating-point column exists** and `check_warehouse.py` fails the run if one appears. Foreign keys declared and enforced. Snapshot grain is one row per subject per date, enforced by the primary key. No `dim_date`. The two movement tables carry **opposite sign conventions** and the schema says so beside each column: cash is signed from the Account's side, accounting carries magnitudes so that Net Revenue = Σcommission − Σrebate − Σfee is literally true. |
 | Warehouse Adapter | ✅ working | `veritas/warehouse/adapter.py` — the only module in the repository that imports `duckdb`, which is checked rather than promised. `create_schema`, `tables`, `columns`, `columns_by_table`, `row_count`, `execute`, `query` and `estimated_scan_rows`, plus the `in_memory()` constructor for throwaway databases. Assembles no SQL text from any argument: introspection goes through `information_schema` with a bound parameter, row counts through the relational API. `columns_by_table` returns the whole catalogue in the shape sqlglot's optimizer calls a schema, in **one** query rather than one per table, because the Validation Gate reads it on every judgement. `estimated_scan_rows` is the one method that assembles anything — it prefixes the engine's `EXPLAIN`, in the JavaScript Object Notation (JSON) form that returns a plan with a number in a field rather than a drawn box diagram, and sums the planner's estimate over the operators that read a table. **The plan format, the `EXPLAIN` spelling and the field names live only here.** It never runs the statement, and its caller must have established the statement is a single read first: the engine executes every statement after the first in such a string even under `EXPLAIN`. It raises `WarehouseError`, the adapter's own error type, which is what lets a caller that may not import `duckdb` tell an engine refusal from its own bug; `execute` and `query` raise it too, and the methods that run SQL this package wrote deliberately do not. Hardcoded database path licensed in writing by [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md). |
 | Warehouse check | ✅ working | `.claude/scripts/check_warehouse.py` — four checks always, plus three flag-gated suites. Always: the table set matches Glossary Section B *read from the Glossary*, no floating-point columns, fourteen constraint rejections fire against an in-memory Warehouse with a seven-row positive control, and **the adapter seam holds in both the halves [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) named** — no `duckdb` import outside `veritas/warehouse/`, and no DuckDB-specific **construct** in the SQL that leaves the adapter. The dialect scan reads every string literal sqlglot parses as a statement, plus every SQL field the Semantic Layer publishes (a Metric Definition's `expression` and `filters`, a Join Path's `on`), and reads all of it twice. **By name**: any function call standard SQL does not have, with the name set subtracted out of sqlglot's own dialect tables rather than typed, so the list tracks the library; this fails the run. **By type**: each statement is retargeted to BigQuery and every type construct compared against the same type retargeted *on its own*, so `DECIMAL(38, 6)` arriving as `NUMERIC` inside a statement and as `NUMERIC(38, 6)` alone is a finding while `VARCHAR` arriving as `STRING` is not; this prints a **review comment** rather than failing, because the corpus carries a widening cast the engine will not compute without — a statement sqlglot cannot write in BigQuery at all *does* fail. `retarget` and `round_trip_rewrites` live here and `check_validation_feasibility.py` imports them back, so the spike's dated measurement and this scan are one trip. Five probes run every time, each recording what **both** readings must say, and a probe reading wrong in either column fails the run. Those probes are the scan's **one fixture exemption**, scoped to the file it lives in: `FIXTURE_EXEMPTIONS` names `.claude/scripts/check_warehouse.py` as well as the symbol `DIALECT_PROBES`, so no other scanned file can claim it by choosing that name, and pointing the entry at a file that does not exist makes the run fail loudly. `--rebuild` recreates the database. `--sources` checks the loaded data, one function per star table: for `dim_instrument`, normalisation, the declared universe, every raw table non-empty and a **richness** assertion; for `fct_instrument_price` and `fct_fx_rate`, every row **re-derived from the committed snapshots in Python** and compared row-for-row against what the SQL built, with named wrong readings shown to change real rows, no day-over-day move exceeding 1.5, a rate for every Market Price in its own Quotation Currency on its own date, and a currency converted through another and back unchanged within the rounding its stored scale forces. **`--distinctions`** adds four more: every client-activity row is exactly what the simulator produces from the same seed, **every quantity is a whole lot of its own Instrument**, every Snapshot is markable and at least one Position Change is one no Trade explains, and **every Glossary Section C pair is printed as two numbers with how far apart they are** — a pair that has collapsed fails the run. `--rebuild` is mutually exclusive with both. It also holds the **nine independent figures** — one per Certified Metric — that `check_semantic_layer.py` compares every published expression against. They **read nothing from `semantic/`** ([R2](../plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)), and they are independent in **method** as well as in text: each fetches the component columns and folds them in Python, because a `DECIMAL(18, 6)` amount times a `DECIMAL(18, 8)` rate overflows `DECIMAL(18)` and an aggregate written here would need the same engine-specific width the published expressions carry. The `decimal` context precision is set explicitly for the same reason. The price of that independence is that editing a published expression means editing this SQL too, or the run fails. |
@@ -220,10 +237,10 @@ verdict survives retargeting to BigQuery and one type does not.
 | Ingestion | ✅ working | `veritas/ingestion/` — **both halves**: four real sources and the seeded simulator. `uv run python -m veritas.ingestion` builds all ten tables end-to-end from a clean clone with **no network**, and two consecutive runs produce byte-identical output. `--refresh` is the only mode that opens a socket; a refresh that fails part-way names the snapshots it had already rewritten, and one that succeeds reports how many it rewrote and how many were distinct — **failing the run if a source was fetched twice**. **Two phases, in an order that cannot be reversed:** dlt lands the real sources in `raw` and the adapter builds three star tables from them; then `simulator.py` *reads those three through the adapter*, generates the client side as a pure function of them and a seed, and a second dlt load plus seven more build scripts lands it. No two connections are ever open at once. The pipeline refuses to complete on four silent-shortness conditions, among them a Position with no Market Price on its own Snapshot date, and a monetary amount whose Denomination Currency has no FX Rate on its own date. |
 | Retrieval | ✅ working | `veritas/retrieval/` — `searchable.py` and `search.py` behind an `__init__.py` that re-exports both, laid out like `veritas/semantic/`. `SEARCHABLE_FIELDS` is the whitelist of fields a search may match, one row per entry type and disjoint from the loader's `SQL_FIELDS`; `searchable_entries()` renders the whole Semantic Layer as one record per entry — `name`, `kind`, and the single `text` field a search reads, which is flat: a hit on the name scores what a hit on the description scores, and [DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) is the measurement that settles whether it should. A **Join Path renders as empty text**, because its name, its two tables and its `on` clause are Warehouse identifiers end to end, and it is left out of both indexes rather than sitting in them at score zero. `search.py` indexes the rest under **four Retrieval Strategies**, enumerated by `RetrievalStrategy` and chosen per call: `text` is minsearch's Term Frequency-Inverse Document Frequency cosine, with stop words dropped and a token pattern that admits `&` so `P&L` survives tokenisation at all; `vector` is cosine over `BAAI/bge-small-en-v1.5` sentence embeddings; `hybrid` fuses the two by Reciprocal Rank Fusion, on positions rather than scores because the two cosines are not on one scale; and `reranked` re-scores the fusion's candidates with the `Xenova/ms-marco-MiniLM-L-6-v2` cross-encoder and is the default. Both models are Open Neural Network Exchange (ONNX) models, credential-free, and **downloaded on first use rather than snapshotted** ([DEBT-026](../debt-ledger.md#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted)); the text index needs neither, so a `text`-only caller loads no model and opens no socket. **Two entry points, and the difference is reference closure**: `rank` returns what a search scored, which is what Evaluation will measure, and `retrieve` returns that plus every entry those hits name, transitively — a Metric Definition's `join_paths` and `derives_from`, an Ambiguous Term's `disambiguates`, a Dimension Definition's `routes`. `REFERENCE_FIELDS` is that map, one row per entry type, and closure terminates at a Join Path because a Join Path names nothing back. Nothing calls it yet — no question reaches it from anything but a test. |
 | Large Language Model boundary | ✅ working | `veritas/llm/` — `model.py` behind an `__init__.py` that re-exports it. `LanguageModel` is the seam — a system instruction and a user message in, text out, with `json_object` as a request the provider may or may not honour. `ChatCompletions` is the one implementation, an OpenAI-compatible Chat Completions client at temperature 0. `PROVIDERS` is the whole of what it may be pointed at from the environment: **`openai`** (`OPENAI_API_KEY`, `gpt-4o-mini`, the default) and **`groq`** (`GROQ_API_KEY`, `openai/gpt-oss-120b`), chosen by `VERITAS_LLM_PROVIDER` and `VERITAS_LLM_MODEL`, per [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md); a third name raises rather than dials it. `model_for(provider, model)` builds one directly, which is what a comparison across providers calls. Keys come from the environment or from `.env`, which `python-dotenv` reads without overriding what is set; `.env.example` is the committed template. Nothing outside the package names a provider, a model, a key or a message role. Every failure — refused, timed out, no text, no choice, unsupported provider, missing key — arrives as one `LanguageModelError`, and the missing-key message names the variable to set. `openai` is imported inside the client, so importing the package costs nothing until a model is called. |
-| Orchestrator | ✅ working | `veritas/orchestrator/` — `rewrite.py`, `generate.py`, `answer.py` and `flow.py` behind an `__init__.py` that re-exports all four. **All seven steps of the flow run.** `flow.py` holds the `Orchestrator`: built over one Warehouse, it gives the Gate's `SemanticLayer` to the Retriever and to the rewrite step so one reading of `semantic/` serves every step, holds the Retrieval Strategy so a sweep varies the Orchestrator rather than the question, and resolves the model at the moment it is called so constructing one costs no key. `answer(question, access_profile)` runs REWRITE → RETRIEVE → GROUND → GENERATE → VALIDATE → EXECUTE → ANSWER and returns a `GroundedAnswer` however it ends. **`rewrite.py` is step 1**: `rewrite(question)` returns a frozen `Rewrite` carrying the question as asked, the text Retrieval searches, the Certified Metrics each Ambiguous Term resolved to, and the clarification asked back — `None` exactly when the question is ready to retrieve for. Which terms a question says is matched against the names [Glossary Section D](../glossary.md#d-ambiguous-terms) registers, in the order the question says them, with `X` in a name matching the subject it stands for; which meaning it named is the model's answer, given only those terms' own `description` and `resolution`; whether that answer counts is decided against `disambiguates`. A question saying no Ambiguous Term costs no model call. Detection is the registered spelling and nothing else, so *"revenues"*, *"PnL"*, *"turnover"* and *"how much is in"* reach Retrieval as though they had been unambiguous ([DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently), pinned by a test that asserts today's misses); and a resolved meaning is appended to the question rather than spliced over the word, which is the text every Retrieval Strategy searches and is unmeasured ([DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)). **`generate.py` is steps 3 and 4.** `GROUNDED_FIELDS` is the whitelist of what each entry type may put in front of a model — parallel to `SEARCHABLE_FIELDS`, `REFERENCE_FIELDS` and `SQL_FIELDS` — and an **Ambiguous Term grounds nothing**, because the rewrite step has already settled which meaning was wanted. Every field that holds a route is written out as the `JOIN … ON …` clause it stands for rather than as the Join Path's name, and each Metric Definition's join list also carries the joins the Access Profile requires from that metric's `from_table`, taken from the access axis's own `routes`. The rules the model is given are the Gate's rules written as instructions, plus the statement's clause order; the reply is one JSON object holding either a statement or a refusal, and a refusal is a first-class result. **`answer.py` is the contract**: a frozen `GroundedAnswer` carrying the question, what Retrieval searched for, the SQL, the rows, the `Lineage`, the `Validation Gate outcome`, and either a refusal or a clarification — never both, and never a number without the statement and the allowing verdict behind it, which is *"Veritas never returns a bare number"* as three construction errors. `Lineage` holds the entries themselves, so it records the version each was read at; it leads with the Ambiguous Terms the rewrite step resolved and continues with everything that reached the prompt. **A question ends without a number in five ways**, each a `GroundedAnswer`: an Ambiguous Term left open, nothing retrieved that defines a metric, the model refusing, the Gate refusing, or the engine refusing a statement the Gate allowed. **Two things it does not carry:** rows come back without column names ([DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names)), and a refusal that is not the Gate's is prose rather than a member of a taxonomy ([DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)). |
+| Orchestrator | ✅ working | `veritas/orchestrator/` — `rewrite.py`, `generate.py`, `answer.py` and `flow.py` behind an `__init__.py` that re-exports all four. **All seven steps of the flow run.** `flow.py` holds the `Orchestrator`: built over one Warehouse, it gives the Gate's `SemanticLayer` to the Retriever and to the rewrite step so one reading of `semantic/` serves every step, holds the Retrieval Strategy so a sweep varies the Orchestrator rather than the question, and resolves the model at the moment it is called so constructing one costs no key. `answer(question, access_profile)` runs REWRITE → RETRIEVE → GROUND → GENERATE → VALIDATE → EXECUTE → ANSWER and returns a `GroundedAnswer` however it ends. **`rewrite.py` is step 1**: `rewrite(question)` returns a frozen `Rewrite` carrying the question as asked, the text Retrieval searches, the Certified Metrics each Ambiguous Term resolved to, and the Clarifying Question asked back — `None` exactly when the question is ready to retrieve for. Which terms a question says is matched against the names [Glossary Section D](../glossary.md#d-ambiguous-terms) registers, in the order the question says them, with `X` in a name matching the subject it stands for; which meaning it named is the model's answer, given only those terms' own `description` and `resolution`; whether that answer counts is decided against `disambiguates`. A question saying no Ambiguous Term costs no model call. Detection is the registered spelling and nothing else, so *"revenues"*, *"PnL"*, *"turnover"* and *"how much is in"* reach Retrieval as though they had been unambiguous ([DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently), pinned by a test that asserts today's misses); and a resolved meaning is appended to the question rather than spliced over the word, which is the text every Retrieval Strategy searches and is unmeasured ([DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)). **`generate.py` is steps 3 and 4.** `GROUNDED_FIELDS` is the whitelist of what each entry type may put in front of a model — parallel to `SEARCHABLE_FIELDS`, `REFERENCE_FIELDS` and `SQL_FIELDS` — and an **Ambiguous Term grounds nothing**, because the rewrite step has already settled which meaning was wanted. Every field that holds a route is written out as the `JOIN … ON …` clause it stands for rather than as the Join Path's name, and each Metric Definition's join list also carries the joins the Access Profile requires from that metric's `from_table`, taken from the access axis's own `routes`. The rules the model is given are the Gate's rules written as instructions, plus the statement's clause order; the reply is one JSON object holding either a statement or a refusal, and a refusal is a first-class result. **`answer.py` is the contract**: a frozen `GroundedAnswer` carrying the question, what Retrieval searched for, the SQL, the rows, the `Lineage`, the `Validation Gate outcome`, and either a refusal or a Clarifying Question — never both, and never a number without the statement and the allowing verdict behind it, which is *"Veritas never returns a bare number"* as three construction errors. `Lineage` holds the entries themselves, so it records the version each was read at; it leads with the Ambiguous Terms the rewrite step resolved and continues with everything that reached the prompt. **A question ends without a number in five ways**, each a `GroundedAnswer`: an Ambiguous Term left open, nothing retrieved that defines a metric, the model refusing, the Gate refusing, or the engine refusing a statement the Gate allowed. **Two things it does not carry:** rows come back without column names ([DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names)), and a refusal that is not the Gate's is prose rather than a member of a taxonomy ([DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)). |
 | Validation Gate | ✅ working | `veritas/validation/` — an `__init__.py` that re-exports, `outcome.py`, `profile.py`, and `gate.py`. **All five of the Gate's decisions, spelled as eight rules.** `outcome.py` holds the `Validation Gate outcome` — frozen, carrying allowed-or-rejected, the explanation a person reads, the `Rejection Reason` members a chart groups by, the rules that actually ran, and the trusted rewrites the verdict was reached under — and the `RejectionReason` taxonomy itself, thirteen members registered in code by [R3](../plan/step-005-validation-gate.md#r3--validation-gate-outcome-and-rejection-reason-get-glossary-rows--approved-by-amino-2026-08-25) — a rule may register more than one, and the tracing rule registers three while the certified-route rule registers four. It is a separate module from the rules because a Grounded Answer, the App and Observability all read a verdict and import no rule. `profile.py` holds the `Access Profile` — a role, a permitted region, and the `RestrictedColumn`s that role may not see, as a table and a column rather than a bare name — and the one profile this slice declares, `ANALYST`, permitting `EU` and forbidding `dim_client.client_name`. The permitted region is a **value of the `by region` axis**, named by the `ACCESS_AXIS` constant, never a second registration of the column or its buckets; a region that axis does not certify raises `ValueError` at the first judgement made under the profile. **The profile is an argument to `judge`, not a field on the Gate** — `judge(sql, access_profile)`, with no default, so no statement is judged without an identity and a second identity is a second call rather than a second Gate ([R14](../plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)). `rules(access_profile)` binds it into the two rules that read it, so the other six take a statement and nothing else. `gate.py` parses with `sqlglot.parse` rather than `parse_one` — `parse_one` reads `SELECT 1; SELECT 2` as one `Block` node — and runs eight rules in the order a statement meets them, **stopping at the first that rejects**: unparseable, more or fewer than one statement, not a `SELECT`, a planner estimate over the scan ceiling, a statement whose expressions do not all trace, a statement whose answer would carry a Restricted Column, a statement computed across joins or over a date column or without a certified filter the corpus does not certify for the metric it traces to or sliced by an axis no route reaches from it, and a statement not scoped to the Access Profile's permitted region. The ceiling is a policy constant and a constructor argument, not a measurement. `TRUSTED_REWRITES` names `qualify` and `merge_subqueries` as [C5](validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two) requires, and `resolve` is the one place that applies them; it turns both of the ways sqlglot refuses a statement — its own `SqlglotError`, and the bare `AssertionError` its `assert_is` raises — into one refusal a rule can act on. **The tracer, the lineage walk and the route reader live here too** — `resolve`, `projected_expressions`, `metric_expressions`, `certified_form`, `certified_forms`, `certified_metrics_only`, `columns_reaching_the_answer`, `restricted_columns_in_projection`, `route_of`, `certified_route` and `date_columns_filtered`, which the spike imports back; each has a variant taking an already-resolved tree, which is what lets one judgement resolve once. A `Route` is where a statement's rows start and the joins it reaches the rest through, read off a parse tree or assembled from the corpus — the corpus through the same reader as the query, which is `certified_form`'s argument applied to the route. **Permitted and required are two Routes**: `required_route` is the metric's own `join_paths`, which a statement must carry, and `permitted_route` adds the `routes` of each axis it groups by and the route the Access Profile's predicate needs, which it may. A join beyond the second is a rejection and a join absent from the first is a rejection; both go through `assembled_route`, which names each Join Path once and keeps them in the order they are joined. A certified expression is canonicalised through the same `resolve` a statement goes through, in a scope holding the Warehouse tables the expression names; without that symmetry `Position Change` traces to nothing. The Restricted Column rule asks whether a column **reaches the answer**, not whether its name appears: it numbers the output columns and walks each one's lineage back to base tables, so a name in a comment, in a string literal, in a filter, or projected inside a subquery and aggregated away is not a projection of it. The Semantic Layer is loaded once at construction; the catalogue, the resolved statement and the corpus's canonical forms are read **once per judgement**, on a `Reading` that every rule shares, so all four parse-tree rules judge one tree qualified against one catalogue. They are read lazily rather than in the constructor, because the rules that need nothing must return a verdict on a day the Warehouse will not open. **The order is a safety property, not a speed one**: the rules that need nothing touch nothing — proved by judging every probe through a Warehouse that raises on contact — and the single-statement rule runs before the bounded read because the engine executes the tail of a multi-statement string even under `EXPLAIN`. The route rule reads all three of the fields that pin down which rows a certified expression covers — `join_paths`, `date_column` and `filters` — the last since [DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters) was paid. `where_conjuncts` reads the **outermost** WHERE clause's ANDed parts, which is what both the filter comparison and the access predicate ask of a statement; a predicate inside a subquery the optimizer could not flatten does not count, which is the fail-closed direction. `grouped_columns` reads every scope's `GROUP BY`, because reaching an axis is permitted by grouping on it and never by mentioning its table. **A ninth reading closes the two holes Sub-step 5.5 left.** A `Join` carries the kind of join as well as the table and the condition, collapsed by `join_kind` so that a bare `JOIN` and an explicit inner join stay one join and a left join is another — so an outer join over a certified condition no longer passes as the inner one a Join Path means, and `joins_beyond` spells the kind in the rejection ([DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one) paid). And `metric_expressions_through` keeps, beside each projection's canonical form, the joins the aliases in it were read through, so `crossed_conversion` can require each metric expression to read only through the joins its **own** Metric Definition names — which the union of two metrics' routes cannot say ([DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart) paid). Both refuse as `UNCERTIFIED_ROUTE`, and `tests/test_gate.py` prints what each returns. The Orchestrator judges every statement it generates through this Gate, and executes only what it allows. |
 | Validation Gate check | ✅ working | `.claude/scripts/check_validation_gate/` — a **package**, by [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25): `__main__.py` holds the rule order, the report and the exit code, `probes.py` the shared machinery, and one module per Gate rule — `read_only.py`, `traces.py`, `restricted.py`, `route.py` and `access.py`, all five. Run as one command, `uv run python .claude/scripts/check_validation_gate/`, because Python runs a directory holding a `__main__.py`. Needs a filled Warehouse. Seventy-nine probes, each declaring the verdict and the Rejection Reason members it was measured with, so a rejection for the **wrong reason** fails as loudly as no rejection. `read_only.py` holds twelve: the six shapes read-only has to cover, a union, a string that is not SQL, a query over a lowered ceiling, one the engine will not plan, a cross product, and an ordinary question. `traces.py` holds eighteen — the shapes Sub-step 3.2 measured, re-judged through the whole Gate rather than through a tracer, plus a statement that aggregates nothing, one the optimizer will not resolve, and a certified expression sitting beside a Shadow Metric in one projection, which is the probe for the word *every* — and then builds nine more from `semantic/metrics/`, one per Certified Metric, so a tenth Metric Definition is a tenth probe with no edit — probes built out of the corpus they are checked against, which is [DEBT-018](../debt-ledger.md#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus): they prove the Gate recognises what `semantic/metrics/` says, and six of the nine expressions have no text pinned anywhere outside it. `restricted.py` holds ten, each declaring **three** answers rather than one — the Gate's verdict, the parse tree's reading, and what a search of the query's text would say — so ADR-0003's rejected alternative is shown wrong on every run rather than in an argument; nine are the spike's claim-2 shapes and the tenth is a `SELECT *` written so that it reaches the rule. `access.py` holds twenty-one, each also declaring whether this rule reads the statement as scoped: every Certified Metric scoped and unscoped, which is eighteen and is how the rule is shown to bind on the Snapshot and movement metrics and not only on the trade-side four, plus three about the slice route — `Net Revenue by region`, `Cash Balance by instrument type` refused on the absent key, and one join to a table the statement does not group by. It **executes** the Glossary's worked example twice, unscoped and scoped, so the three buckets the axis registers and the one the Access Profile permits are printed side by side, and it runs three mutations: the access rule deleted, the absent-key branch deleted, and the certified-filter comparison deleted, each re-run to show what stops being refused. `route.py` holds nine, each also declaring whether the statement is off its metric's route and whether it filters on a date column that metric is not certified against: the spike's wrong-currency statement, a cross product computing a certified metric, a count with a join that multiplies it, a slice by `by region`, the same notional converted the certified way, a period keyed on Trade Date and the same period keyed on Settlement Date, and the two halves of [DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters). It **executes** three pairs and prints how far apart each is, because a rejection is only worth having if the thing rejected returns a different number; every date in it is read from the Snapshot calendar; and it rebuilds all nine Certified Metrics from `semantic/metrics/` to show the rule allows each one computed the way its own entry says. **The *character for character* claim is checked in both modules that make it**: `probes.py` reads the spike's statements out of its **source text** with `ast` rather than importing it, so a check that runs on every commit does not depend on a 1,700-line script staying importable, and `traces.py`'s fifteen are checked the same way — including the one it judges under a shorter local name, and the one shape the spike measures that it does not judge, which is **declared** with where the Gate refuses it instead. Checks beyond the probes: every probe decided before the bounded rule is decided again through a Warehouse that raises on any attribute access; the engine is asked to plan a two-statement string against a throwaway table in an in-memory Warehouse, and the run fails if the table **survives**; the planner's estimate is compared against a real row count, because an unread plan sums to zero and zero is under every ceiling; the corpus is canonicalised the rejected way as well as the Gate's way, failing the run if **no** Certified Metric depends on the difference; the Access Profile's own declaration is printed and an empty one fails the run; two statements no rule can read are put to the detector directly, which must refuse rather than report nothing found; and one judgement is made through an adapter that counts catalogue reads, failing the run on anything but one, with the `Reading`'s own memo read afterwards to show the resolution and the corpus were each computed once. Statements a Sub-step's own rules allow are checked by the rules that **ran** rather than by the final verdict, so a later rule refusing them is not mistaken for these rules refusing everything. It also prints the trusted rewrites, the ceiling's current headroom, and what one judgement costs. |
-| App | ✗ none | — |
+| App | ✅ working | `veritas/app/` — `render.py` and `page.py` behind an `__init__.py` that re-exports the first. `uv run streamlit run veritas/app/page.py` serves one page: the identity a question is asked as, a question box, and what the question came back as. `render.py` turns a Grounded Answer into strings and imports no Streamlit — values under the column names the engine returned, the Lineage one line per entry, and the verdict as the rules that ran or the Rejection Reasons that fired; `page.py` places them and is the only module in the repository permitted to import `streamlit`, which `tests/test_app.py` checks the way `check_warehouse.py` checks the `duckdb` seam. **Nothing is hidden**: the statement, the Lineage and the Validation Gate outcome are laid out under every answer, including under a refusal and under a question asked back — the Glossary's *"never renders a bare number"* as a test rather than an intention. The sidebar carries the Access Profile, the model the environment configures, and [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s own sentence on what enforcing that profile in the application layer is worth. The page is driven in tests through Streamlit's own `AppTest`, so every rendering claim is proven without a browser and without a key. |
 | Observability | ✗ none | — |
 | Evaluation | ✗ none | — |
 | Containerization | ✗ none | — |
@@ -308,6 +325,12 @@ veritas/
 │   │   │                      # importable without the sequence that produces it
 │   │   └── flow.py            # the Orchestrator: all seven steps, and the five ways
 │   │                          # a question ends without a number
+│   ├── app/
+│   │   ├── __init__.py        # re-exports render.py, and not the page
+│   │   ├── render.py          # a Grounded Answer as strings a person reads —
+│   │   │                      # no Streamlit, so every claim is testable
+│   │   └── page.py            # the Streamlit page: identity, question box, answer,
+│   │                          # SQL, Lineage, verdict. The only streamlit importer
 │   ├── validation/
 │   │   ├── __init__.py        # re-exports all three modules
 │   │   ├── outcome.py         # the Validation Gate outcome + the Rejection Reason
@@ -349,6 +372,8 @@ veritas/
 │   │                          # back — two live tests, skipped with no key
 │   ├── test_gate.py           # the crossed conversion and the outer join, with the
 │   │                          # numbers each returns: DEBT-021 and DEBT-022's probes
+│   ├── test_app.py            # what the page shows, driven through Streamlit's AppTest
+│   │                          # — one live test, skipped with no key
 │   └── test_llm.py            # what goes on the wire, against a stub server on localhost
 └── .claude/
     ├── skills/                # 5 framework skills
@@ -375,31 +400,26 @@ veritas/
         ├── adr/
         ├── plan/
         └── reviews/
+            └── images/        # screenshots a review cites, committed with it
 ```
 
 ## Known gaps
 
-**Everything above the Semantic Layer.** The Warehouse itself has no gaps left: all ten
-tables hold rows, the two components below the Semantic Layer are done, and the
-Validation Gate now decides all five of the things the Target State's flow says
-`VALIDATE` decides. Nothing calls it: no component anywhere hands it a statement.
+**Nothing measures Veritas.** The flow runs whole — a question typed into the App is
+resolved, retrieved for, grounded, generated, judged and executed — and no run of it is
+recorded or scored. There is no Gold Question Set, so hit rate, Mean Reciprocal Rank and
+Execution Accuracy are unmeasured and the four Retrieval Strategies have never been
+compared on anything but whether they find the entry a person names. Nothing logs a
+question, a verdict, a cost or a latency, so *"Validation-Gate rejections by reason"* and
+*"metric-usage frequency"* are chart descriptions rather than charts. Both components
+are Step 007.
 
-**A metric returning a number is not a metric being *asked for*.** All nine Metric
-Definitions are written down and certified, so every Certified Metric says in a file
-which arithmetic it is and which rows it is computed over, and every one of them is now
-rendered as text a search finds, under four Retrieval Strategies. **Nothing turns a
-question into SQL**: the entries a question needs can be retrieved and the word it used
-can be resolved to one of them, and what happens between that and a statement — the
-Grounding that puts the retrieved entries in a prompt, and the generator that writes the
-query — does not exist.
-
-**The corpus can be sliced and nothing asks it to slice anything.** All four entry types
-are complete, every axis names the routes that reach it, and the Gate has the rule that
-lets a `GROUP BY` on a certified axis add the joins that axis declares — so a slice is
-now decidable rather than merely certified, and `check_semantic_layer.py` prints how many
-metrics each axis is reachable from on every run. What is still absent is anything that
-would **write** such a query: the search reaches the axis, and there is no Grounding to
-put it in a prompt and no generator to consume one.
+**An answer cites what the model was shown, not what the statement used.** The Lineage
+under an answer lists every grounded entry, so a `Gross Revenue` answer cites
+`Net Revenue` too, and a refusal cites eleven entries having produced nothing —
+[DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used).
+The same gap is why the figure is shown without a unit or a reporting currency: the
+metric that would label it is not identifiable from a list naming two.
 
 **Two published fields have no check on what they say** — `description` and `aliases`.
 Both now reach the searchable text, and `tests/test_retrieval.py` proves every alias
@@ -412,17 +432,20 @@ for.** `Cash Balance` summed across every Snapshot date is every date in the Sna
 calendar added together — `check_semantic_layer.py` prints how many, on the
 `by snapshot date` line — and the check executes it that way on purpose: it is the
 strongest thing a corpus check can do without inventing a question. The "as of" date
-comes from the question, and no component that asks questions exists yet.
+comes from the question, and no question yet asked through the App has carried one —
+the live sets that reach the generator carry no period, which is
+[DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it).
 
 **Every test a reviewer runs drives a stub** — a stub model for the rewrite step, a stub
 server on `127.0.0.1` for the boundary — so `uv run pytest` needs no key and opens no
 socket, and what it proves is the request Veritas builds, the reply it reads, and what it
-does with each answer a model could give. **Three tests are not stubs, and all three are
+does with each answer a model could give. **Four tests are not stubs, and all four are
 opt-in**: `VERITAS_LIVE_MODEL=1` runs the configured provider against the real prompt —
 one on the rewrite step, which is how
 [DEBT-028](../debt-ledger.md#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server)
-was paid, and two on the generator — one over the five questions the corpus covers, one
-over a question it does not. All three have been run against both providers; a key
+was paid, two on the generator — one over the five questions the corpus covers, one over
+a question it does not — and one that asks a question through the App's own page. The
+first three have been run against both providers; a key
 sitting in `.env` for the App is not consent to spend it on every run, which is why they
 stay opt-in. Those five questions are self-written and reach five of the nine Certified
 Metrics, which is
@@ -491,7 +514,7 @@ The [Debt Ledger](../debt-ledger.md) and the
 trigger or readiness condition and its status, and the running counts. Read them there —
 this file does not keep a second copy.
 
-**Open debt: 19 · open extensions: 11.** 6.3 opened one entry and paid it in the same
+**Open debt: 18 · open extensions: 11.** 6.3 opened one entry and paid it in the same
 Sub-step —
 [DEBT-028](../debt-ledger.md#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server),
 the live model path, run against real OpenAI once a key existed — and filed
@@ -515,7 +538,7 @@ and
 [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
 on their shared trigger and left three open behind the flow it closed:
 [DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names),
-rows with no column names, due in 6.5;
+rows with no column names, **paid in 6.5**;
 [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by),
 a refusal that is not the Gate's carrying prose where the Gate's carries a taxonomy
 member; and
@@ -523,6 +546,13 @@ member; and
 the evidence under both — the generator's live runs are five questions written by the
 person who wrote the prompt, four Certified Metrics are never generated for, and no
 generated statement has met the Gate's date rule. The last two come due in Step 007.
+6.5 paid the two entries its own Trigger named —
+[DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers),
+the access-control claim, now made in the App with the Ledger's own qualification beside
+it, and DEBT-031 — and opened one the App is the first thing to make visible:
+[DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used),
+where the Lineage under an answer records what the model was shown rather than what the
+statement used, which the metric-usage chart in Step 007 would count wrongly.
 [DEBT-001](../debt-ledger.md#debt-001--framework-rules-rely-on-discipline-not-enforcement)
 is the one that is partly paid and stays open on its main subject, **the hook layer**:
 nothing mechanically blocks a commit by Claude, a missing Ledger entry, or a review that
@@ -545,6 +575,7 @@ its dated review.
 | 003 | The sqlglot spike — all four parse-tree claims measured on real data, and the **GO** recorded in [validation-feasibility.md](validation-feasibility.md) with six constraints | [plan](../plan/step-003-validation-feasibility.md) | [review](../reviews/step-003-validation-feasibility.md) |
 | 004 | The Semantic Layer — all four entry types, twenty-seven entries, and eighteen checks over them | [plan](../plan/step-004-semantic-layer.md) | [review](../reviews/step-004-semantic-layer.md) |
 | 005 | The Validation Gate — **done**. 5.1 built: the outcome, the reason taxonomy, and the four rules that judge a statement's shape. 5.2 built: the tracer, and the rule that every metric expression traces to a Certified Metric. 5.3 built: the Access Profile, and the rule that no Restricted Column reaches the answer. 5.4 built: the route reader, and the rule that a metric is computed across its own joins and over its own date column. 5.5 built: the five Join Paths and the `routes` field that make an axis reachable, the slice route and the certified filters inside the route rule, and the rule that every statement carries the Access Profile's predicate | [plan](../plan/step-005-validation-gate.md) | [review](../reviews/step-005-validation-gate.md) |
+| 006 | Retrieval, the Orchestrator and the App — **done**. 6.1 built: the searchable text each entry type exposes, one whitelist per type. 6.2 built: `retrieve` over four Retrieval Strategies, and the reference closure that is the only way a Join Path reaches an answer. 6.3 built: `veritas/llm/` as the one place a provider, a model or a key is named, and the rewrite step that resolves an Ambiguous Term against the question's own words or asks back. 6.4 built: grounding, SQL generation, the flow's seven steps and five ways out, the `Grounded Answer` with its `Lineage` and `Validation Gate outcome`, and the two Gate readings that paid DEBT-021 and DEBT-022. 6.5 built: the Streamlit page that shows the answer with its SQL, Lineage and Gate outcome rather than hiding them, the column names a breakdown needs, and the access-control wording that paid DEBT-008 | [plan](../plan/step-006-retrieval-and-orchestrator.md) | [review](../reviews/step-006-retrieval-and-orchestrator.md) |
 
 **Commits, in order.** Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`,
 Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the
@@ -556,7 +587,11 @@ in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`, Step 004 pla
 `ae75f0e`, Sub-step 4.4 in `71ce677`, Sub-step 4.5 in `7ddd96c`, **Step 005 planning in
 `aa42205`**, the Current State trim in `aa918fb`, Sub-step 5.1 in `d98fe7f`, Sub-step 5.2
 in `7522ad8`, Sub-step 5.3 in `fce9248`, Sub-step 5.4 in `faba544`, **Sub-step 5.5 in
-`1c96281`**. A Step's planning commit is normally what writes the previous Step's last
-hash into this list and turns that plan from `in review` to `done`; Step 005 was closed
-ahead of that, by the commit carrying this line, so all five of its hashes are written
-here at once and none is left for Step 006's planning commit to fill in.
+`1c96281`**, the Step 005 close in `3661263`, the move to Delivery Mode in `2cfd10f`,
+**Step 006 planning in `fdf0dc4`**, Sub-step 6.1 in `827fca3`, Sub-step 6.2 in `e0a69bc`,
+Sub-step 6.3 in `40a6f94`, Sub-step 6.4 in `d374f8d`, and **Sub-step 6.5 in the commit
+that carries this line**. A Step's planning commit is normally what writes the previous
+Step's last hash into this list and turns that plan from `in review` to `done`; Steps 005
+and 006 were both closed ahead of that, by the commit carrying their own last Sub-step, so
+every hash of each is written here at once and none is left for the next Step's planning
+commit to fill in.
