@@ -59,7 +59,7 @@ available to the model.
   rate and Mean Reciprocal Rank (MRR) are meaningful measures here rather than
   proxies for user satisfaction.
 - **Retrieval ground truth is derived, not labelled.** The Semantic Entries a
-  gold SQL touches are its relevant set. No hand-labelling and no Large Language
+  gold SQL touches are its Relevant Set. No hand-labelling and no Large Language
   Model (LLM) judge is needed for the primary retrieval signal.
 - **The Validation Gate has something to check against.** Certified-metrics-only
   is enforceable only because the certified set is an enumerable corpus of

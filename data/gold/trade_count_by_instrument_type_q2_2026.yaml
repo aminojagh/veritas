@@ -1,0 +1,17 @@
+name: Trade Count by instrument type in the second quarter of 2026
+question: how many trades did we make by instrument type in the second quarter of 2026
+expects: answer
+sql: |
+  SELECT dim_instrument.instrument_type AS slice, count(fct_trade.trade_id) AS answer
+  FROM fct_trade
+  JOIN dim_instrument ON dim_instrument.instrument_id = fct_trade.instrument_id
+  JOIN dim_account ON dim_account.account_id = fct_trade.account_id
+  JOIN dim_client ON dim_client.client_id = dim_account.client_id
+  WHERE dim_client.client_region = 'EU' AND fct_trade.trade_date BETWEEN '2026-04-01' AND '2026-06-30'
+  GROUP BY dim_instrument.instrument_type
+  ORDER BY dim_instrument.instrument_type
+result:
+  - ["ETF", 19]
+  - ["currency pair", 10]
+  - ["equity", 26]
+  - ["future", 17]

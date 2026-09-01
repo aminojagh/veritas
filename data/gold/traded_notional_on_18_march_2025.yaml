@@ -1,0 +1,16 @@
+# Scoped to one day on purpose. Over a whole book the fills either side of the close
+# cancel and valuing this notional at the Market Price instead of the Execution Price
+# lands inside the result tolerance, which is DEBT-011. tests/test_gold.py prints both.
+name: Traded Notional on 18 March 2025
+question: how much notional did we trade on 18 March 2025
+expects: answer
+sql: |
+  SELECT sum(CAST(fct_trade.quantity AS DECIMAL(38, 6)) * fct_trade.execution_price * fct_fx_rate.fx_rate) AS answer
+  FROM fct_trade
+  JOIN dim_instrument ON dim_instrument.instrument_id = fct_trade.instrument_id
+  JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_trade.trade_date AND fct_fx_rate.from_currency = dim_instrument.quotation_currency AND fct_fx_rate.to_currency = 'EUR'
+  JOIN dim_account ON dim_account.account_id = fct_trade.account_id
+  JOIN dim_client ON dim_client.client_id = dim_account.client_id
+  WHERE dim_client.client_region = 'EU' AND fct_trade.trade_date = '2025-03-18'
+result:
+  - [828616.381946]

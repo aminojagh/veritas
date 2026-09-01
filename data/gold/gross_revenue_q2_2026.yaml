@@ -1,0 +1,12 @@
+name: Gross Revenue in the second quarter of 2026
+question: what was our gross revenue in the second quarter of 2026
+expects: answer
+sql: |
+  SELECT sum(fct_trade.commission * fct_fx_rate.fx_rate) AS answer
+  FROM fct_trade
+  JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_trade.trade_date AND fct_fx_rate.from_currency = fct_trade.denomination_currency AND fct_fx_rate.to_currency = 'EUR'
+  JOIN dim_account ON dim_account.account_id = fct_trade.account_id
+  JOIN dim_client ON dim_client.client_id = dim_account.client_id
+  WHERE dim_client.client_region = 'EU' AND fct_trade.trade_date BETWEEN '2026-04-01' AND '2026-06-30'
+result:
+  - [8658.946908]

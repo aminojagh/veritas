@@ -1,0 +1,14 @@
+name: Net Revenue by region in the second quarter of 2026
+question: break our net revenue down by region for the second quarter of 2026
+expects: answer
+sql: |
+  SELECT dim_client.client_region AS slice, sum((fct_trade.commission - fct_trade.rebate - fct_trade.fee) * fct_fx_rate.fx_rate) AS answer
+  FROM fct_trade
+  JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_trade.trade_date AND fct_fx_rate.from_currency = fct_trade.denomination_currency AND fct_fx_rate.to_currency = 'EUR'
+  JOIN dim_account ON dim_account.account_id = fct_trade.account_id
+  JOIN dim_client ON dim_client.client_id = dim_account.client_id
+  WHERE dim_client.client_region = 'EU' AND fct_trade.trade_date BETWEEN '2026-04-01' AND '2026-06-30'
+  GROUP BY dim_client.client_region
+  ORDER BY dim_client.client_region
+result:
+  - ["EU", 5704.161698]

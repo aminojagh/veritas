@@ -31,14 +31,14 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-001](#debt-001--framework-rules-rely-on-discipline-not-enforcement) | Framework rules rely on discipline, not enforcement | M | A rule is broken in practice | open |
 | [DEBT-002](#debt-002--market-prices-depend-on-an-unofficial-endpoint) | Market prices depend on an unofficial endpoint | S | Before any reproducibility claim in `README.md` | **paid** (Sub-step 2.3) |
 | [DEBT-003](#debt-003--no-market-price-vendor-so-single-bonds-and-options-are-out-of-scope) | No Market Price vendor, so single bonds and options are out of scope | L | Any requirement to hold a single bond or an option | open |
-| [DEBT-004](#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal) | The FX-date distinction is too small to be a reliable evaluation signal | S | Building the Gold Question Set | open |
+| [DEBT-004](#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal) | The FX-date distinction is too small to be a reliable evaluation signal | S | Building the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-005](#debt-005--moved-to-ext-002) | Nothing detects Semantic Layer drift from the Warehouse | M | — | moved → [EXT-002](extension-register.md#ext-002--semantic-layer-drift-detection) |
 | [DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently) | No ad-hoc exploration | — | — | **accepted** (permanent) |
 | [DEBT-007](#debt-007--moved-to-ext-003) | Metric authoring does not scale beyond a hand-written corpus | L | — | moved → [EXT-003](extension-register.md#ext-003--metric-authoring-at-scale) |
 | [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers) | The access-control story promises more than it delivers | S | Any access-control claim in `README.md` or the App — **🔴 fired** | **paid** (6.5, 2026-08-31) |
 | [DEBT-009](#debt-009--the-seam-scan-checks-imports-but-not-the-dialect) | The seam scan checks imports but not the dialect | S | The first component outside the adapter emits SQL — **🔴 fired** | **paid** (Sub-step 2.6) |
 | [DEBT-010](#debt-010--movement_type-has-no-registered-value-vocabulary) | `movement_type` has no registered value vocabulary | S | The first Cash Movement row is generated | **paid** (Sub-step 2.1) |
-| [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level) | Execution Price against Market Price cancels at book level | S | Building the Gold Question Set | open |
+| [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level) | Execution Price against Market Price cancels at book level | S | Building the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The price table is sparse, so the Snapshot calendar has holes | M | The first "as of" date chosen by anything but the Snapshot calendar | open |
 | [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
 | [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate — **🔴 fired** | **paid** (Sub-step 5.4) |
@@ -60,10 +60,11 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 | open |
 | [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown — **🔴 fired** | **paid** (6.5, 2026-08-31) |
 | [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals | open |
-| [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set | open |
+| [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
+| [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | M | The Sub-step of Step 007 that measures Execution Accuracy | open |
 
-**Open debt:** 18 · **Paid:** 13 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 16 · **Paid:** 16 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -391,7 +392,7 @@ Whichever comes first:
 
 ### DEBT-004 — The FX-date distinction is too small to be a reliable evaluation signal
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 7.1 (`.claude/docs/reviews/step-007-evaluation.md`)
 - **Opened:** Sub-step 1.2 (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** S
 - **Location:** `.claude/scripts/check_data_availability.py` (the `NOTE` emitted by
@@ -428,10 +429,20 @@ measure would be lying, and nothing would look broken.
 
 **Trigger**
 
-When the Gold Question Set is built. Any gold question that turns on Trade Date
+When the Gold Question Set is built. Any Gold Question that turns on Trade Date
 versus Settlement Date must be constructed over a window where the two FX Rates
 differ by more than the result comparison's tolerance — or that question must be
 left out and the limitation stated. Do not add the question and hope.
+
+**How it was paid, Sub-step 7.1 (2026-09-01).** The question was added rather than left
+out, because the window it is asked over separates the pair by far more than the
+tolerance — and the tolerance is now a constant a test can measure against,
+`veritas/evaluation/gold.py`'s `RESULT_TOLERANCE`. *"Gross Revenue in the second quarter
+of 2026"* is the Gold Question; `tests/test_gold.py` re-keys its own gold SQL on
+Settlement Date, executes both, and fails the run if they land inside the tolerance. It
+prints the rate half on its own beside the whole move, which is the figure this entry was
+opened about: the entry's worry was **measured, not inherited**, and both halves clear
+the tolerance on the loaded data. The Step Review carries the run and its date.
 
 ---
 
@@ -886,7 +897,7 @@ being free once 2.5 has loaded rows.
 
 ### DEBT-011 — Execution Price against Market Price cancels at book level
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 7.1 (`.claude/docs/reviews/step-007-evaluation.md`)
 - **Opened:** Sub-step 2.5 (`.claude/docs/reviews/step-002-warehouse-and-ingestion.md`)
 - **Size:** S
 - **Location:** `veritas/ingestion/simulator.py` — `MIN_EXECUTION_DRIFT` and
@@ -917,7 +928,7 @@ introducing a systematic bias so that a book-level total diverges would be shapi
 the data to pass our own check. The real half-spread on these instruments is one
 to five basis points, which would not move the aggregate either.
 
-The gap is in **what a gold question may ask**, not in the data.
+The gap is in **what a Gold Question may ask**, not in the data.
 
 **Why we deferred**
 
@@ -930,18 +941,29 @@ exist.
 **Cost while unpaid**
 
 Identical in shape to DEBT-004's, and worth restating because it is the dangerous
-kind: a gold question that asks for book-level Traded Notional and accepts an
+kind: a Gold Question that asks for book-level Traded Notional and accepts an
 answer computed at the close would score a **wrong answer as correct**, because
 the wrong number is inside any plausible tolerance. Veritas would report accuracy
 on a distinction it did not actually make.
 
 **Trigger**
 
-When the Gold Question Set is built. Any gold question turning on Execution Price
+When the Gold Question Set is built. Any Gold Question turning on Execution Price
 against Market Price must be scoped narrowly enough that the two differ by more
 than the result comparison's tolerance — the per-Trade figures are printed by
 `uv run python .claude/scripts/check_warehouse.py --distinctions` — or the
 question must be left out and the limitation stated.
+
+**How it was paid, Sub-step 7.1 (2026-09-01).** Scoped, not left out. *"Traded Notional
+on 18 March 2025"* is the Gold Question and one day is the scope; `tests/test_gold.py`
+values the same Trades at the day's close, executes both, and requires the day-scoped
+pair to be **outside** `RESULT_TOLERANCE` and the same pair over the whole book to be
+**inside** it. The second assertion is this entry's own claim turned into a live
+measurement rather than a warning: it is what says a book-level notional question would
+score the wrong answer as correct, and it is why there is no book-level notional question
+in `data/gold/`. If a `--refresh` ever moves the cancellation, that assertion fails and
+the constraint is re-decided rather than quietly stale. The Step Review carries both
+figures and their date.
 
 ---
 
@@ -1027,7 +1049,7 @@ across one is attributed to the next Snapshot date.
 The first "as of" date that is chosen by anything other than the Snapshot calendar
 itself. In practice, whichever of these lands first:
 
-1. A gold question naming a date — the Gold Question Set is where a date gets
+1. A Gold Question naming a date — the Gold Question Set is where a date gets
    picked for a reason unrelated to which dates happen to exist.
 2. The App accepting a date from a user.
 3. A Dimension Definition whose period boundary is a calendar date rather than a
@@ -1060,7 +1082,7 @@ indistinguishable from not having noticed."*
   the entry a reader retrieves, and `check_semantic_layer.py` holds the two Snapshot
   tables to one calendar, so a drift between them fails the run rather than surfacing
   as an Account Value missing a leg.
-- **Arms 1 and 2 are untouched and still live.** A gold question naming a date and
+- **Arms 1 and 2 are untouched and still live.** A Gold Question naming a date and
   the App accepting one from a user fire on their own schedule, and neither is
   affected by how the date axis was written. This entry stays **open** on all three.
 
@@ -1818,7 +1840,7 @@ Whichever lands first:
 1. **The Sub-step that builds Grounding** — the first component that assembles a
    statement out of a Metric Definition rather than a person writing one out. That is
    when a filter can be forgotten by something other than a probe.
-2. **The Sub-step that builds the Gold Question Set** — where a gold question about
+2. **The Sub-step that builds the Gold Question Set** — where a Gold Question about
    `Realised P&L` would need the Gate to be right about which rows it covers.
 
 **Status note, Sub-step 5.4 (2026-08-28) — Amino ruled that this is paid in Sub-step
@@ -2554,7 +2576,7 @@ only the Gate's reasons, this closes as *accepted* with that as the reason.
 
 ### DEBT-033 — The generator's live evidence is five self-written questions, and four Certified Metrics never reach it
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 7.1 (`.claude/docs/reviews/step-007-evaluation.md`)
 - **Opened:** Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** S
 - **Location:** `tests/test_orchestrator.py` — `COVERED`, and the two live tests it drives
@@ -2600,6 +2622,19 @@ prompt keep a model on the certified side of it.
 Sub-step [DEBT-004](#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
 and [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level)
 already wait on.
+
+**How it was paid, Sub-step 7.1 (2026-09-01).** `data/gold/` holds twenty-four Gold
+Questions written against the corpus rather than against the prompt, and
+`tests/test_gold.py` derives what they cover from their own statements instead of from a
+list: all **nine** Certified Metrics are computed by one, every gold statement keys on
+its own metric's `date_column` and on no other date, and the three endings a question can
+have are all present. The four metrics no live run generated for — `Account Value`,
+`Unrealised P&L`, `Position Change`, `Traded Notional` — each have a question now, and
+the entry's own prediction that one of them *"could be ungeneratable today and no test
+would say so"* came true for `Account Value`, which is
+[DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows).
+What this entry does **not** buy is Execution Accuracy itself: Sub-step 7.4 is what runs
+the set past a model.
 
 ---
 
@@ -2661,3 +2696,69 @@ The [Target State](design/target-state.md#zoomcamp-criteria-map)
 puts *"metric-usage frequency"* on the Monitoring scorecard, and a chart of it built on
 this Lineage counts every retrieved metric as used — so the chart is wrong the day it is
 drawn, and it is wrong in the direction that flatters the corpus.
+
+---
+
+### DEBT-035 — A composed Certified Metric has no statement the Gate allows
+
+- **Status:** open
+- **Opened:** Sub-step 7.1 (`.claude/docs/reviews/step-007-evaluation.md`)
+- **Size:** M
+- **Location:** `veritas/validation/gate.py` — `ValidationGate.traces`, which reads a
+  Metric Definition's `expression` and not its `derives_from`; the exemption it forces is
+  `REFUSED_TODAY` in `tests/test_gold.py`
+
+**What we did**
+
+Left the tracing rule reading one field. A Metric Definition may name the Certified
+Metrics whose value is **added** to its own expression — `derives_from` — and `Account
+Value` is the one metric in the corpus that uses it: *"Cash Balance plus all Positions
+marked to market"*, rooted at two Snapshot tables that join on nothing without
+multiplying rows. So the only correct statement for it adds two scalar subqueries, one
+per half. The Gate reads that outer addition as a third projected expression, finds it in
+no Certified Metric, and refuses the statement as a `SHADOW_METRIC`.
+
+`.claude/scripts/check_semantic_layer.py` has assembled and executed exactly that
+statement since Sub-step 4.2 — `query_parts` and `executable_query` are what build it —
+so the corpus and the Semantic Layer check agree on a shape the Gate refuses.
+
+**What we should have done**
+
+Read `derives_from` in the tracing rule: an addition whose operands each trace to a
+Certified Metric is a certified expression when the corpus says one metric derives from
+the others. The corpus already carries the relationship, and
+`.claude/scripts/check_semantic_layer.py` already checks that a composed metric adds up
+metrics that exist, are not itself, do not derive further, and share its unit and
+currency — so what is missing is the Gate reading a field the corpus publishes, not a new
+field.
+
+**Why we deferred**
+
+Found in the Sub-step that writes the Gold Question Set, which is not the Sub-step that
+changes a Gate rule. The tracing rule is the rule every other rule runs behind, its
+verdicts are pinned by seventy-nine probes in `.claude/scripts/check_validation_gate/`,
+and widening it a week before the deadline on the strength of one metric is a change with
+more ways to go wrong than to go right. The Gold Question is written with the correct
+statement and the correct result, so the specification is on record and the Gate is
+measurably behind it.
+
+**Cost while unpaid**
+
+`Account Value` is unanswerable. It is a Certified Metric, it is the answer to *"how much
+does this Client have"* that Cash Balance is not, both Ambiguous Terms that resolve to it
+— `balance` and `how much does X have` — can resolve to it, and there is no statement
+Veritas will run that computes it. A question that asks for it is refused by the Gate
+with an explanation about Shadow Metrics, which is true about the parse tree and
+misleading about the cause.
+
+It also puts a **scoped exemption** in `tests/test_gold.py`: `REFUSED_TODAY` names the
+one Gold Question whose statement the Gate refuses, by name, so the test asserts today's
+refusal in both directions and breaks when this entry is paid.
+
+**Trigger**
+
+**The Sub-step of Step 007 that measures Execution Accuracy** — Sub-step 7.4, where a
+model is asked the Gold Question Set and `Account Value` scores zero however well the
+model writes, so the measure would report a generation failure that is a Gate failure. If
+7.4 runs without it being paid, the entry stays open and the Step Review states that
+`Account Value` is excluded from the accuracy figure and why.

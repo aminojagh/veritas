@@ -12,9 +12,11 @@ trimmed this file to on 2026-08-25, and
 wrote the rule that keeps it short into step 5 of the `closing-a-substep` skill: a
 Sub-step adds what is now true, and the story of how it got there stays in the review.
 
-**Last updated:** 2026-09-01 — **Step 006 — Ask a question, get a Grounded Answer — is
-`done`, and so is every Step before it. Seven of the nine Target State components are
-built, and a question typed into a browser comes back as a Grounded Answer.**
+**Last updated:** 2026-09-01 — **Step 007 — Evaluation — is `active` and Step 006 is
+`done`, with every Step before it. Seven of the nine Target State components are built, a
+question typed into a browser comes back as a Grounded Answer, and the eighth has its
+ground truth: `data/gold/` holds the Gold Question Set and `veritas/evaluation/` reads
+it. Nothing is measured yet.**
 `veritas/validation/` refuses anything that
 is not a single, parseable, bounded `SELECT`, refuses any statement whose expressions do
 not all trace to a Certified Metric, refuses any statement whose answer would carry a
@@ -56,50 +58,53 @@ columns
 ([DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names)
 paid), so a breakdown is labelled by the query it came from rather than by the prompt
 that asked for it.
+**Sub-step 7.1 wrote the Gold Question Set.** `data/gold/` holds twenty-four Gold
+Questions, one file each: the question as a person asks it, which of a Grounded Answer's
+three endings is correct for it, and — where that ending is a number — the gold SQL and
+the gold result. The relevant Semantic Entries are **derived** from the gold SQL through
+the Gate's own readers rather than listed beside it. All nine Certified Metrics, all five
+Ambiguous Terms and all four of DEBT-029's phrasing classes are in the set, and
+`Account Value`'s statement is the one the Gate refuses
+([DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)).
 **`tests/` holds Delivery Mode's two guards, the six corpus checks, the search checks,
-the rewrite and boundary checks, the flow checks, the two route probes and the App's
-rendering and page checks**; `uv run pytest` is the command that proves behaviour from
-here on, and no test in it needs a key or a network — the four that call a real provider
-run only when `VERITAS_LIVE_MODEL` is set.
+the rewrite and boundary checks, the flow checks, the two route probes, the App's
+rendering and page checks and the gold checks**; `uv run pytest` is the command that
+proves behaviour from here on, and no test in it needs a key or a network — the four that
+call a real provider run only when `VERITAS_LIVE_MODEL` is set.
 
 ---
 
 ## Resume here
 
-- **Next: Sub-step 7.1 — write the Gold Question Set.** The
-  [Step 006 plan](../plan/step-006-retrieval-and-orchestrator.md) is `done`: all five
-  Sub-steps built, ruled and committed.
+- **Next: Sub-step 7.2 — register the phrasings and detect them.**
   [Step 007 — Evaluation](../plan/step-007-evaluation.md) is `active`, approved on
-  2026-09-01, four Sub-steps: the Gold Question Set
-  ([DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)'s
-  coverage,
+  2026-09-01, four Sub-steps. **7.1 is built and approved by Amino on 2026-09-01**:
+  `data/gold/`, `veritas/evaluation/gold.py` and `tests/test_gold.py`, paying
+  [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it),
   [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
   and
-  [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level)'s
-  constraints), the Section D phrasings
+  [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level),
+  and opening
+  [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows).
+  Still to come: the Section D phrasings
   ([DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently)),
   hit rate and Mean Reciprocal Rank with the two measured arms
   ([DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match),
   [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)),
-  and Execution Accuracy with LLM-as-judge. Its one route decision is approved:
-  Observability splits out to Step 008 — six Sub-steps is the planning skill's own
-  two-Steps threshold — so
-  [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
-  and
-  [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
-  now name Step 008 in their Triggers, and Containerization with `README.md` is
-  Step 009. Nothing in `veritas/evaluation/` is built yet.
-- **Nothing in Step 006 awaits Amino.** 6.3's `Clarifying Question` Term Proposal was
-  approved on 2026-09-01 and is registered in Section A of the
-  [Glossary](../glossary.md#a-the-system); `clarification` is now `clarifying_question`
-  on both `Rewrite` and `GroundedAnswer`, and `clarification_for` is
-  `clarifying_question_for`. The rest was already settled:
-  [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) is
-  `accepted` as of 2026-09-01, the closed two-row registry stands at OpenAI
-  `gpt-4o-mini` and Groq `openai/gpt-oss-120b`, a third provider is
-  [EXT-011](../extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam),
-  and the Target State's credential table carries the narrowing of 2026-08-30 as a
-  confirmed change rather than a flagged one.
+  and Execution Accuracy with LLM-as-judge. Observability is Step 008 and
+  Containerization with `README.md` is Step 009.
+- **No Term Proposal is open.** 7.1's two were agreed on 2026-09-01 and are
+  [Glossary](../glossary.md#a-the-system) Section A rows: **`Gold Question`**, one member
+  of the Gold Question Set, and **`Relevant Set`**, the Semantic Entries one Gold
+  Question's gold SQL touches. Both are swept to the registered spelling in the living
+  documents and in code; the committed Step Reviews and the closed plans keep theirs,
+  as the [2026-08-04 sweep](../glossary.md#documents-swept-on-agreement) left them.
+- **7.2 inherits one question from 7.1.** *"turnover"* is registered today as an alias of
+  `Traded Notional` **and** is DEBT-029's synonym class for the Ambiguous Term `volume`.
+  A Gold Question saying it expects a Clarifying Question, so 7.2 has to settle which of
+  the two it is —
+  `.claude/scripts/check_semantic_layer.py` refuses a metric alias that is also a
+  registered Ambiguous Term, so it cannot be both.
 - **The project is under [Delivery Mode](../../../CLAUDE.md) until 2026-09-09**,
   the capstone deadline. Behaviour is proven in `tests/` (`uv run pytest`);
   `.claude/scripts/` is frozen and `tests/test_delivery_mode.py` enforces both that
@@ -114,23 +119,19 @@ run only when `VERITAS_LIVE_MODEL` is set.
   and de-duplicating the nine Certified Metrics
   ([DEBT-025](../debt-ledger.md#debt-025--the-nine-certified-metrics-are-implemented-twice)).
   All three come due on 2026-09-09.
-- **[DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
-  and [DEBT-022](../debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
-  are paid**, each with the probe its entry owed, in `tests/test_gate.py`, and so are
-  [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-  and [DEBT-031](../debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names),
-  both in 6.5. No Trigger is left inside Step 006.
-- **The handoff detail for Step 006 is in its
-  [6.5 review entry](../reviews/step-006-retrieval-and-orchestrator.md#sub-step-65--ask-a-question-in-the-browser)**,
-  which also carries the ruling that closed the Step. Step 005's is in its
-  [5.5 entry](../reviews/step-005-validation-gate.md#sub-step-55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020).
+- **The handoff detail for Sub-step 7.1 is in its
+  [review entry](../reviews/step-007-evaluation.md#sub-step-71--write-the-gold-question-set)**.
+  Step 006's is in its
+  [6.5 entry](../reviews/step-006-retrieval-and-orchestrator.md#sub-step-65--ask-a-question-in-the-browser),
+  which also carries the ruling that closed that Step.
 
 ---
 
 ## Summary
 
-A fully designed project with seven of its nine components built, and a question
-asked in a browser comes back as a Grounded Answer.
+A fully designed project with seven of its nine components built, a question asked in a
+browser comes back as a Grounded Answer, and the eighth — Evaluation — has the ground
+truth its measures will be computed over.
 The framework is in place and the Target State is `agreed`, so there is a fixed point
 to build toward: a natural-language analytics copilot over a brokerage warehouse, whose
 answers are grounded in a certified Semantic Layer and checked by a deterministic
@@ -252,7 +253,7 @@ verdict survives retargeting to BigQuery and one type does not.
 | Validation Gate check | ✅ working | `.claude/scripts/check_validation_gate/` — a **package**, by [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25): `__main__.py` holds the rule order, the report and the exit code, `probes.py` the shared machinery, and one module per Gate rule — `read_only.py`, `traces.py`, `restricted.py`, `route.py` and `access.py`, all five. Run as one command, `uv run python .claude/scripts/check_validation_gate/`, because Python runs a directory holding a `__main__.py`. Needs a filled Warehouse. Seventy-nine probes, each declaring the verdict and the Rejection Reason members it was measured with, so a rejection for the **wrong reason** fails as loudly as no rejection. `read_only.py` holds twelve: the six shapes read-only has to cover, a union, a string that is not SQL, a query over a lowered ceiling, one the engine will not plan, a cross product, and an ordinary question. `traces.py` holds eighteen — the shapes Sub-step 3.2 measured, re-judged through the whole Gate rather than through a tracer, plus a statement that aggregates nothing, one the optimizer will not resolve, and a certified expression sitting beside a Shadow Metric in one projection, which is the probe for the word *every* — and then builds nine more from `semantic/metrics/`, one per Certified Metric, so a tenth Metric Definition is a tenth probe with no edit — probes built out of the corpus they are checked against, which is [DEBT-018](../debt-ledger.md#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus): they prove the Gate recognises what `semantic/metrics/` says, and six of the nine expressions have no text pinned anywhere outside it. `restricted.py` holds ten, each declaring **three** answers rather than one — the Gate's verdict, the parse tree's reading, and what a search of the query's text would say — so ADR-0003's rejected alternative is shown wrong on every run rather than in an argument; nine are the spike's claim-2 shapes and the tenth is a `SELECT *` written so that it reaches the rule. `access.py` holds twenty-one, each also declaring whether this rule reads the statement as scoped: every Certified Metric scoped and unscoped, which is eighteen and is how the rule is shown to bind on the Snapshot and movement metrics and not only on the trade-side four, plus three about the slice route — `Net Revenue by region`, `Cash Balance by instrument type` refused on the absent key, and one join to a table the statement does not group by. It **executes** the Glossary's worked example twice, unscoped and scoped, so the three buckets the axis registers and the one the Access Profile permits are printed side by side, and it runs three mutations: the access rule deleted, the absent-key branch deleted, and the certified-filter comparison deleted, each re-run to show what stops being refused. `route.py` holds nine, each also declaring whether the statement is off its metric's route and whether it filters on a date column that metric is not certified against: the spike's wrong-currency statement, a cross product computing a certified metric, a count with a join that multiplies it, a slice by `by region`, the same notional converted the certified way, a period keyed on Trade Date and the same period keyed on Settlement Date, and the two halves of [DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters). It **executes** three pairs and prints how far apart each is, because a rejection is only worth having if the thing rejected returns a different number; every date in it is read from the Snapshot calendar; and it rebuilds all nine Certified Metrics from `semantic/metrics/` to show the rule allows each one computed the way its own entry says. **The *character for character* claim is checked in both modules that make it**: `probes.py` reads the spike's statements out of its **source text** with `ast` rather than importing it, so a check that runs on every commit does not depend on a 1,700-line script staying importable, and `traces.py`'s fifteen are checked the same way — including the one it judges under a shorter local name, and the one shape the spike measures that it does not judge, which is **declared** with where the Gate refuses it instead. Checks beyond the probes: every probe decided before the bounded rule is decided again through a Warehouse that raises on any attribute access; the engine is asked to plan a two-statement string against a throwaway table in an in-memory Warehouse, and the run fails if the table **survives**; the planner's estimate is compared against a real row count, because an unread plan sums to zero and zero is under every ceiling; the corpus is canonicalised the rejected way as well as the Gate's way, failing the run if **no** Certified Metric depends on the difference; the Access Profile's own declaration is printed and an empty one fails the run; two statements no rule can read are put to the detector directly, which must refuse rather than report nothing found; and one judgement is made through an adapter that counts catalogue reads, failing the run on anything but one, with the `Reading`'s own memo read afterwards to show the resolution and the corpus were each computed once. Statements a Sub-step's own rules allow are checked by the rules that **ran** rather than by the final verdict, so a later rule refusing them is not mistaken for these rules refusing everything. It also prints the trusted rewrites, the ceiling's current headroom, and what one judgement costs. |
 | App | ✅ working | `veritas/app/` — `render.py` and `page.py` behind an `__init__.py` that re-exports the first. `uv run streamlit run veritas/app/page.py` serves one page: the identity a question is asked as, a question box, and what the question came back as. `render.py` turns a Grounded Answer into strings and imports no Streamlit — values under the column names the engine returned, the Lineage one line per entry, and the verdict as the rules that ran or the Rejection Reasons that fired; `page.py` places them and is the only module in the repository permitted to import `streamlit`, which `tests/test_app.py` checks the way `check_warehouse.py` checks the `duckdb` seam. **Nothing is hidden**: the statement, the Lineage and the Validation Gate outcome are laid out under every answer, including under a refusal and under a question asked back — the Glossary's *"never renders a bare number"* as a test rather than an intention. The sidebar carries the Access Profile, the model the environment configures, and [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s own sentence on what enforcing that profile in the application layer is worth. The page is driven in tests through Streamlit's own `AppTest`, so every rendering claim is proven without a browser and without a key. |
 | Observability | ✗ none | — |
-| Evaluation | ✗ none | — |
+| Evaluation | ◐ ground truth only | `data/gold/` — **twenty-four Gold Questions**, one file each, and `veritas/evaluation/` reads them. A Gold Question carries the question as a person asks it, `expects` — which of a Grounded Answer's three endings is correct, one of `answer`, `refusal`, `clarifying question` — and, where a number is correct, the gold SQL and the gold result. The dataclass field list is the file format, as it is for a Semantic Entry: an unknown key fails to load, and a question that expects no answer may not carry a statement. **The relevant Semantic Entries are derived, never listed**: the Certified Metrics a statement's projections trace to, the certified axes it groups by or filters on, and the Join Paths those two declare — three readings, all through `veritas/validation/`'s own readers, so a Relevant Set is never a second opinion about what a statement computes. `tests/test_gold.py` compares the Join Paths derived that way against the joins the statement itself carries. **Coverage is read off the statements**: all nine Certified Metrics are computed by one, every gold statement keys on its own metric's `date_column` and on no other date, `by region` and `by instrument type` are both sliced, all five Ambiguous Terms are asked about, and all three endings are present. `RESULT_TOLERANCE` is how close two result sets must be to be the same answer — relative, because the metrics span a count of dozens and a notional of tens of millions — and it is what [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal) and [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level) are measured against: the test executes both halves of each Section C pair a Gold Question turns on. **One gold statement the Gate refuses** — `Account Value`, whose only correct form adds the two halves the corpus's `derives_from` describes, which the Gate reads as a Shadow Metric ([DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)); `REFUSED_TODAY` in the test names it, so paying that entry breaks the exemption. **No measure is computed yet** — hit rate, Mean Reciprocal Rank and Execution Accuracy are Sub-steps 7.3 and 7.4. |
 | Containerization | ✗ none | — |
 
 ## Repository layout
@@ -268,7 +269,10 @@ veritas/
 │   ├── snapshots/             # committed source data + dated probe record
 │   │   └── ingestion/         # ingestion's own snapshots — one per source, one
 │   │                          # per traded Instrument; only --refresh writes here
-│   └── veritas.duckdb         # the Warehouse — gitignored, rebuilt by ingestion
+│   ├── veritas.duckdb         # the Warehouse — gitignored, rebuilt by ingestion
+│   └── gold/                  # the Gold Question Set — twenty-four files, one per gold
+│                              # question: the question, the ending it expects, and the
+│                              # gold SQL and gold result where that ending is a number
 ├── semantic/                  # the Semantic Layer — the certified registry, as data
 │   ├── metrics/               # nine files, one per Certified Metric of Section B
 │   │   ├── gross_revenue.yaml            # ─┐ the trade side
@@ -335,6 +339,11 @@ veritas/
 │   │   │                      # importable without the sequence that produces it
 │   │   └── flow.py            # the Orchestrator: all seven steps, and the five ways
 │   │                          # a question ends without a number
+│   ├── evaluation/
+│   │   ├── __init__.py        # re-exports the one module
+│   │   └── gold.py            # the Gold Question Set's file format, the Relevant Set
+│   │                          # derived from a gold SQL, and what makes two result
+│   │                          # sets the same answer
 │   ├── app/
 │   │   ├── __init__.py        # re-exports render.py, and not the page
 │   │   ├── render.py          # a Grounded Answer as strings a person reads —
@@ -382,6 +391,9 @@ veritas/
 │   │                          # back — two live tests, skipped with no key
 │   ├── test_gate.py           # the crossed conversion and the outer join, with the
 │   │                          # numbers each returns: DEBT-021 and DEBT-022's probes
+│   ├── test_gold.py           # every gold SQL judged and executed, coverage read off
+│   │                          # the statements, the Relevant Set compared against the
+│   │                          # route, and both Section C pairs executed side by side
 │   ├── test_app.py            # what the page shows, driven through Streamlit's AppTest
 │   │                          # — one live test, skipped with no key
 │   └── test_llm.py            # what goes on the wire, against a stub server on localhost
@@ -417,12 +429,18 @@ veritas/
 
 **Nothing measures Veritas.** The flow runs whole — a question typed into the App is
 resolved, retrieved for, grounded, generated, judged and executed — and no run of it is
-recorded or scored. There is no Gold Question Set, so hit rate, Mean Reciprocal Rank and
-Execution Accuracy are unmeasured and the four Retrieval Strategies have never been
-compared on anything but whether they find the entry a person names. Nothing logs a
-question, a verdict, a cost or a latency, so *"Validation-Gate rejections by reason"* and
-*"metric-usage frequency"* are chart descriptions rather than charts. Both components
-are Step 007.
+scored. The Gold Question Set exists and nothing reads it yet: hit rate, Mean Reciprocal
+Rank and Execution Accuracy are unmeasured, and the four Retrieval Strategies have never
+been compared on anything but whether they find the entry a person names. Sub-steps 7.3
+and 7.4 are the measures. Nothing logs a question, a verdict, a cost or a latency either,
+so *"Validation-Gate rejections by reason"* and *"metric-usage frequency"* are chart
+descriptions rather than charts — that is Observability, Step 008.
+
+**`Account Value` is a Certified Metric with no answer.** Its only correct statement adds
+the two halves `derives_from` describes, and the Gate refuses that as a Shadow Metric —
+[DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows).
+Both Ambiguous Terms that can resolve to it, `balance` and `how much does X have`, can
+therefore resolve to a metric Veritas will not compute.
 
 **An answer cites what the model was shown, not what the statement used.** The Lineage
 under an answer lists every grounded entry, so a `Gross Revenue` answer cites
@@ -434,7 +452,7 @@ metric that would label it is not identifiable from a list naming two.
 **Two published fields have no check on what they say** — `description` and `aliases`.
 Both now reach the searchable text, and `tests/test_retrieval.py` proves every alias
 gets there, but nothing measures whether either helps a question find its metric; the
-Gold Question Set is what would. A Metric Definition's `grain` is read by nobody beyond
+Gold Question Set is what will, in Sub-step 7.3. A Metric Definition's `grain` is read by nobody beyond
 that same text; a Dimension Definition's is compared against the Glossary's.
 
 **A Snapshot metric executed over the whole Warehouse is not a number anyone would ask
@@ -442,9 +460,11 @@ for.** `Cash Balance` summed across every Snapshot date is every date in the Sna
 calendar added together — `check_semantic_layer.py` prints how many, on the
 `by snapshot date` line — and the check executes it that way on purpose: it is the
 strongest thing a corpus check can do without inventing a question. The "as of" date
-comes from the question, and no question yet asked through the App has carried one —
-the live sets that reach the generator carry no period, which is
-[DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it).
+comes from the question, and the Gold Question Set is where the questions that carry one
+now live: every gold statement keys on its own metric's `date_column`, which is what
+[DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
+was opened about and 7.1 paid. No **live** run has met that rule yet; Sub-step 7.4 is the
+first that will.
 
 **Every test a reviewer runs drives a stub** — a stub model for the rewrite step, a stub
 server on `127.0.0.1` for the boundary — so `uv run pytest` needs no key and opens no
@@ -458,8 +478,8 @@ a question it does not — and one that asks a question through the App's own pa
 first three have been run against both providers; a key
 sitting in `.env` for the App is not consent to spend it on every run, which is why they
 stay opt-in. Those five questions are self-written and reach five of the nine Certified
-Metrics, which is
-[DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it).
+Metrics; the Gold Question Set is what replaces them, and Sub-step 7.4 is where a live
+run is asked it.
 
 **The spike's go was measured on a spike, and two of its limits still stand.** Only
 projections are read for claim 1, so a metric expression appearing solely in a filter
@@ -474,15 +494,18 @@ one carries no estimate — so a cross product scans each side once and produces
 square, and the rule sees only the scans. `check_validation_gate/` carries it as a probe
 with a declared `allowed` verdict; the certified-route rule is what bounds it.
 
-**Two Section C pairs are real but small at book level**, and both are on the Ledger
-against the Gold Question Set rather than fixed in the data:
+**Two Section C pairs are real but small at book level**, and neither is a defect in the
+simulator — making either diverge would mean shaping the data to pass our own check.
+Both were constraints on what a Gold Question may ask and both are now **measured
+against the result tolerance rather than argued**, in `tests/test_gold.py`:
 [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
-(the FX half of Trade Date against Settlement Date) and
+(the FX half of Trade Date against Settlement Date) clears it on the window the Gold
+Question asks over, and
 [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level)
-(Execution Price against Market Price). Neither is a defect in the simulator — making
-either diverge would mean shaping the data to pass our own check — and both are
-constraints on what a gold question may ask. `--distinctions` prints both figures on
-every run.
+(Execution Price against Market Price) clears it over one day and does **not** clear it
+over the whole book — which is why there is no book-level notional question in
+`data/gold/`, and why that second reading is an assertion rather than a note.
+`--distinctions` prints the per-Trade figures on every run.
 
 **What the dialect scan does not cover**, so nobody reads the seam as fully mechanical:
 SQL assembled at run time is not a literal and is invisible to a static scan — that is
@@ -524,7 +547,19 @@ The [Debt Ledger](../debt-ledger.md) and the
 trigger or readiness condition and its status, and the running counts. Read them there —
 this file does not keep a second copy.
 
-**Open debt: 18 · open extensions: 11.** 6.3 opened one entry and paid it in the same
+**Open debt: 16 · open extensions: 11.** 7.1 paid three on one Trigger — the Gold
+Question Set —
+[DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
+(coverage, now read off the gold statements),
+[DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
+and
+[DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level)
+(both Section C pairs, executed against the result tolerance rather than argued) — and
+opened one the gold set is the first thing to expose:
+[DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows),
+where the tracing rule reads a Metric Definition's `expression` and not its
+`derives_from`, so the one composed metric in the corpus has no statement the Gate
+allows. 6.3 opened one entry and paid it in the same
 Sub-step —
 [DEBT-028](../debt-ledger.md#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server),
 the live model path, run against real OpenAI once a key existed — and filed
@@ -552,17 +587,14 @@ rows with no column names, **paid in 6.5**;
 [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by),
 a refusal that is not the Gate's carrying prose where the Gate's carries a taxonomy
 member; and
-[DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it),
-the evidence under both — the generator's live runs are five questions written by the
-person who wrote the prompt, four Certified Metrics are never generated for, and no
-generated statement has met the Gate's date rule. The last two come due in Step 007.
+DEBT-033, the evidence under both, **paid in 7.1**. DEBT-032 comes due in Step 008.
 6.5 paid the two entries its own Trigger named —
 [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers),
 the access-control claim, now made in the App with the Ledger's own qualification beside
 it, and DEBT-031 — and opened one the App is the first thing to make visible:
 [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used),
 where the Lineage under an answer records what the model was shown rather than what the
-statement used, which the metric-usage chart in Step 007 would count wrongly.
+statement used, which the metric-usage chart in Step 008 would count wrongly.
 [DEBT-001](../debt-ledger.md#debt-001--framework-rules-rely-on-discipline-not-enforcement)
 is the one that is partly paid and stays open on its main subject, **the hook layer**:
 nothing mechanically blocks a commit by Claude, a missing Ledger entry, or a review that
@@ -586,6 +618,7 @@ its dated review.
 | 004 | The Semantic Layer — all four entry types, twenty-seven entries, and eighteen checks over them | [plan](../plan/step-004-semantic-layer.md) | [review](../reviews/step-004-semantic-layer.md) |
 | 005 | The Validation Gate — **done**. 5.1 built: the outcome, the reason taxonomy, and the four rules that judge a statement's shape. 5.2 built: the tracer, and the rule that every metric expression traces to a Certified Metric. 5.3 built: the Access Profile, and the rule that no Restricted Column reaches the answer. 5.4 built: the route reader, and the rule that a metric is computed across its own joins and over its own date column. 5.5 built: the five Join Paths and the `routes` field that make an axis reachable, the slice route and the certified filters inside the route rule, and the rule that every statement carries the Access Profile's predicate | [plan](../plan/step-005-validation-gate.md) | [review](../reviews/step-005-validation-gate.md) |
 | 006 | Retrieval, the Orchestrator and the App — **done**. 6.1 built: the searchable text each entry type exposes, one whitelist per type. 6.2 built: `retrieve` over four Retrieval Strategies, and the reference closure that is the only way a Join Path reaches an answer. 6.3 built: `veritas/llm/` as the one place a provider, a model or a key is named, and the rewrite step that resolves an Ambiguous Term against the question's own words or asks back. 6.4 built: grounding, SQL generation, the flow's seven steps and five ways out, the `Grounded Answer` with its `Lineage` and `Validation Gate outcome`, and the two Gate readings that paid DEBT-021 and DEBT-022. 6.5 built: the Streamlit page that shows the answer with its SQL, Lineage and Gate outcome rather than hiding them, the column names a breakdown needs, and the access-control wording that paid DEBT-008 | [plan](../plan/step-006-retrieval-and-orchestrator.md) | [review](../reviews/step-006-retrieval-and-orchestrator.md) |
+| 007 | Evaluation — **in progress**. 7.1 built: `data/gold/`, the Gold Question Set's file format, the Relevant Set derived from a gold SQL through the Gate's own readers, and the result comparison both Section C constraints are measured against | [plan](../plan/step-007-evaluation.md) | [review](../reviews/step-007-evaluation.md) |
 
 **Commits, in order.** Step 000 and Sub-step 1.1 in `6281e6b`, Sub-step 1.2 in `4b48a46`,
 Sub-step 1.3 in `9c5b060`, Step 002 planning in `57e8aee`, Sub-step 2.1 in `5a061a7`, the
@@ -599,9 +632,10 @@ in `23020e9`, Sub-step 3.4 in `c20d601`, Sub-step 3.5 in `fcf4b7d`, Step 004 pla
 in `7522ad8`, Sub-step 5.3 in `fce9248`, Sub-step 5.4 in `faba544`, **Sub-step 5.5 in
 `1c96281`**, the Step 005 close in `3661263`, the move to Delivery Mode in `2cfd10f`,
 **Step 006 planning in `fdf0dc4`**, Sub-step 6.1 in `827fca3`, Sub-step 6.2 in `e0a69bc`,
-Sub-step 6.3 in `40a6f94`, Sub-step 6.4 in `d374f8d`, and **Sub-step 6.5 in the commit
-that carries this line**. A Step's planning commit is normally what writes the previous
-Step's last hash into this list and turns that plan from `in review` to `done`; Steps 005
-and 006 were both closed ahead of that, by the commit carrying their own last Sub-step, so
-every hash of each is written here at once and none is left for the next Step's planning
-commit to fill in.
+Sub-step 6.3 in `40a6f94`, Sub-step 6.4 in `d374f8d`, **Sub-step 6.5 in `814b07b`**,
+**Step 007 planning in `fdf6693`**, and Sub-step 7.1 in the commit that carries this
+line. A Step's planning commit is normally what writes the previous Step's last hash into
+this list and turns that plan from `in review` to `done`; Steps 005 and 006 were both
+closed ahead of that, by the commit carrying their own last Sub-step, so every hash of
+each is written here at once and none is left for the next Step's planning commit to fill
+in.

@@ -1,0 +1,12 @@
+name: Realised P&L in the second quarter of 2026
+question: what was our realised P&L in the second quarter of 2026
+expects: answer
+sql: |
+  SELECT sum(CAST(fct_accounting_movement.amount AS DECIMAL(38, 6)) * fct_fx_rate.fx_rate) AS answer
+  FROM fct_accounting_movement
+  JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_accounting_movement.movement_date AND fct_fx_rate.from_currency = fct_accounting_movement.denomination_currency AND fct_fx_rate.to_currency = 'EUR'
+  JOIN dim_account ON dim_account.account_id = fct_accounting_movement.account_id
+  JOIN dim_client ON dim_client.client_id = dim_account.client_id
+  WHERE fct_accounting_movement.movement_type = 'realised P&L' AND dim_client.client_region = 'EU' AND fct_accounting_movement.movement_date BETWEEN '2026-04-01' AND '2026-06-30'
+result:
+  - [65029.731342]

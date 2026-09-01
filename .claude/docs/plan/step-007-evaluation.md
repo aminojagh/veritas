@@ -1,7 +1,7 @@
 # Step 007 — Evaluation: measure Veritas over a Gold Question Set
 
 **Status:** **active** — approved by Amino on 2026-09-01, by the commit that carries
-this plan. Next: Sub-step 7.1.
+this plan. 7.1 is built and approved. Next: Sub-step 7.2.
 
 **Goal.** Build Evaluation — the committed Gold Question Set and the Evaluation
 Measures over it: hit rate and Mean Reciprocal Rank (MRR) for Retrieval,
@@ -42,7 +42,7 @@ itself unchanged.
 
 ### 7.1 — Write the Gold Question Set
 
-`data/gold/` — one YAML file per gold question: the question as a person asks
+`data/gold/` — one YAML file per Gold Question: the question as a person asks
 it, the gold SQL, and the gold result. The relevant Semantic Entries are
 **derived** from the gold SQL through the Gate's own readers, never listed by
 hand — the Target State's *"Ground truth is derived"* — by the gold loader,
@@ -70,7 +70,7 @@ Amino's agreement. Each row's phrasings are carried as `aliases` on its
 Ambiguous Term entry — the field `veritas/semantic/loader.py` already names as
 a deferral — and detection matches an alias exactly as it matches the
 registered name. Both directions are proven: the four-class miss test in
-`tests/test_rewrite.py` inverts, and no gold question that names its meaning
+`tests/test_rewrite.py` inverts, and no Gold Question that names its meaning
 becomes one Veritas asks back about.
 
 *Verify:* `uv run pytest tests/test_rewrite.py tests/test_gold.py`
@@ -80,8 +80,8 @@ becomes one Veritas asks back about.
 Pays [DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match)
 (*"Repayment is the measurement, not the split"*) and
 [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it).
-A runner over `rank` — the seam 6.2 left for exactly this — scoring each gold
-question's derived relevant set: one row per Retrieval Strategy per arm. The
+A runner over `rank` — the seam 6.2 left for exactly this — scoring each Gold
+Question's derived Relevant Set: one row per Retrieval Strategy per arm. The
 arms: the flat searchable text against a per-field index, and the appended
 rewrite against the spliced one, both rewrite forms built from the gold entry's
 own resolution so the sweep costs no model call and no key. Keep what the

@@ -167,7 +167,7 @@ not an afterthought.
 |---|---|---|
 | Problem description | 2 | The grader's first checkbox — *does the project explain what problem it solves and why it matters?* Veritas frames it as **silent metric ambiguity**: answering "revenue" with Gross when the business meant Net is a confident, well-formatted wrong number. The [`The problem`](#the-problem) section is that narrative, carried by the Gross-vs-Net worked example. |
 | Retrieval flow | 2 | Semantic Layer knowledge base + LLM, both load-bearing in the flow. |
-| Retrieval evaluation | 2 | Hit rate and MRR across ≥3 approaches — text, vector, hybrid, re-ranked. Ground truth is *derived*: the Semantic Entries a gold SQL touches are its relevant set. |
+| Retrieval evaluation | 2 | Hit rate and MRR across ≥3 approaches — text, vector, hybrid, re-ranked. Ground truth is *derived*: the Semantic Entries a gold SQL touches are its Relevant Set. |
 | LLM evaluation | 2 | Execution Accuracy across ≥2 prompts and ≥2 models, plus LLM-as-judge as a second lens. Objective primary signal. |
 | Interface | 2 | The **App** — a Streamlit page showing answer, SQL, Lineage, and Validation Gate outcome. (The rubric's criterion is named *Interface*; our component is the `App`, renamed 2026-08-04 to stop one word carrying both.) |
 | Ingestion pipeline | 2 | dlt pipelines for FX, market data, and the Semantic Layer index. |

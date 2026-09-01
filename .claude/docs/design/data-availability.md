@@ -163,7 +163,7 @@ Date "moves the number twice" — true in direction, but over a T+2 lag in a cal
 FX period the second move is small enough to hide inside rounding. The script
 prints a `NOTE` whenever that delta falls below 1%. Tracked as
 **[DEBT-004](../debt-ledger.md)**, triggered when the Gold Question Set is
-built: a gold question turning on Trade Date versus Settlement Date must use a
+built: a Gold Question turning on Trade Date versus Settlement Date must use a
 window where the two FX Rates differ by more than the comparison tolerance, or
 be left out and the limitation stated. Otherwise Execution Accuracy would score
 a wrong answer as correct on precisely the distinction Veritas exists for.
