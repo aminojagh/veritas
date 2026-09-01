@@ -190,19 +190,21 @@ class AmbiguousTerm(SemanticEntry):
                       column. Four of the five rows say *"Ask"* and one says
                       *"Ask, unless the question names one"*, and the difference is
                       a rule the Orchestrator acts on rather than a note.
+      `aliases`       the other spellings of the word, from Section D's *Also said
+                      as* column. Each is the registered term: a question that says
+                      one has said this term, and the rewrite step detects it exactly
+                      as it detects `name`.
 
     **It publishes no SQL, and that is the point.** An Ambiguous Term is a claim
     about *language* — it can be wrong while every expression in the corpus is
     right, and its fix is in the Glossary rather than in a query. `SQL_FIELDS` below
     therefore has no row for it, and the two readers that ask get nothing back.
-
-    There is no `aliases` field, and that is a deferral rather than an omission —
-    see the Sub-step 4.4 review.
     """
 
     description: str
     disambiguates: tuple[str, ...]
     resolution: str
+    aliases: tuple[str, ...]
 
 
 @dataclass(frozen=True)

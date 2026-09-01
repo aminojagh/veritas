@@ -186,28 +186,50 @@ def test_the_set_holds_a_breakdown_for_more_than_one_axis(gold, gate):
     assert {"by region", "by instrument type"} <= sliced
 
 
-def test_debt_029s_four_phrasing_classes_are_in_the_set_and_still_missed(gold, semantic):
+def test_debt_029s_four_phrasing_classes_are_in_the_set_and_detected(gold, semantic):
     """[DEBT-029](../.claude/docs/debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently),
-    pinned over the Gold Question Set rather than over four strings.
+    paid and scored over the Gold Question Set rather than over four strings.
 
-    A question that spells a registered term the registered way is detected; one that
-    spells it any of the four other ways is not, silently. Sub-step 7.2 inverts the
-    second half of this and the `phrasing_class` field is what it is scored by.
+    Every question whose correct ending is a Clarifying Question says a term Veritas
+    finds — the four spelled some other way included, which is what `phrasing_class`
+    is carried on the question to say.
     """
     asks_back = [
         question for question in gold
         if question.expects is Expectation.CLARIFYING_QUESTION
     ]
-    detected = {
-        question.name: bool(ambiguous_terms_in(question.question, semantic))
+    missed = [
+        f"{question.name} ({question.phrasing_class or 'as registered'})"
         for question in asks_back
-    }
-    assert {
-        question.name: question.phrasing_class is None for question in asks_back
-    } == detected
+        if not ambiguous_terms_in(question.question, semantic)
+    ]
+    assert not missed, f"said an Ambiguous Term and were detected as saying none: {missed}"
     assert {question.phrasing_class for question in asks_back} == {
         None, *PhrasingClass
     }
+
+
+def test_no_gold_question_that_names_its_meaning_is_asked_back_about(gold, semantic):
+    """The other direction of DEBT-029's repayment, and the one a wider alias breaks.
+
+    A spelling registered too loosely turns a question Veritas should answer into one
+    it stops to ask about. So every Gold Question whose correct ending is *not* a
+    Clarifying Question is checked for the terms it says, and each of them must have
+    one of its own meanings named in the question — which is what the rewrite step
+    resolves it by, and is why the question is answerable at all.
+    """
+    for question in gold:
+        if question.expects is Expectation.CLARIFYING_QUESTION:
+            continue
+        for term in ambiguous_terms_in(question.question, semantic):
+            named = [
+                meaning for meaning in term.disambiguates
+                if meaning.casefold() in question.question.casefold()
+            ]
+            assert named, (
+                f"{question.name}: expects {question.expects} and says the Ambiguous "
+                f"Term {term.name!r} without naming any of {list(term.disambiguates)}"
+            )
 
 
 # -- the derivation claim --------------------------------------------------------

@@ -6,8 +6,10 @@ answerable — ask which, or use the one the question actually names"* — and t
 first place Veritas calls a model.
 
 **Three jobs, and only the middle one is the model's.** Which Ambiguous Terms a
-question says is decided here, by matching the names
-[Glossary Section D](../../.claude/docs/glossary.md#d-ambiguous-terms) registers.
+question says is decided here, by matching the spellings
+[Glossary Section D](../../.claude/docs/glossary.md#d-ambiguous-terms) registers —
+the *User says* cell and every *Also said as* cell beside it, which reach an entry
+as its `name` and its `aliases` and are matched the same way.
 Which certified meaning the question's own words name is decided by the model,
 which is given those terms' own `description` and `resolution` text and nothing
 else. Whether the model's answer counts is decided here again: a meaning outside
@@ -74,23 +76,50 @@ class Rewrite:
 
 
 @cache
-def said_as(name: str) -> re.Pattern[str]:
-    r"""The pattern that finds one Ambiguous Term's name in a question.
+def said_as(spelling: str) -> re.Pattern[str]:
+    r"""The pattern that finds one registered spelling of an Ambiguous Term.
 
-    Whole words, any case, and a `X` in the name matches the subject it stands for.
-    A name with no placeholder is one bounded literal — `revenue` becomes
+    Whole words, any case, and a `X` in the spelling matches the subject it stands
+    for. A spelling with no placeholder is one bounded literal — `revenue` becomes
     `\brevenue\b`, which finds *"our revenue last quarter"* and not `revenue` inside
-    a longer word. A name with one becomes the two halves with the subject between
-    them — `how much does X have` becomes `\bhow\ much\ does\s+(.+?)\s+have\b`, which
-    finds *"how much does account 41 have"* and captures *"account 41"*.
+    a longer word, so `revenues` is a spelling of its own rather than something this
+    pattern stretches to. A spelling with the placeholder between two halves becomes
+    those halves with the subject between them — `how much does X have` becomes
+    `\bhow\ much\ does\s+(.+?)\s+have\b`, which finds *"how much does account 41
+    have"*. A spelling that **ends** with the placeholder has nothing after the
+    subject to close on, so it requires one without consuming it — `how much is in X`
+    becomes `\bhow\ much\ is\ in(?=\s+\S)`, which finds *"how much is in ACC-0001"*
+    where demanding whitespace after the subject would miss it, and does not find
+    *"how much is in"* on its own.
 
-    The match is literal, which is
-    [DEBT-029](../../.claude/docs/debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently):
-    a phrasing that is not the registered spelling is not detected, and is not
-    detected silently.
+    Whichever shape it is, the match spans the words the question used and no
+    others, so a caller that asks a person about a term can quote them rather than
+    quote the registry.
     """
-    parts = [re.escape(part.strip()) for part in PLACEHOLDER.split(name)]
-    return re.compile(r"\b" + r"\s+(.+?)\s+".join(parts) + r"\b", re.IGNORECASE)
+    parts = [re.escape(part.strip()) for part in PLACEHOLDER.split(spelling)]
+    trailing = not parts[-1]
+    said = r"\b" + r"\s+(.+?)\s+".join(parts[:-1] if trailing else parts)
+    return re.compile(said + (r"(?=\s+\S)" if trailing else r"\b"), re.IGNORECASE)
+
+
+def spellings(term: AmbiguousTerm) -> tuple[str, ...]:
+    """Every way Section D registers this term: its name, then its other spellings.
+
+    One list rather than two, because an alias is not a lesser form of the term — a
+    question that says *"turnover"* has said `volume`, and the only thing the name
+    has that an alias does not is that it is what the corpus files the entry under.
+    """
+    return (term.name, *term.aliases)
+
+
+def first_said(term: AmbiguousTerm, question: str) -> re.Match[str] | None:
+    """The question's first mention of this term, in whichever spelling it used."""
+    found = [
+        match
+        for spelling in spellings(term)
+        if (match := said_as(spelling).search(question))
+    ]
+    return min(found, key=lambda match: match.start()) if found else None
 
 
 def ambiguous_terms_in(question: str, layer: SemanticLayer) -> list[AmbiguousTerm]:
@@ -102,21 +131,33 @@ def ambiguous_terms_in(question: str, layer: SemanticLayer) -> list[AmbiguousTer
     said = [
         (match.start(), position, term)
         for position, term in enumerate(layer.ambiguous_terms.values())
-        if (match := said_as(term.name).search(question))
+        if (match := first_said(term, question))
     ]
     return [term for _, _, term in sorted(said, key=lambda found: found[:2])]
 
 
-def resolution_instruction(terms: list[AmbiguousTerm]) -> str:
+def resolution_instruction(terms: list[AmbiguousTerm], question: str = "") -> str:
     """The system instruction: the rules, then the terms the question said.
 
     Only the terms this question said, so the meanings on offer are the ones it
     could plausibly have meant and the model is never shown a metric it was not
     asked about.
+
+    A term the question spelled some other way carries one line more, naming that
+    spelling — the answer is still keyed by the registered name, and without the line
+    the model would have to guess that the `volume` it is asked about is the
+    *"turnover"* in front of it. A term said as it is registered carries no such
+    line, so the instruction for a question that says one is the text it always was.
     """
     blocks = [
         "\n".join([
             f'Term: "{term.name}"',
+            *(
+                [f'  the question says it as: "{said.group(0)}"']
+                if (said := first_said(term, question))
+                and said.group(0).casefold() != term.name.casefold()
+                else []
+            ),
             "  certified meanings: "
             + " | ".join(f'"{name}"' for name in term.disambiguates),
             f"  what the ambiguity is: {_flat(term.description)}",
@@ -150,10 +191,17 @@ def resolutions_in(
     return resolved
 
 
-def clarifying_question_for(terms: list[AmbiguousTerm]) -> str:
-    """The question Veritas asks back about the terms that stayed unresolved."""
+def clarifying_question_for(terms: list[AmbiguousTerm], question: str) -> str:
+    """The question Veritas asks back about the terms that stayed unresolved.
+
+    Each term is quoted as the question spelled it rather than as the corpus files
+    it, so a person who typed *"turnover"* is asked about "turnover" and not about
+    the `volume` entry they have never seen. The meanings on offer are the entry's,
+    because those are what the two spellings share.
+    """
     asked = "; ".join(
-        f'"{term.name}" could mean ' + " or ".join(term.disambiguates)
+        f'"{said.group(0) if (said := first_said(term, question)) else term.name}"'
+        f" could mean " + " or ".join(term.disambiguates)
         for term in terms
     )
     return f"{asked}. Which do you mean?"
@@ -190,12 +238,16 @@ def rewrite(
 
     model = default_model() if model is None else model
     resolved = resolutions_in(
-        model.complete(resolution_instruction(terms), question, json_object=True),
+        model.complete(
+            resolution_instruction(terms, question), question, json_object=True
+        ),
         terms,
     )
     unresolved = [term for term in terms if term.name not in resolved]
     if unresolved:
-        return Rewrite(question, question, resolved, clarifying_question_for(unresolved))
+        return Rewrite(
+            question, question, resolved, clarifying_question_for(unresolved, question)
+        )
     return Rewrite(question, rewritten_with(question, resolved), resolved)
 
 

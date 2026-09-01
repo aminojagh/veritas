@@ -13,3 +13,4 @@ disambiguates: [Cash Balance, Account Value]
 resolution: >
   Ask. Nothing in the phrasing distinguishes cash from the whole holding, so there
   is no unless clause here of the kind "revenue" has.
+aliases: ["how much is in X", "how much does X hold"]

@@ -47,3 +47,50 @@ a set's reachable part; gold SQL is not dialect-scanned; twenty-four questions i
 2026-09-01**, now two Section A rows. Swept to the registered spelling: the living
 documents, this code, this review. Not swept: committed reviews and closed plans, which
 are point-in-time. `Expectation` and `PhrasingClass` coin nothing.
+
+---
+
+## Sub-step 7.2 — Register the phrasings and detect them
+
+**Changed.** [Glossary Section D](../glossary.md#d-ambiguous-terms) gained an *Also said as*
+column — nine spellings, five rows — `semantic/ambiguous/` publishes each row's cell as
+`aliases`, and `rewrite.py` matches per **spelling**, naming the one used both to the model
+and in the question it asks back. *"turnover"* left `Traded Notional`.
+
+**Verified.** `uv run pytest` — 195 passed, 4 skipped (live-model), from 189 + 4 before; all
+six frozen checks PASS, `check_semantic_layer.py` included. The four classes, 2026-09-01:
+
+```
+$ uv run pytest tests/test_rewrite.py -q -s -k "not_the_registered_name"
+  what is our PnL on tech positions
+    says 'P&L' -> "PnL" could mean Realised P&L or Unrealised P&L. Which do you mean?
+  how much is in account 41
+    says 'how much does X have' -> "how much is in" could mean Cash Balance or Account Value. Which do you mean?
+  what were our revenues last quarter
+    says 'revenue' -> "revenues" could mean Gross Revenue or Net Revenue. Which do you mean?
+  what was turnover last month
+    says 'volume' -> "turnover" could mean Traded Notional or Trade Count. Which do you mean?
+4 passed, 31 deselected in 2.73s
+```
+
+**Debt** — DEBT-029 paid. Nothing opened.
+
+**Sceptically.** (1) **The column is domain content I wrote and Amino has not agreed** —
+nine spellings, and the "turnover" ruling inside them. Rejecting it restores the metric
+alias and flips `data/gold/turnover_q2_2026.yaml` to `expects: answer`. (2) An Ambiguous
+Term's `aliases` are **not** searchable text though a metric's are: nothing would match on
+one, since the rewrite step reads them before any search runs — and indexing them cost
+`how much does client 42 have` its vector hit, 4th to 8th, failing
+`test_every_strategy_finds_the_entry_a_person_names`. Measured 2026-09-01 at `top_k=8`;
+reproduce by adding `"aliases"` to `SEARCHABLE_FIELDS[AmbiguousTerm]`. It cost narrowing
+`test_corpus_makes_every_alias_searchable` to Metric Definitions — the one existing claim
+this Sub-step made smaller. (3) The phrase row's aliases are the first spellings ending in
+`X`, which the old pattern would have missed silently, so the guard is
+`test_every_registered_spelling_finds_its_own_term` rather than four examples.
+
+**Approved 2026-09-01, on all three, and Section D's column with them** — *"all changes
+and decisions including the sceptical points are approved"*. The nine spellings are agreed
+Glossary content, *"turnover"* stays a spelling of `volume`, and 2's narrowing stands.
+
+**Language.** No Term Proposal: the amendment adds spellings of five registered terms and
+coins nothing. `spellings` and `first_said` are process words; `aliases` is an existing field.

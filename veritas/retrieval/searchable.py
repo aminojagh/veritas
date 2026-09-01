@@ -33,6 +33,13 @@ from veritas.semantic import (
 # ADR-0001 forbids. It is reached by reference instead: a Metric Definition's
 # `join_paths` and a Dimension Definition's `routes` name the ones an answer needs,
 # and no question ever names one in words.
+#
+# An **Ambiguous Term's `aliases` are left out** though a Metric Definition's are in,
+# because nothing here would match on one: the rewrite step reads those spellings
+# before any search runs, and a question that says one arrives already asked back
+# about or already carrying the certified meaning it resolved to. Measured as well as
+# argued: indexing them moves a fixed-set question out of the vector search's top
+# five, and `tests/test_retrieval.py` is what says so.
 SEARCHABLE_FIELDS: dict[type[SemanticEntry], tuple[str, ...]] = {
     MetricDefinition: (
         "name", "aliases", "description", "grain", "unit", "derives_from",

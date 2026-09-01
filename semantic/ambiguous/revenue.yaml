@@ -13,3 +13,4 @@ resolution: >
   Ask, unless the question names one. "Gross", "net", "before rebates" and "after
   rebates" each name one, and a question carrying one of those has already
   resolved itself.
+aliases: ["revenues"]

@@ -315,13 +315,37 @@ trust. Every pair here is drawn from the job specification's own list.
 Words users genuinely say that are **not** metrics. Veritas must resolve them
 before generating SQL — never guess silently.
 
-| User says | Could mean | Resolution |
-|---|---|---|
-| "revenue" | Gross Revenue · Net Revenue | Ask, unless the question names one |
-| "volume" | Traded Notional · Trade Count | Ask |
-| "balance" | Cash Balance · Account Value | Ask |
-| "P&L" | Realised P&L · Unrealised P&L · both | Ask |
-| "how much does X have" | Cash Balance · Account Value | Ask |
+| User says | Could mean | Resolution | Also said as |
+|---|---|---|---|
+| "revenue" | Gross Revenue · Net Revenue | Ask, unless the question names one | revenues |
+| "volume" | Traded Notional · Trade Count | Ask | volumes · turnover |
+| "balance" | Cash Balance · Account Value | Ask | balances |
+| "P&L" | Realised P&L · Unrealised P&L · both | Ask | PnL · P and L · P & L · P/L |
+| "how much does X have" | Cash Balance · Account Value | Ask | how much is in X · how much does X hold |
+
+**Amended 2026-09-01 (Sub-step 7.2), agreed by Amino the same day.**
+*Also said as* is the other spellings of the same word — what a person types when
+they do not type the registered one. A spelling here is **the registered term**: it
+is detected exactly as the *User says* cell is, resolved against the same *Could
+mean* pair, and `X` stands for the subject in a phrase as it does in the row above.
+`semantic/ambiguous/` publishes the cell as the entry's `aliases`, and
+`tests/test_rewrite.py` reads it back against them, so this table and the corpus
+cannot drift apart silently. Without the column, every one of these spellings
+reached SQL generation as though the question had been unambiguous — not refused
+and not asked back, but silently — which is what
+[DEBT-029](debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently)
+records and this amendment pays.
+
+**"turnover" moved, and it could only go to one of the two places.** It was an
+alias of `Traded Notional` in `semantic/metrics/`, which made it a word Veritas
+answers with a number; it is registered here as a spelling of "volume", which makes
+it a word Veritas asks about. It cannot be both — an alias that is also an
+Ambiguous Term resolves silently the very thing this section says must be asked,
+which is the rule `check_semantic_layer.py`'s check 14 already enforced for the
+*User says* column and this amendment extends to this one. It is here rather than
+there because the reason "volume" is ambiguous is the reason "turnover" is: it
+names notional to a trading desk and count to an operations team, and Veritas
+serves both.
 
 **Amended 2026-08-24 (Sub-step 4.4).** The "P&L" row's *Could mean* cell read
 `Realised · Unrealised`, which is neither Section B term spelled as registered.

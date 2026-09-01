@@ -20,7 +20,13 @@ from veritas.retrieval import (
     references,
     searchable_entries,
 )
-from veritas.semantic import ENTRY_KINDS, SQL_FIELDS, JoinPath, entry_files
+from veritas.semantic import (
+    ENTRY_KINDS,
+    SQL_FIELDS,
+    JoinPath,
+    MetricDefinition,
+    entry_files,
+)
 
 # Warehouse columns spelled as a single word that is also the domain's own word for
 # the thing. `Commission`, `Fee` and `Rebate` are registered Glossary terms; `amount`
@@ -46,11 +52,19 @@ def test_corpus_holds_every_semantic_entry(root, semantic):
     assert len(records) == len(entry_files(root / "semantic"))
 
 
-def test_corpus_makes_every_alias_searchable(semantic):
-    """Every alias a Metric Definition publishes is text a search can match."""
+def test_corpus_makes_every_metric_alias_searchable(semantic):
+    """Every alias a Metric Definition publishes is text a search can match.
+
+    A Metric Definition's, and deliberately not every entry type's: an Ambiguous
+    Term's `aliases` are spellings the rewrite step matches before any search runs,
+    and `SEARCHABLE_FIELDS` says why they are not indexed. This scanned whatever
+    carried the field until Sub-step 7.2 gave a second entry type one.
+    """
     seen = 0
     for record, entry in zip(searchable_entries(semantic), semantic.entries()):
-        for alias in getattr(entry, "aliases", ()):
+        if not isinstance(entry, MetricDefinition):
+            continue
+        for alias in entry.aliases:
             seen += 1
             assert alias in record["text"], f"{entry.name}: alias {alias!r} not searchable"
     assert seen, "no aliases in the corpus — this check proved nothing"

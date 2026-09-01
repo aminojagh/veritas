@@ -12,3 +12,4 @@ disambiguates: [Cash Balance, Account Value]
 resolution: >
   Ask. "Cash balance" names the first, but "balance" alone does not, and the
   larger of the two answers is the one a wrong guess understates.
+aliases: ["balances"]

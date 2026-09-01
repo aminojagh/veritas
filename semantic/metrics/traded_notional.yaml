@@ -16,5 +16,5 @@ from_table: fct_trade
 join_paths: [trade_to_instrument, instrument_to_fx_rate_on_quotation_currency]
 filters: []
 date_column: fct_trade.trade_date
-aliases: ["notional", "traded value", "turnover"]
+aliases: ["notional", "traded value"]
 derives_from: []

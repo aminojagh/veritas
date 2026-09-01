@@ -26,11 +26,13 @@ from veritas.orchestrator.rewrite import (
     Rewrite,
     ambiguous_terms_in,
     clarifying_question_for,
+    first_said,
     resolution_instruction,
     resolutions_in,
     rewrite,
     rewritten_with,
     said_as,
+    spellings,
 )
 
 __all__ = [
@@ -47,6 +49,7 @@ __all__ = [
     "clarifying_question_for",
     "entry_text",
     "field_text",
+    "first_said",
     "generate",
     "generation_instruction",
     "grounding",
@@ -56,4 +59,5 @@ __all__ = [
     "rewritten_with",
     "said_as",
     "scope_text",
+    "spellings",
 ]

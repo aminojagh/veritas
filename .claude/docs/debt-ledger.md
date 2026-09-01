@@ -56,7 +56,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-026](#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted) | The retrieval models are downloaded rather than snapshotted | S | The Step that containerizes Veritas, or any offline claim in `README.md` | open |
 | [DEBT-027](#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) | The searchable text is one flat field, so a name match cannot outrank a description match | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank for Retrieval | open |
 | [DEBT-028](#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server) | No test reaches a real provider, so the live path is proven only by a stub server | S | Sub-step 6.4, or the first key available | **paid** (6.3, 2026-08-30) |
-| [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set | open |
+| [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.2, 2026-09-01) |
 | [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 | open |
 | [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown — **🔴 fired** | **paid** (6.5, 2026-08-31) |
 | [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals | open |
@@ -64,7 +64,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | M | The Sub-step of Step 007 that measures Execution Accuracy | open |
 
-**Open debt:** 16 · **Paid:** 16 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 15 · **Paid:** 17 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2354,7 +2354,7 @@ accepted cost, and Step 007's two-model comparison is what forces it.
 
 ### DEBT-029 — Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 7.2, 2026-09-01
 - **Opened:** Sub-step 6.3 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** M
 - **Location:** `veritas/orchestrator/rewrite.py` — `said_as`, `ambiguous_terms_in`
@@ -2424,6 +2424,23 @@ this entry is missing. Repayment is: agree the phrasings into
 spellings, carry them on the entry, and measure — a Gold Question that says
 *"turnover"* must reach the same outcome as the one that says *"volume"*, and no
 question that names its meaning may become one Veritas asks back about.
+
+**How it was paid, Sub-step 7.2 (2026-09-01).** Section D gained an *Also said as*
+column — nine spellings across the five rows, agreed as Glossary content rather than
+coined in a matcher — and `semantic/ambiguous/` publishes each row's cell as the
+entry's `aliases`. `said_as` builds a pattern per **spelling** rather than per name,
+and detection takes the earliest match over all of a term's spellings, so an alias is
+found exactly as the name is; the phrase row's aliases made the trailing-placeholder
+shape reachable for the first time, which the old pattern would have missed silently.
+Both directions are tests rather than assertions: the four-class table above inverts in
+`tests/test_rewrite.py`, every registered spelling is put back into a question and must
+find its own entry, Section D's column and the corpus `aliases` are read back against
+each other, and `tests/test_gold.py` holds the other side — no Gold Question that
+names its meaning is asked back about. The **"turnover" collision** the Gold Question
+Set inherited is settled in Section D: it is a spelling of *"volume"*, so it is no
+longer an alias of `Traded Notional`, and `test_no_certified_metric_claims_a_registered_spelling`
+extends check 14's rule from Section D's names to its spellings. A Clarifying Question
+now quotes the words the person used rather than the term the corpus files them under.
 
 ### DEBT-030 — The resolved meaning is appended to the question, and nothing has measured that against splicing it
 

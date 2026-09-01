@@ -13,3 +13,4 @@ disambiguates: [Traded Notional, Trade Count]
 resolution: >
   Ask. Neither is the default: "volume" means notional to a trading desk and count
   to an operations team, and Veritas serves both.
+aliases: ["volumes", "turnover"]
