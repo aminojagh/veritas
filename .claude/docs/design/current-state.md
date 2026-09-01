@@ -66,19 +66,29 @@ run only when `VERITAS_LIVE_MODEL` is set.
 
 ## Resume here
 
-- **Next: plan Step 007 — Evaluation and Observability.** The
+- **Next: Sub-step 7.1 — write the Gold Question Set.** The
   [Step 006 plan](../plan/step-006-retrieval-and-orchestrator.md) is `done`: all five
-  Sub-steps built, ruled and committed. Step 007 is the
-  Gold Question Set, hit rate, Mean Reciprocal Rank, Execution Accuracy and
-  LLM-as-judge, then Postgres logging and Grafana — and it is where five entries come
-  due at once:
-  [DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match),
-  [DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently),
-  [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it),
-  [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
+  Sub-steps built, ruled and committed.
+  [Step 007 — Evaluation](../plan/step-007-evaluation.md) is `active`, approved on
+  2026-09-01, four Sub-steps: the Gold Question Set
+  ([DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)'s
+  coverage,
+  [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
   and
-  [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used).
-  The Step 006 plan reserves ~3.5 days for it against the 2026-09-09 deadline.
+  [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level)'s
+  constraints), the Section D phrasings
+  ([DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently)),
+  hit rate and Mean Reciprocal Rank with the two measured arms
+  ([DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match),
+  [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)),
+  and Execution Accuracy with LLM-as-judge. Its one route decision is approved:
+  Observability splits out to Step 008 — six Sub-steps is the planning skill's own
+  two-Steps threshold — so
+  [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
+  and
+  [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+  now name Step 008 in their Triggers, and Containerization with `README.md` is
+  Step 009. Nothing in `veritas/evaluation/` is built yet.
 - **Nothing in Step 006 awaits Amino.** 6.3's `Clarifying Question` Term Proposal was
   approved on 2026-09-01 and is registered in Section A of the
   [Glossary](../glossary.md#a-the-system); `clarification` is now `clarifying_question`

@@ -59,9 +59,9 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set | open |
 | [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 | open |
 | [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown — **🔴 fired** | **paid** (6.5, 2026-08-31) |
-| [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 007 that charts refusals | open |
+| [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals | open |
 | [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set | open |
-| [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 007 that logs Lineage or charts metric usage | open |
+| [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
 
 **Open debt:** 18 · **Paid:** 13 · **Accepted:** 1 · **Moved:** 2
 
@@ -2545,8 +2545,10 @@ refusal and a Gate refusal from an Orchestrator one, because `clarifying_questio
 
 **Trigger**
 
-**The Sub-step of Step 007 that charts refusals.** If that Step charts only the Gate's
-reasons, this closes as *accepted* with that as the reason.
+**The Sub-step of Step 008 that charts refusals.** *Amended 2026-09-01: the
+[Step 007 plan](plan/step-007-evaluation.md#one-route-decision-observability-moves-to-step-008)
+moved Observability to Step 008. The firing condition is unchanged.* If that Step charts
+only the Gate's reasons, this closes as *accepted* with that as the reason.
 
 ---
 
@@ -2651,8 +2653,11 @@ that names two.
 
 **Trigger**
 
-**The Sub-step of Step 007 that logs a Grounded Answer or charts metric-usage
-frequency.** The [Target State](design/target-state.md#zoomcamp-criteria-map)
+**The Sub-step of Step 008 that logs a Grounded Answer or charts metric-usage
+frequency.** *Amended 2026-09-01: the
+[Step 007 plan](plan/step-007-evaluation.md#one-route-decision-observability-moves-to-step-008)
+moved Observability to Step 008. The firing condition is unchanged.*
+The [Target State](design/target-state.md#zoomcamp-criteria-map)
 puts *"metric-usage frequency"* on the Monitoring scorecard, and a chart of it built on
 this Lineage counts every retrieved metric as used — so the chart is wrong the day it is
 drawn, and it is wrong in the direction that flatters the corpus.
