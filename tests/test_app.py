@@ -32,7 +32,7 @@ from veritas.app import (
     single_value,
     table,
 )
-from veritas.llm import LanguageModelError
+from veritas.llm import LIVE_VARIABLE, LanguageModelError
 from veritas.orchestrator import GroundedAnswer, Lineage, Orchestrator
 from veritas.validation import (
     ANALYST,
@@ -40,8 +40,6 @@ from veritas.validation import (
     ValidationGate,
     ValidationGateOutcome,
 )
-
-LIVE_VARIABLE = "VERITAS_LIVE_MODEL"
 
 # A question the corpus covers, and the shape a breakdown of it comes back in: the
 # generation rules alias the axis `slice` and the metric `answer`, and the engine hands

@@ -17,10 +17,17 @@ corpus rather than a schema dump.
 every certified filter in the statement it writes is text pasted out of an entry, and
 the [Validation Gate](../validation/) is what decides whether it actually was. A
 statement this module produces is a proposal.
+
+**`PromptForm` is the one thing about the instruction that varies.** Two lengths of the
+same contract, so that which of them Veritas uses is a measured choice rather than a
+written one — `veritas/evaluation/generation.py` scores both. What surrounds them — the
+identity, the entries, and what the rewrite step has already done to the question — is
+the same under either.
 """
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from types import MappingProxyType
 
 from veritas.llm import LanguageModel, default_model, json_reply
@@ -104,6 +111,73 @@ breakdown that was asked for, or when the question is not about a number this li
 produce. Refusing is a correct answer; inventing SQL is not. A question that leaves the
 period or the breakdown unsaid is not a reason to refuse.\
 """
+
+# The same contract in a quarter of the words: the JSON reply, the statement's shape,
+# and the three constraints the itemised rules above spell out. Every rule dropped is a
+# consequence of one of the three, so this is the shorter statement of one instruction
+# rather than a laxer one.
+GENERATION_SHAPE = """\
+You write one DuckDB SELECT statement answering a question about a brokerage, using
+only the certified entries listed below.
+
+Answer with one JSON object and nothing else:
+  - {"sql": "<the statement>"} when the entries below can answer the question
+  - {"sql": null, "why": "<one sentence>"} when they cannot
+
+The statement has this shape:
+
+  SELECT [<axis column> AS slice,] <metric expression> AS answer
+  FROM <the metric's from_table>
+  <one JOIN <to_table> ON <on> per join path the entries list, in the order listed>
+  WHERE <each of the metric's filters> AND <the predicate that scopes the rows>
+  [GROUP BY <axis column>]
+
+Paste every metric expression and every join condition out of the entries character
+for character. Never write arithmetic, a table or a column of your own. Refusing is a
+correct answer; inventing SQL is not.\
+"""
+
+# What the question the model is handed has already had done to it. The rewrite step
+# resolves the Ambiguous Terms a person said before anything searches for the question,
+# and the model is given what that step produced rather than what was typed — see
+# `rewrite.py`. It is stated apart from the rules so that both forms below carry it: it
+# describes the input, not the instruction, and an arm that differed in both would
+# measure two changes at once.
+REWRITTEN_QUESTION = """\
+The question has already had its ambiguous words resolved, so where the person typed
+one it may now carry a certified metric's name instead, written over their own words
+and reading a little oddly. Such a name says which metric to compute. It is never a
+table, a column, or a value to filter on, and the words around it are still the
+person's — they say which period and which breakdown was asked for.\
+"""
+
+
+class PromptForm(StrEnum):
+    """How the generation instruction states what the model must do.
+
+    One instruction, two lengths. Both are given the same entries, the same identity
+    and the same `REWRITTEN_QUESTION`, so what an arm of the sweep in
+    `veritas/evaluation/generation.py` varies is the rules and nothing else.
+    """
+
+    RULES = "rules"
+    """Every constraint the Validation Gate enforces, itemised — `GENERATION_RULES`."""
+
+    SHAPE = "shape"
+    """The statement's shape and the three constraints under it — `GENERATION_SHAPE`."""
+
+
+# Which text each form is. A dispatch table rather than a match, because the sweep that
+# compares them iterates it — the shape `REWRITE_FORMS` has for the same reason.
+PROMPT_FORMS = {
+    PromptForm.RULES: GENERATION_RULES,
+    PromptForm.SHAPE: GENERATION_SHAPE,
+}
+
+# Which form the flow writes. Measured rather than chosen: `veritas/evaluation/
+# generation.py` scores both over the Gold Question Set, and the Step Review that set
+# this line carries the numbers and the losing form.
+DEFAULT_PROMPT_FORM = PromptForm.RULES
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,12 +351,16 @@ def scope_text(axis: DimensionDefinition, access_profile: AccessProfile) -> str:
 
 
 def generation_instruction(
-    entries: Sequence[SemanticEntry], access_profile: AccessProfile
+    entries: Sequence[SemanticEntry],
+    access_profile: AccessProfile,
+    form: PromptForm = DEFAULT_PROMPT_FORM,
 ) -> str:
-    """The system instruction: the rules, the identity, then the entries themselves."""
+    """The system instruction: the rules, what the question has had done to it, the
+    identity, then the entries themselves."""
     axis = access_axis_in(entries)
     return "\n\n".join([
-        GENERATION_RULES,
+        PROMPT_FORMS[form],
+        REWRITTEN_QUESTION,
         scope_text(axis, access_profile),
         "Certified entries:",
         grounding(entries, axis.routes),
@@ -294,6 +372,7 @@ def generate(
     entries: Sequence[SemanticEntry],
     access_profile: AccessProfile,
     model: LanguageModel | None = None,
+    form: PromptForm = DEFAULT_PROMPT_FORM,
 ) -> Generated:
     """Ask a model for the statement these entries can answer this question with.
 
@@ -305,7 +384,9 @@ def generate(
     model = default_model() if model is None else model
     reply = json_reply(
         model.complete(
-            generation_instruction(entries, access_profile), question, json_object=True
+            generation_instruction(entries, access_profile, form),
+            question,
+            json_object=True,
         )
     )
     sql = reply.get("sql")

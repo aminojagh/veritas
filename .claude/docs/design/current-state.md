@@ -12,14 +12,16 @@ trimmed this file to on 2026-08-25, and
 wrote the rule that keeps it short into step 5 of the `closing-a-substep` skill: a
 Sub-step adds what is now true, and the story of how it got there stays in the review.
 
-**Last updated:** 2026-09-02 — **Step 007 — Evaluation — is `active` and Step 006 is
-`done`, with every Step before it. Seven of the nine Target State components are built, a
-question typed into a browser comes back as a Grounded Answer, and the eighth measures
-the first half of the flow: `data/gold/` holds the Gold Question Set, `veritas/evaluation/`
-reads it, and Retrieval is scored over it by hit rate and Mean Reciprocal Rank. What
-Veritas *answers* is still unmeasured. A question that says an Ambiguous Term in any
-spelling [Glossary Section D](../glossary.md#d-ambiguous-terms) registers is detected as
-saying it, not only in the registered name.**
+**Last updated:** 2026-09-02 — **Step 007 — Evaluation — is `active` with all four of its
+Sub-steps built, and Step 006 is `done`, with every Step before it. Eight of the nine
+Target State components are built, a question typed into a browser comes back as a
+Grounded Answer, and the eighth measures both halves of the flow: `data/gold/` holds the
+Gold Question Set, `veritas/evaluation/` reads it, Retrieval is scored over it by hit rate
+and Mean Reciprocal Rank, and what Veritas *answers* is scored by Execution Accuracy and
+an LLM-as-judge's agreement with it, across two prompts and both registered providers.
+A question that says an Ambiguous Term in any spelling
+[Glossary Section D](../glossary.md#d-ambiguous-terms) registers is detected as saying it,
+not only in the registered name.**
 `veritas/validation/` refuses anything that
 is not a single, parseable, bounded `SELECT`, refuses any statement whose expressions do
 not all trace to a Certified Metric, refuses any statement whose answer would carry a
@@ -82,6 +84,17 @@ scores every Retrieval Strategy over the Gold Question Set by hit rate and Mean
 Reciprocal Rank, under both settings the Ledger had left to a measurement: the corpus
 indexed flat or field by field, and a resolved meaning appended to the question or
 spliced over it. Both defaults changed to what the numbers said — per field, and spliced.
+**Sub-step 7.4 measured generation.**
+`VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation` runs the whole flow
+over the Gold Question Set once per prompt per registered provider and scores what came
+back: Execution Accuracy against the gold result, the ending against the one the set calls
+correct, and an LLM-as-judge's agreement with the first. `PromptForm` is the prompt seam —
+two lengths of one contract, `rules` and `shape` — and both tell the model the question
+arrives with its Ambiguous Terms already resolved into it. `EndedBy` says which step of
+the flow ended each question, so a statement the Validation Gate refused is not read as a
+generation failure. A Gold Question whose own gold statement the Gate refuses is left out
+of the figures, derived rather than named. The sweep spends keys and refuses to start
+without `VERITAS_LIVE_MODEL`.
 **`tests/` holds Delivery Mode's two guards, the six corpus checks, the search checks,
 the rewrite and boundary checks, the flow checks, the two route probes, the App's
 rendering and page checks, the gold checks and the evaluation checks**;
@@ -93,9 +106,10 @@ call a real provider run only when `VERITAS_LIVE_MODEL` is set.
 
 ## Resume here
 
-- **Next: Sub-step 7.4 — measure generation: Execution Accuracy and LLM-as-judge.**
-  [Step 007 — Evaluation](../plan/step-007-evaluation.md) is `active`, approved on
-  2026-09-01, four Sub-steps. **7.1 is built and approved by Amino on 2026-09-01**:
+- **Next: Amino's ruling on Sub-step 7.4, which closes Step 007. Then Step 008 —
+  Observability.** [Step 007 — Evaluation](../plan/step-007-evaluation.md) is `active`,
+  approved on
+  2026-09-01, four Sub-steps, all four built. **7.1 is built and approved by Amino on 2026-09-01**:
   `data/gold/`, `veritas/evaluation/gold.py` and `tests/test_gold.py`, paying
   [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it),
   [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
@@ -115,19 +129,25 @@ call a real provider run only when `VERITAS_LIVE_MODEL` is set.
   [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)
   on one sweep and opening
   [DEBT-036](../debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one).
-  Still to come: Execution Accuracy with LLM-as-judge,
-  where [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
-  comes due and the first Groq call is made. Observability is Step 008 and
-  Containerization with `README.md` is Step 009.
-- **Awaiting Amino:
+  **7.4 is built and awaiting Amino**: `veritas/evaluation/generation.py`, `PromptForm`
+  in `veritas/orchestrator/generate.py`, the `generation` command and the generation
+  tests, paying
   [DEBT-036](../debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one)
-  alone** — it was opened at 7.3's close, after the Sub-step was approved, by the splice
-  tests added there; it changes no code and moves no measured number. Both flipped
-  defaults stand: the corpus is indexed field by field and a resolved meaning is spliced
-  over the word rather than appended, on measured Mean Reciprocal Rank. The rewritten
-  question is also what the model is grounded in, and splicing was chosen on retrieval
-  evidence alone; 7.4 is where generation gets a say and where the generator is made to
-  take the spliced question as its input.
+  and opening
+  [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse).
+  The first Groq call was made there. Observability is Step 008 and
+  Containerization with `README.md` is Step 009.
+- **Awaiting Amino: the whole of Sub-step 7.4, and two decisions inside it.** First,
+  [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
+  was **not** paid — its Trigger allows that and asks for the exclusion to be stated, and
+  `Account Value` is out of every measured figure. Second,
+  [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
+  is open rather than fixed: `gpt-4o-mini` refuses most Gold Questions because their
+  period is later than its own training data, which costs most of Execution Accuracy on
+  the default provider, and the fix is one sentence in each prompt — but the prompt is
+  the arm being measured, so changing it would have published a table the prompts no
+  longer match. `DEFAULT_PROMPT_FORM` therefore stays `rules`: the two forms tie exactly
+  on Execution Accuracy, and a tie is not evidence for a change.
   No Term Proposal is open: 7.1's two were agreed on 2026-09-01 and are
   [Glossary](../glossary.md#a-the-system) Section A rows, **`Gold Question`** and
   **`Relevant Set`**, and 7.2's Section D column was agreed the same day.
@@ -463,15 +483,22 @@ veritas/
 
 ## Known gaps
 
-**Nothing measures what Veritas answers.** Retrieval is scored — hit rate and Mean
-Reciprocal Rank over the Gold Question Set, every Retrieval Strategy under every setting —
-but nothing scores the SQL that comes out the other end: **Execution Accuracy and
-LLM-as-judge are unmeasured**, and no Groq call has ever been made. Sub-step 7.4 is that.
-The retrieval numbers are also narrow: **hit rate is 1.000 in every cell**, so only MRR
-separates the settings, and it does that over twelve scored questions in steps of 1/24.
-Nothing logs a question, a verdict, a cost or a latency either,
-so *"Validation-Gate rejections by reason"* and *"metric-usage frequency"* are chart
-descriptions rather than charts — that is Observability, Step 008.
+**What Veritas answers is measured, and on the default provider the measure is poor.**
+Both halves are scored over the Gold Question Set now — hit rate and Mean Reciprocal Rank
+for Retrieval, Execution Accuracy and an LLM-as-judge's agreement for generation, across
+two prompts and both registered providers. The generation figures split hard by model:
+`openai/gpt-oss-120b` on Groq answers ten of the eleven answerable Gold Questions
+correctly and `gpt-4o-mini` answers two, because `gpt-4o-mini` refuses a question whose
+period is later than its own training data —
+[DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse),
+whose fix is one sentence and a re-run. Both measures are also narrow: retrieval's
+**hit rate is 1.000 in every cell**, so only MRR separates those settings, over twelve
+questions in steps of 1/24; generation's Execution Accuracy is over **eleven** questions,
+so one of them is worth 0.09. The dated tables and the commands that produce them are in
+the [Step 007 review](../reviews/step-007-evaluation.md). Nothing logs a question, a
+verdict, a cost or a latency, so *"Validation-Gate rejections by reason"* and
+*"metric-usage frequency"* are chart descriptions rather than charts — that is
+Observability, Step 008.
 
 **`Account Value` is a Certified Metric with no answer.** Its only correct statement adds
 the two halves `derives_from` describes, and the Gate refuses that as a Shadow Metric —
@@ -503,8 +530,10 @@ strongest thing a corpus check can do without inventing a question. The "as of" 
 comes from the question, and the Gold Question Set is where the questions that carry one
 now live: every gold statement keys on its own metric's `date_column`, which is what
 [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
-was opened about and 7.1 paid. No **live** run has met that rule yet; Sub-step 7.4 is the
-first that will.
+was opened about and 7.1 paid. Sub-step 7.4 is the first live run to have been asked
+them, and the period every one of them carries is what
+[DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
+was found by.
 
 **Every test a reviewer runs drives a stub** — a stub model for the rewrite step, a stub
 server on `127.0.0.1` for the boundary — so `uv run pytest` needs no key and opens no
@@ -518,8 +547,10 @@ a question it does not — and one that asks a question through the App's own pa
 first three have been run against both providers; a key
 sitting in `.env` for the App is not consent to spend it on every run, which is why they
 stay opt-in. Those five questions are self-written and reach five of the nine Certified
-Metrics; the Gold Question Set is what replaces them, and Sub-step 7.4 is where a live
-run is asked it.
+Metrics; the Gold Question Set replaces them, and
+`VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation` is what asks it —
+the same name gating the same consent, which is why it is `veritas/llm/`'s constant
+rather than a literal in four files.
 
 **The spike's go was measured on a spike, and two of its limits still stand.** Only
 projections are read for claim 1, so a metric expression appearing solely in a filter

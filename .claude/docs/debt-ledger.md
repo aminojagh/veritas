@@ -63,9 +63,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | M | The Sub-step of Step 007 that measures Execution Accuracy | open |
-| [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice | open |
+| [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice | **paid** |
+| [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | S | Before the capstone is submitted — it costs most of Execution Accuracy on the default provider | open |
 
-**Open debt:** 14 · **Paid:** 19 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 14 · **Paid:** 20 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2801,6 +2802,11 @@ It also puts a **scoped exemption** in `tests/test_gold.py`: `REFUSED_TODAY` nam
 one Gold Question whose statement the Gate refuses, by name, so the test asserts today's
 refusal in both directions and breaks when this entry is paid.
 
+Since Sub-step 7.4 it also costs a question out of the generation sweep. That exclusion
+is **derived and names nothing** — `answerable_by_veritas` asks the Gate whether it would
+allow each Gold Question's own gold statement — so the day this is paid the sweep scores
+one question more without a line being edited.
+
 **Trigger**
 
 **The Sub-step of Step 007 that measures Execution Accuracy** — Sub-step 7.4, where a
@@ -2809,11 +2815,21 @@ model writes, so the measure would report a generation failure that is a Gate fa
 7.4 runs without it being paid, the entry stays open and the Step Review states that
 `Account Value` is excluded from the accuracy figure and why.
 
+**7.4 ran without paying it, 2026-09-02**, and the second branch is what happened: the
+question is named in the sweep's own header line and in the Step Review. Widening the
+tracing rule is not the whole repayment any more, which is the finding that Sub-step
+bought. The generation rules pin a single-SELECT shape — *"no Common Table Expression, no
+second top-level SELECT"* — and the only correct statement for a composed metric adds two
+scalar subqueries, so a Gate that allowed the shape would still be asked for it by no
+prompt Veritas writes. Paying this now means the Gate rule **and** a generation rule that
+admits the composed shape, measured across both prompts again. The Trigger is unchanged
+and the entry is bigger than `M` was written against.
+
 ---
 
 ### DEBT-036 — Splicing writes over the first mention of a term and leaves every later one
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 7.4, 2026-09-02
 - **Opened:** Sub-step 7.3 (`.claude/docs/reviews/step-007-evaluation.md`)
 - **Size:** S
 - **Location:** `veritas/orchestrator/rewrite.py` — `spliced_with`, through the
@@ -2862,3 +2878,76 @@ quarter"* is an ordinary question for a person to ask.
 grounded in the rewritten question there, so a leftover ambiguous word costs Execution
 Accuracy rather than a rank. Earlier if it fires earlier: the first Gold Question that
 says one Ambiguous Term twice puts the leftover word inside the measurement itself.
+
+**How it was paid, Sub-step 7.4 (2026-09-02).** `said_throughout` finds every mention
+where `first_said` found one, and `spliced_with` writes over all of them — still right to
+left, so no replacement moves the next. The reduction the deferral named as the reason it
+was not a one-line change is `without_overlaps`, which takes the mentions of **every**
+resolved term together and keeps the earliest, and the longer of two that begin together:
+two spellings of one term and two different terms can both claim intersecting words, and
+`how much does X have` spans a subject a shorter spelling can match inside. `first_said`
+survives as the first of that list, which is what its two remaining callers want — the
+resolution instruction naming the spelling the question used, and the Clarifying Question
+quoting it back. The word a longer match swallowed still appears in the output, inside
+the subject the phrase captured: *"how much does the trading balance have"* splices to
+*"Account Value the trading balance"*, and that is correct, because the subject is the
+question's own words. The retrieval sweep's table is unmoved, as the deferral predicted
+it would be — no Gold Question says one term twice.
+
+---
+
+### DEBT-037 — Nothing tells the generator that a date it has never heard of is not a reason to refuse
+
+- **Status:** open
+- **Opened:** Sub-step 7.4 (`.claude/docs/reviews/step-007-evaluation.md`)
+- **Size:** S
+- **Location:** `veritas/orchestrator/generate.py` — the refusal paragraph of
+  `GENERATION_RULES`, and the same three sentences at the end of `GENERATION_SHAPE`
+
+**What we did**
+
+Listed the three reasons to refuse and left the list open. A model is told to refuse
+*"when no metric below computes what was asked, when no axis reaches the breakdown that
+was asked for, or when the question is not about a number this list can produce"*, and
+nothing says those are the **only** reasons. A generator that finds another one is
+therefore doing as it was told.
+
+**What we should have done**
+
+Closed the list, and closed it on the one thing the corpus cannot tell a model: which
+dates the Warehouse holds. A Metric Definition publishes its `date_column` and no
+Semantic Entry publishes a range, so a model asked about a period has nothing to check
+it against and substitutes what it does have — what it saw in training.
+
+**Why we deferred**
+
+It was found **by** the measurement, in the Sub-step whose whole subject is the
+measurement, and the prompt is the arm being measured. Changing it on discovering the
+result would have published a table produced by prompts that no longer exist — see the
+Step 007 plan's *"a finding needing more than that becomes a Ledger entry, not silent
+scope"*.
+
+**Cost while unpaid**
+
+Most of Execution Accuracy on the default provider. Every Gold Question carries a
+period, because [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
+required it, and on 2026-09-02 `gpt-4o-mini` refused eight of the eleven answerable ones
+in that shape under both prompts — *"The date 18 March 2025 is beyond the data available
+up to October 2023"*, and *"The date range specified is outside the available data"*. It
+is a refusal about the model's own knowledge, not about the corpus, and it is the
+difference between 0.182 and 0.909 in the Step Review's table: `openai/gpt-oss-120b`
+does not do it. Two providers, one prompt, one measure — and the measure is reading a
+habit of one model rather than anything Veritas decided.
+
+It costs a **wrong** answer rather than a wrong number, which is the better of the two
+failures: a refusal is one of the three endings Veritas is built to have, and nothing
+uncertified reached a person. What it damages is the product being useful and the
+[Zoomcamp criterion](design/target-state.md#zoomcamp-criteria-map)'s figure.
+
+**Trigger**
+
+**Before the capstone is submitted.** One sentence in each prompt form — the list of
+reasons to refuse is exhaustive, and a period the model has not heard of is not on it —
+then `VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation` again, so the
+table in the review is replaced rather than annotated. Both prompts change together or
+the arms stop being comparable.

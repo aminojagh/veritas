@@ -18,7 +18,7 @@ unresolved term is asked back rather than guessed at.
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cache
@@ -114,14 +114,45 @@ def spellings(term: AmbiguousTerm) -> tuple[str, ...]:
     return (term.name, *term.aliases)
 
 
-def first_said(term: AmbiguousTerm, question: str) -> re.Match[str] | None:
-    """The question's first mention of this term, in whichever spelling it used."""
-    found = [
+def without_overlaps(found: Iterable[re.Match[str]]) -> list[re.Match[str]]:
+    """Those of these matches that can all be written over, in question order.
+
+    Two spellings of one term, or two terms, can match overlapping words of the same
+    question, and writing over both would splice into text the first replacement had
+    already removed. So a set of matches is reduced to non-overlapping ones before any
+    of it is written.
+
+    Earliest first, and the longer of two that begin together: a longer match spans more
+    of the words the person used, and those words are exactly what a splice replaces and
+    what a Clarifying Question quotes back.
+    """
+    kept: list[re.Match[str]] = []
+    for match in sorted(found, key=lambda match: (match.start(), -match.end())):
+        if not kept or match.start() >= kept[-1].end():
+            kept.append(match)
+    return kept
+
+
+def said_throughout(term: AmbiguousTerm, question: str) -> list[re.Match[str]]:
+    """Every mention of this term the question makes, in whichever spellings it used.
+
+    Non-overlapping and in question order, so a caller may write over all of them.
+    """
+    return without_overlaps(
         match
         for spelling in spellings(term)
-        if (match := said_as(spelling).search(question))
-    ]
-    return min(found, key=lambda match: match.start()) if found else None
+        for match in said_as(spelling).finditer(question)
+    )
+
+
+def first_said(term: AmbiguousTerm, question: str) -> re.Match[str] | None:
+    """The question's first mention of this term, in whichever spelling it used.
+
+    What the two callers that want one mention want: the resolution instruction naming
+    the spelling the question used, and the Clarifying Question quoting it back.
+    """
+    said = said_throughout(term, question)
+    return said[0] if said else None
 
 
 def ambiguous_terms_in(question: str, layer: SemanticLayer) -> list[AmbiguousTerm]:
@@ -256,9 +287,16 @@ def appended_with(
 def spliced_with(
     question: str, resolutions: Mapping[str, tuple[str, ...]], layer: SemanticLayer
 ) -> str:
-    """The question with each resolved term's own words replaced by its meanings.
+    """The question with every resolved term's own words replaced by its meanings.
 
-    Right to left, so replacing one mention does not move the next one's position.
+    Right to left, so replacing one mention does not move the next one's position, and
+    **every** mention: a question that says one term twice — *"revenue last quarter
+    against revenue this quarter"* — would otherwise keep the second, and an ambiguous
+    word left in the question is the cue resolving it was supposed to remove.
+
+    The mentions of all the resolved terms are reduced together rather than term by
+    term, because two terms can claim overlapping words as readily as two spellings of
+    one can.
 
     A spelling that stands for a phrase about a subject captures that subject —
     `how much does X have` matches all of *"how much does account 12 have"* — and the
@@ -267,17 +305,17 @@ def spliced_with(
     splices to *"Cash Balance account 12"*, which is clumsy; dropping the subject
     would lose which account was asked about, which is worse.
     """
-    said = [
-        (match, metrics)
+    meant = {
+        match: metrics
         for term_name, metrics in resolutions.items()
         if (term := layer.ambiguous_terms.get(term_name))
-        and (match := first_said(term, question))
-    ]
+        for match in said_throughout(term, question)
+    }
     spliced = question
-    for match, metrics in sorted(said, key=lambda found: -found[0].start()):
+    for match in sorted(without_overlaps(meant), key=lambda match: -match.start()):
         spliced = (
             spliced[:match.start()]
-            + " ".join([" and ".join(metrics), *match.groups()])
+            + " ".join([" and ".join(meant[match]), *match.groups()])
             + spliced[match.end():]
         )
     return spliced

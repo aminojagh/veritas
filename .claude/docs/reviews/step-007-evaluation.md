@@ -148,3 +148,47 @@ approval and changes no code, so the measured arms and the table above stand as 
 **Language.** No Term Proposal: `SearchableForm` and `RewriteForm` take the Ledger's own
 words — DEBT-027's *"one flat field"* against a *"per-field index"*, DEBT-030's
 *"Appending"* against *"splicing"* — and `RetrievalMeasures` is `Evaluation Measure`'s.
+
+---
+
+## Sub-step 7.4 — Measure generation: Execution Accuracy and LLM-as-judge
+
+**Changed.** `veritas/evaluation/generation.py` runs the whole flow over the Gold Question
+Set once per prompt per registered provider, scoring Execution Accuracy, the ending the set
+calls correct, and a judge's agreement with the first. `PromptForm` is the prompt seam and
+`EndedBy` names the step that ended each question, so a Gate refusal is not a wrong number.
+
+**Verified.** `uv run pytest` — 236 passed, 4 skipped (live-model), from 219 + 4 before.
+`verify_framework.py`, `check_language.py` and all four Warehouse checks PASS. The sweep,
+2026-09-02, less two header lines the table's own columns repeat:
+
+```
+$ VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation
+  gold          data/gold — 24 Gold Questions, 23 of them scored
+  excluded      'Account Value as of 10 August 2026' — the Validation Gate refuses the statement the set itself calls correct, so no model can answer it
+  judge         gpt-4o-mini, on every scored question
+
+  prompt  model                      ending  execution accuracy  judge agreement
+  rules   openai gpt-4o-mini          14/23          2/11 0.182      17/23 0.739  <- today
+  rules   groq openai/gpt-oss-120b    22/23         10/11 0.909      18/23 0.783
+  shape   openai gpt-4o-mini          14/23          2/11 0.182      21/23 0.913
+  shape   groq openai/gpt-oss-120b    22/23         10/11 0.909      21/23 0.913
+```
+
+**Debt** — DEBT-036 paid: every mention is spliced now, not the first. DEBT-035 **not
+paid**, on the second branch its own Trigger allows; the `excluded` line above is its cost,
+derived rather than named. DEBT-037 opened: eight of `gpt-4o-mini`'s nine failures are
+`no sql` — asked why, it says *"The date 18 March 2025 is beyond the data available up to
+October 2023"*.
+
+**Sceptically.** (1) **The prompts tie and the models do not** — Execution Accuracy is
+identical across `rules` and `shape` on both providers, so `DEFAULT_PROMPT_FORM` stays
+`rules`, though `shape` says it in a quarter of the words. (2) **0.182 reads one model's
+habit, not Veritas**; DEBT-037's fix is one sentence per prompt, not made here because the
+prompt is the arm being measured. (3) **Eleven questions**, so one is worth 0.09 — and
+`Cash Balance` failed in the sweep and answered when re-asked, so a cell moves between runs
+at temperature 0. (4) **The judge grades itself among others**, disagreeing only on refusals.
+
+**Language.** No Term Proposal: `PromptForm` takes `RewriteForm`'s shape, Execution Accuracy
+and LLM-as-judge are the Glossary's [Evaluation Measure](../glossary.md#a-the-system) row,
+and `EndedBy` names endings `flow.py` already had.

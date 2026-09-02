@@ -20,19 +20,20 @@ import re
 
 import pytest
 
+from veritas.llm import LIVE_VARIABLE
 from veritas.orchestrator import (
-    GENERATION_RULES,
     GROUNDED_FIELDS,
+    PROMPT_FORMS,
+    REWRITTEN_QUESTION,
     GroundedAnswer,
     Lineage,
     Orchestrator,
+    PromptForm,
     entry_text,
     generation_instruction,
 )
 from veritas.semantic import MetricDefinition
 from veritas.validation import ACCESS_AXIS, ANALYST, RejectionReason, ValidationGate
-
-LIVE_VARIABLE = "VERITAS_LIVE_MODEL"
 
 # A Warehouse identifier, as the corpus and a statement both spell one. Every table in
 # `veritas/warehouse/schema.sql` is `fct_` or `dim_` prefixed.
@@ -203,8 +204,37 @@ def test_the_prompt_names_no_table_the_entries_do_not(orchestrator):
 
 
 def test_the_rules_name_no_table_of_their_own(orchestrator):
-    """Veritas's own instructions are about the corpus, never about the Warehouse."""
-    assert not TABLE.findall(GENERATION_RULES)
+    """Veritas's own instructions are about the corpus, never about the Warehouse.
+
+    Every `PromptForm`, and what is said about the question besides them, because an
+    instruction that named a table would ground the model in something the entries
+    cannot check — whichever arm of the sweep was running when it did.
+    """
+    for said in [*PROMPT_FORMS.values(), REWRITTEN_QUESTION]:
+        assert not TABLE.findall(said)
+
+
+def test_the_two_prompt_forms_say_the_same_thing_at_two_lengths(orchestrator):
+    """One instruction, two arms: both ask for one JSON object, both give the statement's
+    shape, and one is markedly shorter than the other — which is the only difference the
+    sweep in `veritas/evaluation/generation.py` is measuring."""
+    rules, shape = PROMPT_FORMS[PromptForm.RULES], PROMPT_FORMS[PromptForm.SHAPE]
+    for said in (rules, shape):
+        assert '{"sql": null, "why"' in said
+        assert "<metric expression> AS answer" in said
+    assert len(shape.splitlines()) * 2 < len(rules.splitlines())
+
+
+def test_the_question_the_generator_is_handed_is_described_to_it(orchestrator, semantic):
+    """The rewrite step splices certified names over the words a person typed, so the
+    generator is never handed the question as it was asked.
+
+    Every form carries that, because it describes the input rather than the instruction —
+    an arm that varied both would be measuring two changes at once.
+    """
+    entries = orchestrator().grounded_entries(UNAMBIGUOUS)
+    for form in PromptForm:
+        assert REWRITTEN_QUESTION in generation_instruction(entries, ANALYST, form)
 
 
 def test_an_ambiguous_term_grounds_nothing(semantic):

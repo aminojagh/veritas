@@ -23,7 +23,12 @@ from collections.abc import Mapping, Sequence
 
 from veritas.llm import LanguageModel
 from veritas.orchestrator.answer import GroundedAnswer, Lineage
-from veritas.orchestrator.generate import GROUNDED_FIELDS, generate
+from veritas.orchestrator.generate import (
+    DEFAULT_PROMPT_FORM,
+    GROUNDED_FIELDS,
+    PromptForm,
+    generate,
+)
 from veritas.orchestrator.rewrite import rewrite
 from veritas.retrieval import TOP_K, RetrievalStrategy, Retriever
 from veritas.semantic import MetricDefinition, SemanticEntry
@@ -48,9 +53,10 @@ class Orchestrator:
     than loading their own — two readings of `semantic/` under one question is two
     chances for a Grounded Answer to cite a version the Gate did not judge against.
 
-    `strategy` is held here rather than passed per question because a comparison across
-    Retrieval Strategies varies the Orchestrator and not the question, and every
-    Orchestrator built over one Retriever shares its indexes.
+    `strategy` and `prompt_form` are held here rather than passed per question because a
+    comparison across Retrieval Strategies or across generation prompts varies the
+    Orchestrator and not the question, and every Orchestrator built over one Retriever
+    shares its indexes.
 
     The model is resolved when it is called rather than when this is built, so
     constructing one costs no key: `None` means whichever provider the environment
@@ -65,6 +71,7 @@ class Orchestrator:
         gate: ValidationGate | None = None,
         strategy: RetrievalStrategy = RetrievalStrategy.RERANKED,
         top_k: int = TOP_K,
+        prompt_form: PromptForm = DEFAULT_PROMPT_FORM,
     ) -> None:
         self.warehouse = warehouse
         self.gate = ValidationGate(warehouse) if gate is None else gate
@@ -74,6 +81,7 @@ class Orchestrator:
         self.model = model
         self.strategy = strategy
         self.top_k = top_k
+        self.prompt_form = prompt_form
 
     def grounded_entries(self, question: str) -> list[SemanticEntry]:
         """What the model is shown: what the question retrieves, then what the identity
@@ -133,7 +141,9 @@ class Orchestrator:
                         "Metric, and Veritas answers only with those",
             )
 
-        written = generate(resolved.rewritten, entries, access_profile, self.model)
+        written = generate(
+            resolved.rewritten, entries, access_profile, self.model, self.prompt_form
+        )
         if not written.sql:
             return GroundedAnswer(
                 question=question,

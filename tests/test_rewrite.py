@@ -26,7 +26,7 @@ import re
 
 import pytest
 
-from veritas.llm import LanguageModelError
+from veritas.llm import LIVE_VARIABLE, LanguageModelError
 from veritas.orchestrator import (
     DEFAULT_REWRITE_FORM,
     PLACEHOLDER,
@@ -55,8 +55,8 @@ ASKED = {
 
 # Calling a real provider costs money on a paid one and rate limit on a free one,
 # and a key sitting in `.env` for the App to use is not permission to spend it. The
-# live test is opt-in and names what it will do.
-LIVE_VARIABLE = "VERITAS_LIVE_MODEL"
+# live test is opt-in and names what it will do — `LIVE_VARIABLE` is that name, and it
+# is `veritas/llm/`'s because it is a fact about spending a key.
 
 # A question about the brokerage that says no Ambiguous Term at all. Trade Count is
 # a Certified Metric named outright, so there is nothing to resolve and nothing to
@@ -431,17 +431,60 @@ def test_the_spliced_form_writes_over_the_words_in_the_case_they_were_typed(sema
     ) == "what was Gross Revenue in March"
 
 
-def test_the_spliced_form_writes_over_the_first_mention_and_leaves_a_later_one(semantic):
-    """[DEBT-036](../.claude/docs/debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one):
-    a term said twice keeps its second mention, so what Retrieval searches and the
-    generator is grounded in carries the certified name and the ambiguous word both.
+def test_the_spliced_form_writes_over_every_mention_of_a_term(semantic):
+    """A term said twice is written over twice: an ambiguous word left in the question is
+    the cue resolving it was supposed to remove.
+
+    Paid [DEBT-036](../.claude/docs/debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one),
+    which pinned the first mention alone.
     """
     assert rewritten_with(
         "what was our revenue last quarter and our revenue this quarter",
         {"revenue": ("Gross Revenue",)},
         semantic,
         RewriteForm.SPLICED,
-    ) == "what was our Gross Revenue last quarter and our revenue this quarter"
+    ) == (
+        "what was our Gross Revenue last quarter and our Gross Revenue this quarter"
+    )
+
+
+def test_the_spliced_form_writes_over_a_later_mention_in_another_spelling(semantic):
+    """Every registered spelling counts as a mention, so a question that says the word
+    once and an alias of it once has both written over — and neither replacement moves
+    the other."""
+    assert rewritten_with(
+        "was our P&L better than our PnL last year",
+        {"P&L": ("Realised P&L",)},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "was our Realised P&L better than our Realised P&L last year"
+
+
+def test_a_phrase_said_twice_is_written_over_twice_with_each_subject_kept(semantic):
+    """Two mentions of the spelling that captures a subject, each keeping its own."""
+    assert rewritten_with(
+        "how much does account 12 have and how much does account 13 have",
+        {"how much does X have": ("Cash Balance",)},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "Cash Balance account 12 and Cash Balance account 13"
+
+
+def test_two_terms_claiming_the_same_words_are_written_over_once(semantic):
+    """`how much does X have` spans the subject it is about, and a second term can sit
+    inside that subject — so both resolved, the shorter would splice into text the
+    longer had already replaced.
+
+    The longer match wins, because it spans more of the words the person used. The word
+    it swallowed survives in the output as part of the subject, which is right: the
+    subject is the question's own words and not the term's.
+    """
+    assert rewritten_with(
+        "how much does the trading balance have",
+        {"how much does X have": ("Account Value",), "balance": ("Cash Balance",)},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "Account Value the trading balance"
 
 
 def test_a_resolution_the_question_says_no_words_for_is_not_spliced_in(semantic):

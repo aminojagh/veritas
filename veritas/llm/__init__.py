@@ -9,6 +9,7 @@ from veritas.llm.model import (
     DEFAULT_PROVIDER,
     ENV_FILE,
     FENCED,
+    LIVE_VARIABLE,
     MODEL_VARIABLE,
     PROVIDER_VARIABLE,
     PROVIDERS,
@@ -21,12 +22,14 @@ from veritas.llm.model import (
     default_model,
     json_reply,
     model_for,
+    registered_models,
 )
 
 __all__ = [
     "DEFAULT_PROVIDER",
     "ENV_FILE",
     "FENCED",
+    "LIVE_VARIABLE",
     "MODEL_VARIABLE",
     "PROVIDERS",
     "PROVIDER_VARIABLE",
@@ -39,4 +42,5 @@ __all__ = [
     "default_model",
     "json_reply",
     "model_for",
+    "registered_models",
 ]

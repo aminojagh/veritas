@@ -67,6 +67,13 @@ PROVIDER_VARIABLE = "VERITAS_LLM_PROVIDER"
 MODEL_VARIABLE = "VERITAS_LLM_MODEL"
 DEFAULT_PROVIDER = "openai"
 
+# Consent to spend a key, for anything that would spend one without a person having
+# asked this question. A key sitting in `.env` so the App can answer is not consent for
+# a test run or a sweep to spend it, and this is the name that says so — read by the
+# tests that call a real provider and by the Evaluation sweep that calls one a few
+# hundred times.
+LIVE_VARIABLE = "VERITAS_LIVE_MODEL"
+
 # Nothing Veritas asks a model is a matter of taste: a resolution the model is
 # free to vary between two runs is a resolution a person cannot check.
 TEMPERATURE = 0.0
@@ -210,6 +217,19 @@ def default_model() -> ChatCompletions:
         os.environ.get(PROVIDER_VARIABLE) or DEFAULT_PROVIDER,
         os.environ.get(MODEL_VARIABLE) or None,
     )
+
+
+def registered_models() -> dict[str, ChatCompletions]:
+    """One client per supported provider, each on that provider's own default model.
+
+    What a comparison across models is run over, keyed by provider name — the whole of
+    `PROVIDERS` rather than a list written somewhere else, so a third provider reaches
+    an evaluation by being registered here and not by being named twice.
+
+    Raises `LanguageModelError` for the first provider with no key, because a sweep that
+    quietly dropped an arm would publish a comparison it never made.
+    """
+    return {name: model_for(name) for name in PROVIDERS}
 
 
 def json_reply(reply: str) -> dict[str, object]:
