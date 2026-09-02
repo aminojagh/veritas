@@ -12,14 +12,13 @@ trimmed this file to on 2026-08-25, and
 wrote the rule that keeps it short into step 5 of the `closing-a-substep` skill: a
 Sub-step adds what is now true, and the story of how it got there stays in the review.
 
-**Last updated:** 2026-09-02 — **Step 007 — Evaluation — is `active` with all four of its
-Sub-steps built, and Step 006 is `done`, with every Step before it. Eight of the nine
-Target State components are built, a question typed into a browser comes back as a
-Grounded Answer, and the eighth measures both halves of the flow: `data/gold/` holds the
-Gold Question Set, `veritas/evaluation/` reads it, Retrieval is scored over it by hit rate
-and Mean Reciprocal Rank, and what Veritas *answers* is scored by Execution Accuracy and
-an LLM-as-judge's agreement with it, across two prompts and both registered providers.
-A question that says an Ambiguous Term in any spelling
+**Last updated:** 2026-09-02 — **Step 007 — Evaluation — is `done`, and so is every Step
+before it. Eight of the nine Target State components are built, a question typed into a
+browser comes back as a Grounded Answer, and the eighth measures both halves of the flow:
+`data/gold/` holds the Gold Question Set, `veritas/evaluation/` reads it, Retrieval is
+scored over it by hit rate and Mean Reciprocal Rank, and what Veritas *answers* is scored
+by Execution Accuracy and an LLM-as-judge's agreement with it, across two prompts and
+both registered providers. A question that says an Ambiguous Term in any spelling
 [Glossary Section D](../glossary.md#d-ambiguous-terms) registers is detected as saying it,
 not only in the registered name.**
 `veritas/validation/` refuses anything that
@@ -106,51 +105,27 @@ call a real provider run only when `VERITAS_LIVE_MODEL` is set.
 
 ## Resume here
 
-- **Next: Amino's ruling on Sub-step 7.4, which closes Step 007. Then Step 008 —
-  Observability.** [Step 007 — Evaluation](../plan/step-007-evaluation.md) is `active`,
-  approved on
-  2026-09-01, four Sub-steps, all four built. **7.1 is built and approved by Amino on 2026-09-01**:
-  `data/gold/`, `veritas/evaluation/gold.py` and `tests/test_gold.py`, paying
-  [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it),
-  [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
-  and
-  [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level),
-  and opening
-  [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows).
-  **7.2 is built and approved by Amino on 2026-09-01** too: Glossary Section D's
-  *Also said as* column, `aliases` on every Ambiguous Term, and detection over every
-  registered spelling, paying
-  [DEBT-029](../debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently).
-  **7.3 is built and approved by Amino on 2026-09-02**: `veritas/evaluation/retrieval.py`,
-  `veritas/evaluation/__main__.py`, `tests/test_evaluation.py` and the splice tests in
-  `tests/test_rewrite.py`, paying
-  [DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match)
-  and
-  [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)
-  on one sweep and opening
-  [DEBT-036](../debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one).
-  **7.4 is built and awaiting Amino**: `veritas/evaluation/generation.py`, `PromptForm`
-  in `veritas/orchestrator/generate.py`, the `generation` command and the generation
-  tests, paying
-  [DEBT-036](../debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one)
-  and opening
-  [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse).
-  The first Groq call was made there. Observability is Step 008 and
-  Containerization with `README.md` is Step 009.
-- **Awaiting Amino: the whole of Sub-step 7.4, and two decisions inside it.** First,
+- **Next: Step 008 — Observability**, which has no plan yet.
+  [Step 007 — Evaluation](../plan/step-007-evaluation.md) is **`done`**, and so is every
+  Step before it: four Sub-steps, all four built, ruled and committed — 7.1 (`a361b79`),
+  7.2 (`35099c3`), 7.3 (`47dfb8c`) and 7.4 (`7e40092`), the last approved on 2026-09-02.
+  The first Groq call was made in 7.4. Observability is Step 008 and Containerization
+  with `README.md` is Step 009.
+- **Nothing awaits Amino, and no Term Proposal is open**: 7.1's two were agreed on
+  2026-09-01 and are [Glossary](../glossary.md#a-the-system) Section A rows,
+  **`Gold Question`** and **`Relevant Set`**, and 7.2's Section D column was agreed the
+  same day. **Two entries carry out of Step 007.**
   [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
-  was **not** paid — its Trigger allows that and asks for the exclusion to be stated, and
-  `Account Value` is out of every measured figure. Second,
+  is open and unpaid on the second branch its own Trigger allows — `Account Value` is
+  excluded from every generation figure, derived rather than named — and Sub-step 7.4
+  resized it `M` → `L`, because a Gate rule alone no longer pays it.
   [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
-  is open rather than fixed: `gpt-4o-mini` refuses most Gold Questions because their
-  period is later than its own training data, which costs most of Execution Accuracy on
-  the default provider, and the fix is one sentence in each prompt — but the prompt is
-  the arm being measured, so changing it would have published a table the prompts no
-  longer match. `DEFAULT_PROMPT_FORM` therefore stays `rules`: the two forms tie exactly
-  on Execution Accuracy, and a tie is not evidence for a change.
-  No Term Proposal is open: 7.1's two were agreed on 2026-09-01 and are
-  [Glossary](../glossary.md#a-the-system) Section A rows, **`Gold Question`** and
-  **`Relevant Set`**, and 7.2's Section D column was agreed the same day.
+  is open with a Trigger that fires **before the capstone is submitted**: `gpt-4o-mini`
+  refuses a Gold Question whose period is later than its own training data, which costs
+  most of Execution Accuracy on the default provider, and the fix is one sentence in each
+  prompt and a re-run of the sweep.
+  `DEFAULT_PROMPT_FORM` stays `rules`: the two forms tie exactly on Execution Accuracy,
+  and a tie is not evidence for a change.
 - **The project is under [Delivery Mode](../../../CLAUDE.md) until 2026-09-09**,
   the capstone deadline. Behaviour is proven in `tests/` (`uv run pytest`);
   `.claude/scripts/` is frozen and `tests/test_delivery_mode.py` enforces both that
@@ -165,8 +140,10 @@ call a real provider run only when `VERITAS_LIVE_MODEL` is set.
   and de-duplicating the nine Certified Metrics
   ([DEBT-025](../debt-ledger.md#debt-025--the-nine-certified-metrics-are-implemented-twice)).
   All three come due on 2026-09-09.
-- **The handoff detail for Sub-step 7.3 is in its
-  [review entry](../reviews/step-007-evaluation.md#sub-step-73--measure-retrieval-hit-rate-and-mrr)**,
+- **The handoff detail for Sub-step 7.4 is in its
+  [review entry](../reviews/step-007-evaluation.md#sub-step-74--measure-generation-execution-accuracy-and-llm-as-judge)**,
+  which also carries the ruling that closed Step 007. 7.3's is in
+  [its own](../reviews/step-007-evaluation.md#sub-step-73--measure-retrieval-hit-rate-and-mrr),
   7.2's in
   [its own](../reviews/step-007-evaluation.md#sub-step-72--register-the-phrasings-and-detect-them)
   and 7.1's in
@@ -179,9 +156,9 @@ call a real provider run only when `VERITAS_LIVE_MODEL` is set.
 
 ## Summary
 
-A fully designed project with seven of its nine components built, a question asked in a
-browser comes back as a Grounded Answer, and the eighth — Evaluation — has the ground
-truth its measures will be computed over.
+A fully designed project with eight of its nine components built, a question asked in a
+browser comes back as a Grounded Answer, and the eighth — Evaluation — measures both
+halves of that flow over a committed Gold Question Set.
 The framework is in place and the Target State is `agreed`, so there is a fixed point
 to build toward: a natural-language analytics copilot over a brokerage warehouse, whose
 answers are grounded in a certified Semantic Layer and checked by a deterministic
@@ -303,7 +280,7 @@ verdict survives retargeting to BigQuery and one type does not.
 | Validation Gate check | ✅ working | `.claude/scripts/check_validation_gate/` — a **package**, by [R8](../plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25): `__main__.py` holds the rule order, the report and the exit code, `probes.py` the shared machinery, and one module per Gate rule — `read_only.py`, `traces.py`, `restricted.py`, `route.py` and `access.py`, all five. Run as one command, `uv run python .claude/scripts/check_validation_gate/`, because Python runs a directory holding a `__main__.py`. Needs a filled Warehouse. Seventy-nine probes, each declaring the verdict and the Rejection Reason members it was measured with, so a rejection for the **wrong reason** fails as loudly as no rejection. `read_only.py` holds twelve: the six shapes read-only has to cover, a union, a string that is not SQL, a query over a lowered ceiling, one the engine will not plan, a cross product, and an ordinary question. `traces.py` holds eighteen — the shapes Sub-step 3.2 measured, re-judged through the whole Gate rather than through a tracer, plus a statement that aggregates nothing, one the optimizer will not resolve, and a certified expression sitting beside a Shadow Metric in one projection, which is the probe for the word *every* — and then builds nine more from `semantic/metrics/`, one per Certified Metric, so a tenth Metric Definition is a tenth probe with no edit — probes built out of the corpus they are checked against, which is [DEBT-018](../debt-ledger.md#debt-018--six-certified-metrics-have-no-expression-text-pinned-outside-the-corpus): they prove the Gate recognises what `semantic/metrics/` says, and six of the nine expressions have no text pinned anywhere outside it. `restricted.py` holds ten, each declaring **three** answers rather than one — the Gate's verdict, the parse tree's reading, and what a search of the query's text would say — so ADR-0003's rejected alternative is shown wrong on every run rather than in an argument; nine are the spike's claim-2 shapes and the tenth is a `SELECT *` written so that it reaches the rule. `access.py` holds twenty-one, each also declaring whether this rule reads the statement as scoped: every Certified Metric scoped and unscoped, which is eighteen and is how the rule is shown to bind on the Snapshot and movement metrics and not only on the trade-side four, plus three about the slice route — `Net Revenue by region`, `Cash Balance by instrument type` refused on the absent key, and one join to a table the statement does not group by. It **executes** the Glossary's worked example twice, unscoped and scoped, so the three buckets the axis registers and the one the Access Profile permits are printed side by side, and it runs three mutations: the access rule deleted, the absent-key branch deleted, and the certified-filter comparison deleted, each re-run to show what stops being refused. `route.py` holds nine, each also declaring whether the statement is off its metric's route and whether it filters on a date column that metric is not certified against: the spike's wrong-currency statement, a cross product computing a certified metric, a count with a join that multiplies it, a slice by `by region`, the same notional converted the certified way, a period keyed on Trade Date and the same period keyed on Settlement Date, and the two halves of [DEBT-020](../debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters). It **executes** three pairs and prints how far apart each is, because a rejection is only worth having if the thing rejected returns a different number; every date in it is read from the Snapshot calendar; and it rebuilds all nine Certified Metrics from `semantic/metrics/` to show the rule allows each one computed the way its own entry says. **The *character for character* claim is checked in both modules that make it**: `probes.py` reads the spike's statements out of its **source text** with `ast` rather than importing it, so a check that runs on every commit does not depend on a 1,700-line script staying importable, and `traces.py`'s fifteen are checked the same way — including the one it judges under a shorter local name, and the one shape the spike measures that it does not judge, which is **declared** with where the Gate refuses it instead. Checks beyond the probes: every probe decided before the bounded rule is decided again through a Warehouse that raises on any attribute access; the engine is asked to plan a two-statement string against a throwaway table in an in-memory Warehouse, and the run fails if the table **survives**; the planner's estimate is compared against a real row count, because an unread plan sums to zero and zero is under every ceiling; the corpus is canonicalised the rejected way as well as the Gate's way, failing the run if **no** Certified Metric depends on the difference; the Access Profile's own declaration is printed and an empty one fails the run; two statements no rule can read are put to the detector directly, which must refuse rather than report nothing found; and one judgement is made through an adapter that counts catalogue reads, failing the run on anything but one, with the `Reading`'s own memo read afterwards to show the resolution and the corpus were each computed once. Statements a Sub-step's own rules allow are checked by the rules that **ran** rather than by the final verdict, so a later rule refusing them is not mistaken for these rules refusing everything. It also prints the trusted rewrites, the ceiling's current headroom, and what one judgement costs. |
 | App | ✅ working | `veritas/app/` — `render.py` and `page.py` behind an `__init__.py` that re-exports the first. `uv run streamlit run veritas/app/page.py` serves one page: the identity a question is asked as, a question box, and what the question came back as. `render.py` turns a Grounded Answer into strings and imports no Streamlit — values under the column names the engine returned, the Lineage one line per entry, and the verdict as the rules that ran or the Rejection Reasons that fired; `page.py` places them and is the only module in the repository permitted to import `streamlit`, which `tests/test_app.py` checks the way `check_warehouse.py` checks the `duckdb` seam. **Nothing is hidden**: the statement, the Lineage and the Validation Gate outcome are laid out under every answer, including under a refusal and under a question asked back — the Glossary's *"never renders a bare number"* as a test rather than an intention. The sidebar carries the Access Profile, the model the environment configures, and [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s own sentence on what enforcing that profile in the application layer is worth. The page is driven in tests through Streamlit's own `AppTest`, so every rendering claim is proven without a browser and without a key. |
 | Observability | ✗ none | — |
-| Evaluation | ◐ Retrieval measured | `data/gold/` — **twenty-four Gold Questions**, one file each, and `veritas/evaluation/` reads them. A Gold Question carries the question as a person asks it, `expects` — which of a Grounded Answer's three endings is correct, one of `answer`, `refusal`, `clarifying question` — and, where a number is correct, the gold SQL and the gold result. The dataclass field list is the file format, as it is for a Semantic Entry: an unknown key fails to load, and a question that expects no answer may not carry a statement. **The relevant Semantic Entries are derived, never listed**: the Certified Metrics a statement's projections trace to, the certified axes it groups by or filters on, and the Join Paths those two declare — three readings, all through `veritas/validation/`'s own readers, so a Relevant Set is never a second opinion about what a statement computes. `tests/test_gold.py` compares the Join Paths derived that way against the joins the statement itself carries. **Coverage is read off the statements**: all nine Certified Metrics are computed by one, every gold statement keys on its own metric's `date_column` and on no other date, `by region` and `by instrument type` are both sliced, all five Ambiguous Terms are asked about, and all three endings are present. `RESULT_TOLERANCE` is how close two result sets must be to be the same answer — relative, because the metrics span a count of dozens and a notional of tens of millions — and it is what [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal) and [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level) are measured against: the test executes both halves of each Section C pair a Gold Question turns on. **One gold statement the Gate refuses** — `Account Value`, whose only correct form adds the two halves the corpus's `derives_from` describes, which the Gate reads as a Shadow Metric ([DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)); `REFUSED_TODAY` in the test names it, so paying that entry breaks the exemption. **Retrieval is measured.** `veritas/evaluation/retrieval.py` computes hit rate and Mean Reciprocal Rank (MRR) over the twelve Gold Questions that should come back as a number, and `uv run python -m veritas.evaluation retrieval` prints one row per Retrieval Strategy per setting. A ranking is scored against the **searchable part** of a Relevant Set — Join Paths publish no searchable text and no search can return one, so they are dropped rather than counted as misses — and both measures come off one number per question, `reciprocal_rank`, so a hit is a reciprocal rank above zero and the two cannot disagree about what a hit is. The question a ranking is scored for is the rewritten one a **correct** rewrite step would have produced, derived from the gold SQL's own metrics, so the sweep costs no model call and no key. The two settings it varies are the two the Ledger left open: `SearchableForm` and `RewriteForm`, both re-runnable rather than deleted, and their defaults are what the sweep chose ([DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) and [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) paid). **Execution Accuracy and LLM-as-judge are not computed** — Sub-step 7.4. |
+| Evaluation | ✅ working | `data/gold/` — **twenty-four Gold Questions**, one file each, and `veritas/evaluation/` reads them. A Gold Question carries the question as a person asks it, `expects` — which of a Grounded Answer's three endings is correct, one of `answer`, `refusal`, `clarifying question` — and, where a number is correct, the gold SQL and the gold result. The dataclass field list is the file format, as it is for a Semantic Entry: an unknown key fails to load, and a question that expects no answer may not carry a statement. **The relevant Semantic Entries are derived, never listed**: the Certified Metrics a statement's projections trace to, the certified axes it groups by or filters on, and the Join Paths those two declare — three readings, all through `veritas/validation/`'s own readers, so a Relevant Set is never a second opinion about what a statement computes. `tests/test_gold.py` compares the Join Paths derived that way against the joins the statement itself carries. **Coverage is read off the statements**: all nine Certified Metrics are computed by one, every gold statement keys on its own metric's `date_column` and on no other date, `by region` and `by instrument type` are both sliced, all five Ambiguous Terms are asked about, and all three endings are present. `RESULT_TOLERANCE` is how close two result sets must be to be the same answer — relative, because the metrics span a count of dozens and a notional of tens of millions — and it is what [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal) and [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level) are measured against: the test executes both halves of each Section C pair a Gold Question turns on. **One gold statement the Gate refuses** — `Account Value`, whose only correct form adds the two halves the corpus's `derives_from` describes, which the Gate reads as a Shadow Metric ([DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)); `REFUSED_TODAY` in the test names it, so paying that entry breaks the exemption. **Retrieval is measured.** `veritas/evaluation/retrieval.py` computes hit rate and Mean Reciprocal Rank (MRR) over the twelve Gold Questions that should come back as a number, and `uv run python -m veritas.evaluation retrieval` prints one row per Retrieval Strategy per setting. A ranking is scored against the **searchable part** of a Relevant Set — Join Paths publish no searchable text and no search can return one, so they are dropped rather than counted as misses — and both measures come off one number per question, `reciprocal_rank`, so a hit is a reciprocal rank above zero and the two cannot disagree about what a hit is. The question a ranking is scored for is the rewritten one a **correct** rewrite step would have produced, derived from the gold SQL's own metrics, so the sweep costs no model call and no key. The two settings it varies are the two the Ledger left open: `SearchableForm` and `RewriteForm`, both re-runnable rather than deleted, and their defaults are what the sweep chose ([DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) and [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) paid). **What Veritas answers is measured too.** `veritas/evaluation/generation.py` runs the whole flow — rewrite, retrieve, ground, generate, validate, execute — once per `PromptForm` per registered provider, and `uv run python -m veritas.evaluation generation` prints one row per cell. Three measures come off each run: the **ending** the set calls correct, **Execution Accuracy** over the questions whose ending is a number, and an **LLM-as-judge's agreement** with the first. `EndedBy` names the step of the flow that ended each question — `answer`, `rewrite`, `no sql`, `gate`, `engine`, `provider` — so a Gate refusal is not scored as a wrong number and a provider that never replied is not scored at all. A question is compared under the same `RESULT_TOLERANCE` the gold set's own constraints were built against; one gold-labelled a refusal or a Clarifying Question scores by ending the same way. The judge is shown the question, the correct statement and what Veritas did, and **not** the two result sets — comparing numbers is `same_result`'s job, and a judge given them would make the agreement a measure of nothing. `answerable_by_veritas` asks the Gate whether it would allow each Gold Question's **own gold statement** and drops the ones it refuses, so [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)'s cost is derived and names no question: the day the Gate stops refusing it, the sweep scores one question more with no line edited. The sweep needs keys and is opt-in behind `VERITAS_LIVE_MODEL`; the dated table it printed is in the [Step 007 review](../reviews/step-007-evaluation.md#sub-step-74--measure-generation-execution-accuracy-and-llm-as-judge). |
 | Containerization | ✗ none | — |
 
 ## Repository layout
@@ -651,7 +628,13 @@ where 6.1's flat `text` field stopped being a note in a review. **7.3 paid both*
 sweep: splicing and the per-field index each won, no boost was ever guessed, and the
 losing form of each is in the Step Review with the table. Splicing brought one back:
 [DEBT-036](../debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one),
-the mention it does not reach, which comes due where the generator reads what it wrote.
+the mention it does not reach, which came due where the generator reads what it wrote —
+**7.4 paid it**, splicing every mention rather than the first. 7.4 also left
+[DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
+open, the one entry that carries out of Step 007 with a Trigger inside it: the generator
+is not told that a period it has never heard of is not a reason to refuse, and
+that costs most of Execution Accuracy on the default provider until one sentence is added
+to each prompt and the sweep is re-run.
 6.4 paid
 [DEBT-021](../debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
 and

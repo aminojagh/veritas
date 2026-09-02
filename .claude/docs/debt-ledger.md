@@ -62,8 +62,8 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals | open |
 | [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
-| [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | M | The Sub-step of Step 007 that measures Execution Accuracy | open |
-| [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice | **paid** |
+| [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | L | The Sub-step of Step 007 that measures Execution Accuracy — **🔴 fired** | open |
+| [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice — **🔴 fired** | **paid** (7.4, 2026-09-02) |
 | [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | S | Before the capstone is submitted — it costs most of Execution Accuracy on the default provider | open |
 
 **Open debt:** 14 · **Paid:** 20 · **Accepted:** 1 · **Moved:** 2
@@ -2750,7 +2750,8 @@ drawn, and it is wrong in the direction that flatters the corpus.
 
 - **Status:** open
 - **Opened:** Sub-step 7.1 (`.claude/docs/reviews/step-007-evaluation.md`)
-- **Size:** M
+- **Size:** L — opened at `M`, resized when Sub-step 7.4 fired the Trigger and found that
+  a Gate rule alone does not pay it
 - **Location:** `veritas/validation/gate.py` — `ValidationGate.traces`, which reads a
   Metric Definition's `expression` and not its `derives_from`; the exemption it forces is
   `REFUSED_TODAY` in `tests/test_gold.py`

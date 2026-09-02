@@ -189,6 +189,18 @@ prompt is the arm being measured. (3) **Eleven questions**, so one is worth 0.09
 `Cash Balance` failed in the sweep and answered when re-asked, so a cell moves between runs
 at temperature 0. (4) **The judge grades itself among others**, disagreeing only on refusals.
 
+**Approved 2026-09-02, on all four, and this closes Step 007** — *"all changed and
+decisions are approved … substep 7.4 is approved and committed"*. The three things the
+Sub-step was holding stand as measured: `DEFAULT_PROMPT_FORM` stays `rules` on the tie,
+[DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
+stays open with `Account Value` excluded, and
+[DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
+stays open rather than fixed, to be paid before the capstone is submitted. Two Ledger
+consequences of this Sub-step are carried by the closing commit rather than by `7e40092`:
+DEBT-035 is **resized `M` → `L`**, which is this section's own finding that a Gate rule
+alone no longer pays it, and DEBT-036's row gains the Sub-step and date every other paid
+row carries. What carries into Step 008 is DEBT-037's Trigger and nothing else.
+
 **Language.** No Term Proposal: `PromptForm` takes `RewriteForm`'s shape, Execution Accuracy
 and LLM-as-judge are the Glossary's [Evaluation Measure](../glossary.md#a-the-system) row,
 and `EndedBy` names endings `flow.py` already had.

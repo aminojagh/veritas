@@ -1,7 +1,9 @@
 # Step 007 — Evaluation: measure Veritas over a Gold Question Set
 
-**Status:** **active** — approved by Amino on 2026-09-01, by the commit that carries
-this plan. 7.1, 7.2 and 7.3 are built and approved; 7.4 is built and awaiting Amino.
+**Status:** **done** — plan approved 2026-09-01 (`fdf6693`); all four Sub-steps built,
+ruled and committed: 7.1 (`a361b79`), 7.2 (`35099c3`), 7.3 (`47dfb8c`), 7.4 (`7e40092`),
+the last approved 2026-09-02. 7.4 was committed before its ruling, so unlike Steps 005
+and 006 the status turns `active` → `done` in the commit that carries this line.
 
 **Goal.** Build Evaluation — the committed Gold Question Set and the Evaluation
 Measures over it: hit rate and Mean Reciprocal Rank (MRR) for Retrieval,
