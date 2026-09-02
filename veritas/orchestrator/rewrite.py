@@ -20,6 +20,7 @@ unresolved term is asked back rather than guessed at.
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from functools import cache
 
 from veritas.llm import LanguageModel, default_model, json_reply
@@ -57,8 +58,9 @@ class Rewrite:
     """What the rewrite step made of a question.
 
     `question` is what was asked, verbatim. `rewritten` is what Retrieval searches
-    — the question plus the meanings that were resolved, and the question itself
-    where nothing was. `resolutions` maps an Ambiguous Term's name to the Certified
+    — the question carrying the meanings that were resolved, in whichever
+    `RewriteForm` writes them, and the question itself where nothing was resolved.
+    `resolutions` maps an Ambiguous Term's name to the Certified
     Metrics it resolved to, in the order the question says the terms.
     `clarifying_question` is the question Veritas asks back, and is `None` exactly when
     the question is ready to be retrieved for.
@@ -207,11 +209,40 @@ def clarifying_question_for(terms: list[AmbiguousTerm], question: str) -> str:
     return f"{asked}. Which do you mean?"
 
 
-def rewritten_with(question: str, resolutions: Mapping[str, tuple[str, ...]]) -> str:
-    """The question with the meanings that were resolved named alongside it.
+class RewriteForm(StrEnum):
+    """How a resolved meaning is written into the question Retrieval searches with.
 
-    Appended rather than spliced over the word, which is
-    [DEBT-030](../../.claude/docs/debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it).
+    The two forms
+    [DEBT-030](../../.claude/docs/debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)
+    was opened to have measured against each other. `DEFAULT_REWRITE_FORM` is which
+    one `rewrite` uses.
+    """
+
+    APPENDED = "appended"
+    """The person's words intact, with the certified names in a parenthesis after
+    them: *"what was our gross revenue last quarter (revenue means Gross Revenue)"*."""
+
+    SPLICED = "spliced"
+    """The certified names written over the words that were ambiguous: *"what was our
+    gross Gross Revenue last quarter"*. Shorter, and it doubles the cue where the
+    question already carried it."""
+
+
+# Which form `rewrite` writes, and therefore which one every Retrieval Strategy
+# searches with. Measured rather than chosen: `veritas/evaluation/retrieval.py` scores
+# both over the Gold Question Set, and the Step Review that set this line carries the
+# numbers and the losing form.
+DEFAULT_REWRITE_FORM = RewriteForm.SPLICED
+
+
+def appended_with(
+    question: str, resolutions: Mapping[str, tuple[str, ...]], layer: SemanticLayer
+) -> str:
+    """The question, then the meanings that were resolved, in a parenthesis.
+
+    `layer` is unread — an appended clause names the registered term rather than the
+    spelling the question used, so nothing here has to find the words again. It is in
+    the signature because `REWRITE_FORMS` dispatches both forms through one shape.
     """
     if not resolutions:
         return question
@@ -220,6 +251,55 @@ def rewritten_with(question: str, resolutions: Mapping[str, tuple[str, ...]]) ->
         for term, metrics in resolutions.items()
     )
     return f"{question.rstrip()} ({named})"
+
+
+def spliced_with(
+    question: str, resolutions: Mapping[str, tuple[str, ...]], layer: SemanticLayer
+) -> str:
+    """The question with each resolved term's own words replaced by its meanings.
+
+    Right to left, so replacing one mention does not move the next one's position.
+
+    A spelling that stands for a phrase about a subject captures that subject —
+    `how much does X have` matches all of *"how much does account 12 have"* — and the
+    subject is written back after the meanings, because it is the question's own words
+    and not the term's. *"how much does account 12 have"* resolved to `Cash Balance`
+    splices to *"Cash Balance account 12"*, which is clumsy; dropping the subject
+    would lose which account was asked about, which is worse.
+    """
+    said = [
+        (match, metrics)
+        for term_name, metrics in resolutions.items()
+        if (term := layer.ambiguous_terms.get(term_name))
+        and (match := first_said(term, question))
+    ]
+    spliced = question
+    for match, metrics in sorted(said, key=lambda found: -found[0].start()):
+        spliced = (
+            spliced[:match.start()]
+            + " ".join([" and ".join(metrics), *match.groups()])
+            + spliced[match.end():]
+        )
+    return spliced
+
+
+# Which function writes each form. A dispatch table rather than a match, because the
+# sweep that chose between them iterates it.
+REWRITE_FORMS = {
+    RewriteForm.APPENDED: appended_with,
+    RewriteForm.SPLICED: spliced_with,
+}
+
+
+def rewritten_with(
+    question: str,
+    resolutions: Mapping[str, tuple[str, ...]],
+    layer: SemanticLayer,
+    form: RewriteForm = DEFAULT_REWRITE_FORM,
+) -> str:
+    """The question as Retrieval will search for it, in whichever form is asked for."""
+    write = REWRITE_FORMS[form]
+    return write(question, resolutions, layer)
 
 
 def rewrite(
@@ -248,7 +328,7 @@ def rewrite(
         return Rewrite(
             question, question, resolved, clarifying_question_for(unresolved, question)
         )
-    return Rewrite(question, rewritten_with(question, resolved), resolved)
+    return Rewrite(question, rewritten_with(question, resolved, layer), resolved)
 
 
 def _flat(text: str) -> str:

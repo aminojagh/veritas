@@ -11,6 +11,7 @@ itself, and `retrieve` is the seam the Orchestrator calls.
 
 from veritas.retrieval.search import (
     CANDIDATES,
+    DEFAULT_SEARCHABLE_FORM,
     EMBEDDING_MODEL,
     REFERENCE_FIELDS,
     RERANKER_MODEL,
@@ -19,6 +20,7 @@ from veritas.retrieval.search import (
     VECTORIZER_PARAMS,
     RetrievalStrategy,
     Retriever,
+    SearchableForm,
     default_retriever,
     embedding_model,
     fuse,
@@ -29,21 +31,26 @@ from veritas.retrieval.search import (
 )
 from veritas.retrieval.searchable import (
     SEARCHABLE_FIELDS,
+    TEXT_FIELDS,
     searchable_entries,
+    searchable_fields,
     searchable_text,
 )
 
 __all__ = [
     "CANDIDATES",
+    "DEFAULT_SEARCHABLE_FORM",
     "EMBEDDING_MODEL",
     "REFERENCE_FIELDS",
     "RERANKER_MODEL",
     "RRF_K",
     "SEARCHABLE_FIELDS",
+    "TEXT_FIELDS",
     "TOP_K",
     "VECTORIZER_PARAMS",
     "RetrievalStrategy",
     "Retriever",
+    "SearchableForm",
     "default_retriever",
     "embedding_model",
     "fuse",
@@ -52,5 +59,6 @@ __all__ = [
     "reranker",
     "retrieve",
     "searchable_entries",
+    "searchable_fields",
     "searchable_text",
 ]

@@ -1,7 +1,7 @@
 # Step 007 — Evaluation: measure Veritas over a Gold Question Set
 
 **Status:** **active** — approved by Amino on 2026-09-01, by the commit that carries
-this plan. 7.1 and 7.2 are built and approved. Next: Sub-step 7.3.
+this plan. 7.1, 7.2 and 7.3 are built and approved. Next: Sub-step 7.4.
 
 **Goal.** Build Evaluation — the committed Gold Question Set and the Evaluation
 Measures over it: hit rate and Mean Reciprocal Rank (MRR) for Retrieval,
@@ -97,11 +97,15 @@ Execution Accuracy over the Gold Question Set, across two prompts and the
 registry's two models — the first Groq call ever made, which is
 [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md)'s
 first accepted cost coming due. The prompt gains a variant seam in
-`generate.py`; result sets are compared under the tolerance 7.1's constraints
-were built against; a question gold-labelled as a refusal or a Clarifying
-Question scores by ending the same way. LLM-as-judge is the second lens, its
-prompt proven against a stub like every other model-reading test. The live
-sweep is opt-in and its output is dated evidence in the review.
+`generate.py`, and with it the input 7.3 changed underneath it: the generator
+was written for a question a person typed and is now handed the spliced one —
+*"Cash Balance account 12"* — so taking that input properly is this Sub-step's,
+and [DEBT-036](../debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one)
+comes due with it. Result sets are compared under the tolerance 7.1's
+constraints were built against; a question gold-labelled as a refusal or a
+Clarifying Question scores by ending the same way. LLM-as-judge is the second
+lens, its prompt proven against a stub like every other model-reading test. The
+live sweep is opt-in and its output is dated evidence in the review.
 
 *Verify:* `uv run pytest tests/test_evaluation.py`, then
 `VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation`, output

@@ -54,17 +54,18 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-024](#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit) | Source and Step documents carry prose Delivery Mode would not admit | L | Delivery Mode ends, 2026-09-09 | open |
 | [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) | The nine Certified Metrics are implemented twice | M | Any change to a Certified Metric's expression | open |
 | [DEBT-026](#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted) | The retrieval models are downloaded rather than snapshotted | S | The Step that containerizes Veritas, or any offline claim in `README.md` | open |
-| [DEBT-027](#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) | The searchable text is one flat field, so a name match cannot outrank a description match | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank for Retrieval | open |
+| [DEBT-027](#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) | The searchable text is one flat field, so a name match cannot outrank a description match | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank for Retrieval — **🔴 fired** | **paid** (7.3, 2026-09-01) |
 | [DEBT-028](#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server) | No test reaches a real provider, so the live path is proven only by a stub server | S | Sub-step 6.4, or the first key available | **paid** (6.3, 2026-08-30) |
 | [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.2, 2026-09-01) |
-| [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 | open |
+| [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 — **🔴 fired** | **paid** (7.3, 2026-09-01) |
 | [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown — **🔴 fired** | **paid** (6.5, 2026-08-31) |
 | [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals | open |
 | [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | M | The Sub-step of Step 007 that measures Execution Accuracy | open |
+| [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice | open |
 
-**Open debt:** 15 · **Paid:** 17 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 14 · **Paid:** 19 · **Accepted:** 1 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2252,7 +2253,7 @@ Veritas runs without network access, whichever comes first.
 
 ### DEBT-027 — The searchable text is one flat field, so a name match cannot outrank a description match
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 7.3, 2026-09-01
 - **Opened:** Sub-step 6.2 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** S
 - **Location:** `veritas/retrieval/searchable.py` — `searchable_text`
@@ -2293,6 +2294,20 @@ settle this on evidence. Repayment is the measurement, not the split: run the
 Retrieval Strategies against a per-field index as well as the flat one, and keep
 whichever the numbers support, recording the losing arm in the Step Review so the
 decision stays checkable.
+
+**How it was paid, Sub-step 7.3 (2026-09-01).** `searchable_fields` returns one string
+per field beside the flat block `searchable_text` still joins, `SearchableForm` names
+the two, and `Retriever` fits whichever it is built with — so a form is a constructor
+argument rather than a rewrite. Both were scored over the Gold Question Set by
+`veritas/evaluation/retrieval.py`, and the **per-field form won**: it is
+`DEFAULT_SEARCHABLE_FORM` because it ranks the entry a question names above the entries
+that merely mention it, which is this entry's own hypothesis measured. The Step Review
+carries the table and the losing form. **No weighting was swept**, and the entry's
+*"chosen the weights on measured hit rate and MRR"* is answered by the split rather than
+by a boost: each field's cosine is already normalised by that field's own length, so a
+term in the short `name` outweighs the same term in a long `description` with nothing
+written down — and with twelve scored questions, a boost ladder would be fitting a
+parameter to a measure that moves in steps of 1/24.
 
 ### DEBT-028 — No test reaches a real provider, so the live path is proven only by a stub server
 
@@ -2444,7 +2459,7 @@ now quotes the words the person used rather than the term the corpus files them 
 
 ### DEBT-030 — The resolved meaning is appended to the question, and nothing has measured that against splicing it
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 7.3, 2026-09-01
 - **Opened:** Sub-step 6.3 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** S
 - **Location:** `veritas/orchestrator/rewrite.py` — `rewritten_with`
@@ -2488,6 +2503,20 @@ the numbers support, and record the losing arm in the Step Review.
 to leave silent.** The marginal cost is one arm on a sweep that is being run
 anyway; if Step 007 drops it for time, this entry closes as *accepted* with that
 reason and the appended form becomes the deliberate one.
+
+**How it was paid, Sub-step 7.3 (2026-09-01).** `RewriteForm` names the two,
+`appended_with` and `spliced_with` write them, and `rewritten_with` dispatches — so the
+arm stays re-runnable rather than being a form deleted. Both were scored over the Gold
+Question Set, and the **spliced form won**: it is `DEFAULT_REWRITE_FORM`, and the reason
+is mechanical rather than a coincidence of twelve questions — splicing *removes* the
+ambiguous word, and the Ambiguous Term entry that word matches is never in a Relevant
+Set, so the Certified Metric moves up the ranking it was sitting behind. Two costs, both
+in the Step Review with the table: the rewritten question is also what the generator is
+grounded in, which this measures nothing about and Sub-step 7.4 does; and splicing a
+spelling that stands for a phrase about a subject — `how much does X have` — writes
+*"Cash Balance account 12"*, which keeps every word the question carried and reads
+badly. Appending keeps its worked example: *"our gross revenue"* still splices to
+*"our gross Gross Revenue"*, and that is the form now in use.
 
 ---
 
@@ -2779,3 +2808,57 @@ model is asked the Gold Question Set and `Account Value` scores zero however wel
 model writes, so the measure would report a generation failure that is a Gate failure. If
 7.4 runs without it being paid, the entry stays open and the Step Review states that
 `Account Value` is excluded from the accuracy figure and why.
+
+---
+
+### DEBT-036 — Splicing writes over the first mention of a term and leaves every later one
+
+- **Status:** open
+- **Opened:** Sub-step 7.3 (`.claude/docs/reviews/step-007-evaluation.md`)
+- **Size:** S
+- **Location:** `veritas/orchestrator/rewrite.py` — `spliced_with`, through the
+  `first_said` it finds each mention with
+
+**What we did**
+
+Wrote each resolved meaning over the term's **first** mention, because `spliced_with`
+finds that mention with `first_said` — the function the Clarifying Question uses to quote
+a person's own words once. A question that says the same Ambiguous Term twice keeps the
+second: *"what was our revenue last quarter and our revenue this quarter"* resolved to
+`Gross Revenue` becomes *"what was our Gross Revenue last quarter and our revenue this
+quarter"*. `tests/test_rewrite.py::test_the_spliced_form_writes_over_the_first_mention_and_leaves_a_later_one`
+pins that sentence, so it is behaviour on record rather than something to be found later.
+
+**What we should have done**
+
+Splice every mention — `said_as(spelling).finditer` where `first_said` searches, still
+right to left so no replacement moves the next one. What stops it being a one-line change
+is that two spellings of one term, or two terms, can match overlapping spans of the same
+question, and a set of matches has to be reduced to non-overlapping ones before any of
+them is written over. `first_said` cannot do that reduction for its other two callers,
+which want exactly one mention and the earliest.
+
+**Why we deferred**
+
+The two rewrite forms were what this Sub-step measured, and the measurement does not turn
+on this: no question in the Gold Question Set says one Ambiguous Term twice — the
+questions are in `data/gold/`, one per file — so every scored question has exactly one
+mention per term to splice, and the table in the review reads the same either way.
+
+**Cost while unpaid**
+
+What Retrieval searches, and what the generator is grounded in, carries the certified
+name and the word that name was supposed to replace. For Retrieval that is mild and
+measured: the leftover word matches the Ambiguous Term entry, which is never in a
+Relevant Set, so a repeated term hands back part of the gain that made splicing win
+[DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it).
+For generation it is not mild — an ambiguous word left in the question is the cue
+resolving it was supposed to remove, and *"revenue last quarter against revenue this
+quarter"* is an ordinary question for a person to ask.
+
+**Trigger**
+
+**Sub-step 7.4, where generation is measured over the Gold Question Set** — the model is
+grounded in the rewritten question there, so a leftover ambiguous word costs Execution
+Accuracy rather than a rank. Earlier if it fires earlier: the first Gold Question that
+says one Ambiguous Term twice puts the leftover word inside the measurement itself.

@@ -7,7 +7,8 @@ opposite pole from Observability."*
 
 `gold.py` is the Gold Question Set: the Gold Questions, what each should come back as,
 and each one's Relevant Set — the Semantic Entries its statement touches, derived rather
-than listed.
+than listed. `retrieval.py` is the first pair of measures over it, hit rate and MRR, and
+`__main__.py` is the command that prints them.
 """
 
 from veritas.evaluation.gold import (
@@ -28,6 +29,16 @@ from veritas.evaluation.gold import (
     relevant_entries,
     same_result,
 )
+from veritas.evaluation.retrieval import (
+    RetrievalMeasures,
+    gold_resolutions,
+    measure_retrieval,
+    measures_of,
+    reciprocal_rank,
+    scored,
+    searchable_relevant_set,
+    searched_as,
+)
 
 __all__ = [
     "GOLD_DIR",
@@ -37,13 +48,21 @@ __all__ = [
     "GoldQuestion",
     "GoldQuestionError",
     "PhrasingClass",
+    "RetrievalMeasures",
     "axes_touched",
     "filtered_columns",
+    "gold_resolutions",
     "join_paths_touched",
     "load_gold_questions",
+    "measure_retrieval",
+    "measures_of",
     "metrics_touched",
     "read_gold_question",
     "reading_of",
+    "reciprocal_rank",
     "relevant_entries",
     "same_result",
+    "scored",
+    "searchable_relevant_set",
+    "searched_as",
 ]

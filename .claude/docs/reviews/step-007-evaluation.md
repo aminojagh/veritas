@@ -94,3 +94,57 @@ Glossary content, *"turnover"* stays a spelling of `volume`, and 2's narrowing s
 
 **Language.** No Term Proposal: the amendment adds spellings of five registered terms and
 coins nothing. `spellings` and `first_said` are process words; `aliases` is an existing field.
+
+---
+
+## Sub-step 7.3 — Measure Retrieval: hit rate and MRR
+
+**Changed.** `veritas/evaluation/retrieval.py` scores every Retrieval Strategy over the
+Gold Question Set under the two settings the Ledger left to a measurement — corpus indexed
+flat or per field, resolved meaning appended or spliced. Each is a named argument rather
+than a rewrite, so the sweep stays re-runnable; both defaults now say what the numbers said.
+`tests/test_rewrite.py` pins the winning form on the sentences that make it awkward — a
+captured subject, two meanings at once, two terms, a term said twice.
+
+**Verified.** `uv run pytest` — 219 passed, 4 skipped (live-model), from 195 + 4 before.
+`verify_framework.py`, `check_language.py`, `check_semantic_layer.py`,
+`check_warehouse.py` and `check_validation_gate/` PASS. The sweep, measured 2026-09-01:
+
+```
+$ uv run python -m veritas.evaluation retrieval
+  gold          data/gold — 24 Gold Questions, 12 with a Relevant Set a search can return
+  scored        39 relevant entries across them, at top_k = 5
+  rewrite       6 of the 12 say an Ambiguous Term, so the two rewrite forms differ on those and agree on the rest
+
+  searchable  rewrite   text       vector     hybrid     reranked
+                        hit   mrr  hit   mrr  hit   mrr  hit   mrr
+  flat        appended  1.000 0.681  1.000 0.708  1.000 0.681  1.000 0.750
+  flat        spliced   1.000 0.681  1.000 0.778  1.000 0.722  1.000 0.833
+  per field   appended  1.000 0.750  1.000 0.708  1.000 0.750  1.000 0.750
+  per field   spliced   1.000 0.833  1.000 0.778  1.000 0.833  1.000 0.833  <- today
+```
+
+**Debt** — DEBT-027 and DEBT-030 paid, each with its losing form named.
+[DEBT-036](../debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one)
+opened: the splice writes over a term's **first** mention, so a question that says one
+twice keeps the second — found by the splice tests this section's close added, after the
+approval below.
+
+**Sceptically.** (1) **Hit rate decides nothing** — 1.000 in all sixteen cells, so both
+defaults flipped on MRR alone, which over twelve questions moves in steps of 1/24. (2)
+**The rewritten question is also what the generator is grounded in** — `flow.py` hands
+`resolved.rewritten` to `generate` — and splicing was chosen on retrieval evidence only;
+7.4 is where generation gets a say, and flipping back is one line. (3) **MRR is held down
+by the corpus, not the search**: for the six questions saying an Ambiguous Term, that
+term's entry matches the words and is never in a Relevant Set — `gold.py`'s *"no gold SQL
+touches one"* — so splicing wins partly by deleting the word it matches. (4) `vector` is
+identical across the searchable forms, as it must be, which is the sweep's own check.
+
+**Approved 2026-09-02, on all four sceptical points and the two defaults they hedge** —
+*"all other changes and decision, including the sceptical points are reviewed, staged and
+approved"*. DEBT-036 is the one thing here Amino has not ruled on: it was opened after that
+approval and changes no code, so the measured arms and the table above stand as they are.
+
+**Language.** No Term Proposal: `SearchableForm` and `RewriteForm` take the Ledger's own
+words — DEBT-027's *"one flat field"* against a *"per-field index"*, DEBT-030's
+*"Appending"* against *"splicing"* — and `RetrievalMeasures` is `Evaluation Measure`'s.

@@ -281,7 +281,7 @@ def test_a_resolved_ambiguous_term_reaches_lineage(orchestrator):
         wrote(CERTIFIED),
     ).answer("what was our net revenue")
     assert answer.answered, answer.refusal
-    assert "revenue means Net Revenue" in answer.rewritten
+    assert "Net Revenue" in answer.rewritten
     assert next(iter(answer.lineage.versions())) == "revenue"
 
 

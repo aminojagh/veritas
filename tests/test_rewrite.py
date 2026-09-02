@@ -28,12 +28,16 @@ import pytest
 
 from veritas.llm import LanguageModelError
 from veritas.orchestrator import (
+    DEFAULT_REWRITE_FORM,
     PLACEHOLDER,
+    REWRITE_FORMS,
     Rewrite,
+    RewriteForm,
     ambiguous_terms_in,
     first_said,
     resolution_instruction,
     rewrite,
+    rewritten_with,
     said_as,
     spellings,
 )
@@ -267,7 +271,7 @@ def test_a_question_that_names_a_meaning_resolves_to_it(semantic):
     assert resolved.clarifying_question is None
     assert resolved.resolved
     assert "Gross Revenue" in resolved.rewritten
-    assert resolved.rewritten.startswith(resolved.question)
+    assert "last quarter" in resolved.rewritten, "the question's own words are gone"
 
 
 @pytest.mark.parametrize("name", sorted(ASKED))
@@ -324,6 +328,153 @@ def test_two_terms_in_one_question_are_asked_about_in_the_order_asked(semantic):
     assert not asked.resolved
     assert "volume" in asked.clarifying_question
     assert '"revenue" could mean' not in asked.clarifying_question
+
+
+@pytest.mark.parametrize("form", list(RewriteForm))
+def test_every_rewrite_form_carries_every_resolved_meaning(form, semantic):
+    """Whatever the form, the certified names are in the text Retrieval searches."""
+    both = ("Realised P&L", "Unrealised P&L")
+    written = rewritten_with(
+        "what is our P&L on tech", {"P&L": both}, semantic, form
+    )
+    assert all(meaning in written for meaning in both)
+    assert "tech" in written, "the words that were not the term are gone"
+
+
+def test_the_appended_form_leaves_the_question_it_was_given_intact(semantic):
+    """The person's words, then the meanings — which is what makes it auditable."""
+    written = rewritten_with(
+        "what was our gross revenue last quarter",
+        {"revenue": ("Gross Revenue",)},
+        semantic,
+        RewriteForm.APPENDED,
+    )
+    assert written == (
+        "what was our gross revenue last quarter (revenue means Gross Revenue)"
+    )
+
+
+def test_the_spliced_form_writes_the_meaning_over_the_words_that_were_ambiguous(semantic):
+    """The shorter sentence, and the doubled cue where the question already carried it."""
+    written = rewritten_with(
+        "what was our gross revenue last quarter",
+        {"revenue": ("Gross Revenue",)},
+        semantic,
+        RewriteForm.SPLICED,
+    )
+    assert written == "what was our gross Gross Revenue last quarter"
+
+
+@pytest.mark.parametrize(
+    "question", ["how much does account 12 have", "how much is in account 12"]
+)
+def test_the_spliced_form_keeps_the_subject_the_spelling_captured(question, semantic):
+    """`how much does X have` is a phrase about a subject, and the subject is the
+    question's own words rather than the term's.
+
+    Two spellings, one sentence, by different routes: the registered one captures
+    `account 12` between its halves and the splice writes it back after the meaning,
+    and the alias that ends in the placeholder never consumes it, so it is already
+    where the splice leaves off.
+    """
+    assert rewritten_with(
+        question,
+        {"how much does X have": ("Cash Balance",)},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "Cash Balance account 12"
+
+
+def test_the_spliced_form_writes_every_meaning_a_term_resolved_to(semantic):
+    """A term resolved to both of its meanings writes both, joined as a person joins
+    them, and over the words the question used — *"PnL"*, a registered spelling of `P&L`,
+    rather than the name the corpus files it under."""
+    assert rewritten_with(
+        "what is our PnL on tech",
+        {"P&L": ("Realised P&L", "Unrealised P&L")},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "what is our Realised P&L and Unrealised P&L on tech"
+
+
+def test_the_spliced_form_writes_the_meanings_before_the_captured_subject(semantic):
+    """Both halves of the splice in one question: every meaning, then the subject the
+    phrase was about."""
+    assert rewritten_with(
+        "how much does client 42 hold",
+        {"how much does X have": ("Cash Balance", "Account Value")},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "Cash Balance and Account Value client 42"
+
+
+def test_the_spliced_form_writes_every_resolved_term_from_the_right(semantic):
+    """Two terms in one question, the first of them a phrase whose splice is shorter than
+    the words it replaces — so a left-to-right pass would cut the second term at
+    coordinates that had already moved."""
+    assert rewritten_with(
+        "how much does account 12 have and what was revenue",
+        {"how much does X have": ("Account Value",), "revenue": ("Net Revenue",)},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "Account Value account 12 and what was Net Revenue"
+
+
+def test_the_spliced_form_writes_over_the_words_in_the_case_they_were_typed(semantic):
+    """Detection ignores case, so the splice replaces what was matched rather than the
+    registered spelling: a shouted word goes the way the rest of the match went."""
+    assert rewritten_with(
+        "what was REVENUE in March",
+        {"revenue": ("Gross Revenue",)},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "what was Gross Revenue in March"
+
+
+def test_the_spliced_form_writes_over_the_first_mention_and_leaves_a_later_one(semantic):
+    """[DEBT-036](../.claude/docs/debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one):
+    a term said twice keeps its second mention, so what Retrieval searches and the
+    generator is grounded in carries the certified name and the ambiguous word both.
+    """
+    assert rewritten_with(
+        "what was our revenue last quarter and our revenue this quarter",
+        {"revenue": ("Gross Revenue",)},
+        semantic,
+        RewriteForm.SPLICED,
+    ) == "what was our Gross Revenue last quarter and our revenue this quarter"
+
+
+def test_a_resolution_the_question_says_no_words_for_is_not_spliced_in(semantic):
+    """The splice writes over words, so a resolution whose term the question never said —
+    or whose name the Semantic Layer does not register at all — writes nothing rather
+    than inventing somewhere to put it. Neither case reaches it from `rewrite`, which
+    resolves only the terms a question says; the appended form, which never looks for the
+    words, would write both.
+    """
+    for resolutions in (
+        {"volume": ("Trade Count",)},
+        {"not a registered term": ("Gross Revenue",)},
+    ):
+        assert rewritten_with(
+            UNAMBIGUOUS, resolutions, semantic, RewriteForm.SPLICED
+        ) == UNAMBIGUOUS
+
+
+def test_a_question_that_resolved_nothing_is_itself_under_every_form(semantic):
+    """No resolution, no rewrite — and the two forms cannot disagree about that."""
+    assert {
+        rewritten_with(UNAMBIGUOUS, {}, semantic, form) for form in RewriteForm
+    } == {UNAMBIGUOUS}
+
+
+def test_the_form_the_rewrite_step_writes_is_the_one_that_was_measured(semantic):
+    """`DEFAULT_REWRITE_FORM` is the decision; `rewrite` is what acts on it."""
+    assert set(REWRITE_FORMS) == set(RewriteForm)
+    question = "what was our gross revenue last quarter"
+    resolved = rewrite(question, StubModel({"revenue": "Gross Revenue"}), semantic)
+    assert resolved.rewritten == rewritten_with(
+        question, resolved.resolutions, semantic, DEFAULT_REWRITE_FORM
+    )
 
 
 def test_a_reply_that_is_not_a_json_object_is_the_provider_failing(semantic):

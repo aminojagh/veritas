@@ -21,10 +21,14 @@ from veritas.orchestrator.generate import (
     scope_text,
 )
 from veritas.orchestrator.rewrite import (
+    DEFAULT_REWRITE_FORM,
     PLACEHOLDER,
     RESOLUTION_RULES,
+    REWRITE_FORMS,
     Rewrite,
+    RewriteForm,
     ambiguous_terms_in,
+    appended_with,
     clarifying_question_for,
     first_said,
     resolution_instruction,
@@ -33,9 +37,11 @@ from veritas.orchestrator.rewrite import (
     rewritten_with,
     said_as,
     spellings,
+    spliced_with,
 )
 
 __all__ = [
+    "DEFAULT_REWRITE_FORM",
     "GENERATION_RULES",
     "GROUNDED_FIELDS",
     "Generated",
@@ -44,8 +50,11 @@ __all__ = [
     "Orchestrator",
     "PLACEHOLDER",
     "RESOLUTION_RULES",
+    "REWRITE_FORMS",
     "Rewrite",
+    "RewriteForm",
     "ambiguous_terms_in",
+    "appended_with",
     "clarifying_question_for",
     "entry_text",
     "field_text",
@@ -60,4 +69,5 @@ __all__ = [
     "said_as",
     "scope_text",
     "spellings",
+    "spliced_with",
 ]

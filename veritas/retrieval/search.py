@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from minsearch import Index, VectorSearch
 
-from veritas.retrieval.searchable import searchable_entries
+from veritas.retrieval.searchable import TEXT_FIELDS, searchable_entries
 from veritas.semantic import (
     AmbiguousTerm,
     DimensionDefinition,
@@ -73,6 +73,33 @@ class RetrievalStrategy(StrEnum):
     """`HYBRID`'s candidates re-scored by `RERANKER_MODEL`, a cross-encoder that
     reads the question and one entry together instead of comparing two vectors
     embedded apart. The default, and the pipeline the Target State describes."""
+
+
+class SearchableForm(StrEnum):
+    """How the text index carries one entry — as one document, or as its fields.
+
+    Orthogonal to `RetrievalStrategy`: a strategy is which search runs, and this is
+    what the text half of that search is fitted on. `VECTOR` embeds the flat text
+    whichever form is chosen, so it is the one strategy this cannot move.
+    """
+
+    FLAT = "flat"
+    """One document per entry, every searchable field concatenated. A term matching
+    the entry's own name counts for exactly what the same term inside its description
+    counts for."""
+
+    PER_FIELD = "per field"
+    """One document per field per entry, scored apart and summed. Each field's cosine
+    is normalised by that field's own length, so a term matching the short `name`
+    outweighs the same term inside a long `description` without any weighting being
+    written down."""
+
+
+# Which form the text index is fitted in, and therefore what every Retrieval Strategy
+# but `VECTOR` searches. Measured rather than chosen: `veritas/evaluation/retrieval.py`
+# scores both over the Gold Question Set, and the Step Review that set this line carries
+# the numbers and the losing form.
+DEFAULT_SEARCHABLE_FORM = SearchableForm.PER_FIELD
 
 
 # Both models are the small English ones of their family: the corpus is tens of
@@ -186,8 +213,11 @@ class Retriever:
     loads either.
     """
 
-    def __init__(self, layer: SemanticLayer) -> None:
+    def __init__(
+        self, layer: SemanticLayer, form: SearchableForm = DEFAULT_SEARCHABLE_FORM
+    ) -> None:
         self.layer = layer
+        self.form = form
         self.entries = {entry.name: entry for entry in layer.entries()}
         self.records = [
             record for record in searchable_entries(layer) if record["text"]
@@ -195,12 +225,23 @@ class Retriever:
         self.text_by_name = {
             record["name"]: record["text"] for record in self.records
         }
-        self._text_index = Index(
-            text_fields=["text"],
-            keyword_fields=["name", "kind"],
+        self._text_index = self._fitted_index(form)
+
+    def _fitted_index(self, form: SearchableForm) -> Index:
+        """The text index of one `SearchableForm`, over the same records.
+
+        `name` is a keyword field in the flat form and a text field in the per-field
+        one — a field cannot usefully be both, and identity does not need it either
+        way, because a hit carries the whole record and is resolved by the `name` key
+        on it.
+        """
+        index = Index(
+            text_fields=["text"] if form is SearchableForm.FLAT else list(TEXT_FIELDS),
+            keyword_fields=["name", "kind"] if form is SearchableForm.FLAT else ["kind"],
             vectorizer_params=VECTORIZER_PARAMS,
         )
-        self._text_index.fit(self.records)
+        index.fit(self.records)
+        return index
 
     @cached_property
     def _vector_index(self) -> VectorSearch:
