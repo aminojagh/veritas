@@ -1874,6 +1874,73 @@ class ValidationGate:
         """
         return self.assembled_route(metrics, axes, schema, access=True)
 
+    def certifying_paths(
+        self, metric: MetricDefinition, axes: Iterable[DimensionDefinition]
+    ) -> list[str]:
+        """The Join Paths that certify a route from this metric to these axes, named
+        once and in the order they extend the route.
+
+        The metric's own `join_paths` first, then the `routes` each axis declares from
+        the metric's `from_table` — an axis's route starts where the metric does, so
+        appending it produces a chain whose every hop extends a route already arrived at
+        its start. A Join Path already named — `trade_to_instrument`, which `Traded
+        Notional` computes across and `by instrument type` is reached by — is not
+        appended twice, because joining one table twice under one name makes every
+        column that names it ambiguous.
+
+        One list, read twice: `assembled_route` turns these names into the Route a
+        statement is compared against, and `composed_from` reports them as the Join Paths
+        the allowed statement's route was certified by. A Lineage naming a path the Route
+        was not built from would be a record of a different statement.
+        """
+        names = list(metric.join_paths)
+        for axis in axes:
+            for name in axis.routes.get(metric.from_table, ()):
+                if name not in names:
+                    names.append(name)
+        return names
+
+    def composed_from(
+        self, reading: Reading
+    ) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+        """What the statement was composed from: the Certified Metrics its expressions
+        traced to, the certified axes it sliced by, and the Join Paths its route was
+        certified by.
+
+        Three lists the rules above compute to reach a verdict and then discard.
+        `traced_metrics`'s argument for reading them again rather than being handed them
+        applies unchanged: a rule that fed another reader's output would stop being
+        independently answerable, and what is repeated is two walks of a tree the
+        `Reading` already holds.
+
+        **`judge` calls it only where every rule has passed**, which is what makes the
+        walks safe — a statement an earlier rule refused for being unreadable is one
+        these would raise on — and is the shape
+        [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+        asks for: a refused statement composed nothing.
+
+        **The access axis is in the third list and not the second.** Every statement
+        Veritas runs is scoped, so the Join Paths that scope it are part of how its rows
+        were reached; but an axis nothing grouped by is not one the statement sliced by,
+        and an *axis usage* chart in which every answer names `by region` would be a
+        chart of the Access Profile rather than of the questions.
+        """
+        hit = self.traced_metrics(reading)
+        metrics = [self.semantic.metrics[name] for name in hit]
+        axes = self.axes_sliced_by(grouped_columns(reading.resolved))
+        wanted = [*axes, self.semantic.dimensions[ACCESS_AXIS]]
+        return (
+            tuple(hit),
+            tuple(axis.name for axis in axes),
+            tuple(
+                dict.fromkeys(
+                    name
+                    for metric in metrics
+                    for name in self.certifying_paths(metric, wanted)
+                )
+            ),
+        )
+
     def assembled_route(
         self,
         metrics: Iterable[MetricDefinition],
@@ -1890,13 +1957,8 @@ class ValidationGate:
         differently, which is precisely what `certified_route` exists to prevent one
         level down.
 
-        **The joins are named once and kept in order.** An axis's route starts at the
-        metric's `from_table`, so appending it after the metric's own joins produces a
-        statement whose every hop extends a route already arrived at its start; and a
-        Join Path already named — `trade_to_instrument`, which `Traded Notional`
-        computes across and `by instrument type` is reached by — is not appended twice,
-        because joining one table twice under one name makes every column that names it
-        ambiguous.
+        Which Join Paths a metric's route is assembled from, and in what order, is
+        `certifying_paths`.
         """
         wanted = list(axes)
         if access:
@@ -1904,11 +1966,6 @@ class ValidationGate:
 
         declared = []
         for metric in metrics:
-            names = list(metric.join_paths)
-            for axis in wanted:
-                for name in axis.routes.get(metric.from_table, ()):
-                    if name not in names:
-                        names.append(name)
             declared.append(
                 certified_route(
                     metric.expression,
@@ -1918,7 +1975,7 @@ class ValidationGate:
                             self.semantic.join_paths[path].to_table,
                             self.semantic.join_paths[path].on,
                         )
-                        for path in names
+                        for path in self.certifying_paths(metric, wanted)
                     ],
                     schema,
                 )
@@ -2024,6 +2081,11 @@ class ValidationGate:
         rule a question it cannot answer. The outcome names the rules that ran, so a
         reader never has to infer what a verdict covered.
 
+        **An allowing verdict also names what the statement was composed from** —
+        `composed_from`, read after the last rule has passed. A rejecting one names
+        nothing: it is the first return below, and the entries a refused statement
+        reached for were attempted rather than used.
+
         The Access Profile is required and has no default — see the class docstring for
         why it is here rather than on the Gate.
 
@@ -2072,12 +2134,16 @@ class ValidationGate:
                 rules=tuple(ran),
                 trusted_rewrites=trusted_rewrite_names(),
             )
+        metrics, dimensions, join_paths = self.composed_from(reading)
         return ValidationGateOutcome(
             allowed=True,
             explanation="",
             reasons=(),
             rules=tuple(ran),
             trusted_rewrites=trusted_rewrite_names(),
+            metrics=metrics,
+            dimensions=dimensions,
+            join_paths=join_paths,
         )
 
 

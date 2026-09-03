@@ -61,14 +61,14 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown — **🔴 fired** | **paid** (6.5, 2026-08-31) |
 | [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals | open |
 | [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
-| [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
+| [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage — **🔴 fired** | **paid** (8.2, 2026-09-03) |
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | L | The Sub-step of Step 007 that measures Execution Accuracy — **🔴 fired** | open |
 | [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice — **🔴 fired** | **paid** (7.4, 2026-09-02) |
 | [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | ~~S~~ M | 🔴 fired (8.1) — prose relabels the refusal, the honest fix crosses ADR-0001, and the generation sweep is the standing guard | **accepted** (8.1) |
 | [DEBT-038](#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | A capable model answers an ad-hoc row request instead of refusing it | S | Before the capstone is submitted | open |
 | [DEBT-039](#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished) | The published two-provider sweep failed its own runner and is not republished | S | The final documentation pass, a Sub-step that needs the published figures, or submission — whichever is first | open |
 
-**Open debt:** 15 · **Paid:** 20 · **Accepted:** 2 · **Moved:** 2
+**Open debt:** 14 · **Paid:** 21 · **Accepted:** 2 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2689,7 +2689,7 @@ the set past a model.
 
 ### DEBT-034 — Lineage records what the model was shown, not what the statement used
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 8.2 (`.claude/docs/reviews/step-008-observability.md`)
 - **Opened:** Sub-step 6.5 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** M
 - **Location:** `veritas/orchestrator/flow.py` — `Orchestrator.lineage_of`, and
@@ -2745,6 +2745,20 @@ The [Target State](design/target-state.md#zoomcamp-criteria-map)
 puts *"metric-usage frequency"* on the Monitoring scorecard, and a chart of it built on
 this Lineage counts every retrieved metric as used — so the chart is wrong the day it is
 drawn, and it is wrong in the direction that flatters the corpus.
+
+**How it was paid, Sub-step 8.2 (2026-09-03).** `ValidationGateOutcome` gained
+`metrics`, `dimensions` and `join_paths` — the Certified Metrics the statement's
+expressions traced to, the certified axes it sliced by, and the Join Paths its route was
+certified by, as the names the Semantic Layer registers. `ValidationGate.composed_from`
+reads them after the last rule has passed, so they are the Gate's own decisions rather
+than a second opinion, and a **rejecting** verdict names none of them — a construction
+error if one tries, because a refused statement's entries were attempted rather than
+used. `Orchestrator.lineage_of` builds the Lineage off the verdict instead of off
+`GROUNDED_FIELDS`: the resolved Ambiguous Terms, then what the statement used. The App
+labels a single figure with that metric's `unit` and Reporting Currency
+(`render.unit_line`), which is the smaller thing this entry was blocking. Nothing records
+what was retrieved any more — Evaluation scores `rank` directly, so the list left rather
+than moved.
 
 ---
 

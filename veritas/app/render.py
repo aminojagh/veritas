@@ -9,6 +9,7 @@ from decimal import Decimal
 
 from veritas.llm import LanguageModelError, default_model
 from veritas.orchestrator import GroundedAnswer
+from veritas.semantic import MetricDefinition
 from veritas.validation import AccessProfile, ValidationGateOutcome
 
 # What the App says about the enforcement it demonstrates, in the words
@@ -79,6 +80,36 @@ def single_value(answer: GroundedAnswer) -> tuple[str, str] | None:
     if len(answer.rows) == 1 and len(answer.columns) == 1:
         return labels(answer)[0], formatted(answer.rows[0][0])
     return None
+
+
+def unit_line(answer: GroundedAnswer) -> str:
+    """What a one-number answer is in: the Certified Metric that produced it, that
+    metric's `unit`, and its Reporting Currency where it has one.
+
+    A single figure comes back under whatever the statement aliased it — `answer` — so
+    the number reaches a person labelled with nothing they can read a unit off. The
+    metric is identifiable because Lineage now records what the statement used, which is
+    the smaller thing
+    [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    was blocking: *"the figure is shown without its unit or its reporting currency,
+    because the metric whose `unit` and `reporting_currency` would label it is not
+    identifiable from a list that names two."*
+
+    Empty for anything that is not one number, and empty when the Lineage names no
+    metric or more than one. A unit no entry pins down is a unit invented for the page.
+    """
+    if single_value(answer) is None:
+        return ""
+    metrics = [
+        entry
+        for entry in answer.lineage.entries
+        if isinstance(entry, MetricDefinition)
+    ]
+    if len(metrics) != 1:
+        return ""
+    [metric] = metrics
+    currency = f", in {metric.reporting_currency}" if metric.reporting_currency else ""
+    return f"{metric.name} — {metric.unit}{currency}"
 
 
 def outcome_line(outcome: ValidationGateOutcome | None) -> str:

@@ -16,6 +16,7 @@ from veritas.app.render import (
     outcome_line,
     single_value,
     table,
+    unit_line,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "outcome_line",
     "single_value",
     "table",
+    "unit_line",
 ]

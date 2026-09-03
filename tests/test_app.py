@@ -1,8 +1,9 @@
 """What the App shows a person, and what it refuses to hide from them.
 
 Two claims. The **rendering claim**: a Grounded Answer becomes strings a person reads —
-values under the names the engine gave them, a verdict that says which rules ran, and
-an identity that carries what its enforcement is worth. The **page claim**: every one
+values under the names the engine gave them, a single figure under the unit its
+Certified Metric is quoted in, a verdict that says which rules ran, and an identity that
+carries what its enforcement is worth. The **page claim**: every one
 of the four things a question can come back as reaches the page as itself, and none of
 them arrives without the statement, the Lineage and the Validation Gate outcome beside
 it — [`App`](../.claude/docs/glossary.md#a-the-system)'s *"never renders a bare
@@ -16,6 +17,7 @@ the real flow runs only when `VERITAS_LIVE_MODEL` says so.
 
 import os
 import re
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
@@ -31,6 +33,7 @@ from veritas.app import (
     outcome_line,
     single_value,
     table,
+    unit_line,
 )
 from veritas.llm import LIVE_VARIABLE, LanguageModelError
 from veritas.orchestrator import GroundedAnswer, Lineage, Orchestrator
@@ -53,6 +56,20 @@ STATEMENT = (
     "JOIN dim_instrument ON dim_instrument.instrument_id = fct_trade.instrument_id "
     "WHERE dim_client.client_region = 'EU' "
     "GROUP BY dim_instrument.instrument_type"
+)
+
+# A one-number question, and the statement that answers it: `Gross Revenue`, which is
+# money in a Reporting Currency where `Trade Count` is a bare count.
+FIGURE_QUESTION = "what was our gross revenue"
+FIGURE_STATEMENT = (
+    "SELECT sum(fct_trade.commission * fct_fx_rate.fx_rate) AS answer "
+    "FROM fct_trade "
+    "JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_trade.trade_date "
+    " AND fct_fx_rate.from_currency = fct_trade.denomination_currency "
+    " AND fct_fx_rate.to_currency = 'EUR' "
+    "JOIN dim_account ON dim_account.account_id = fct_trade.account_id "
+    "JOIN dim_client ON dim_client.client_id = dim_account.client_id "
+    "WHERE dim_client.client_region = 'EU'"
 )
 
 
@@ -106,6 +123,30 @@ def answered(allowed, lineage):
         columns=("slice", "answer"),
         rows=(("equity", 412), ("ETF", 170), ("future", 61), ("currency pair", 9)),
         lineage=lineage,
+        outcome=allowed,
+    )
+
+
+@pytest.fixture
+def figure(allowed, semantic):
+    """One number, under a Lineage that says which metric it is.
+
+    The engine calls the column `answer`, which is what the generation rules asked the
+    model to alias it — so the Lineage is the only thing on the page that can say what
+    the number is measured in.
+    """
+    return GroundedAnswer(
+        question=FIGURE_QUESTION,
+        rewritten=FIGURE_QUESTION,
+        sql=FIGURE_STATEMENT,
+        columns=("answer",),
+        rows=((Decimal("67935.82"),),),
+        lineage=Lineage((
+            semantic.metrics["Gross Revenue"],
+            semantic.join_paths["trade_to_fx_rate_on_denomination_currency"],
+            semantic.join_paths["trade_to_account"],
+            semantic.join_paths["account_to_client"],
+        )),
         outcome=allowed,
     )
 
@@ -208,6 +249,36 @@ def test_only_a_one_number_answer_is_shown_as_one(answered, allowed):
     assert single_value(empty) is None
 
 
+def test_a_single_figure_carries_the_unit_its_metric_is_quoted_in(
+    figure, answered, semantic
+):
+    """The smaller thing
+    [DEBT-034](../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    was blocking: the metric whose `unit` and `reporting_currency` label the figure is
+    identifiable now that Lineage names what the statement used.
+
+    A count has no Reporting Currency and says so by not naming one. A breakdown is a
+    table under the names the engine returned, and gets no unit line.
+    """
+    assert unit_line(figure) == "Gross Revenue — money, in EUR"
+    counted = replace(figure, lineage=Lineage((semantic.metrics["Trade Count"],)))
+    assert unit_line(counted) == "Trade Count — count"
+    assert unit_line(answered) == ""
+
+
+def test_a_figure_no_lineage_identifies_carries_no_unit(figure, semantic):
+    """A unit no entry pins down is a unit invented for the page.
+
+    Two metrics in one Lineage is the state this replaced — every retrieved metric
+    cited — and it is still what a two-metric statement produces.
+    """
+    two = replace(figure, lineage=Lineage((
+        semantic.metrics["Gross Revenue"], semantic.metrics["Net Revenue"],
+    )))
+    assert unit_line(two) == ""
+    assert unit_line(replace(figure, lineage=Lineage())) == ""
+
+
 def test_the_verdict_says_what_ran_or_what_fired(allowed, rejected):
     """An allowed statement names the rules that ran — the Gate stops at the first
     rejection, so a verdict is only as wide as the rules it got through — and a
@@ -262,6 +333,15 @@ def test_an_answer_is_never_a_bare_number(answered):
     assert page.code[0].value == STATEMENT
     assert "Trade Count — metric v1" in shown(page)
     assert page.success[0].value.startswith("allowed")
+
+
+def test_a_one_number_answer_reaches_the_page_with_its_unit(figure):
+    """The number, and what it is measured in, beside each other — where the engine's
+    own label for it is `answer`."""
+    page = asked(figure, question=FIGURE_QUESTION)
+    assert not page.exception and not page.dataframe
+    assert page.metric[0].value == "67,935.82"
+    assert "Gross Revenue — money, in EUR" in shown(page)
 
 
 def test_a_breakdown_is_shown_under_the_names_it_came_back_under(answered):

@@ -1,11 +1,19 @@
-"""The two holes in the certified-route rule that a generator can walk through.
+"""What a verdict records, and the two holes in the certified-route rule.
 
+Two claims. The **composition claim**: an allowing verdict names the Certified Metrics
+the statement's expressions traced to, the axes it sliced by and the Join Paths its
+route was certified by, and a refusing verdict names none of them — which is what a
+Lineage of what the statement *used* is read off
+([DEBT-034](../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)).
+
+The **route claim**:
 [DEBT-021](../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
 and
 [DEBT-022](../.claude/docs/debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
 both name the Sub-step that builds Grounding as their Trigger, and both owe the same
 thing: a probe that writes the statement, declares it, and prints the numbers it and
-the certified statement return. This file is that probe for each.
+the certified statement return. The tests under the second divider are that probe for
+each.
 
 Every statement here is written out rather than generated, because both shapes need a
 writer that means to write them: no model is asked to cross two conversions or to
@@ -18,7 +26,12 @@ Run it with `-s` to read the numbers:
 
 import pytest
 
-from veritas.validation import ANALYST, RejectionReason, ValidationGate
+from veritas.validation import (
+    ANALYST,
+    RejectionReason,
+    ValidationGate,
+    ValidationGateOutcome,
+)
 
 # The one statement in this project that has to join `fct_fx_rate` twice: `Gross
 # Revenue` converts on the Trade's own Denomination Currency and `Traded Notional` on
@@ -73,10 +86,102 @@ def both_metrics(gross_rate: str, notional_rate: str) -> str:
     )
 
 
+# `Trade Count` sliced by a certified axis: the one shape whose verdict has something to
+# put in all three lists — a metric, the axis it grouped by, and a route that is the
+# axis's hop plus the two the Access Profile's predicate is reached through.
+TRADE_COUNT_BY_INSTRUMENT_TYPE = (
+    "SELECT dim_instrument.instrument_type AS slice, count(fct_trade.trade_id) AS answer "
+    "FROM fct_trade "
+    "JOIN dim_account ON dim_account.account_id = fct_trade.account_id "
+    "JOIN dim_client ON dim_client.client_id = dim_account.client_id "
+    "JOIN dim_instrument ON dim_instrument.instrument_id = fct_trade.instrument_id "
+    "WHERE dim_client.client_region = 'EU' "
+    "GROUP BY dim_instrument.instrument_type"
+)
+
+
 @pytest.fixture(scope="module")
 def gate(warehouse):
     """The Gate over the built Warehouse and the corpus on disk."""
     return ValidationGate(warehouse)
+
+
+# -- the composition claim -------------------------------------------------------
+
+
+def test_an_allowed_verdict_names_what_the_statement_was_composed_from(gate):
+    """The metric the expression traced to, and the Join Paths the route was certified
+    by — including the two that scope it.
+
+    `Gross Revenue` and `Net Revenue` are one join and one arithmetic operator apart and
+    both are in the corpus; the verdict names the one this statement computes. The two
+    access hops are in the route because every statement Veritas runs is scoped, so they
+    are part of how these rows were reached and not an aside.
+    """
+    outcome = gate.judge(GROSS_REVENUE_ALONE.format(kind="JOIN"), ANALYST)
+    assert outcome.allowed, outcome.explanation
+    assert outcome.metrics == ("Gross Revenue",)
+    assert outcome.dimensions == ()
+    assert outcome.join_paths == (
+        "trade_to_fx_rate_on_denomination_currency",
+        "trade_to_account",
+        "account_to_client",
+    )
+
+
+def test_a_sliced_statement_names_the_axis_and_not_the_one_that_scopes_it(gate):
+    """The axis a statement grouped by is what it sliced by; `by region` is what every
+    statement is scoped along, whether or not it asked to be.
+
+    Its Join Paths are in the route all the same. An *axis usage* chart in which every
+    answer named `by region` would be a chart of the Access Profile.
+    """
+    outcome = gate.judge(TRADE_COUNT_BY_INSTRUMENT_TYPE, ANALYST)
+    assert outcome.allowed, outcome.explanation
+    assert outcome.metrics == ("Trade Count",)
+    assert outcome.dimensions == ("by instrument type",)
+    assert outcome.join_paths == (
+        "trade_to_instrument",
+        "trade_to_account",
+        "account_to_client",
+    )
+
+
+def test_a_statement_computing_two_metrics_names_both_and_both_their_routes(gate):
+    """Each metric's own Join Paths, named once and in the order they extend the route."""
+    outcome = gate.judge(both_metrics("denom_rate", "quote_rate"), ANALYST)
+    assert outcome.allowed, outcome.explanation
+    assert outcome.metrics == ("Gross Revenue", "Traded Notional")
+    assert outcome.join_paths == (
+        "trade_to_fx_rate_on_denomination_currency",
+        "trade_to_account",
+        "account_to_client",
+        "trade_to_instrument",
+        "instrument_to_fx_rate_on_quotation_currency",
+    )
+
+
+def test_a_refused_statement_composed_nothing(gate):
+    """The widened join traces to `Gross Revenue` and is refused for its route — and a
+    statement that never ran produced nothing, so the verdict names nothing it reached
+    for."""
+    outcome = gate.judge(GROSS_REVENUE_ALONE.format(kind="LEFT JOIN"), ANALYST)
+    assert not outcome.allowed
+    assert (outcome.metrics, outcome.dimensions, outcome.join_paths) == ((), (), ())
+
+
+def test_a_verdict_cannot_refuse_and_name_what_it_composed():
+    """The contract, as a construction error: *"metric-usage frequency"* counts what was
+    computed, and a refused statement's entries were attempted rather than used."""
+    with pytest.raises(ValueError, match="composed nothing"):
+        ValidationGateOutcome(
+            allowed=False,
+            reasons=(RejectionReason.SHADOW_METRIC,),
+            metrics=("Gross Revenue",),
+        )
+
+
+# -- the route claim -------------------------------------------------------------
 
 
 def test_two_metrics_may_convert_through_two_rates_in_one_statement(gate, warehouse):

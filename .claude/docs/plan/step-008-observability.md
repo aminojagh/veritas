@@ -1,8 +1,8 @@
 # Step 008 — Observability: record every question and chart it
 
 **Status:** **active** — approved by Amino on 2026-09-03, by the commit that carries
-this plan and its two Term Proposals. Next: Sub-step 8.1. The status turns `done` by
-the commit that closes 8.5.
+this plan and its two Term Proposals. Next: Sub-step 8.3 — 8.1 is committed (`2cf4170`)
+and 8.2 is built. The status turns `done` by the commit that closes 8.5.
 
 **Goal.** Build Observability — every question a person asks, recorded in Postgres
 with its Grounded Answer, Validation Gate outcome, Lineage, cost, latency and Feedback,

@@ -301,3 +301,75 @@ is **opened** for the re-run the failed sweep owes.
    is nothing broken to chase, just a garbled generation to explain.
 
 **Language.** None. Model names are catalogue entries, not domain terms.
+
+---
+
+## Sub-step 8.2 — Lineage records what the statement used
+
+**Changed.** A `Validation Gate outcome` that allows a statement now names what it was
+composed from — the Certified Metrics its expressions traced to, the certified axes it
+sliced by, the Join Paths its route was certified by — and one that refuses may not name
+any of them. `ValidationGate.composed_from` reads all three after the last rule has
+passed, off the `Reading` the judgement already holds; `certifying_paths` is the Join
+Path naming `assembled_route` was doing inline, extracted so the Route a statement is
+judged against and the Lineage a person reads come from one list rather than two.
+`Orchestrator.lineage_of` takes the verdict where it took the grounded entries, and the
+App labels a single figure with its metric's `unit` and Reporting Currency.
+
+**Verified.**
+
+```
+$ uv run pytest tests/test_gate.py tests/test_orchestrator.py tests/test_app.py
+collected 59 items
+tests/test_gate.py .............                                         [ 22%]
+tests/test_orchestrator.py .......................ss.                    [ 67%]
+tests/test_app.py ..................s                                    [100%]
+======================== 56 passed, 3 skipped in 36.54s ========================
+
+$ uv run pytest tests/test_orchestrator.py -s -q -k cites_what_the_statement_used
+  shown:  Trade Count, Traded Notional, Net Revenue
+  cited:  Trade Count (metric v1); trade_to_account (join_path v1); account_to_client (join_path v1)
+
+$ uv run pytest -q | tail -1
+252 passed, 4 skipped in 136.56s (0:02:16)
+
+$ uv run python .claude/scripts/check_validation_gate/__main__.py | tail -1 | cut -c1-76
+PASS — the Validation Gate refuses what it cannot read, what is more than
+```
+
+The second block is the payment: retrieval put three Certified Metrics in front of the
+model, and the answer cites the one the statement computed plus its route.
+
+**Debt.**
+[DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+**paid**, on its own Trigger, including the App half of its *"Cost while unpaid"*. None
+opened.
+
+**Sceptically.**
+
+1. **The access axis's Join Paths are in a Lineage and the axis itself is not.** A reader
+   sees `trade_to_account` and `account_to_client` with nothing in the Lineage saying
+   what certified them — the `by region` axis did, and it is on the page only as the
+   Access Profile in the sidebar. I chose it so that 8.5's axis-usage chart is a chart of
+   what people asked to slice by rather than one every answer contributes `by region` to.
+   The plan's words are *"the axes it sliced by"*, which is what shipped.
+2. **A rejecting verdict is forbidden to name what its statement reached for**, by a
+   `__post_init__` check rather than by convention. It makes the metric-usage chart
+   impossible to draw wrongly, and it forecloses a chart of *attempted* metrics — which
+   would want the tracing rule's output on a refusal. Nothing asks for that today.
+3. **`composed_from` re-reads what the rules decided** instead of the rules handing it
+   over. That is `traced_metrics`'s own argument applied again — a rule fed by another
+   rule stops being independently deletable, and `check_validation_gate` measures rules
+   by deleting them — and it costs two walks of a tree already in memory.
+4. **I fixed staleness in Current State this Sub-step did not create:** the *How we got
+   here* table said Step 007 was in progress and had no 7.4 or 008 row, and the commit
+   list stopped at 7.1. Every hash came from `git log`. Worth checking I read them right.
+5. **`unit_line`'s "not exactly one metric" branch is unreachable through the flow**
+   today — one output column is one projection is one metric — so it is a guard with a
+   test and no live caller.
+
+**Language.** None. `metrics`, `dimensions` and `join_paths` on the outcome are the
+`SemanticLayer`'s own field names, so an entry is looked up under the word it is stored
+under; `composed_from` and `certifying_paths` are process words. The
+[`Lineage`](../glossary.md#a-the-system) row is unamended: it always said *"which
+Semantic Entries … **produced** a Grounded Answer"*, and it was the code that disagreed.

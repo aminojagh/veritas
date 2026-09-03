@@ -19,13 +19,12 @@ out of here, because *"this question cannot be answered"* and *"this installatio
 reach a model"* are different sentences and only the first is about the question.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 from veritas.llm import LanguageModel
 from veritas.orchestrator.answer import GroundedAnswer, Lineage
 from veritas.orchestrator.generate import (
     DEFAULT_PROMPT_FORM,
-    GROUNDED_FIELDS,
     PromptForm,
     generate,
 )
@@ -37,6 +36,7 @@ from veritas.validation import (
     ANALYST,
     AccessProfile,
     ValidationGate,
+    ValidationGateOutcome,
 )
 from veritas.warehouse import WarehouseAdapter, WarehouseError
 
@@ -131,12 +131,12 @@ class Orchestrator:
             )
 
         entries = self.grounded_entries(resolved.rewritten)
-        lineage = self.lineage_of(entries, resolved.resolutions)
+        terms = self.lineage_of(resolved.resolutions)
         if not any(isinstance(entry, MetricDefinition) for entry in entries):
             return GroundedAnswer(
                 question=question,
                 rewritten=resolved.rewritten,
-                lineage=lineage,
+                lineage=terms,
                 refusal="nothing retrieved for this question defines a Certified "
                         "Metric, and Veritas answers only with those",
             )
@@ -148,7 +148,7 @@ class Orchestrator:
             return GroundedAnswer(
                 question=question,
                 rewritten=resolved.rewritten,
-                lineage=lineage,
+                lineage=terms,
                 refusal=written.refusal,
             )
 
@@ -158,11 +158,12 @@ class Orchestrator:
                 question=question,
                 rewritten=resolved.rewritten,
                 sql=written.sql,
-                lineage=lineage,
+                lineage=terms,
                 outcome=outcome,
                 refusal=outcome.explanation,
             )
 
+        lineage = self.lineage_of(resolved.resolutions, outcome)
         try:
             columns, rows = self.warehouse.query_with_columns(written.sql)
         except WarehouseError as refused:
@@ -187,21 +188,30 @@ class Orchestrator:
 
     def lineage_of(
         self,
-        entries: Sequence[SemanticEntry],
         resolutions: Mapping[str, tuple[str, ...]],
+        outcome: ValidationGateOutcome | None = None,
     ) -> Lineage:
         """The entries an answer was built from: the Ambiguous Terms the rewrite step
-        resolved, then everything that reached the prompt.
+        resolved, then what the allowed statement was composed from.
 
-        `GROUNDED_FIELDS` decides the second half, so what Lineage claims produced the
-        answer is exactly what the model was shown — one list, read twice, rather than a
-        second opinion about what mattered. An entry retrieved and grounded as nothing
-        is left out.
+        The **verdict** decides the second half, which is
+        [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+        paid. Until here it was `GROUNDED_FIELDS` — everything the model was shown — so
+        an answer computed with `Gross Revenue` cited `Net Revenue` beside it, having
+        been offered both and used one.
 
-        The resolved terms lead, because they are what turned the word the person typed
-        into the metric that was computed, and they ground nothing themselves.
+        A question that reached no allowing verdict is the terms alone: nothing ran, so
+        nothing produced an answer. The resolved terms lead, because they are what turned
+        the word the person typed into the metric that was computed, and they ground
+        nothing themselves. Then what was computed, how it was sliced, and how its rows
+        were reached — the order a reader checks an answer in.
         """
-        return Lineage(
-            tuple(self.gate.semantic.ambiguous_terms[name] for name in resolutions)
-            + tuple(entry for entry in entries if GROUNDED_FIELDS[type(entry)])
-        )
+        semantic = self.gate.semantic
+        entries: list[SemanticEntry] = [
+            semantic.ambiguous_terms[name] for name in resolutions
+        ]
+        if outcome is not None:
+            entries.extend(semantic.metrics[name] for name in outcome.metrics)
+            entries.extend(semantic.dimensions[name] for name in outcome.dimensions)
+            entries.extend(semantic.join_paths[name] for name in outcome.join_paths)
+        return Lineage(tuple(entries))

@@ -5,7 +5,8 @@ the identity asking, so a metric that was not retrieved publishes no expression 
 model and no Warehouse table reaches the prompt except through an entry that names it.
 The **flow claim**: each of the five ways a question ends without a number comes back as
 a Grounded Answer saying which, and an answered one carries its SQL, its Lineage and the
-verdict it ran under. The **contract claim**: a Grounded Answer cannot be built that
+verdict it ran under — the Lineage naming what the statement used rather than what
+retrieval put in front of the model. The **contract claim**: a Grounded Answer cannot be built that
 says two things at once, or that carries a number without the statement and the verdict
 behind it.
 
@@ -265,6 +266,55 @@ def test_a_question_the_corpus_covers_returns_a_number_and_its_lineage(orchestra
     print(f"\n  {UNAMBIGUOUS!r} -> {trades}\n  lineage: {answer.lineage}")
 
 
+def test_lineage_cites_what_the_statement_used_and_not_what_was_retrieved(orchestrator):
+    """[DEBT-034](../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    paid at the end that reads it.
+
+    Retrieval shows the model several Certified Metrics — that is its job, and one of
+    them is the answer. Lineage used to claim all of them, so an answer computed with
+    one metric cited the others beside it and *"metric-usage frequency"* would have
+    counted every retrieval as a use. It now names the one the statement computed, and
+    the Join Paths its route was certified by.
+    """
+    orchestra = orchestrator(wrote(CERTIFIED))
+    shown = [
+        entry.name
+        for entry in orchestra.grounded_entries(UNAMBIGUOUS)
+        if isinstance(entry, MetricDefinition)
+    ]
+    answer = orchestra.answer(UNAMBIGUOUS)
+    assert answer.answered, answer.refusal
+    cited = answer.lineage.versions()
+    assert len(shown) > 1, "one metric retrieved is not a test of which one is cited"
+    assert [name for name in cited if name in shown] == ["Trade Count"]
+    assert list(cited) == ["Trade Count", "trade_to_account", "account_to_client"]
+    print(f"\n  shown:  {', '.join(shown)}\n  cited:  {answer.lineage}")
+
+
+def test_a_breakdown_cites_the_axis_it_was_sliced_by(orchestrator):
+    """What was computed, how it was sliced, and how its rows were reached — in the
+    order a reader checks them."""
+    answer = orchestrator(wrote(BREAKDOWN)).answer(
+        "how many trades did we make by instrument type"
+    )
+    assert answer.answered, answer.refusal
+    assert list(answer.lineage.versions())[:2] == ["Trade Count", "by instrument type"]
+
+
+def test_a_question_the_gate_refuses_cites_the_terms_alone(orchestrator):
+    """A refusal produced no answer, so its Lineage claims nothing produced one.
+
+    The resolved Ambiguous Term stays: it is what the person's word was read as, and it
+    is true of the question whether or not a statement ever ran.
+    """
+    answer = orchestrator({"revenue": "Net Revenue"}, wrote(SHADOW)).answer(
+        "what was our revenue last quarter"
+    )
+    assert not answer.answered
+    assert answer.outcome is not None and not answer.outcome.allowed
+    assert list(answer.lineage.versions()) == ["revenue"]
+
+
 def test_an_answered_breakdown_carries_the_names_its_values_came_back_under(
     orchestrator, semantic
 ):
@@ -324,6 +374,7 @@ def test_a_model_that_refuses_is_a_refusal_and_not_a_crash(orchestrator):
     assert answer.refusal == "no metric here counts instruments"
     assert answer.sql == ""
     assert answer.outcome is None
+    assert answer.lineage.entries == (), "nothing ran, so nothing produced an answer"
 
 
 def test_a_model_that_refuses_without_saying_why_still_refuses(orchestrator):

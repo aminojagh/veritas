@@ -33,6 +33,7 @@ from veritas.app.render import (
     outcome_line,
     single_value,
     table,
+    unit_line,
 )
 from veritas.llm import LanguageModelError
 from veritas.orchestrator import GroundedAnswer, Orchestrator
@@ -64,8 +65,9 @@ def built() -> Orchestrator:
 def show(answer: GroundedAnswer) -> None:
     """One Grounded Answer, whichever of the four it is, and the record behind it.
 
-    A question asked back is a warning, a refusal is an error, a number is a number and
-    a breakdown is a table. What follows is the same in all four cases: the statement if
+    A question asked back is a warning, a refusal is an error, a number is a number under
+    the unit its Certified Metric is quoted in, and a breakdown is a table. What follows
+    is the same in all four cases: the statement if
     one was written, the Lineage if anything grounded it, and the Validation Gate's
     verdict — including when the verdict is that nothing reached it. The statement wraps
     rather than scrolling, because a reader who has to scroll a box sideways to see the
@@ -79,6 +81,8 @@ def show(answer: GroundedAnswer) -> None:
         st.info("the statement ran and matched no rows")
     elif single := single_value(answer):
         st.metric(*single)
+        if unit := unit_line(answer):
+            st.caption(unit)
     else:
         st.dataframe(table(answer), width="stretch", hide_index=True)
 

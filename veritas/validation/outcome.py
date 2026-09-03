@@ -323,6 +323,25 @@ class ValidationGateOutcome:
     names, taken off those callables so there is no second list to drift. A verdict
     reached under a wider rule set is a different verdict, which is why it travels with
     the verdict instead of being looked up later.
+
+    **`metrics`, `dimensions` and `join_paths` are what the statement was composed
+    from** — the Certified Metrics its expressions traced to, the certified axes it
+    sliced by, and the Join Paths its route was certified by. They are
+    [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    paid: `Lineage` is read off the verdict rather than off what the model was shown, so
+    an answer cites the entries that produced it and *"metric-usage frequency"* counts
+    the metrics that were computed. The Gate's rules already decide all three on the way
+    to a verdict; carrying them is the difference between a verdict and an audit trail.
+
+    **Names, not entries.** A name survives into a Postgres row and a Grafana filter,
+    where an entry would drag the Semantic Layer into a contract three components import
+    without importing a rule. The Semantic Layer is what turns a name back into the entry
+    and the version it was read at.
+
+    **A rejected statement composed nothing**, and the check below holds it to that. Its
+    metrics were *attempted*, not used — nothing ran — and a usage chart that counted
+    them would report the corpus's failures as its traffic, which is the direction
+    DEBT-034 says a wrong Lineage flatters the corpus in.
     """
 
     allowed: bool
@@ -330,6 +349,9 @@ class ValidationGateOutcome:
     reasons: tuple[RejectionReason, ...] = ()
     rules: tuple[str, ...] = ()
     trusted_rewrites: tuple[str, ...] = ()
+    metrics: tuple[str, ...] = ()
+    dimensions: tuple[str, ...] = ()
+    join_paths: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.allowed and self.reasons:
@@ -342,4 +364,11 @@ class ValidationGateOutcome:
                 "a rejected outcome names at least one Rejection Reason, because "
                 "'rejections by reason' is a chart and an unlabelled rejection is a "
                 "bar with no name"
+            )
+        composed = [*self.metrics, *self.dimensions, *self.join_paths]
+        if not self.allowed and composed:
+            raise ValueError(
+                f"a rejected statement composed nothing and this one names "
+                f"{composed} — a refused statement's entries were attempted, not "
+                f"used, and Lineage records what produced an answer"
             )
