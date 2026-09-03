@@ -105,16 +105,26 @@ call a real provider run only when `VERITAS_LIVE_MODEL` is set.
 
 ## Resume here
 
-- **Next: Step 008 — Observability**, which has no plan yet.
+- **Next: Sub-step 8.1 — tell the generator an unknown period is not a reason to
+  refuse**, paying
+  [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse).
+  [Step 008 — Observability](../plan/step-008-observability.md) is `active`, approved
+  on 2026-09-03, five Sub-steps: 8.1; Lineage read off what the statement used
+  ([DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used));
+  every question a person asks recorded in Postgres with the ending as a taxonomy
+  ([DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by));
+  Feedback in the App; and the Grafana dashboard. Nothing in `veritas/observability/`
+  is built yet.
   [Step 007 — Evaluation](../plan/step-007-evaluation.md) is **`done`**, and so is every
   Step before it: four Sub-steps, all four built, ruled and committed — 7.1 (`a361b79`),
   7.2 (`35099c3`), 7.3 (`47dfb8c`) and 7.4 (`7e40092`), the last approved on 2026-09-02.
-  The first Groq call was made in 7.4. Observability is Step 008 and Containerization
-  with `README.md` is Step 009.
-- **Nothing awaits Amino, and no Term Proposal is open**: 7.1's two were agreed on
-  2026-09-01 and are [Glossary](../glossary.md#a-the-system) Section A rows,
-  **`Gold Question`** and **`Relevant Set`**, and 7.2's Section D column was agreed the
-  same day. **Two entries carry out of Step 007.**
+  The first Groq call was made in 7.4. Containerization with `README.md` is Step 009.
+- **Nothing awaits Amino, and no Term Proposal is open**: the plan's two —
+  **`Question Log`** and **`Feedback`**, from its
+  [Language](../plan/step-008-observability.md#language) section — were agreed with it
+  on 2026-09-03 and are [Glossary](../glossary.md#a-the-system) Section A rows; 7.1's
+  **`Gold Question`** and **`Relevant Set`** were agreed on 2026-09-01, and 7.2's
+  Section D column the same day. **Two entries carry out of Step 007.**
   [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
   is open and unpaid on the second branch its own Trigger allows — `Account Value` is
   excluded from every generation figure, derived rather than named — and Sub-step 7.4
@@ -123,7 +133,7 @@ call a real provider run only when `VERITAS_LIVE_MODEL` is set.
   is open with a Trigger that fires **before the capstone is submitted**: `gpt-4o-mini`
   refuses a Gold Question whose period is later than its own training data, which costs
   most of Execution Accuracy on the default provider, and the fix is one sentence in each
-  prompt and a re-run of the sweep.
+  prompt and a re-run of the sweep, which is Sub-step 8.1.
   `DEFAULT_PROMPT_FORM` stays `rules`: the two forms tie exactly on Execution Accuracy,
   and a tie is not evidence for a change.
 - **The project is under [Delivery Mode](../../../CLAUDE.md) until 2026-09-09**,

@@ -155,8 +155,10 @@ What Veritas is made of.
 | **Retrieval Strategy** | Which search one call of Retrieval runs over the corpus — the thing an Evaluation Measure is grouped by when Retrieval's hit rate and MRR are compared, as a Validation Gate outcome is grouped by its Rejection Reason. Not a second word for **Retrieval**: Retrieval is the step, and a Retrieval Strategy is which of its searches that step ran, so two of them over one corpus return different entries for one question and are comparable by measure. The **members** are registered in `veritas/retrieval/`, where `RetrievalStrategy` enumerates them, and deliberately not in this cell for the reason [DEBT-017](debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) is open about. **Registered 2026-08-30** ([Sub-step 6.2](reviews/step-006-retrieval-and-orchestrator.md#sub-step-62--retrieve-semantic-entries-for-a-question)), where Sub-step 6.2 made the word a class and gave a call a parameter Step 007 must measure the arms of — the same trigger that registered `Route` in 5.4. `Retrieval Approach` was considered and rejected: one concept, one word. | `veritas/retrieval/` — as an enumeration (no file publishes one) | agreed |
 | **Orchestrator** | The component that runs a question through the seven-step flow: rewrite, retrieve, ground, generate, validate, execute, answer. Owns the sequence and the failure paths; owns none of the steps' logic. Renamed from `Copilot` on 2026-08-04 — Veritas *is* a copilot, so the word could not also name one component inside it. | `veritas/orchestrator/` | agreed |
 | **App** | Where a person asks a question and reads a Grounded Answer — with its SQL, its Lineage and its Validation Gate outcome. **Never renders a bare number.** Renamed from `Interface` on 2026-08-04, so the name matches the directory and does not collide with the rubric's own "Interface" criterion. | `veritas/app/` | agreed |
-| **Observability** | Records what happened at runtime: every question, Grounded Answer, Validation Gate outcome, cost, latency and feedback. Produces Operational Measures. **Records; never judges.** Live traffic, no ground truth. | `veritas/observability/` | agreed |
+| **Observability** | Records what happened at runtime: every question, Grounded Answer, Validation Gate outcome, cost, latency and Feedback — the Question Log. Produces Operational Measures. **Records; never judges.** Live traffic, no ground truth. | `veritas/observability/` | agreed |
 | **Evaluation** | Computes Evaluation Measures over the Gold Question Set: hit rate and MRR for Retrieval, Execution Accuracy and LLM-as-judge for generation. **Offline, against known-correct answers** — the opposite pole from Observability. | `veritas/evaluation/` | agreed |
+| **Question Log** | The record Observability keeps: one row per question a person asked through the App, carrying its Grounded Answer, Validation Gate outcome, Lineage, Operational Measures and Feedback. The seam `veritas/observability/` exposes and the tables behind it. Not the **Gold Question Set**: a Question Log row is live traffic with no ground truth; a Gold Question is ground truth with no traffic. **Registered 2026-09-03** ([Step 008 plan](plan/step-008-observability.md#language)), where the phrase [EXT-004](extension-register.md#ext-004--coverage-miss-capture)'s seam cell had carried since Step 001 — *"the Observability question log"* — became the seam Sub-step 8.3 builds; the cell now spells it as registered. | `veritas/observability/` | agreed |
+| **Feedback** | What a person says about a Grounded Answer they were shown: a verdict, up or down, and optionally a sentence. Attached to that answer's **Question Log** row and never to the question text alone, so Feedback on an answer is Feedback on *that* SQL, Lineage and Validation Gate outcome, and a later answer to the same words inherits none of it. The one of **Operational Measure**'s four — cost, latency, Validation Gate outcome, Feedback — that had no row of its own. Not an **Evaluation Measure**: a verdict is live traffic, and nothing scores it against a gold result. **Registered 2026-09-03** ([Step 008 plan](plan/step-008-observability.md#language)), ahead of Sub-step 8.4, which makes it a widget in the App and a column in the Question Log. | `veritas/observability/` — offered by the App | agreed |
 
 #### Component terms — `agreed` 2026-08-04
 
@@ -218,7 +220,7 @@ enough, and restructuring an `agreed` section costs more than it returns today.
 - **`Observability` and `Evaluation`** — weak individually, strong as a pair. One
   is live traffic with no ground truth; the other is offline against known
   answers. Blurring them produces the disease Section E exists to prevent —
-  reporting user feedback as accuracy, or expecting hit rate from production.
+  reporting Feedback as accuracy, or expecting hit rate from production.
   Section E registers the *measures*; these register the components that produce
   them.
 - **`Orchestrator`** — thin by design. It owns sequence and failure paths only,
@@ -371,7 +373,7 @@ hit-rate.
 | Term | Definition | Lives in | Status |
 |---|---|---|---|
 | **Evaluation Measure** | A measure of how well Veritas answers, computed over the Gold Question Set: hit rate and MRR for Retrieval; Execution Accuracy and LLM-as-judge agreement for generation. These are the Zoomcamp evaluation measures. | `veritas/evaluation/` | agreed |
-| **Operational Measure** | A runtime measure logged per question and shown on the Grafana dashboard: cost, latency, Validation Gate outcome, and user feedback. | `veritas/observability/` | agreed |
+| **Operational Measure** | A runtime measure logged per question and shown on the Grafana dashboard: cost, latency, Validation Gate outcome, and Feedback. | `veritas/observability/` | agreed |
 
 Execution Accuracy is registered separately in
 [Section A. The system](#a-the-system) because it is the primary correctness

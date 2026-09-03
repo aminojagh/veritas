@@ -40,7 +40,7 @@ reason) · `superseded`.
 | [EXT-001](#ext-001--warehouse-native-security-and-concurrency) | Warehouse-native security and concurrency | Warehouse adapter · Validation Gate Access Profile check | L | open |
 | [EXT-002](#ext-002--semantic-layer-drift-detection) | Semantic Layer drift detection | Semantic Entry schema · continuous integration | M | open |
 | [EXT-003](#ext-003--metric-authoring-at-scale) | Metric authoring at scale | `semantic/` file format · retrieval index build | L | open |
-| [EXT-004](#ext-004--coverage-miss-capture) | Coverage-miss capture | Observability question log · Grounded Answer refusal path | M | open |
+| [EXT-004](#ext-004--coverage-miss-capture) | Coverage-miss capture | Question Log · Grounded Answer refusal path | M | open |
 | [EXT-005](#ext-005--semantic-layer-coherence-checks) | Semantic Layer coherence checks | Metric Definition fields · the same sqlglot parse as EXT-002 | M | open |
 | [EXT-006](#ext-006--position-change-attribution) | Position Change attribution | `fct_position_snapshot` · the `Position Change` Metric Definition | M | open |
 | [EXT-007](#ext-007--corporate-actions) | Corporate actions | `fct_instrument_price` · `fct_position_snapshot` · the P&L Metric Definitions | M | open |
@@ -229,7 +229,7 @@ and collides with [EXT-002](#ext-002--semantic-layer-drift-detection).
 - **Status:** open
 - **Opened:** Sub-step 1.3 (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** M
-- **Seam:** the Observability question log, and the Grounded Answer refusal path
+- **Seam:** the Question Log, and the Grounded Answer refusal path
 - **Motivated by:** [ADR-0001](adr/0001-semantic-layer-as-the-retrieval-corpus.md),
   the second cost — coverage is a hard ceiling, which is *intended*, but the slice
   refuses **silently and forgetfully**
