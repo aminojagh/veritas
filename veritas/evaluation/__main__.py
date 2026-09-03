@@ -3,6 +3,10 @@
     uv run python -m veritas.evaluation retrieval                        # hit rate, MRR
     VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation  # accuracy
 
+    # one provider, one of its models, no judge — what a run ranking models costs
+    VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation \\
+        --provider openai --model <name> --no-judge
+
 Prints the Evaluation Measures for one part of Veritas over the Gold Question Set. It
 computes nothing itself: `retrieval.py` and `generation.py` hold the measures and the
 sweeps, and this file is the table they are read in.
@@ -37,6 +41,7 @@ from veritas.llm import (
     ENV_FILE,
     LIVE_VARIABLE,
     PROVIDER_VARIABLE,
+    PROVIDERS,
     default_model,
     registered_models,
 )
@@ -90,8 +95,12 @@ def retrieval_table(rows: list[RetrievalMeasures]) -> list[str]:
     return lines
 
 
-def retrieval(warehouse: WarehouseAdapter) -> int:
-    """Score every setting of Retrieval over the Gold Question Set and print the table."""
+def retrieval(warehouse: WarehouseAdapter, options: argparse.Namespace) -> int:
+    """Score every setting of Retrieval over the Gold Question Set and print the table.
+
+    Takes `options` to share one signature with the sweep beside it and reads nothing
+    from it: every flag there selects a model or a judge, and this sweep calls neither.
+    """
     gate = ValidationGate(warehouse)
     questions = load_gold_questions()
     wanted = scored(questions, gate)
@@ -128,7 +137,12 @@ def measured(right: int, of: int, rate: float) -> str:
 
 
 def generation_table(rows: list[GenerationMeasures], today: str) -> list[str]:
-    """The sweep as one line per prompt per model, one column per Evaluation Measure."""
+    """The sweep as one line per prompt per model, one column per Evaluation Measure.
+
+    Agreement prints `—` where nothing was judged — a run with no judge, and a judge that
+    abstained on every question, are the same absence. The rate itself would be `0.000`
+    over an empty denominator, which reads as a judge that disagreed with everything.
+    """
     width = max(len("model"), *(len(row.model) for row in rows))
     lines = [
         f"  {'prompt':<6}  {'model':<{width}}  {'ending':>7}  "
@@ -140,8 +154,12 @@ def generation_table(rows: list[GenerationMeasures], today: str) -> list[str]:
         accuracy = measured(
             sum(one.correct for one in executed), len(executed), row.execution_accuracy
         )
-        agreement = measured(
-            sum(bool(one.agrees) for one in judged), len(judged), row.judge_agreement
+        agreement = (
+            measured(
+                sum(bool(one.agrees) for one in judged), len(judged), row.judge_agreement
+            )
+            if judged
+            else "—"
         )
         setting = (row.prompt_form, row.model)
         lines.append(
@@ -153,20 +171,29 @@ def generation_table(rows: list[GenerationMeasures], today: str) -> list[str]:
 
 
 def failures(rows: list[GenerationMeasures]) -> list[str]:
-    """Every question each row got wrong, and which step of the flow ended it.
+    """Every question each row got wrong, which step of the flow ended it, and — where it
+    ended in a refusal or never reached a model — the sentence that says which.
 
     A wrong answer and a correct statement the Validation Gate refused score zero
     identically, so a table of rates alone cannot say whether a low figure is the
-    generator's. This is what says.
+    generator's. This is what says. The sentence is printed because the step alone does
+    not distinguish the two refusals `EndedBy.NO_SQL` covers, and a run comparing one
+    prompt against another cannot be read without knowing which of them fired. A row that
+    never reached a model prints what the provider said for the same reason: the step
+    alone leaves a reader with a failed sweep and nothing to fix.
     """
     lines: list[str] = []
     for row in rows:
         lines.append(f"  {row.prompt_form} · {row.model}")
-        lines.extend(
-            f"    ended by {str(one.ended_by):<9} wanted {str(one.gold.expects):<19} "
-            f"{one.gold.name}"
-            for one in row.failed
-        )
+        for one in row.failed:
+            lines.append(
+                f"    ended by {str(one.ended_by):<9} wanted "
+                f"{str(one.gold.expects):<19} {one.gold.name}"
+            )
+            if one.provider_error:
+                lines.append(f"      unreachable: {one.provider_error}")
+            elif one.answer is not None and one.answer.refusal:
+                lines.append(f"      said: {one.answer.refusal}")
         if not row.failed:
             lines.append("    nothing — every question ended the way the set says")
     return lines
@@ -180,13 +207,17 @@ def excluded(
     return [gold for gold in questions if not answerable_by_veritas(gold, gate)]
 
 
-def generation(warehouse: WarehouseAdapter) -> int:
+def generation(warehouse: WarehouseAdapter, options: argparse.Namespace) -> int:
     """Score every prompt against every registered model over the Gold Question Set.
 
     Asks for consent before spending anything, the way the tests that call a real
     provider do: this is a few hundred calls to every provider in the registry, and a
     key sitting in `.env` so the App can answer a question is not consent to spend it on
     a sweep nobody has asked for.
+
+    `options` narrows what is spent: which providers run, which model the one named
+    serves, and whether a judge runs at all. The published figures come from the run
+    that narrows nothing.
     """
     if not os.environ.get(LIVE_VARIABLE):
         print(
@@ -202,11 +233,13 @@ def generation(warehouse: WarehouseAdapter) -> int:
     beyond = excluded(questions, gate)
     scorable = [gold for gold in questions if gold not in beyond]
 
-    clients = registered_models()
+    clients = registered_models(options.provider, options.model)
     models = {f"{name} {client.model}": client for name, client in clients.items()}
-    judge_model = default_model()
+    judge_model = None if options.no_judge else default_model()
+    # What Veritas does today is the configured provider on its **registered** model, so
+    # a row running a candidate under `--model` is never marked as today's setting.
     configured = os.environ.get(PROVIDER_VARIABLE) or DEFAULT_PROVIDER
-    today = f"{configured} {clients[configured].model}"
+    today = f"{configured} {PROVIDERS[configured].default_model}"
 
     print(f"  gold          {GOLD_DIR.relative_to(REPO_ROOT)} — {len(questions)} Gold "
           f"Questions, {len(scorable)} of them scored")
@@ -215,7 +248,9 @@ def generation(warehouse: WarehouseAdapter) -> int:
               f"statement the set itself calls correct, so no model can answer it")
     print(f"  prompts       {', '.join(str(form) for form in PromptForm)}")
     print(f"  models        {', '.join(models)}")
-    print(f"  judge         {judge_model.model}, on every scored question")
+    print(f"  judge         {judge_model.model}, on every scored question"
+          if judge_model is not None
+          else "  judge         none — this run ranks by Execution Accuracy alone")
     print()
 
     if not scorable:
@@ -257,7 +292,25 @@ def main() -> int:
         choices=sorted(MEASURES),
         help="which part of Veritas to score over the Gold Question Set",
     )
-    chosen = parser.parse_args().measure
+    parser.add_argument(
+        "--provider",
+        action="append",
+        choices=sorted(PROVIDERS),
+        help="a registered provider to sweep, repeatable; every one of them by default",
+    )
+    parser.add_argument(
+        "--model",
+        help="the model to run on the named provider instead of the one its registry "
+             "row serves; needs exactly one --provider",
+    )
+    parser.add_argument(
+        "--no-judge",
+        action="store_true",
+        help="run no LLM-as-judge, halving the calls: a run ranking models against each "
+             "other is read off Execution Accuracy alone",
+    )
+    options = parser.parse_args()
+    chosen = options.measure
 
     if not DATABASE_PATH.exists():
         print(
@@ -268,7 +321,7 @@ def main() -> int:
         return 1
     sweep = MEASURES[chosen]
     with WarehouseAdapter() as warehouse:
-        return sweep(warehouse)
+        return sweep(warehouse, options)
 
 
 if __name__ == "__main__":

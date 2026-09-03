@@ -154,6 +154,14 @@ class Scored:
     judged: bool | None = None
     """The judge's verdict, or `None` where no judge ran or it gave no usable one."""
 
+    provider_error: str = ""
+    """What the provider said when the call did not come back, empty otherwise.
+
+    Carried for the same reason a refusal's sentence is: a row with no Grounded Answer
+    says nothing about the question and everything about the installation, and a sweep
+    whose every row ended this way has to say why before a reader can act on it.
+    """
+
     @property
     def agrees(self) -> bool | None:
         """Whether the judge and Execution Accuracy said the same thing about this one."""
@@ -287,8 +295,8 @@ def score(
     """
     try:
         answer = orchestrator.answer(gold.question, access_profile)
-    except LanguageModelError:
-        return Scored(gold, EndedBy.PROVIDER, correct=False)
+    except LanguageModelError as error:
+        return Scored(gold, EndedBy.PROVIDER, correct=False, provider_error=str(error))
 
     correct = correctly_answered(gold, answer)
     verdict = None

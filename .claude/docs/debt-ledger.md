@@ -64,9 +64,11 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage | open |
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | L | The Sub-step of Step 007 that measures Execution Accuracy — **🔴 fired** | open |
 | [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice — **🔴 fired** | **paid** (7.4, 2026-09-02) |
-| [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | S | Before the capstone is submitted — it costs most of Execution Accuracy on the default provider | open |
+| [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | ~~S~~ M | 🔴 fired (8.1) — prose relabels the refusal, the honest fix crosses ADR-0001, and the generation sweep is the standing guard | **accepted** (8.1) |
+| [DEBT-038](#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | A capable model answers an ad-hoc row request instead of refusing it | S | Before the capstone is submitted | open |
+| [DEBT-039](#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished) | The published two-provider sweep failed its own runner and is not republished | S | The final documentation pass, a Sub-step that needs the published figures, or submission — whichever is first | open |
 
-**Open debt:** 14 · **Paid:** 20 · **Accepted:** 1 · **Moved:** 2
+**Open debt:** 15 · **Paid:** 20 · **Accepted:** 2 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2899,11 +2901,12 @@ it would be — no Gold Question says one term twice.
 
 ### DEBT-037 — Nothing tells the generator that a date it has never heard of is not a reason to refuse
 
-- **Status:** open
+- **Status:** **accepted** — 2026-09-03, the Sub-step 8.1 commit
 - **Opened:** Sub-step 7.4 (`.claude/docs/reviews/step-007-evaluation.md`)
-- **Size:** S
+- **Size:** M — opened at `S`, resized when Sub-step 8.1 fired the Trigger and found that
+  the one sentence in each prompt form it prescribes does not move a single figure
 - **Location:** `veritas/orchestrator/generate.py` — the refusal paragraph of
-  `GENERATION_RULES`, and the same three sentences at the end of `GENERATION_SHAPE`
+  `GENERATION_RULES`, and the closing sentences of `GENERATION_SHAPE`
 
 **What we did**
 
@@ -2928,7 +2931,8 @@ result would have published a table produced by prompts that no longer exist —
 Step 007 plan's *"a finding needing more than that becomes a Ledger entry, not silent
 scope"*.
 
-**Cost while unpaid**
+**Cost while unpaid** — *what it cost while `gpt-4o-mini` was the default; see the
+2026-09-03 ruling below for what it costs now, which is nothing measured.*
 
 Most of Execution Accuracy on the default provider. Every Gold Question carries a
 period, because [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
@@ -2952,3 +2956,176 @@ reasons to refuse is exhaustive, and a period the model has not heard of is not 
 then `VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation` again, so the
 table in the review is replaced rather than annotated. Both prompts change together or
 the arms stop being comparable.
+
+**Fired in Sub-step 8.1 (2026-09-03), and this remedy is measured wrong.** All of it was
+done — the list is closed in both forms, both carry the sentence, `tests/
+test_orchestrator.py` pins it, and the sweep was re-run three times on three wordings.
+**Nothing moved**: `gpt-4o-mini` stayed at 0.182 under both prompts and
+`openai/gpt-oss-120b` at 0.909, both exactly where 7.4 left them. The
+[8.1 review](reviews/step-008-observability.md#sub-step-81--tell-the-generator-an-unknown-period-is-not-a-reason-to-refuse)
+carries the three wordings and their figures.
+
+What the run bought instead is the diagnosis, in the model's own words now that the sweep
+prints them. Told nothing, it refuses about its training data — *"The date 18 March 2025
+is in the future"*. Told the entries do not say which dates exist, it refuses about the
+**corpus** instead — *"The entries do not cover the year 2026"*, a claim no entry makes.
+Told that sentence is never true, it refuses citing a bullet from the closed list
+verbatim — *"no metric below computes what was asked;"*. Closing the list does not stop
+the refusal; it relabels it, which is why the entry is resized `S` → `M`: prose cannot
+pay it.
+
+**What is left, and it is a decision rather than a wording.** The model needs the date
+coverage *stated*, and the only honest source is the Warehouse — either a certified field
+on a Metric Definition, or a Warehouse read when the prompt is built. Either crosses
+[ADR-0001](adr/0001-semantic-layer-as-the-retrieval-corpus.md)'s *"corpus rather than a
+schema dump"*, and writing the range into the source is barred by
+[CLAUDE.md](../../CLAUDE.md)'s rule that a measurement is dated evidence and never a
+standing statement.
+
+**Ruled on 2026-09-03: the model changed instead, and this entry is not paid.** The
+second attempt at Sub-step 8.1 measured four OpenAI models against Groq's mark and
+`PROVIDERS["openai"]` now serves `gpt-5.4-mini`, which does not have the habit — it
+answered every answerable Gold Question in the shape that provoked the refusals. So the
+**cost above is no longer being paid**, and the entry stays open on the hole rather than
+on the bill: the list of reasons to refuse is still open in both prompt forms, and
+nothing still tells a generator that a period it has never heard of is not a reason. The
+[8.1 review](reviews/step-008-observability.md#sub-step-81--choose-the-openai-default-model-by-measurement)
+carries the candidates, their prices and their figures.
+
+**What that leaves it costing.** Nothing measured, and one latent hole: the next model
+this registry names could have the habit again, and nothing in the repository would stop
+it or say so before a sweep. The remedy is unchanged and still a seam decision awaiting
+Amino; what changed is that it is no longer urgent, because no figure depends on it.
+
+**Closed `accepted`, 2026-09-03 — the Sub-step 8.1 commit.** Three things put it here
+rather than on the open list:
+
+- The remedy the Trigger named was **measured** not to work — three wordings, three
+  sweeps, no figure moved, and the closed list only relabels the refusal.
+- The one remaining fix, stating the Warehouse's date coverage in the prompt, crosses
+  [ADR-0001](adr/0001-semantic-layer-as-the-retrieval-corpus.md)'s *"corpus rather than
+  a schema dump"* and [CLAUDE.md](../../CLAUDE.md)'s rule against a standing figure in
+  source. It is barred by two agreed rules, not merely deferred.
+- The thing this entry guards against — a default model with the date-refusal habit —
+  is now caught by the generation sweep, which Sub-step 8.1 made the gate every
+  candidate default passes through before it ships.
+
+The open-ended refusal list stays, deliberately, with the sweep as its guard. **What
+would reopen it:** a generation sweep showing the registered default refusing an
+answerable Gold Question about its period. That is the signal the guard exists to raise;
+this entry is the note that says what the guard is for.
+
+---
+
+### DEBT-038 — A capable model answers an ad-hoc row request instead of refusing it
+
+- **Status:** open
+- **Opened:** Sub-step 8.1 (`.claude/docs/reviews/step-008-observability.md`)
+- **Size:** S — stating the limitation in the Step 009 README is the likely repayment,
+  an hour; an enforcement fix at the generation boundary is `M`
+- **Location:** `veritas/orchestrator/generate.py` — `GENERATION_RULES` and
+  `GENERATION_SHAPE`, the sentence telling the model to refuse a question that is *"not
+  about a number this list can produce"*
+
+**What we did**
+
+Left the refusal of ad-hoc exploration to the generator's judgement.
+`data/gold/ten_trades.yaml` — *"show me ten trades"*, `expects: refusal` — and its
+sibling `columns_in_fct_trade.yaml` are the
+[DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently) probes: Veritas is a
+metrics copilot, not a database browser, so a request to list rows has no answer. Both
+prompt forms tell the model to refuse such a question, and `gpt-4o-mini` and
+`openai/gpt-oss-120b` do.
+
+`gpt-5.4-mini`, the default since Sub-step 8.1, does not. In the 2026-09-03 sweep it
+answered *"show me ten trades"* under both prompts — the single miss each way — by
+reading it as the nearest Certified Metric (Trade Count is the near one), writing a
+statement that traces to that metric, and letting it through. **The one thing the
+Validation Gate cannot check is that the statement answers the question that was
+asked**: *"how many trades"* and *"show me ten trades"* ground out to almost the same
+SQL.
+
+**What we should have done**
+
+Either refuse at the generation/orchestrator boundary when the question has no
+metric-shaped intent — which is the classification the model is there to do, and
+[DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
+has just shown prose wording alone relabels a refusal rather than moving it — or state
+plainly, in the Step 009 README, that a sufficiently eager model will occasionally
+answer an ad-hoc row request with the nearest metric instead of refusing.
+
+**Why we deferred**
+
+Found by the 8.1 sweep, whose subject is model selection, not the Gate or the prompt.
+The cost is a wrong *ending*, not a wrong *number* — nothing uncertified reached a
+person, the answer is a real Trade Count — and it is 1 of 23 on the new default. Same
+shape as DEBT-037, and the same reason it is a Ledger entry rather than silent scope in
+the Sub-step that found it.
+
+**Cost while unpaid**
+
+An ad-hoc exploration request — *"show me ten trades"*, *"list the FX trades"* — can be
+answered with a plausible aggregate rather than refused, on the current default model.
+It undercuts the [DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently)
+boundary the project treats as final, and once Observability logs endings (Step 008)
+one such answer is a dashboard row labelled a successful answer. Measured: `ten trades`
+answered under both `rules` and `shape` by `gpt-5.4-mini`, 2026-09-03 sweep; the failure
+list's `ten trades` row is the running count.
+
+**Trigger**
+
+Before the capstone is submitted. Either the boundary fix lands — the Orchestrator
+refuses a question that grounds out to a metric it was not asked for — or the Step 009
+README states the limitation. Re-measured by every generation sweep.
+
+---
+
+### DEBT-039 — The published two-provider sweep failed its own runner and is not republished
+
+- **Status:** open
+- **Opened:** Sub-step 8.1 (`.claude/docs/reviews/step-008-observability.md`)
+- **Size:** S — one command, once, on a day Groq's budget is unspent, and the table
+  pasted into the Sub-step review that runs it
+
+**What we did**
+
+Left the [Zoomcamp](design/target-state.md#zoomcamp-criteria-map) *"≥2 models, ≥2
+prompts"* row evidenced by a sweep that **failed its own runner**. Groq's free tier is
+capped at 200,000 tokens per day; the 2026-09-03 budget was spent by the first 8.1
+attempt's three sweeps, so 37 of Groq's 46 questions never reached a model. The OpenAI
+rows of that run are a measurement; the Groq rows (9/23, 0/23) are the count of
+questions that got through before the cap, not of questions answered. The run prints
+`FAIL`, and the
+[8.1 review](reviews/step-008-observability.md#sub-step-81--choose-the-openai-default-model-by-measurement)
+carries it as such.
+
+**What we should have done**
+
+Re-run `VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation` unchanged,
+once, on a day whose Groq budget is unspent, and paste the dated two-provider table into
+the review of the Sub-step that runs it. Splicing the Groq arm in from a separate run is
+forbidden by the [Step 008 plan](plan/step-008-observability.md) — *"one dated table
+rather than rows spliced from two runs judged by two models"* — and that stands.
+
+**Why we deferred**
+
+Nothing before submission needs the published figure: 8.2 (Lineage), 8.3 (logging), 8.4
+(Feedback) and 8.5 (the dashboard) do not read it, and Step 009 is a fresh-clone
+rehearsal. Groq's cap means the full two-provider sweep runs at most about twice a day,
+so the re-run is booked against a budget reset rather than spent now on a Sub-step that
+does not need it.
+
+**Cost while unpaid**
+
+The *"≥2 models"* criterion has no valid published table — the only one is labelled
+`FAIL`. Low risk, because the fix is one cheap command given a budget reset, but it is a
+real hole in the evidence chain, and it is invisible to the open-debt count until it is
+written down here.
+
+**Trigger**
+
+Whichever comes first: the final documentation pass or README that states the Zoomcamp
+Monitoring or Evaluation figures — the same pass
+[DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
+names — any Sub-step that needs the published two-provider generation table as evidence,
+or the capstone is submitted. Postpone until one of those fires.

@@ -18,6 +18,7 @@ provider, and a caller that wants a different model passes its own.
 import json
 import os
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -51,7 +52,7 @@ PROVIDERS = {
         name="openai",
         base_url="https://api.openai.com/v1",
         key_variable="OPENAI_API_KEY",
-        default_model="gpt-4o-mini",
+        default_model="gpt-5.4-mini",
     ),
     "groq": Provider(
         name="groq",
@@ -219,17 +220,32 @@ def default_model() -> ChatCompletions:
     )
 
 
-def registered_models() -> dict[str, ChatCompletions]:
+def registered_models(
+    providers: Sequence[str] | None = None, model: str | None = None
+) -> dict[str, ChatCompletions]:
     """One client per supported provider, each on that provider's own default model.
 
     What a comparison across models is run over, keyed by provider name — the whole of
     `PROVIDERS` rather than a list written somewhere else, so a third provider reaches
     an evaluation by being registered here and not by being named twice.
 
+    `providers` narrows that to a named subset and `model` replaces the model the one
+    named serves, which is what a sweep ranking one provider's models against each other
+    runs over: it costs that provider alone. Neither widens what is supported — an
+    unregistered name raises through `model_for` exactly as it does anywhere else.
+
     Raises `LanguageModelError` for the first provider with no key, because a sweep that
-    quietly dropped an arm would publish a comparison it never made.
+    quietly dropped an arm would publish a comparison it never made, and for a model
+    asked of more than one provider, because a model name belongs to the provider that
+    serves it.
     """
-    return {name: model_for(name) for name in PROVIDERS}
+    chosen = tuple(PROVIDERS if providers is None else providers)
+    if model is not None and len(chosen) != 1:
+        raise LanguageModelError(
+            f"{model!r} is one provider's name for one of its models, so it can be "
+            f"asked of one provider and not of {len(chosen)}"
+        )
+    return {name: model_for(name, model) for name in chosen}
 
 
 def json_reply(reply: str) -> dict[str, object]:

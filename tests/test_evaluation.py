@@ -54,7 +54,9 @@ from veritas.evaluation import (
     searchable_relevant_set,
     searched_as,
 )
+from veritas.evaluation.__main__ import failures, generation_table
 from veritas.evaluation.generation import JUDGE_RULES
+from veritas.llm import LanguageModelError
 from veritas.orchestrator import (
     PROMPT_FORMS,
     RESOLUTION_RULES,
@@ -460,6 +462,30 @@ def test_each_prompt_form_reaches_the_generator_as_its_own_instruction(
     assert asked[PromptForm.RULES] != asked[PromptForm.SHAPE]
 
 
+def test_a_question_that_never_reached_a_model_says_what_the_provider_said(
+    scorable, warehouse, gate, retriever
+):
+    """A sweep whose rows all end at the provider has measured nothing, and the reason is
+    the only thing in it a reader can act on.
+
+    The one that fired in practice is a model refusing the pinned temperature, which the
+    step name alone reports as twenty-three unanswered questions.
+    """
+    class Unreachable:
+        def complete(self, system: str, user: str, json_object: bool = False) -> str:
+            raise LanguageModelError("temperature 0.0 is not supported by this model")
+
+    rows = measure_generation(
+        scorable, warehouse, gate, retriever, {"unreachable": Unreachable()},
+        prompt_forms=[PromptForm.RULES],
+    )
+    [row] = rows
+    assert len(row.unreached) == len(scorable)
+    assert all(one.provider_error for one in row.unreached)
+    printed = failures(rows)
+    assert any("temperature 0.0 is not supported" in line for line in printed)
+
+
 def test_a_sweep_over_no_prompt_and_no_model_measures_nothing(
     scorable, warehouse, gate, retriever
 ):
@@ -550,3 +576,25 @@ def test_agreement_is_with_execution_accuracy_rather_than_with_the_judge_alone(g
         ),
     )
     assert row.judge_agreement == 0.5
+
+
+def test_a_run_with_nothing_judged_prints_no_agreement_rather_than_zero(gold):
+    """A run ranking models against each other runs no judge, and `0/0 0.000` in that
+    column reads as a judge that disagreed with everything it was shown."""
+    unjudged = GenerationMeasures(
+        PromptForm.RULES,
+        "stub",
+        tuple(
+            Scored(gold[0], EndedBy.ANSWER, correct=correct)
+            for correct in (True, False)
+        ),
+    )
+    judged = GenerationMeasures(
+        PromptForm.RULES,
+        "stub",
+        (Scored(gold[0], EndedBy.ANSWER, correct=True, judged=True),),
+    )
+    assert unjudged.judged == ()
+    printed = generation_table([unjudged, judged], today="nothing running here")
+    assert printed[1].endswith("—")
+    assert printed[2].endswith("1/1 1.000")

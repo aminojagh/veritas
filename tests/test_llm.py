@@ -25,6 +25,7 @@ from veritas.llm import (
     LanguageModelError,
     default_model,
     model_for,
+    registered_models,
 )
 from veritas.orchestrator import rewrite
 
@@ -214,6 +215,40 @@ def test_a_provider_with_no_key_names_the_variable_to_set(monkeypatch, no_env_fi
     for name, provider in PROVIDERS.items():
         with pytest.raises(LanguageModelError, match=provider.key_variable):
             model_for(name)
+
+
+def test_a_sweep_over_the_registry_runs_every_provider_on_its_own_model(
+    monkeypatch, no_env_file
+):
+    """The whole registry, unnarrowed, is what a published comparison is run over."""
+    for provider in PROVIDERS.values():
+        monkeypatch.setenv(provider.key_variable, "not-a-key")
+    clients = registered_models()
+    assert {name: client.model for name, client in clients.items()} == {
+        name: provider.default_model for name, provider in PROVIDERS.items()
+    }
+
+
+def test_a_sweep_can_be_narrowed_to_one_provider_and_one_of_its_models(
+    monkeypatch, no_env_file
+):
+    """What a run ranking one provider's models against each other costs: that provider
+    alone, on the model being ranked rather than on the registered one."""
+    monkeypatch.setenv(PROVIDERS["openai"].key_variable, "not-a-key")
+    monkeypatch.delenv(PROVIDERS["groq"].key_variable, raising=False)
+    clients = registered_models(["openai"], "a-candidate")
+    assert {name: client.model for name, client in clients.items()} == {
+        "openai": "a-candidate"
+    }
+
+
+def test_a_model_asked_of_more_than_one_provider_is_refused(monkeypatch, no_env_file):
+    """A model name belongs to the provider serving it, so one name over two providers
+    would measure a model one of them never ran."""
+    for provider in PROVIDERS.values():
+        monkeypatch.setenv(provider.key_variable, "not-a-key")
+    with pytest.raises(LanguageModelError, match="asked of one provider"):
+        registered_models(model="a-candidate")
 
 
 def test_a_key_in_the_env_file_is_read_when_the_environment_has_none(

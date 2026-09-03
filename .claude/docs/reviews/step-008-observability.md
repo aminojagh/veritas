@@ -1,0 +1,303 @@
+# Step 008 — Observability — Step Review
+
+Handoff notes for Amino, one section per Sub-step. See the `closing-a-substep`
+skill. Under [Delivery Mode](../../../CLAUDE.md) each section is capped at 40
+lines: the diff is in git and the behaviour is in `tests/`, so this file carries
+only what neither of those shows.
+
+---
+
+## Sub-step 8.1 — Tell the generator an unknown period is not a reason to refuse
+
+**Changed.** Both `PromptForm`s close the list of reasons to refuse, and both carry the
+same sentence saying a period the model has never heard of is not on it — the remedy
+[DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)'s
+Trigger names, in the words it names. `failures()` in `veritas/evaluation/__main__.py`
+prints the sentence a refusal gave, because `EndedBy.NO_SQL` covers two different
+refusals and a table of rates cannot say which one fired — that print is what turned
+this Sub-step's result from a number into a finding.
+
+**Verified.** `uv run pytest` — 237 passed, 4 skipped (live-model), from 236 + 4.
+`verify_framework.py` and `check_language.py` PASS. The sweep, 2026-09-03, on the tree as
+it now stands: the table in full, then the failure list for the row marked `<- today`.
+The other three rows' failure lists are one command away and say the same thing in the
+same words.
+
+```
+$ VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation
+  prompt  model                      ending  execution accuracy  judge agreement
+  rules   openai gpt-4o-mini          14/23          2/11 0.182      18/23 0.783  <- today
+  rules   groq openai/gpt-oss-120b    22/23         10/11 0.909      16/23 0.696
+  shape   openai gpt-4o-mini          14/23          2/11 0.182      19/23 0.826
+  shape   groq openai/gpt-oss-120b    22/23         10/11 0.909      20/23 0.870
+
+  rules · openai gpt-4o-mini
+    ended by no sql    wanted answer     Cash Balance as of 10 August 2026
+      said: The date 10 August 2026 is not covered by the available data.
+    ended by no sql    wanted answer     Gross Revenue in the second quarter of 2026
+      said: The entries do not cover the year 2026.
+    ended by no sql    wanted answer     Net Revenue in the second quarter of 2026
+      said: The entries do not cover the year 2026.
+    ended by no sql    wanted answer     Position Change in the second quarter of 2026
+      said: No metric below computes what was asked.
+    ended by no sql    wanted answer     Realised P&L in the second quarter of 2026
+      said: The entries do not cover the year 2026.
+    ended by no sql    wanted answer     Trade Count by instrument type in the second quarter of 2026
+      said: The entries do not provide data for the year 2026.
+    ended by no sql    wanted answer     Trade Count in the second quarter of 2026
+      said: No metric below computes what was asked.
+    ended by no sql    wanted answer     Traded Notional on 18 March 2025
+      said: The date 18 March 2025 is in the future and cannot be filtered on.
+    ended by no sql    wanted answer     Unrealised P&L as of 10 August 2026
+      said: The date 10 August 2026 is not covered by the available data.
+  rules · groq openai/gpt-oss-120b
+    ended by gate      wanted answer     Net Revenue in the second quarter of 2026
+      said: sqlglot could not read this as duckdb SQL: Error tokenizing '026-04-01' AND fct_trade.trade_date <= '2026-06-3'
+
+PASS — Execution Accuracy and LLM-as-judge agreement for every prompt against every registered model
+```
+
+**The debt is not paid.** The Trigger's own remedy — one sentence in each prompt form —
+was written, measured over three wordings and three full sweeps, and moved nothing: every
+figure above is exactly where 7.4 left it on 2026-09-02.
+
+| wording | 4o-mini `rules` | 4o-mini `shape` | groq `rules` | groq `shape` |
+|---|---|---|---|---|
+| 7.4 baseline, 2026-09-02 | 0.182 | 0.182 | 0.909 | 0.909 |
+| 1 — closed list, *"nothing below says which dates exist"* | 0.182 | 0.182 | 0.727 ⚠ | 1.000 |
+| 2 — **kept**, adds *"never refuse because a period looks too recent"* | 0.182 | 0.182 | 0.909 | 0.909 |
+| 3 — forbids the model's own two sentences verbatim | 0.182 | **0.000** | ⚠ | ⚠ |
+
+⚠ marks a row its own run rejected — wording 1 lost one question to a provider error,
+wording 3 lost thirty-two to a groq rate-limited by the third sweep in an hour. Wording 2
+is kept: the only run that passed its own runner, and no wording moved the default
+provider at all. Wording 3 is kept out as the only one measurably **worse**, and it is
+the finding: told that *"the entries do not cover that period"* is never true,
+`gpt-4o-mini` stopped saying it and refused eight of nine with *"no metric below computes
+what was asked;"* — reciting a bullet from my own closed list, semicolon included.
+**Closing the list does not stop the refusal; it relabels it.**
+
+**Debt** — [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
+is resized `S` → `M` and now carries the 2026-09-03 evidence, the diagnosis in the
+model's own words, and the two candidate fixes. The prompt change and the printed
+reasons stay: closing the list was half of what the entry said we should have done, it
+costs nothing, and it measured neutral on both providers. **The second 8.1 section below
+closes the entry `accepted`** — prose was measured not to work, the honest fix is barred
+by ADR-0001 and CLAUDE.md, and the generation sweep is now the guard.
+
+**Sceptically, and the first two are yours to rule on.**
+
+1. **I stopped rather than took the remaining fix, because it is a seam question.** The
+   generator needs the date coverage *stated*, and the only honest source is the
+   Warehouse — a certified field on a Metric Definition, or a Warehouse read when the
+   prompt is built. Either puts a fact in the prompt that no Semantic Entry published,
+   which is [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md)'s *"corpus
+   rather than a schema dump"*. Argued once, in the Ledger entry.
+2. **`DEFAULT_PROVIDER` is `openai`, so the weak model sets the headline figure.** In
+   every row not rejected by its own run, `openai/gpt-oss-120b` scores 0.909–1.000 and
+   `gpt-4o-mini` 0.000–0.182 — one habit, not one question. Switching is one line, and
+   the project already sets `DEFAULT_PROMPT_FORM` and `DEFAULT_SEARCHABLE_FORM` by
+   measurement. It **dodges** the entry rather than paying it, which is why I have not.
+3. **Three sweeps on a Sub-step budgeted for one**, and the third rate-limited groq into
+   a run that measured nothing. The second was already the answer; the third bought the
+   relabelling finding and a worse number. Read the estimate accordingly.
+4. **groq's one Gate failure is unexplained** — `sqlglot could not read this` on a date
+   literal (`'026-04-01'`, `'2026-06-3'` — digits dropped off both ends), in both prompt
+   rows of the clean run, at temperature 0, visible only because this Sub-step started
+   printing the reason. The Gate refused it correctly; the open question is only why groq
+   garbled the literal. **Deferred, 2026-09-03 (Amino):** look again only if it recurs on
+   the next full sweep — no entry, one question, no worries.
+
+**Language.** None. `PromptForm`, `EndedBy` and `Execution Accuracy` are all registered;
+this Sub-step names nothing new.
+
+---
+
+## Sub-step 8.1 — Choose the OpenAI default model by measurement
+
+**The second attempt at 8.1**, after the section above. That attempt was reverted before
+this one measured anything — `GENERATION_RULES`, `GENERATION_SHAPE` and
+`tests/test_orchestrator.py` are back at their 7.4 text — so every figure here is against
+the prompt Veritas shipped, and a result is the model's rather than a model and a prompt
+moving together. The printed refusal reasons stayed, as the plan said they would.
+
+**Changed.** `PROVIDERS["openai"]` serves **`gpt-5.4-mini`**, and
+[ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) carries why
+in the place that argued the row: its table justified the *provider* — *"The key the
+course already asks a grader for"* — and never the model. `registered_models` takes the
+providers to build and a model to put on the one named; the sweep gained `--provider`,
+`--model` and `--no-judge`, so ranking a candidate costs one provider with no judge
+instead of two providers with one. Agreement prints `—` where nothing was judged rather
+than `0/0 0.000`, which reads as a judge that disagreed with everything. `Scored` carries
+what the provider said when a call never came back and `failures()` prints it — the same
+fix the first attempt made for refusals, and the one that turned this Sub-step's first
+run from forty-six blank failures into the finding below.
+
+**The candidates.** Prices per 1M tokens read **2026-09-03** from
+<https://developers.openai.com/api/docs/pricing>, which is the form
+[route decision 3](../plan/step-008-observability.md#three-route-decisions) needs for
+8.3's cost column. Cheapest input first, the 0.20 tie broken on output. One `/v1/models`
+call confirmed all four exist before anything was spent; none was missing, so the plan's
+stop condition did not fire.
+
+| order | model | $/1M in | $/1M out | ending · Execution Accuracy, `rules` | `shape` |
+|---|---|---|---|---|---|
+| — | `gpt-4o-mini`, the incumbent | 0.15 | 0.60 | 14/23 · 2/11 0.182 | 14/23 · 2/11 0.182 |
+| 1 | `gpt-5.6-luna` | 0.20 | 1.20 | **not measurable** | **not measurable** |
+| 2 | `gpt-5.4-nano` | 0.20 | 1.25 | 17/23 · 8/11 0.727 | 15/23 · 6/11 0.545 |
+| 3 | `gpt-5-mini` | 0.25 | 2.00 | **not measurable** | **not measurable** |
+| 4 | **`gpt-5.4-mini`** | 0.75 | 4.50 | **22/23 · 11/11 1.000** | 21/23 · 10/11 0.909 ⚠ |
+
+The mark was Groq's `openai/gpt-oss-120b` at 22/23 and 10/11. `gpt-5.4-mini` matches the
+ending and beats the accuracy, so it wins. **No confirming re-run** — Amino's ruling as
+the Sub-step started, recorded in the plan. The incumbent's two figures are 7.4's,
+unchanged because the revert restored the prompt they were measured under.
+
+⚠ **Temperature 0 did not give the same answer twice, and this Sub-step measured that by
+accident.** The winner's `shape` row is 21/23 · 10/11 above and **22/23 · 11/11** in the
+published run below — same model, same pinned temperature, same committed questions, one
+question apart. The `rules` row, which the bar was actually decided on, is identical in
+both. So the decision is unaffected and a standing project assumption is not:
+`TEMPERATURE = 0.0` buys *less* variance, not none, and any figure here is one sample.
+
+**Two of the four cannot be measured at all, and that is the finding.** `gpt-5.6-luna`
+and `gpt-5-mini` answer every call with a 400 on the pinned temperature. The sweep says
+so itself now; before the `failures()` change it printed forty-six `ended by provider`
+lines and no reason.
+
+```
+$ VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation \
+    --provider openai --model gpt-5-mini --no-judge
+  gold          data/gold — 24 Gold Questions, 23 of them scored
+  excluded      'Account Value as of 10 August 2026' — the Validation Gate refuses the statement the set itself calls correct, so no model can answer it
+  prompts       rules, shape
+  models        openai gpt-5-mini
+  judge         none — this run ranks by Execution Accuracy alone
+
+  prompt  model               ending  execution accuracy  judge agreement
+  rules   openai gpt-5-mini     0/23          0/11 0.000                —
+  shape   openai gpt-5-mini     0/23          0/11 0.000                —
+
+  rules · openai gpt-5-mini
+    ended by provider  wanted clarifying question balance as of 10 August 2026
+      unreachable: ChatCompletions('gpt-5-mini' at 'https://api.openai.com/v1') refused the call: Error code: 400 - {'error': {'message': "Unsupported value: 'temperature' does not support 0.0 with this model. Only the default (1) value is supported.", 'type': 'invalid_request_error', 'param': 'temperature', 'code': 'unsupported_value'}}
+  [trimmed — the remaining 45 rows are the same 400]
+
+$ … --provider openai --model gpt-5.6-luna --no-judge          # the same, on the other one
+  rules   openai gpt-5.6-luna     0/23          0/11 0.000                —
+  shape   openai gpt-5.6-luna     0/23          0/11 0.000                —
+    ended by provider  wanted clarifying question balance as of 10 August 2026
+      unreachable: ChatCompletions('gpt-5.6-luna' at 'https://api.openai.com/v1') refused the call: Error code: 400 - {'error': {'message': "Unsupported value: 'temperature' does not support 0.0 with this model. Only the default (1) value is supported.", 'type': 'invalid_request_error', 'param': 'temperature', 'code': 'unsupported_value'}}
+  [trimmed — the same 45 again]
+```
+
+[ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) **predicted
+this exactly** — *"Newer OpenAI reasoning models reject a temperature that is not the
+default"*, classified *accepted*, *"the fix is one variable"*. Right about the failure,
+wrong about the repair; that bullet is amended in the ADR, which is where it belongs.
+Half this Sub-step's candidate list was ruled out before a figure existed.
+
+**Verified.** `uv run pytest` — **241 passed, 4 skipped** (live-model), from 236 + 4 at
+the end of Step 007: five tests added here, and the one the revert took back out.
+`verify_framework.py` PASS.
+
+**⚠ The published sweep did not publish, and this is the Sub-step's one outstanding
+item.** It ran, and it **failed its own runner**: Groq's free tier is capped at 200,000
+tokens per day and the budget for 2026-09-03 was already spent by the first attempt's
+three sweeps, so 37 of Groq's 46 questions never reached a model. **The OpenAI rows are a
+measurement and the Groq rows are not** — 9/23 and 0/23 are the count of questions that
+got through before the cap, not of questions answered. The table below is therefore
+**evidence for the winner and not the Zoomcamp row's published figure**, and it needs one
+re-run of the same command once the daily budget resets. The plan forbids splicing the
+Groq arm in from a separate run, and that stands. **Tracked as
+[DEBT-039](../debt-ledger.md#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished)**,
+whose Trigger postpones the re-run until a Sub-step needs the published table or the
+final documentation pass reaches it — whichever is first.
+
+```
+$ VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation
+  gold          data/gold — 24 Gold Questions, 23 of them scored
+  excluded      'Account Value as of 10 August 2026' — the Validation Gate refuses the statement the set itself calls correct, so no model can answer it
+  prompts       rules, shape
+  models        openai gpt-5.4-mini, groq openai/gpt-oss-120b
+  judge         gpt-5.4-mini, on every scored question
+
+  prompt  model                      ending  execution accuracy  judge agreement
+  rules   openai gpt-5.4-mini         22/23         11/11 1.000      23/23 1.000  <- today
+  rules   groq openai/gpt-oss-120b     9/23          3/11 0.273        9/9 1.000
+  shape   openai gpt-5.4-mini         22/23         11/11 1.000      23/23 1.000
+  shape   groq openai/gpt-oss-120b     0/23          0/11 0.000                —
+
+  rules · openai gpt-5.4-mini
+    ended by answer    wanted refusal             ten trades
+  rules · groq openai/gpt-oss-120b
+    ended by provider  wanted answer              Net Revenue in the second quarter of 2026
+      unreachable: ChatCompletions('openai/gpt-oss-120b' at 'https://api.groq.com/openai/v1') refused the call: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_…` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199396, Requested 1346. …', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
+  [trimmed — 13 more here and all 23 of `shape · groq`, every one the same 429]
+  shape · openai gpt-5.4-mini
+    ended by answer    wanted refusal             ten trades
+
+FAIL — 37 question(s) never reached a model, so these figures are over fewer answers than they claim
+```
+
+**What the OpenAI half says.** Eleven of eleven under both prompts, against the
+incumbent's two, and the one miss each way is *"ten trades"* — answered where the set
+wants it refused, because `gpt-5.4-mini` reads *"show me ten trades"* as the nearest
+Certified Metric and writes SQL that traces, and the Gate cannot tell a statement
+answers a different question than was asked. `gpt-4o-mini` and Groq refuse it; the new
+default does not. Opened as
+[DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it).
+**No failure is a refusal about a date**, which is the habit the first attempt spent
+three sweeps failing to talk a model out of.
+
+**Debt.**
+[DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)
+is **closed `accepted`.** Its remedy was measured wrong in the attempt above and the
+honest fix is barred by [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md)
+and [CLAUDE.md](../../../CLAUDE.md); what changed is the model, so its *cost* falls out.
+The list of reasons to refuse stays open in both prompt forms, deliberately, and the
+generation sweep every candidate default now passes through is the guard — the entry is
+the note that says what the guard is for.
+[DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)
+is **opened**: `gpt-5.4-mini` answers *"show me ten trades"* — a
+[DEBT-006](../debt-ledger.md#debt-006--no-ad-hoc-exploration--accepted-permanently)
+probe the set wants refused — as the nearest Certified Metric, under both prompts, and
+the Gate passes it because it traces. A wrong ending, not a wrong number; 1 of 23 on the
+new default.
+[DEBT-039](../debt-ledger.md#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished)
+is **opened** for the re-run the failed sweep owes.
+
+**Sceptically.**
+
+1. **The winner is the dearest of the four, at five times the incumbent's input price.**
+   Cheapest-first found nothing cheaper that worked: of the three below it, two would not
+   run at temperature 0 and `gpt-5.4-nano` came 4/11 short. Veritas makes two model calls
+   per question, so this is a real per-question cost increase, and nothing here measured
+   it — 8.3 is what puts a cost column on the dashboard, and this Sub-step bought the
+   price table it needs.
+2. **`gpt-5.4-nano` at 8/11 for a quarter of the price was never weighed against the
+   winner**, because the plan's bar is pass/fail against groq's mark and nothing in it
+   trades accuracy against cost. If the cost column in 8.3 makes that trade worth making,
+   the measurement is already here.
+3. **The published sweep is not published, and only Groq's daily cap stopped it.** That
+   cap is a property of the free tier this project chose on purpose
+   ([ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md): *"no
+   card, optional"*), and it now binds: **the Zoomcamp *"≥2 models"* row cannot be
+   re-measured more than about twice a day.** Step 008 has three Sub-steps left and
+   Step 009 a fresh-clone rehearsal, so a re-run needs booking rather than assuming. The
+   command is unchanged and in the block above.
+4. **`TEMPERATURE = 0.0` is not determinism**, per the ⚠ above, and the project has
+   been reading single runs as though it were since Step 006 — every table in every
+   review, this one included. Nothing here is refuted, because the margins are wide;
+   what is refuted is the reflex of treating one run as the number. Whether that is
+   worth an entry is yours — I have not opened one, because the honest remedy is
+   repeated sampling and that costs the budget item 3 says is scarce.
+5. **One prompt form ran the whole ranking.** The bar is on `rules`, the default; `shape`
+   was in the table but never the criterion. `DEFAULT_PROMPT_FORM` stays `rules`, now
+   backed by a margin rather than by 7.4's tie.
+6. **Groq's unexplained Gate failure from the attempt above** did not recur here,
+   because Groq barely ran. **Deferred by Amino on 2026-09-03:** revisit only if the next
+   full sweep shows it again — the Gate refused a malformed literal correctly, so there
+   is nothing broken to chase, just a garbled generation to explain.
+
+**Language.** None. Model names are catalogue entries, not domain terms.

@@ -49,19 +49,73 @@ Step 009's.
 
 ## Sub-steps
 
-### 8.1 — Tell the generator an unknown period is not a reason to refuse
+### 8.1 — Choose the OpenAI default model by measurement
 
-Pays [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse):
-the list of reasons to refuse becomes exhaustive in both prompt forms, and a period
-the model has never heard of is not on it. Both prompts change together —
-`tests/test_orchestrator.py` pins that each carries the sentence — and the sweep is
-re-run so the table in the review replaces 7.4's. First rather than last because the
-dashboard's first traffic on the default provider should show what Veritas decides,
-not one model's habit.
+**Rewritten 2026-09-03, after its first attempt failed.** That attempt did exactly what
+[DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)'s
+Trigger prescribes — the list of reasons to refuse closed in both prompt forms, a
+sentence in each saying an unfamiliar period is not on it — and across three wordings and
+three sweeps **no figure moved**. Its
+[review section](../reviews/step-008-observability.md#sub-step-81--tell-the-generator-an-unknown-period-is-not-a-reason-to-refuse)
+carries the table and stays as the record. The Ledger entry is not paid — what changes
+is which model OpenAI's registry row names, and the entry's cost falls out rather than
+being repaid — and it is **closed `accepted`** in the second review section: prose was
+measured not to work, the honest fix is barred by ADR-0001 and CLAUDE.md, and the
+generation sweep is the standing guard. Still first in the Step, for the reason it
+always was — the dashboard's first traffic should show what Veritas decides, not one
+model's habit.
 
-*Verify:* `uv run pytest tests/test_orchestrator.py`, then
-`VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation`, output in the
-review.
+**Revert first.** `GENERATION_RULES` and `GENERATION_SHAPE` go back to their 7.4 text,
+closed list and date sentence alike, and `UNFAMILIAR_PERIOD` leaves
+`tests/test_orchestrator.py`. Candidates are then measured against the prompt Veritas
+actually shipped, so a result is the model's and not a model and a prompt moving
+together. The printed refusal reasons in `failures()` stay — they only print, they are
+what made the first attempt legible, and nothing a model sees changes.
+
+**Confirm the candidates exist before spending anything.** One `/v1/models` call covers
+`gpt-5-mini`, `gpt-5.4-nano`, `gpt-5.4-mini` and `gpt-5.6-luna`; if any of the four is
+missing the Sub-step **stops and reports** rather than substituting a neighbour, because
+[ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md)'s own row
+named a model until the first call returned a 404. Price per 1M input tokens is not on
+that endpoint and comes off the pricing page, recorded with the date read and the page
+read from — which is the form
+[route decision 3](#three-route-decisions) needs for 8.3's cost column, bought early.
+
+**The bar, and the order.** Candidates run cheapest first, in the order the fetched
+prices give rather than an assumed one. groq's `openai/gpt-oss-120b` is the mark, last
+measured 2026-09-03: ending **22/23**, Execution Accuracy **10/11**. The first candidate
+to reach both is the winner — **no confirming re-run**, ruled by Amino on 2026-09-03 as
+the Sub-step started: the first run is enough. (The ruling stands on its own; do not
+justify it by the pinned temperature, which the Sub-step went on to measure as *not*
+giving two identical runs — see its review.) If none reaches the mark, the best of the
+four wins instead — but
+it replaces `gpt-4o-mini` only if it also beats `gpt-4o-mini`'s 14/23 and 2/11, so a
+measurement cannot install a default worse than the incumbent. Those two figures need no
+re-run either: the revert restores the prompt they were measured under, twice.
+
+**Ranking sweeps are OpenAI-only and judge-free.** `veritas/evaluation/__main__.py`
+gains a flag selecting which registered clients a sweep runs, so a candidate costs one
+provider rather than two; `measure_generation` already takes `judge_model=None`, which
+halves the calls again. The table prints `—` for agreement where nothing was judged —
+today it would print `0/0 0.000`, which reads as a judge that disagreed with everything.
+
+**Then one published sweep.** The winner becomes OpenAI's `default_model` and, by being
+the default, the judge; ADR-0005's table row is amended with the measurement that moved
+it, as that ADR already does for the groq row it replaced. That sweep is the full one —
+both prompts, both registered providers, one judge — so the
+[Zoomcamp](../design/target-state.md#zoomcamp-criteria-map) row's *"≥2 prompts and ≥2
+models"* is one dated table rather than rows spliced from two runs judged by two models.
+It is the only groq call in the Sub-step.
+
+**Not here.** Retiring groq and carrying a second **OpenAI** model in its place: the
+registry is keyed by provider and holds one model each, so that cannot be expressed
+without reworking the seam, and a seam is not something to hack behind
+([CLAUDE.md](../../../CLAUDE.md)). Nor a runtime failover from one model to another.
+
+*Verify:* `uv run pytest tests/test_orchestrator.py tests/test_evaluation.py`, then the
+published sweep. The review gains a **second** section — titled for this attempt, not
+the first, so both anchors resolve — carrying the price table, the per-candidate figures
+and the final table.
 
 ### 8.2 — Lineage records what the statement used
 
@@ -151,6 +205,11 @@ the dashboard loaded on questions asked in the browser, screenshot in the review
   [EXT-004](../extension-register.md#ext-004--coverage-miss-capture). This Step builds
   the seam it lands on and not the clustering.
 - **DEBT-023, DEBT-024, DEBT-025** — their 2026-09-09 Trigger.
+- **[DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)**
+  (`gpt-5.4-mini` answers *"show me ten trades"*) and
+  **[DEBT-039](../debt-ledger.md#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished)**
+  (the failed two-provider sweep owes one re-run) — both opened by 8.1, both with
+  Triggers that postpone them to a later Sub-step, the documentation pass, or submission.
 - **Cloud deployment; multi-turn memory, charting of answers, export** — outside the
   slice by the Target State's own word.
 

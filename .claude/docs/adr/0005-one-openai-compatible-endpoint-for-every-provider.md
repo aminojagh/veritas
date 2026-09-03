@@ -52,7 +52,7 @@ its key variable and its default model:
 
 | Provider | Base URL | Key variable | Default model | Role |
 |---|---|---|---|---|
-| `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` | The default. The key the course already asks a grader for. |
+| `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-5.4-mini` | The default. The key the course already asks a grader for, on the model that measured best of four — below. |
 | `groq` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | `openai/gpt-oss-120b` | The second model. Free tier, no card, optional. |
 
 `VERITAS_LLM_PROVIDER` selects between them and `VERITAS_LLM_MODEL` names a model
@@ -68,8 +68,8 @@ endpoint is Chat Completions at a base URL, including `temperature` and
 client. Its free tier needs no card and no billing account, which keeps the
 credential rule's *obtained versus assumed* line as short as it can be for a key
 that is optional anyway. And it serves a different model — `openai/gpt-oss-120b`,
-open weights on Groq's own hardware, against OpenAI's hosted `gpt-4o-mini` — which
-is what makes Step 007's *"≥2 models"* two models rather than one model twice.
+open weights on Groq's own hardware, against OpenAI's hosted model — which is what
+makes Step 007's *"≥2 models"* two models rather than one model twice.
 
 **Why that model and not the one this ADR first named.** The row read
 `llama-3.3-70b-versatile` until a key existed to call it, and the first call was a
@@ -85,6 +85,20 @@ registry defaults to. **The cost is that both default models are OpenAI-authored
 — `gpt-oss-120b` is open weights served by someone else, not a second OpenAI
 product, but the *"different vendor's family"* half of the reason above is now the
 sweep's to buy, not the default's.
+
+**Why `gpt-5.4-mini` and not the model this ADR first defaulted to.** The OpenAI row
+read `gpt-4o-mini` from the day it was written, and what this ADR argued for was the
+**provider** — *"the key the course already asks a grader for"* is a sentence about a
+key, not about a catalogue. Step 007 measured what that cost: over the Gold Question
+Set it answered two of the eleven answerable questions correctly against Groq's ten.
+Sub-step 8.1 measured four OpenAI models against Groq's mark, cheapest first by the
+published input price, and took the first to reach it — `gpt-5.4-mini`, at eleven of
+eleven. The prices, the date they were read, the page they were read from and the
+per-candidate figures are in the
+[Sub-step 8.1 review](../reviews/step-008-observability.md#sub-step-81--choose-the-openai-default-model-by-measurement).
+**Groq's row is untouched.** The registry is keyed by provider and holds one model
+each, so carrying a second *OpenAI* model instead of it is not something this seam can
+express, and reworking the seam is not bought before the deadline.
 
 ## Alternatives considered
 
@@ -123,10 +137,19 @@ that speaks the same API.
 - **`temperature` and `response_format` are sent to both providers.** Newer
   OpenAI reasoning models reject a temperature that is not the default, and an
   open model may ignore a JSON-object request and fence its answer instead.
-  *Classified: accepted* — the first case fails loudly, as a `LanguageModelError`
-  naming the model, and the fix is one variable; the second is why
-  `resolutions_in` reads a fenced reply as well as a bare one, and why a reply
-  that is not a JSON object raises rather than being read as an ambiguity.
+  *Classified: accepted, and the first has now fired* — two of the four candidates
+  Sub-step 8.1 priced, `gpt-5-mini` and `gpt-5.6-luna`, answered every call with a
+  400 naming the parameter: *"'temperature' does not support 0.0 with this model.
+  Only the default (1) value is supported."* That is the loud failure this bullet
+  predicted. What the prediction got wrong is the repair. *"The fix is one
+  variable"* holds only if running at a temperature the provider chooses is
+  acceptable, and it is not — a resolution a model is free to vary between two runs
+  is one a person cannot check, which is why `TEMPERATURE` is pinned at all. So the
+  cost is narrower and larger than written: **a model that will not take temperature
+  0 is not selectable, at any price**, and two of four candidates were ruled out
+  before a figure was measured on either. The second case is why `resolutions_in`
+  reads a fenced reply as well as a bare one, and why a reply that is not a JSON
+  object raises rather than being read as an ambiguity.
 - **A default model name will be deprecated by its provider eventually.** Two
   strings in this repository name things on someone else's roadmap.
   *Classified: accepted* — the signal is a 404 from the provider naming the model,
