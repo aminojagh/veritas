@@ -529,3 +529,104 @@ coin nothing. The two new members are named for the flow steps that produce them
 `RETRIEVAL` and `GENERATION` — and the column names are the field names they carry:
 `role` is the Access Profile's, `reasons` the verdict's, `kind` and `version` the
 Semantic Entry's.
+
+---
+
+## Sub-step 8.4 — Leave Feedback on a Grounded Answer
+
+**Changed.** `schema.sql` gains a fourth table, `feedback`, keyed by the question so an
+answer carries at most one standing verdict; `log.py` gains `Feedback` — a frozen `up`
+and `note` — and a second seam method; `postgres.py` writes it with an upsert, which is
+where *"the latest verdict stands"* is decided rather than described. In the App, one
+form under every answer that reached a row takes the verdict and the optional sentence,
+and the answer being shown moved into session state.
+
+**Verified.**
+
+```
+$ docker compose up -d --wait postgres && \
+      uv run pytest tests/test_observability.py tests/test_app.py
+collected 48 items
+tests/test_observability.py ..............                               [ 29%]
+tests/test_app.py ................................ss                     [100%]
+======================== 46 passed, 2 skipped in 5.58s =========================
+
+$ docker compose stop postgres && \
+      uv run pytest tests/test_observability.py tests/test_app.py -q -rs
+SKIPPED [1] tests/test_observability.py:232: no Question Log to record to: the Question
+  Log at localhost:5432/veritas would not open: connection failed: … Connection refused
+  … eleven in all, one per row-claim test …
+SKIPPED [1] tests/test_app.py:652: spends a real key: set VERITAS_LIVE_MODEL=1 to run it
+SKIPPED [1] tests/test_app.py:675: spends a real key: set VERITAS_LIVE_MODEL=1 to run it
+35 passed, 13 skipped in 5.15s
+
+$ uv run pytest -q | tail -1                                # the server up again
+290 passed, 5 skipped in 79.33s (0:01:19)
+
+$ uv run python .claude/scripts/verify_framework.py | tail -1
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py | tail -1
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+**Live traffic, 2026-09-04.** The committed live test now leaves a verdict through the
+widget as well, so the chain from a person's click to a row is made once against the real
+schema rather than only against the double — two questions asked through the page against
+`gpt-5.4-mini`, a thumb down and a sentence left on the second of them:
+
+```
+$ VERITAS_LIVE_MODEL=1 uv run pytest tests/test_app.py -s -k becomes_a_row
+  id  ended_by    rows  seconds  cost         lineage  calls  in calls
+  171 answer      1     8.65     0.0027150    5        2      3.33
+  172 rewrite     None  1.22     0.00029625   0        1      1.22
+
+  feedback: [(172, False, 'I meant gross revenue')]
+1 passed, 33 deselected in 12.50s
+```
+
+The test deletes the two questions afterwards and then asserts the Feedback is gone with
+them: a verdict that outlived the answer it was about would be a bar on a chart nothing
+can explain. The container has been up since 8.3, so this run is also the migration —
+an existing database with three rows of 8.3's traffic in it gained the table on connect.
+
+**Debt.** None opened, none paid.
+
+**Sceptically.**
+
+1. **Feedback is a table rather than two columns on `question`**, though a question has
+   at most one standing verdict — which is the reasoning `schema.sql`'s own comment gives
+   for `ended_by` and `cost` being columns. What decided it is the migration: a table is
+   `CREATE TABLE IF NOT EXISTS`, the form every other statement in that file already
+   takes, where a column has to be added to a table that already exists by a second kind
+   of statement no other part of the file uses, beside a `CREATE TABLE` that will never
+   run again there — and the column's type then written twice, once in each. The cost is a join in two of 8.5's charts.
+2. **The answer moved into `st.session_state`.** Any widget under an answer reruns the
+   script with nothing submitted in the question form, and the page rendered its answer
+   only in the run that produced it — so before this, clicking a thumb would have cleared
+   the answer it was about. `test_the_answer_is_still_on_the_page_after_a_verdict_is_left`
+   is the test that fails without it. Nothing else about the page changed; a question is
+   still answered and recorded exactly once, in the run it was asked in.
+3. **An answer that reached no row is offered no form at all** — no Question Log, or a
+   write that failed. The alternative is a widget that takes a verdict and throws it
+   away. It does mean the one visible consequence of an unreachable log, for a person who
+   does not read the sidebar, is a form that is not there.
+4. **`up` is a boolean and not a `StrEnum`**, unlike `ended_by`, which is a taxonomy
+   precisely so a Grafana filter reads the word. Up and down are two, not a taxonomy that
+   grows, and the Glossary's own words are *"a verdict, up or down"*; 8.5's panel writes
+   the words in its `CASE`.
+5. **The widget has never been rendered in a browser.** `AppTest` runs the real script
+   through Streamlit's own runtime, which is what proves the flow, but nothing here has
+   looked at the thumbs. 8.5 loads the page in a browser for the dashboard screenshot.
+
+**Approved 2026-09-04, on all five sceptical points** — *"all changes and decisions
+inlcuding the sceptical points are reviewed, staged and approved"*. None of the five
+asked for a ruling; the fifth is the one 8.5 closes.
+
+**Language.** Nothing added, nothing proposed. `Feedback` is spelled as registered and
+its two fields are the registered definition's own words. Two collisions were checked
+and avoided: the page's holder of the answer being shown is `Shown`, not `Answered`,
+because `GroundedAnswer.answered` already means the narrower thing — a refusal is shown
+and is not answered — and the widget's local is `thumb`, the index Streamlit returns,
+leaving *verdict* to the prose where the Glossary uses it of both a Gate outcome and a
+Feedback.

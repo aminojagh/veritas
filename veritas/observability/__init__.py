@@ -5,11 +5,11 @@ runtime: every question, Grounded Answer, Validation Gate outcome, cost, latency
 Feedback — the Question Log. **Records; never judges.** Live traffic, no ground truth."*
 
 `log.py` is the seam and the error every failure to record arrives as; `postgres.py` is
-the one implementation that reaches a server, and `schema.sql` is the three tables it
+the one implementation that reaches a server, and `schema.sql` is the four tables it
 applies on connect.
 """
 
-from veritas.observability.log import QuestionLog, QuestionLogError
+from veritas.observability.log import Feedback, QuestionLog, QuestionLogError
 from veritas.observability.postgres import (
     DATABASE_VARIABLE,
     DEFAULTS,
@@ -32,6 +32,7 @@ __all__ = [
     "PORT_VARIABLE",
     "SCHEMA_PATH",
     "USER_VARIABLE",
+    "Feedback",
     "PostgresQuestionLog",
     "QuestionLog",
     "QuestionLogError",

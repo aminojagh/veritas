@@ -16,11 +16,14 @@ server process.
 **The App is the one caller that records.** The Orchestrator measures a question and
 returns what it took; writing that down is this side of the seam, so the Evaluation
 sweep drives the same flow a few hundred times and puts nothing on the dashboard —
-Observability is live traffic, and a sweep is not traffic.
+Observability is live traffic, and a sweep is not traffic. It is also the one caller
+that takes Feedback, for the same reason: nothing but a person reading an answer has
+any to give.
 """
 
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 # `streamlit run` puts this file's own directory on the path and not the repository
 # root, so the import below would fail from a fresh checkout without this. The same
@@ -43,7 +46,12 @@ from veritas.app.render import (
     unit_line,
 )
 from veritas.llm import LanguageModelError
-from veritas.observability import QuestionLog, QuestionLogError, question_log
+from veritas.observability import (
+    Feedback,
+    QuestionLog,
+    QuestionLogError,
+    question_log,
+)
 from veritas.orchestrator import GroundedAnswer, Orchestrator
 from veritas.validation import ANALYST, AccessProfile
 from veritas.warehouse import WarehouseAdapter
@@ -57,6 +65,31 @@ CAPTION = (
 )
 PROMPT = "Your question"
 PLACEHOLDER = "what was our net revenue last quarter?"
+
+# What the Feedback widget asks, and the three things it can say back.
+FEEDBACK_PROMPT = "Was this answer useful?"
+NOTE_PROMPT = "Anything to add? (optional)"
+SEND = "Send"
+THANKS = "Thank you — recorded against this answer."
+NO_VERDICT = "Feedback is a verdict: choose 👍 or 👎."
+
+# Where the answer on the page is kept. A page that held it in nothing but the run that
+# produced it would lose it the moment a Feedback button reran the script, which is the
+# one thing Feedback may not cost.
+SHOWN = "shown"
+
+
+class Shown(NamedTuple):
+    """The Grounded Answer `show` is showing, and the Question Log row it was recorded
+    as — or `None` where it was not recorded, which is where no Feedback can be left on
+    it.
+
+    Not `answered`, which a Grounded Answer already uses for the narrower thing: a
+    refusal is shown and is not answered.
+    """
+
+    answer: GroundedAnswer
+    question_id: int | None
 
 
 @st.cache_resource(show_spinner="Opening the Warehouse and indexing the Semantic Layer…")
@@ -133,10 +166,15 @@ def page(
     log: QuestionLog | None = None,
 ) -> None:
     """The whole page: who is asking, the question box, the answer to the last question
-    asked, and the row that answer was recorded as.
+    asked, the row that answer was recorded as, and the Feedback offered on it.
 
     `log` is taken the way `orchestrator` is, so a test drives the page against a double
     and the server the page opens for itself is the one a person gets.
+
+    The answer is held in session state rather than in the run that produced it. A
+    Feedback button reruns the script with nothing submitted in the question form, and an
+    answer that lived only in that first run would leave the page as the verdict on it
+    arrived.
     """
     st.set_page_config(page_title=TITLE, page_icon="⚖️")
     st.title(TITLE)
@@ -157,41 +195,89 @@ def page(
         question = st.text_input(PROMPT, placeholder=PLACEHOLDER)
         asked = st.form_submit_button("Ask")
 
-    if not (asked and question.strip()):
-        return
+    fresh = None
+    if asked and question.strip():
+        try:
+            fresh = (built() if orchestrator is None else orchestrator).answer(
+                question.strip(), access_profile
+            )
+        except LanguageModelError as unreachable:
+            st.session_state.pop(SHOWN, None)
+            st.error(
+                f"This question was not asked, because Veritas could not reach a "
+                f"model: {unreachable}"
+            )
+            return
+        st.session_state[SHOWN] = Shown(fresh, None)
 
-    try:
-        answer = (built() if orchestrator is None else orchestrator).answer(
-            question.strip(), access_profile
-        )
-    except LanguageModelError as unreachable:
-        st.error(
-            f"This question was not asked, because Veritas could not reach a model: "
-            f"{unreachable}"
-        )
+    showing = st.session_state.get(SHOWN)
+    if showing is None:
         return
-    show(answer)
-    record(answer, access_profile, recorder)
+    show(showing.answer)
+    if fresh is not None:
+        showing = Shown(fresh, record(fresh, access_profile, recorder))
+        st.session_state[SHOWN] = showing
+    offer_feedback(showing.question_id, recorder)
 
 
 def record(
     answer: GroundedAnswer,
     access_profile: AccessProfile,
     log: QuestionLog | None,
-) -> None:
-    """Put the question that was just answered in the Question Log.
+) -> int | None:
+    """Put the question that was just answered in the Question Log, and return its row.
 
     **After the answer is on the page, and never instead of it.** A person asked a
     question; whether Veritas managed to write it down is Veritas's problem, so a failed
     write is a warning beside an answer rather than an error in place of one, and an
     installation with no log at all says so in the sidebar and is otherwise silent.
+
+    `None` for both of those, which is what leaves an answer with no Feedback offered on
+    it: Feedback is left against a row, and there is no row.
     """
     if log is None:
-        return
+        return None
     try:
-        log.record(answer, access_profile)
+        return log.record(answer, access_profile)
     except QuestionLogError as unrecorded:
         st.warning(f"This answer was not recorded: {unrecorded}")
+        return None
+
+
+def offer_feedback(question_id: int | None, log: QuestionLog | None) -> None:
+    """Take the verdict and the sentence a person leaves on the answer above.
+
+    One form, so a verdict and the sentence that qualifies it are one write rather than
+    two — and so the widgets do not rerun the script between them. It is keyed by the
+    row, which is what empties it when a new question is answered and what makes a
+    second verdict on the same answer a replacement rather than a second answer's.
+
+    Offered only where the answer reached the Question Log, because Feedback attaches to
+    a row: an installation with no log says so in the sidebar and shows no widget that
+    would throw a person's verdict away.
+    """
+    if question_id is None or log is None:
+        return
+    st.subheader("Feedback")
+    with st.form(f"feedback-{question_id}"):
+        st.caption(FEEDBACK_PROMPT)
+        # 1 is the thumb up and 0 the thumb down, which is the order `st.feedback`
+        # returns "thumbs" in.
+        thumb = st.feedback("thumbs", key=f"thumbs-{question_id}")
+        note = st.text_input(NOTE_PROMPT, key=f"note-{question_id}")
+        left = st.form_submit_button(SEND)
+
+    if not left:
+        return
+    if thumb is None:
+        st.warning(NO_VERDICT)
+        return
+    try:
+        log.leave_feedback(question_id, Feedback(up=bool(thumb), note=note.strip()))
+    except QuestionLogError as unrecorded:
+        st.warning(f"This feedback was not recorded: {unrecorded}")
+        return
+    st.success(THANKS)
 
 
 if __name__ == "__main__":

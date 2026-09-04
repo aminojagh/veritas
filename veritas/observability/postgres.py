@@ -24,7 +24,7 @@ import psycopg
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from veritas.llm import ENV_FILE
-from veritas.observability.log import QuestionLogError
+from veritas.observability.log import Feedback, QuestionLogError
 from veritas.orchestrator import GroundedAnswer
 from veritas.validation import AccessProfile
 
@@ -60,6 +60,14 @@ INSERT INTO model_call (
     question_id, position, provider, model,
     prompt_tokens, completion_tokens, seconds, cost
 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+"""
+
+# The latest verdict on an answer stands, so a second one replaces the first in place
+# rather than becoming a second row about the same answer.
+LEAVE_FEEDBACK = """
+INSERT INTO feedback (question_id, up, note) VALUES (%s, %s, %s)
+ON CONFLICT (question_id) DO UPDATE
+SET up = EXCLUDED.up, note = EXCLUDED.note, left_at = now()
 """
 
 
@@ -211,6 +219,24 @@ class PostgresQuestionLog:
                 f"the Question Log at {self} would not take this question: {refused}"
             ) from refused
         return question_id
+
+
+    def leave_feedback(self, question_id: int, feedback: Feedback) -> None:
+        """Attach Feedback to the row a question was recorded as.
+
+        Whatever stood there before is replaced, and a `question_id` no row carries is
+        refused by the foreign key rather than stored as Feedback about nothing.
+        """
+        try:
+            with self._connection.transaction(), self._connection.cursor() as cursor:
+                cursor.execute(
+                    LEAVE_FEEDBACK,
+                    (question_id, feedback.up, feedback.note or None),
+                )
+        except psycopg.Error as refused:
+            raise QuestionLogError(
+                f"the Question Log at {self} would not take this feedback: {refused}"
+            ) from refused
 
 
 def question_log() -> PostgresQuestionLog:

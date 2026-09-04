@@ -10,7 +10,9 @@ it — [`App`](../.claude/docs/glossary.md#a-the-system)'s *"never renders a bar
 number"*, as a test rather than as an intention. The **recording claim**: the question a
 person just asked reaches the Question Log after it reaches the page, carrying the
 identity it was asked as — and a log that will not take it costs a warning rather than
-the answer.
+the answer. The **Feedback claim**: the verdict a person leaves is written against the
+row that answer was recorded as, the answer stays on the page while they leave it, and
+an answer that reached no row is offered no widget that would throw a verdict away.
 
 The page is driven through Streamlit's own `AppTest`, which runs the script and reports
 the elements it produced. Every run here answers with a prepared Grounded Answer, so
@@ -44,8 +46,9 @@ from veritas.app import (
     table,
     unit_line,
 )
+from veritas.app.page import NO_VERDICT, THANKS
 from veritas.llm import LIVE_VARIABLE, LanguageModelError
-from veritas.observability import PostgresQuestionLog, QuestionLogError
+from veritas.observability import Feedback, PostgresQuestionLog, QuestionLogError
 from veritas.orchestrator import EndedBy, GroundedAnswer, Lineage, Orchestrator
 from veritas.validation import (
     ANALYST,
@@ -168,20 +171,29 @@ class Recorded:
 
     The double the page is driven against, so what the App writes and when is provable
     without a server — and so that no test in this file can write into the Question Log
-    a person's own `.env` names.
+    a person's own `.env` names. The two refusals are separate because an answer that
+    was never recorded is offered no Feedback at all: a log that takes questions and
+    refuses verdicts is the only way to reach the second failure.
     """
 
     WHERE = "localhost:5432/veritas"
 
-    def __init__(self, refusing: str = "") -> None:
+    def __init__(self, refusing: str = "", refusing_feedback: str = "") -> None:
         self.rows: list[tuple[GroundedAnswer, object]] = []
+        self.feedback: list[tuple[int, Feedback]] = []
         self.refusing = refusing
+        self.refusing_feedback = refusing_feedback
 
     def record(self, answer, access_profile):
         if self.refusing:
             raise QuestionLogError(self.refusing)
         self.rows.append((answer, access_profile))
         return len(self.rows)
+
+    def leave_feedback(self, question_id, feedback):
+        if self.refusing_feedback:
+            raise QuestionLogError(self.refusing_feedback)
+        self.feedback.append((question_id, feedback))
 
     def __str__(self) -> str:
         return self.WHERE
@@ -233,6 +245,20 @@ def asked(given=None, question=QUESTION, timeout=30, log=None):
     if question:
         page.text_input[0].set_value(question)
         page.button[0].click().run()
+    return page
+
+
+def left(page, up=True, note=""):
+    """Choose a verdict on the answer showing, type the optional sentence, press Send.
+
+    `up=None` presses Send with no verdict chosen, which is the one thing the form can
+    be submitted with and not be Feedback.
+    """
+    if up is not None:
+        page.feedback[0].set_value(1 if up else 0)
+    if note:
+        page.text_input[1].set_value(note)
+    page.button[1].click().run()
     return page
 
 
@@ -520,6 +546,94 @@ def test_a_page_with_no_question_log_says_so_and_records_nothing(answered):
     assert page.dataframe
 
 
+# -- the Feedback claim ----------------------------------------------------------
+
+
+def test_feedback_is_offered_on_every_answer_that_reached_the_log(answered, rejected,
+                                                                 lineage):
+    """*"Under every Grounded Answer"* — a refusal is an answer a person may have
+    something to say about as readily as a number is."""
+    for one in (
+        answered,
+        GroundedAnswer(question=QUESTION, ended_by=EndedBy.GATE, sql=STATEMENT,
+                       lineage=lineage, outcome=rejected, refusal=rejected.explanation),
+    ):
+        page = asked(one, log=Recorded())
+        assert page.feedback, shown(page)
+        assert "Feedback" in shown(page)
+
+
+def test_a_verdict_is_written_against_the_row_the_answer_was_recorded_as(answered):
+    """The whole of Feedback in one write: which row, up or down, and the sentence."""
+    log = Recorded()
+    page = left(asked(answered, log=log), up=True, note="matches the finance pack")
+    assert not page.exception
+    assert log.feedback == [(1, Feedback(up=True, note="matches the finance pack"))]
+    assert THANKS in shown(page)
+
+
+def test_the_answer_is_still_on_the_page_after_a_verdict_is_left(answered):
+    """A verdict reruns the script with nothing submitted in the question form, and an
+    answer that lived only in the run that produced it would leave as the verdict
+    arrived."""
+    page = left(asked(answered, log=Recorded()), up=False)
+    assert not page.exception
+    assert page.dataframe[0].value["answer"].tolist() == ["412", "170", "61", "9"]
+    assert page.code[0].value == STATEMENT
+
+
+def test_a_second_verdict_on_one_answer_is_left_on_that_same_row(answered):
+    """Which is what makes *"the latest verdict stands"* the log's decision to take,
+    rather than two rows about one answer for it to choose between."""
+    log = Recorded()
+    page = left(asked(answered, log=log), up=False)
+    left(page, up=True, note="I misread it")
+    assert [question_id for question_id, _ in log.feedback] == [1, 1]
+    assert log.feedback[-1][1] == Feedback(up=True, note="I misread it")
+
+
+def test_a_new_answer_is_offered_a_verdict_of_its_own(answered, figure):
+    """The form is keyed by the row, so a verdict left on one answer never carries onto
+    the next — a stale thumb would be a verdict on an answer nobody gave it to."""
+    log = Recorded()
+    page = left(asked(answered, log=log), up=True, note="matches the finance pack")
+    page.text_input[0].set_value(FIGURE_QUESTION)
+    page.button[0].click().run()
+    assert len(log.rows) == 2
+    assert page.feedback[0].value is None and page.text_input[1].value == ""
+    left(page, up=False)
+    assert [question_id for question_id, _ in log.feedback] == [1, 2]
+
+
+def test_a_sentence_with_no_verdict_is_not_feedback(answered):
+    """Registered as *"a verdict, up or down, and optionally a sentence"*: the optional
+    half cannot arrive on its own, and Send doing nothing silently would be worse."""
+    log = Recorded()
+    page = left(asked(answered, log=log), up=None, note="not sure about this")
+    assert log.feedback == []
+    assert NO_VERDICT in [warning.value for warning in page.warning]
+
+
+def test_an_answer_that_reached_no_row_is_offered_no_verdict(answered):
+    """Feedback attaches to a row. Where there is none — no Question Log, or a write
+    that failed — there is nothing to attach it to, so nothing is offered rather than a
+    widget that throws what a person says away."""
+    assert not asked(answered).feedback
+    page = asked(answered, log=Recorded(refusing="the server went away"))
+    assert "was not recorded" in page.warning[0].value
+    assert not page.feedback
+
+
+def test_a_log_that_will_not_take_the_verdict_does_not_take_the_answer_away(answered):
+    """The same bargain the answer's own row is written under, applied to the verdict on
+    it: a failed write is a warning beside what is on the page."""
+    page = left(asked(answered, log=Recorded(refusing_feedback="the server went away")))
+    assert not page.exception
+    assert page.dataframe[0].value["answer"].tolist() == ["412", "170", "61", "9"]
+    assert "feedback was not recorded" in page.warning[0].value
+    assert "the server went away" in page.warning[0].value
+
+
 def test_only_the_page_imports_streamlit(root):
     """The widget layer is one file, so everything the App decides is testable without
     one."""
@@ -568,8 +682,10 @@ def test_a_real_question_asked_on_the_page_becomes_a_row(warehouse, gate, retrie
     Both halves are real — the configured provider answers and Postgres takes the row —
     so this needs a key **and** a server and skips without either. Two questions, so two
     endings are recorded from one run: one answered, and one that says an Ambiguous Term
-    and is asked back. It deletes the rows it wrote, because a test that leaves traffic
-    behind is a test that changes what the dashboard says.
+    and is asked back. A verdict is then left on the second of them through the widget a
+    person clicks, so the Feedback claim is made once against the real schema rather
+    than only against the double. It deletes the rows it wrote, because a test that
+    leaves traffic behind is a test that changes what the dashboard says.
     """
     import psycopg
 
@@ -589,6 +705,9 @@ def test_a_real_question_asked_on_the_page_becomes_a_row(warehouse, gate, retrie
             self.rows.append(self.log.record(answer, access_profile))
             return self.rows[-1]
 
+        def leave_feedback(self, question_id, feedback):
+            self.log.leave_feedback(question_id, feedback)
+
         def __str__(self):
             return str(self.log)
 
@@ -604,6 +723,8 @@ def test_a_real_question_asked_on_the_page_becomes_a_row(warehouse, gate, retrie
             assert not page.exception, shown(page)
         assert f"recording to {opened}" in shown(page)
         assert len(log.rows) == 2, "one row per question asked, whatever it came back as"
+
+        left(page, up=False, note="I meant gross revenue")
 
         with psycopg.connect(opened.conninfo) as reading:
             written = reading.execute(
@@ -621,9 +742,19 @@ def test_a_real_question_asked_on_the_page_becomes_a_row(warehouse, gate, retrie
             print("\n  id  ended_by    rows  seconds  cost         lineage  calls  in calls")
             for row in written:
                 print("  " + "  ".join(f"{value!s:<10}" for value in row))
+            verdicts = reading.execute(
+                "SELECT question_id, up, note FROM feedback "
+                "WHERE question_id = ANY(%s)",
+                (log.rows,),
+            ).fetchall()
+            print(f"\n  feedback: {verdicts}")
             reading.execute(
                 "DELETE FROM question WHERE question_id = ANY(%s)", (log.rows,)
             )
+            assert reading.execute(
+                "SELECT count(*) FROM feedback WHERE question_id = ANY(%s)", (log.rows,)
+            ).fetchone() == (0,), "a question taken back takes its Feedback with it"
     endings = [row[1] for row in written]
     assert endings == ["answer", "rewrite"], endings
     assert all(row[6] >= 1 for row in written), "every question here calls a model"
+    assert verdicts == [(log.rows[1], False, "I meant gross revenue")], verdicts

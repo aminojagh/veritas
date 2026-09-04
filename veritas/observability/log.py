@@ -14,6 +14,7 @@ the log can fail arrives as `QuestionLogError`, so the App can put a warning bes
 answer a person already has rather than replacing it with one.
 """
 
+from dataclasses import dataclass
 from typing import Protocol
 
 from veritas.orchestrator import GroundedAnswer
@@ -29,14 +30,35 @@ class QuestionLogError(RuntimeError):
     """
 
 
+@dataclass(frozen=True, slots=True)
+class Feedback:
+    """What a person said about a Grounded Answer they were shown.
+
+    [`Feedback`](../../.claude/docs/glossary.md#a-the-system) is *"a verdict, up or
+    down, and optionally a sentence"*: `up` is that verdict, and `note` is the sentence
+    or the empty string where none was written.
+
+    Frozen for the reason a `Lineage` is: it is what somebody said, and a record the
+    App or a logger could edit afterwards is a record nothing can be held to.
+    """
+
+    up: bool
+    note: str = ""
+
+
 class QuestionLog(Protocol):
     """What Observability needs from a store, and the whole of it.
 
     `record` returns the identifier of the row it wrote, because Feedback is left
     against an answer and not against a question string: a person who asks the same
     words twice gets two rows, and a verdict belongs to the one they were shown.
+
+    `leave_feedback` takes that identifier back. An answer carries at most one standing
+    Feedback, and the latest verdict on it stands.
     """
 
     def record(
         self, answer: GroundedAnswer, access_profile: AccessProfile
     ) -> int: ...
+
+    def leave_feedback(self, question_id: int, feedback: Feedback) -> None: ...

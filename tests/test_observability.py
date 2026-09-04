@@ -6,7 +6,8 @@ it is missing rather than raising a driver's exception at whoever asked a questi
 **row claim**: a Grounded Answer becomes one row carrying its ending, its statement, its
 verdict with the Rejection Reasons a chart groups by, its Lineage entry by entry and its
 model calls call by call — and a cost that is absent rather than zero where the model
-that served it is unpriced.
+that served it is unpriced. Feedback then lands on that row and on no other, and the
+latest verdict left on it stands.
 
 The row claim needs a real server, because a claim about a schema proven against a double
 is a claim about the double. Every test under the row-claim heading takes the `log`
@@ -38,6 +39,7 @@ from psycopg.rows import dict_row
 from veritas.llm import ModelCall
 from veritas.observability import (
     DATABASE_VARIABLE,
+    Feedback,
     HOST_VARIABLE,
     PASSWORD_VARIABLE,
     PORT_VARIABLE,
@@ -307,3 +309,38 @@ def test_where_the_rows_go_is_said_without_the_password(log):
     """What the sidebar prints and what an error message carries."""
     assert str(log).endswith("/veritas")
     assert settings()[PASSWORD_VARIABLE] not in f"{log!r} {log!s}"
+
+
+def test_feedback_lands_on_the_row_of_the_answer_it_was_left_on(log, writing, answered):
+    """Registered as *"attached to that answer's Question Log row and never to the
+    question text alone"* — so the same words asked twice are two rows, and a verdict
+    belongs to the one the person was shown."""
+    question_id = writing(answered)
+    the_same_words_again = writing(answered)
+    log.leave_feedback(question_id, Feedback(up=True, note="matches the finance pack"))
+    [row] = read(log, "feedback", question_id)
+    assert (row["up"], row["note"]) == (True, "matches the finance pack")
+    assert row["left_at"] is not None
+    assert read(log, "feedback", the_same_words_again) == []
+
+
+def test_the_latest_verdict_on_an_answer_stands(log, writing, answered):
+    """A second verdict replaces the first rather than becoming a second bar on the
+    chart beside it, and a sentence withdrawn is absent rather than empty."""
+    question_id = writing(answered)
+    log.leave_feedback(question_id, Feedback(up=True, note="right first time"))
+    log.leave_feedback(question_id, Feedback(up=False))
+    [row] = read(log, "feedback", question_id)
+    assert (row["up"], row["note"]) == (False, None)
+
+
+def test_feedback_on_a_question_that_was_never_recorded_is_refused(
+    log, writing, answered
+):
+    """There is no answer to have read, so there is nothing this could be Feedback on.
+    The foreign key says so, and the log goes on taking rows afterwards — a refusal
+    inside a transaction of its own leaves nothing poisoned behind it."""
+    with pytest.raises(QuestionLogError) as orphan:
+        log.leave_feedback(2**40, Feedback(up=True))
+    assert "feedback" in str(orphan.value)
+    assert len(read(log, "question", writing(answered))) == 1
