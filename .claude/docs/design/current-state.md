@@ -12,17 +12,18 @@ trimmed this file to on 2026-08-25, and
 wrote the rule that keeps it short into step 5 of the `closing-a-substep` skill: a
 Sub-step adds what is now true, and the story of how it got there stays in the review.
 
-**Last updated:** 2026-09-04 — **Step 007 — Evaluation — is `done`, and so is every Step
-before it. Nine of the nine Target State components exist, a question typed into a
-browser comes back as a Grounded Answer, and that question is now written down.**
+**Last updated:** 2026-09-04 — **Step 008 — Observability — is `done`, and so is every
+Step before it. Nine of the nine Target State components exist, a question typed into a
+browser comes back as a Grounded Answer, that question is written down, and what Veritas
+does at runtime is a chart rather than a description.**
 Evaluation measures both halves of the flow:
 `data/gold/` holds the Gold Question Set, `veritas/evaluation/` reads it, Retrieval is
 scored over it by hit rate and Mean Reciprocal Rank, and what Veritas *answers* is scored
 by Execution Accuracy and an LLM-as-judge's agreement with it, across two prompts and
 both registered providers. A question that says an Ambiguous Term in any spelling
 [Glossary Section D](../glossary.md#d-ambiguous-terms) registers is detected as saying it,
-not only in the registered name. **Step 008 — Observability — is `active`, and four of
-its five Sub-steps are built**: the OpenAI default model is `gpt-5.4-mini`, chosen by
+not only in the registered name. **Observability** is the ninth component: the OpenAI
+default model is `gpt-5.4-mini`, chosen by
 measuring four candidates, and it answers every answerable Gold Question correctly; a
 Grounded Answer's Lineage names what the statement used rather than what the model was
 shown; and **every question asked through the App is recorded in Postgres** — one row
@@ -30,8 +31,14 @@ carrying the step that ended it, the statement, the verdict with its Rejection R
 the identity, the seconds and the cost, one row per Lineage entry and one per model call.
 Under that answer a person can leave **Feedback** — up or down and an optional sentence —
 which is written against the row the answer was recorded as, where the latest verdict
-stands. `docker compose up -d postgres` is the server, and the App says in its sidebar
-whether it is recording.
+stands. **`grafana/` charts those rows**: three provisioning files and one dashboard of
+seven panels — questions over time by ending, Validation Gate rejections by Rejection
+Reason, metric-usage frequency, latency against model time, cost by model, Feedback up
+against down, and every ending that carried no number — each one statement over the
+Question Log, and each one executed by a test against the schema and then through Grafana
+itself. `docker compose up -d` is both servers: Postgres holds the log, the App says in
+its sidebar whether it is recording, and `http://localhost:3000` opens the dashboard
+without a sign-in.
 `veritas/validation/` refuses anything that
 is not a single, parseable, bounded `SELECT`, refuses any statement whose expressions do
 not all trace to a Certified Metric, refuses any statement whose answer would carry a
@@ -154,39 +161,49 @@ a Postgres server skip without one.
 
 ## Resume here
 
-- **Sub-step 8.4 is approved and staged for commit; 8.1 (`2cf4170`), 8.2 (`b75bdda`) and
-  8.3 (`f9b7bef`) are committed. Next is Sub-step 8.5 — the Grafana dashboard.** 8.4 gave
-  the `QuestionLog` seam its second method and `schema.sql` its fourth table, and put
-  one form under every answer the App recorded. It opened no debt and proposed no term.
-  Three judgement calls are the
-  [8.4 review](../reviews/step-008-observability.md#sub-step-84--leave-feedback-on-a-grounded-answer)'s
-  first three — Feedback is a table of its own rather than two columns on `question`,
-  the answer being shown moved into session state, and an answer that reached no row is
-  offered no form at all — all five of its points approved on 2026-09-04.
+- **Sub-step 8.5 is built and awaiting review; 8.1 (`2cf4170`), 8.2 (`b75bdda`),
+  8.3 (`f9b7bef`) and 8.4 (`05e6b46`) are committed. Step 008 closes with 8.5, and
+  Step 009 — containerization and `README.md` — is next and unplanned.** 8.5
+  wrote `grafana/` — the datasource, the dashboard provider and seven panels — and gave
+  the compose file its second service. It closed
+  [DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded)
+  `accepted` on the route that entry's own Trigger named, and opened
+  [DEBT-042](../debt-ledger.md#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered)
+  — **paid inside the same Sub-step**: Amino opened `http://localhost:3000` on 2026-09-04,
+  all seven panels draw, and the two images the
+  [8.5 review](../reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard)
+  carries are the page. Its
+  eight sceptical points are ruled, and two of them became extensions rather than debt —
+  [EXT-012](../extension-register.md#ext-012--the-dashboards-panels-read-the-dashboards-time-range),
+  no panel reads the dashboard's time range, so dragging a time-series panel zooms its axis
+  and not its query; and
+  [EXT-013](../extension-register.md#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own),
+  Grafana reads the log with the App's own credentials and serves it to anyone.
+  **⚠ The third point is the one to read**: twenty questions aimed at the Validation Gate
+  put two bars in the rejections panel — `shadow metric` and `uncertified route` — and two
+  of the thirteen it answered instead are fresh instances of
+  [DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it),
+  which is due before submission.
+  8.4 gave the `QuestionLog` seam its second method and `schema.sql` its fourth table, and
+  put one form under every answer the App recorded; all five of its points were approved
+  on 2026-09-04.
   8.3 built `veritas/observability/`, the compose file and the Postgres credentials in
   `.env.example`, and paid
   [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by):
   `EndedBy` is the Grounded Answer's own field, stated by the producer rather than
-  derived, and `no sql` is split into `retrieval` and `generation`. Its
-  [8.3 review](../reviews/step-008-observability.md#sub-step-83--record-every-question-a-person-asks)
-  argues that and seven other points, all approved on 2026-09-04, and opened
+  derived, and `no sql` is split into `retrieval` and `generation`. Its eight points were
+  approved on the same day, and it opened
   [DEBT-040](../debt-ledger.md#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves)
-  (the price table is a vendor's page copied once, and groq is unpriced) and
-  [DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded)
-  (a call that never came back is no Grounded Answer and so no row).
+  and DEBT-041.
   8.2 paid
   [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used):
   the verdict names what the statement was composed from and the Lineage is read off it.
-  Two judgement calls in it are the
-  [8.2 review](../reviews/step-008-observability.md#sub-step-82--lineage-records-what-the-statement-used)'s
-  first two — the access axis's Join Paths are in a Lineage while the axis itself is not,
-  and a rejecting verdict is forbidden to name what its statement reached for. 8.1
-  reverted its own failed first attempt, measured
+  8.1 reverted its own failed first attempt, measured
   four OpenAI models against Groq's mark cheapest first, and **`PROVIDERS["openai"]` now
   serves `gpt-5.4-mini`**, which answers eleven of the eleven answerable Gold Questions
   under both prompts where `gpt-4o-mini` answered two.
   [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) carries the
-  amended row and two of its own predictions coming true.
+  amended row.
   **⚠ One item is outstanding inside 8.1**: the published two-provider sweep ran and
   **failed its own runner** — Groq's free tier is capped at 200,000 tokens per day, the
   budget for 2026-09-03 was already spent, and 37 of its 46 questions never reached a
@@ -195,16 +212,13 @@ a Postgres server skip without one.
   resets** is owed — tracked as
   [DEBT-039](../debt-ledger.md#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished),
   whose Trigger postpones it — and splicing the Groq arm in from a separate run is
-  forbidden by the plan. Two findings came out of the Sub-step that bear on everything after it: a model
+  forbidden by the plan. Two findings came out of that Sub-step that bear on everything
+  after it: a model
   rejecting `temperature=0.0` is unusable at any price, and **temperature 0 is not
   determinism** — the winner scored 21/23 and then 22/23 on `shape` across two runs.
   Both are in the
   [8.1 review](../reviews/step-008-observability.md#sub-step-81--choose-the-openai-default-model-by-measurement),
   and nothing in it is now awaiting a ruling.
-  [Step 008 — Observability](../plan/step-008-observability.md) is `active`, approved
-  on 2026-09-03, five Sub-steps: 8.1, 8.2, 8.3 and 8.4, all four built and described
-  above; and the Grafana dashboard, seven charts over those rows, which also gains
-  Grafana in the compose file.
   [Step 007 — Evaluation](../plan/step-007-evaluation.md) is **`done`**, and so is every
   Step before it: four Sub-steps, all four built, ruled and committed — 7.1 (`a361b79`),
   7.2 (`35099c3`), 7.3 (`47dfb8c`) and 7.4 (`7e40092`), the last approved on 2026-09-02.
@@ -230,8 +244,9 @@ a Postgres server skip without one.
   [Language](../plan/step-008-observability.md#language) section — were agreed with it
   on 2026-09-03 and are [Glossary](../glossary.md#a-the-system) Section A rows; 7.1's
   **`Gold Question`** and **`Relevant Set`** were agreed on 2026-09-01, and 7.2's
-  Section D column the same day. **The debt picture after 8.4, which opened none:
-  fifteen open, twenty-two paid, two accepted, two moved.**
+  Section D column the same day. **The debt picture after 8.5:
+  fourteen open, twenty-three paid, three accepted, two moved — and the Extension
+  Register holds thirteen open, two of them 8.5's.**
   [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
   is **paid** by 8.3 and
   [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
@@ -255,6 +270,11 @@ a Postgres server skip without one.
   [DEBT-040](../debt-ledger.md#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves)
   and
   [DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded).
+  8.5 closed DEBT-041 `accepted`, opened and paid
+  [DEBT-042](../debt-ledger.md#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered),
+  and added two dated instances to
+  [DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)
+  without opening an entry for them.
   `DEFAULT_PROMPT_FORM` stays `rules`, now on a margin
   rather than 7.4's tie — `gpt-5.4-mini` scored 22/23 under it in both runs it was
   measured in.
@@ -621,17 +641,26 @@ questions in steps of 1/24; generation's Execution Accuracy is over **eleven** q
 so one of them is worth 0.09. The dated tables and the commands that produce them are in
 the [Step 007 review](../reviews/step-007-evaluation.md).
 
-**Every question is logged and nothing charts it.** Since Sub-step 8.3 a question asked
+**Every question is logged and charted, and nobody has looked at the charts.** Since
+Sub-step 8.3 a question asked
 through the App is a Postgres row carrying its ending, its verdict with the Rejection
 Reasons, its Lineage, its model calls, its seconds and its cost — so
 *"Validation-Gate rejections by reason"* and *"metric-usage frequency"* are two `GROUP
-BY`s away rather than chart descriptions. Since 8.4 the verdict a person leaves on
+BY`s away rather than chart descriptions — and since 8.5 they are the two panels the
+Monitoring criterion names by name. Since 8.4 the verdict a person leaves on
 an answer is a row too, so all four of what an
-[`Operational Measure`](../glossary.md#a-the-system) names are recorded. What is missing
-is the charts and the Grafana service, which are Sub-step 8.5. Three
+[`Operational Measure`](../glossary.md#a-the-system) names are recorded. **What no test
+can reach is the picture**: every panel's query is executed against the schema and then
+through Grafana, and what a panel *looks* like is checked by a person opening the page —
+which happened on 2026-09-04 and paid
+[DEBT-042](../debt-ledger.md#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered),
+leaving the two images in the
+[8.5 review](../reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard) as
+the record of it. Three
 narrower gaps sit inside the log itself. A question the provider never answered is **not
-a row** at all ([DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded)),
-so an outage reads as an afternoon nobody asked anything. A cost is
+a row** at all — [DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded),
+**`accepted`** in 8.5 because every counting panel reads the ending alone — so an outage
+reads as an afternoon nobody asked anything. A cost is
 [list price as of 2026-09-03](../debt-ledger.md#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves)
 and is `NULL` for every groq call, which no page this project has read carries a price
 for. And a question's `seconds` is what a person waited — retrieval, the Gate and the
@@ -749,7 +778,7 @@ The [Debt Ledger](../debt-ledger.md) and the
 trigger or readiness condition and its status, and the running counts. Read them there —
 this file does not keep a second copy.
 
-**Open debt: 14 · open extensions: 11.** 7.1 paid three on one Trigger — the Gold
+**Open debt: 14 · open extensions: 13.** 7.1 paid three on one Trigger — the Gold
 Question Set —
 [DEBT-033](../debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)
 (coverage, now read off the gold statements),

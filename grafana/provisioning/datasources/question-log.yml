@@ -1,0 +1,32 @@
+# The Question Log, as Grafana reads it. Provisioned rather than clicked together, so
+# `docker compose up` opens a dashboard already pointed at a datasource nobody typed.
+#
+# The four values are the ones `.env` gives Postgres and the App, interpolated by
+# Grafana from its own environment — `docker-compose.yml` passes them through — so
+# there is one set of credentials for the server, the application and the charts.
+#
+# `url` is the service name and the container port, not `POSTGRES_HOST` and
+# `POSTGRES_PORT`: those are where the App on the host reaches the published port, and
+# Grafana reaches the same server across the compose network instead.
+
+apiVersion: 1
+
+datasources:
+  - name: Question Log
+    # The panels name this rather than a datasource that happens to be default, so a
+    # second datasource added later cannot silently become the one they read.
+    uid: question-log
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: postgres:5432
+    user: $POSTGRES_USER
+    database: $POSTGRES_DB
+    secureJsonData:
+      password: $POSTGRES_PASSWORD
+    jsonData:
+      # Nothing leaves the compose network, and the image ships no certificate.
+      sslmode: disable
+    isDefault: true
+    # Provisioned files are the source of truth: a change made in the browser would be
+    # lost on the next `up` and is better refused than silently reverted.
+    editable: false

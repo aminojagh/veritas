@@ -48,8 +48,10 @@ reason) · `superseded`.
 | [EXT-009](#ext-009--the-join-path-entry-type-at-warehouse-scale) | The Join Path entry type at Warehouse scale | `semantic/joins/` file format · a Metric Definition's `join_paths` | M | open |
 | [EXT-010](#ext-010--a-metric-certified-over-more-than-one-date-column) | A metric certified over more than one date column | `ValidationGate.routed`'s date half · a Metric Definition's `date_column` | S | open |
 | [EXT-011](#ext-011--more-large-language-model-providers-behind-the-seam) | More Large Language Model providers behind the seam | `veritas/llm/`'s `PROVIDERS` registry · the `LanguageModel` seam | S | open |
+| [EXT-012](#ext-012--the-dashboards-panels-read-the-dashboards-time-range) | The dashboard's panels read the dashboard's time range | each panel's `rawSql` · `question.asked_at` | S | open |
+| [EXT-013](#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own) | Grafana reads the Question Log with credentials of its own | the Grafana datasource file · the `POSTGRES_*` values `.env` declares | S | open |
 
-**Open:** 11 · **Built:** 0 · **Dropped:** 0
+**Open:** 13 · **Built:** 0 · **Dropped:** 0
 
 ### Target State extension path, mapped
 
@@ -814,3 +816,129 @@ Any one of:
    point the second row has to be replaced rather than added to.
 3. A model capability Veritas needs is served by neither — the case that also
    forces the second class behind the seam rather than a third row.
+
+### EXT-012 — The dashboard's panels read the dashboard's time range
+
+- **Status:** open
+- **Opened:** Sub-step 8.5 (`.claude/docs/reviews/step-008-observability.md`)
+- **Seam it lands against:** each panel's `rawSql` in
+  `grafana/dashboards/question-log.json` · `question.asked_at`, the column the two
+  time-series panels already plot along
+- **Size:** S
+- **Motivated by:** the second sceptical item of the
+  [Sub-step 8.5 review](reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard),
+  and Amino's ruling of 2026-09-04: *"i can zoom into panels when i open the dashboard.
+  however, if this is really a limitation, open an extension for it"*
+
+**What the full system needs**
+
+`$__timeFilter(asked_at)` in every panel's WHERE clause and the time picker shown, so
+that *"the last hour"* is a control on the page. Grafana's own idiom, and the reason a
+dashboard over live traffic is a dashboard rather than a report: on a log that grows all
+day, *"how many questions were refused"* has no answer until it says over what period,
+and every panel here answers it over all of history.
+
+**What the slice does instead, and why that is correct here**
+
+Every panel reads the whole log, and the picker is hidden rather than left showing a
+control that changes nothing. What a reader can still do is what Amino did on 2026-09-04:
+drag across either time-series panel, which narrows the **axis** to the dragged range —
+the picture zooms, the query does not, and the five counting panels are unaffected
+because they carry no time axis to zoom.
+
+That is the right trade at this size. The log holds a demo's traffic — dozens of
+questions over two days, asked one at a time through the App's page — so every panel
+already fits on one screen, and a picker over it would narrow a range nobody needs
+narrowed.
+
+**Why this is an extension and not debt**
+
+The trigger test settles it: traffic big enough for a period to matter cannot arrive
+inside this project's life. Rows enter the Question Log one question at a time, from a
+person typing into the App, and the Evaluation sweep — the one thing here that asks
+hundreds of questions — deliberately writes none of them
+([Step 008 plan](plan/step-008-observability.md#three-route-decisions), route decision 1).
+A Ledger entry would carry *"when Veritas serves real traffic"*, which is a wish.
+
+**What adopting it costs**, since that is what makes it `S`: one line per panel, the
+picker unhidden, and one test each way.
+`test_grafana_runs_every_panel_through_the_datasource_compose_gave_it` needs no change —
+it posts each query to `/api/ds/query` with a `from` and a `to`, and Grafana expands the
+macro server-side exactly as it does for the browser.
+`test_every_panel_query_executes_against_the_schema` cannot: it hands the string to
+psycopg, which has never heard of `$__timeFilter`, so it would have to expand the macro
+itself and would then be proving a string of the test's own making.
+`test_no_panel_query_holds_a_macro` is what holds that line today, and is the test this
+extension deletes.
+
+**Readiness**
+
+Any one of:
+
+1. Veritas records traffic that no longer fits one screen — the direct case, and the one
+   that makes a panel over all of history unreadable rather than merely un-zoomable.
+2. A question is asked of the log that is about a period rather than about the whole
+   record — *"what did this morning look like"* — which is the same need arriving before
+   the volume does.
+3. The direct-against-schema test is retired in favour of the one that goes through
+   Grafana, at which point the macro costs nothing at all.
+
+### EXT-013 — Grafana reads the Question Log with credentials of its own
+
+- **Status:** open
+- **Opened:** Sub-step 8.5 (`.claude/docs/reviews/step-008-observability.md`)
+- **Seam it lands against:** `grafana/provisioning/datasources/question-log.yml` · the
+  `POSTGRES_*` values `.env` declares and `veritas/observability/postgres.py` reads
+- **Size:** S
+- **Motivated by:** the fourth sceptical item of the
+  [Sub-step 8.5 review](reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard),
+  and Amino's ruling of 2026-09-04 on it: *"it's ok for now. you can also make an
+  extension for this if you see fit."*
+
+**What the full system needs**
+
+Two things the demo folds into one. A Postgres role that may `SELECT` on the four
+Question Log tables and do nothing else, which is what the datasource file is handed; and
+a viewer who signs in, rather than anonymous access with the Viewer role. A dashboard is
+a read, and a read does not need the credentials that write the rows it charts —
+granting `SELECT` on those four tables to a role of its own is the whole of the change on
+the Postgres side.
+
+**What the slice does instead, and why that is correct here**
+
+Grafana connects as the same Postgres user the App writes with, and anonymous viewing is
+on with the admin login declared in `.env.example` for anyone who wants to edit a panel.
+Both are deliberate and both buy the same thing: `docker compose up` opens the dashboard
+with nothing typed and nothing clicked, which is what the reproducibility criterion asks
+of a reviewer who has cloned the repository and has five minutes.
+
+**Why this is an extension and not debt**
+
+These credentials are the ones the
+[Target State](design/target-state.md#what-credential-free-means) already rules on —
+*"**Service credentials inside `docker-compose`** — Postgres, Grafana · ✅ yes · Not
+obtained, declared"* — and the same section closes the deployment question: *"Cloud
+deployment is out of scope for the slice regardless."* So the condition that makes one
+credential set wrong is a Veritas somebody other than the person who started it can
+reach, and that cannot happen inside this project's life. The code is right for this
+scope rather than cheap: nothing is being deferred except the second role that a second
+reader would need.
+
+It lands as pure addition. The datasource file names a user and a password, so a
+read-only role is a different pair of values in it plus one granting statement beside the
+schema; and
+`GF_AUTH_ANONYMOUS_ENABLED` is one line of the compose file. No caller and no query
+moves, which is the *addition, not rewrite* test.
+
+**Readiness**
+
+Any one of:
+
+1. Veritas runs anywhere a second person can reach it — the direct case, and the one that
+   makes anonymous viewing a decision rather than a convenience.
+2. The Question Log holds anything that is not synthetic. It holds real questions today
+   in the sense that a person typed them, but nothing in it is about a real client;
+   [DEBT-008](debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+   is the entry that says what the access story is and is not.
+3. A second dashboard or a second reader arrives, at which point one role per reader is
+   cheaper than one credential set shared by all of them.

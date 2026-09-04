@@ -68,9 +68,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-038](#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | A capable model answers an ad-hoc row request instead of refusing it | S | Before the capstone is submitted | open |
 | [DEBT-039](#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished) | The published two-provider sweep failed its own runner and is not republished | S | The final documentation pass, a Sub-step that needs the published figures, or submission — whichever is first | open |
 | [DEBT-040](#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves) | The price table is a vendor's page copied once, and nothing notices when it moves | S | The final documentation pass, or the first cost figure quoted outside a review | open |
-| [DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded) | A question the provider never answered is not recorded | S | The Sub-step that charts refusals, or the first time a provider outage is invisible on the dashboard | open |
+| [DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded) | A question the provider never answered is not recorded | S | 🔴 fired (8.5) — the charts read the ending alone, and the gap is the one the entry predicted | **accepted** (8.5) |
+| [DEBT-042](#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered) | No panel of the dashboard has been seen rendered | S | Before the capstone is submitted, or the first time the dashboard is opened — **🔴 fired** | **paid** (8.5, 2026-09-04) |
 
-**Open debt:** 15 · **Paid:** 22 · **Accepted:** 2 · **Moved:** 2
+**Open debt:** 14 · **Paid:** 23 · **Accepted:** 3 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -3105,6 +3106,15 @@ one such answer is a dashboard row labelled a successful answer. Measured: `ten 
 answered under both `rules` and `shape` by `gpt-5.4-mini`, 2026-09-03 sweep; the failure
 list's `ten trades` row is the running count.
 
+**Two more instances, 2026-09-04**, from the twenty questions the third sceptical point of
+the [8.5 review](reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard) put
+through the App. *"What was our realised P&L across every movement type"* was answered
+with the certified `movement_type = 'realised P&L'` filter still on, and *"what was our
+gross revenue by month in 2026"* was answered grouped by `trade_date`, a day at a time.
+Both traced, both passed the Gate, both are recorded as answers. Neither is a new entry —
+the shape is this one's, and what it shows is that the miss is not confined to the
+ad-hoc-exploration probes that found it.
+
 **Trigger**
 
 Before the capstone is submitted. Either the boundary fix lands — the Orchestrator
@@ -3218,7 +3228,7 @@ the five rows and the date, and add groq if it is priced anywhere readable.
 
 ### DEBT-041 — A question the provider never answered is not recorded
 
-- **Status:** open
+- **Status:** **accepted** — 2026-09-04, the Sub-step 8.5 commit
 - **Opened:** Sub-step 8.3 (`.claude/docs/reviews/step-008-observability.md`)
 - **Size:** S
 - **Location:** `veritas/app/page.py` — the `LanguageModelError` branch, which returns
@@ -3260,3 +3270,91 @@ it and no one else.
 **The Sub-step that charts refusals** — 8.5 — or the first time a provider outage has to be
 explained from the dashboard. If 8.5's charts read the ending alone and the gap is
 acceptable there, this closes as *accepted* with that as the reason.
+
+**Fired in Sub-step 8.5 (2026-09-04), and closed `accepted` on the route this Trigger
+named.** All five panels that count questions read `ended_by` off the question row and
+nothing else, so the gap is exactly the one described above and no wider: *"Questions
+over time by ending"* and *"Endings without a number"* undercount by the questions a
+provider never answered, and the other five — rejections by reason, metric usage,
+latency, cost, Feedback — are unaffected, because a question with no reply has no verdict,
+no Lineage, no cost and nothing to leave Feedback on.
+
+Three things put it here rather than on the open list:
+
+- **The remedy is a second shape through a seam built one Sub-step ago.** `record` takes
+  a Grounded Answer; a failed call is not one. Widening it now, for the one ending that
+  says nothing about the question, is the thing
+  [CLAUDE.md](../../CLAUDE.md) means by debt across a seam rather than behind it.
+- **Nothing in the slice needs it.** The dashboard's job is to show what Veritas decides;
+  a provider outage is an installation fault, and the App already tells the person in
+  front of it, on the page, in the same run.
+- **The undercount is bounded and visible.** Every ending the log can hold is charted, so
+  a reader is never shown a wrong proportion between two endings — only a missing bar for
+  an ending no Grounded Answer may carry.
+
+**What would reopen it:** a provider outage that has to be explained from the dashboard,
+or the Target State's *"every question"* being quoted as a claim about the Question Log
+in `README.md`. Step 009 writes that README, so the sentence it uses is the next place
+this entry is due a reading.
+
+---
+
+### DEBT-042 — No panel of the dashboard has been seen rendered
+
+- **Status:** **paid** — Sub-step 8.5, 2026-09-04
+  (`.claude/docs/reviews/step-008-observability.md`)
+- **Opened:** Sub-step 8.5 (`.claude/docs/reviews/step-008-observability.md`)
+- **Size:** S — opening the page and looking at it
+- **Location:** `grafana/dashboards/question-log.json` — every panel's `type`,
+  `options` and `fieldConfig`; not its `rawSql`, which is tested
+
+**What we did**
+
+Proved the dashboard by its queries. `tests/test_observability.py` reads the file,
+executes every panel's statement against the schema, and then makes Grafana execute each
+one through the datasource `docker-compose.yml` gave it — so the SQL is right, the
+columns exist, the credentials interpolated and each panel comes back holding a frame.
+Nothing has looked at the result. The Sub-step could not: this machine's Chromium is
+missing five shared libraries and installing them needs a password nobody typed, so no
+screenshot was taken and the review carries a table of frames where the plan asked for a
+picture.
+
+**What we should have done**
+
+Opened `http://localhost:3000`, looked at all seven panels, and put the image in the
+review — which is what the [Step 008 plan](plan/step-008-observability.md) asked for in
+so many words: *"the dashboard loaded on questions asked in the browser, screenshot in the
+review"*.
+
+**Why we deferred**
+
+The browser would not start and the fix is a system package install, not a code change.
+The evidence that *can* be produced here was produced instead, and it is reproducible
+where a screenshot is not.
+
+**Cost while unpaid**
+
+A query that runs is not a chart that reads. Everything between the frame and the picture
+is unproven: `xField` naming a column that is no longer there, an `overrides` matcher that
+matches nothing, a bar chart handed a null where a category was expected, a panel taller
+than the row it sits in. Each of those renders as an empty or wrong panel and passes every
+test in the suite. The [Zoomcamp criteria map](design/target-state.md#zoomcamp-criteria-map)
+scores this dashboard by eye, so the one reader who matters sees exactly the layer nothing
+here has checked.
+
+**Trigger**
+
+**Before the capstone is submitted**, or the first time anyone opens the dashboard —
+whichever is first. `docker compose up -d` and `http://localhost:3000`; the seven panels
+are listed in the [8.5 review](reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard)
+with what each one's query returned, so a reader can compare the page against the frames.
+
+**How it was paid, Sub-step 8.5 (2026-09-04).** Amino opened `http://localhost:3000` and
+put the page in the review as two images — the
+[8.5 review](reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard) shows
+them and says what each one holds. All seven panels draw: the layer this entry called
+unproven — the `type`, the `options` and the `fieldConfig` — is the layer those images
+are of. Nothing in the list above was found wrong. The images were retaken after the
+twenty questions of that review's third sceptical point, so what they show is the log the
+frame table beside them counts — the two pictures and the eight frames can be read against
+each other.

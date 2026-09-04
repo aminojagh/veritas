@@ -1,0 +1,281 @@
+{
+  "uid": "question-log",
+  "title": "Veritas — the Question Log",
+  "description": "Every question a person asked through the App, as Observability recorded it. Records; never judges — nothing here is scored against a gold result. No panel reads the dashboard's time range, so every chart is the whole log and the time picker is hidden rather than shown doing nothing.",
+  "tags": ["veritas", "observability"],
+  "editable": false,
+  "schemaVersion": 41,
+  "refresh": "30s",
+  "timepicker": {"hidden": true},
+  "time": {"from": "now-90d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Questions over time by ending",
+      "description": "One bar per minute per EndedBy member. A question the provider never answered is not here at all — DEBT-041.",
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('minute', asked_at) AS time,\n       ended_by AS metric,\n       count(*) AS questions\nFROM question\nGROUP BY 1, 2\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "fillOpacity": 90,
+            "lineWidth": 0,
+            "stacking": {"mode": "normal", "group": "A"},
+            "axisSoftMax": 3
+          }
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "answer"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "rewrite"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]},
+          {"matcher": {"id": "byName", "options": "retrieval"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}}]},
+          {"matcher": {"id": "byName", "options": "generation"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+          {"matcher": {"id": "byName", "options": "gate"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "engine"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]}
+        ]
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Validation Gate rejections by Rejection Reason",
+      "description": "Which rule refused a statement the model wrote. Read off the verdict's own reasons, so a rule that fires twice is two rejections and never one row of prose.",
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT reason AS \"Rejection Reason\",\n       count(*) AS \"rejections\"\nFROM question, unnest(reasons) AS reason\nWHERE allowed IS FALSE\nGROUP BY 1\nORDER BY 2 DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {"mode": "fixed", "fixedColor": "red"},
+          "custom": {"lineWidth": 0, "fillOpacity": 90, "axisSoftMax": 3}
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Rejection Reason",
+        "showValue": "auto",
+        "legend": {"showLegend": false},
+        "tooltip": {"mode": "single", "sort": "none"}
+      }
+    },
+    {
+      "id": 3,
+      "type": "barchart",
+      "title": "Metric-usage frequency",
+      "description": "Which Certified Metrics answered questions, from the Lineage of the answers that carried a number. A metric nobody asks for has no bar; a metric named only by a refused question has none either.",
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT lineage_entry.name AS \"Certified Metric\",\n       count(*) AS \"answers\"\nFROM lineage_entry\nJOIN question USING (question_id)\nWHERE lineage_entry.kind = 'metric'\n  AND question.ended_by = 'answer'\nGROUP BY 1\nORDER BY 2 DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {"mode": "fixed", "fixedColor": "green"},
+          "custom": {"lineWidth": 0, "fillOpacity": 90, "axisSoftMax": 3}
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "Certified Metric",
+        "showValue": "auto",
+        "legend": {"showLegend": false},
+        "tooltip": {"mode": "single", "sort": "none"}
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Latency: what a person waited, and how much of it was the model",
+      "description": "Two series in one unit, so they share one axis. The upper is the whole question — retrieval, the Gate and the engine included, and the first question in a server process also pays the embedding model's warm-up. Only the lower is model time.",
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 17},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT asked_at AS time,\n       seconds AS \"waited\"\nFROM question\nORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT question.asked_at AS time,\n       sum(model_call.seconds) AS \"in model calls\"\nFROM model_call\nJOIN question USING (question_id)\nGROUP BY question.question_id, question.asked_at\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "pointSize": 8,
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "waited"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]},
+          {"matcher": {"id": "byName", "options": "in model calls"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}}]}
+        ]
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Cost by model",
+      "description": "Summed over every call, at the list prices veritas/llm/ recorded with the date they were read. A model this repository has read no price for has calls and no bar — a cost of nothing and a cost nobody knows are different things, and only one of them is zero.",
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 17},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT model_call.model AS \"model\",\n       sum(model_call.cost) AS \"cost\"\nFROM model_call\nGROUP BY 1\nORDER BY 2 DESC NULLS LAST"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "unpriced",
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "custom": {"lineWidth": 0, "fillOpacity": 90}
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "model",
+        "showValue": "auto",
+        "legend": {"showLegend": false},
+        "tooltip": {"mode": "single", "sort": "none"}
+      }
+    },
+    {
+      "id": 6,
+      "type": "bargauge",
+      "title": "Feedback: up against down",
+      "description": "What people said about the answers they were shown. One standing verdict per answer — a second verdict on the same answer replaces the first rather than adding a bar here.",
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT count(*) FILTER (WHERE up) AS \"up\",\n       count(*) FILTER (WHERE NOT up) AS \"down\"\nFROM feedback"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "fixed", "fixedColor": "text"}
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "up"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "down"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Endings without a number: refusals and Clarifying Questions",
+      "description": "Every EndedBy member but `answer`, so a refusal the Validation Gate never saw is counted beside one it did. `rewrite` is the Clarifying Question — not a refusal: it says the question is not answerable yet and what would settle it.",
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT ended_by AS \"ending\",\n       count(*) AS \"questions\"\nFROM question\nWHERE ended_by <> 'answer'\nGROUP BY 1\nORDER BY 2 DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {"mode": "fixed", "fixedColor": "orange"},
+          "custom": {"lineWidth": 0, "fillOpacity": 90, "axisSoftMax": 3}
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "ending",
+        "showValue": "auto",
+        "legend": {"showLegend": false},
+        "tooltip": {"mode": "single", "sort": "none"}
+      }
+    }
+  ]
+}

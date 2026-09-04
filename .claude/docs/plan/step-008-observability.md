@@ -1,9 +1,12 @@
 # Step 008 — Observability: record every question and chart it
 
-**Status:** **active** — approved by Amino on 2026-09-03, by the commit that carries
-this plan and its two Term Proposals. Next: Sub-step 8.5 — 8.1 (`2cf4170`), 8.2
-(`b75bdda`) and 8.3 (`f9b7bef`) are committed, and 8.4 is approved and staged. The
-status turns `done` by the commit that closes 8.5.
+**Status:** **done** — approved by Amino on 2026-09-03, by the commit that carries this
+plan and its two Term Proposals. All five Sub-steps are built: 8.1 (`2cf4170`), 8.2
+(`b75bdda`), 8.3 (`f9b7bef`) and 8.4 (`05e6b46`) are committed, and 8.5 is built and
+awaiting review. The dashboard is provisioned, every panel's query is tested, and the page
+has been opened and photographed — which paid
+[DEBT-042](../debt-ledger.md#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered)
+inside the Sub-step that opened it. Its verification is met as the plan wrote it.
 
 **Goal.** Build Observability — every question a person asks, recorded in Postgres
 with its Grounded Answer, Validation Gate outcome, Lineage, cost, latency and Feedback,

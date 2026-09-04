@@ -1,24 +1,27 @@
-"""What the Question Log records, and what it refuses to lose on the way.
+"""What the Question Log records, what it refuses to lose on the way, and what charts it.
 
-Two claims. The **seam claim**: the only module that names Postgres is
+Three claims. The **seam claim**: the only module that names Postgres is
 `veritas/observability/postgres.py`, and an installation with no server says which value
 it is missing rather than raising a driver's exception at whoever asked a question. The
 **row claim**: a Grounded Answer becomes one row carrying its ending, its statement, its
 verdict with the Rejection Reasons a chart groups by, its Lineage entry by entry and its
 model calls call by call — and a cost that is absent rather than zero where the model
 that served it is unpriced. Feedback then lands on that row and on no other, and the
-latest verdict left on it stands.
+latest verdict left on it stands. The **chart claim**: the dashboard is a file rather than
+something clicked together, it holds the two charts the Monitoring criterion names, and
+every query on it runs against the schema — so a panel broken by the next column to move
+fails a test rather than a demo.
 
 The row claim needs a real server, because a claim about a schema proven against a double
-is a claim about the double. Every test under the row-claim heading takes the `log`
-fixture, and that fixture is the whole of the gating: with no server reachable it skips
-the test, naming the value it could not connect with. The seam-claim tests above it never
-connect, and run either way.
+is a claim about the double, and the chart claim ends up needing both a server and Grafana
+for the same reason. Every test that does takes the `log` or the `grafana` fixture, and
+those fixtures are the whole of the gating: with nothing reachable they skip, naming what
+they could not reach. Everything else here reads files and runs either way.
 
 Nothing here starts or stops a container — the server is brought up by hand, once, and
 left up:
 
-    docker compose up -d postgres && uv run pytest tests/test_observability.py
+    docker compose up -d && uv run pytest tests/test_observability.py
 
 Afterwards `docker compose down` stops it and keeps the rows, because the volume is named;
 `docker compose down -v` empties it, and the next connect applies `schema.sql` to an empty
@@ -29,14 +32,20 @@ its own connection rather than through the writer's, since a writer that reports
 rows correct proves less than an independent reader does.
 """
 
+import base64
+import json
+import os
 import re
+import urllib.error
+import urllib.request
 from decimal import Decimal
 
 import psycopg
 import pytest
+import yaml
 from psycopg.rows import dict_row
 
-from veritas.llm import ModelCall
+from veritas.llm import ENV_FILE, ModelCall
 from veritas.observability import (
     DATABASE_VARIABLE,
     Feedback,
@@ -344,3 +353,228 @@ def test_feedback_on_a_question_that_was_never_recorded_is_refused(
         log.leave_feedback(2**40, Feedback(up=True))
     assert "feedback" in str(orphan.value)
     assert len(read(log, "question", writing(answered))) == 1
+
+
+# -- the chart claim -------------------------------------------------------------
+
+GRAFANA = "grafana"
+DASHBOARD = "question-log.json"
+
+# The two charts the Monitoring criterion of the
+# [Zoomcamp criteria map](../.claude/docs/design/target-state.md) names in its own words —
+# *"including Validation-Gate rejections by reason and metric-usage frequency"*.
+NAMED_BY_THE_CRITERION = (
+    "validation gate rejections by rejection reason",
+    "metric-usage frequency",
+)
+
+
+@pytest.fixture(scope="module")
+def dashboard(root) -> dict:
+    """The dashboard as Grafana reads it — the provisioned file itself, not an export."""
+    return json.loads((root / GRAFANA / "dashboards" / DASHBOARD).read_text())
+
+
+def provisioned(root, kind: str, name: str) -> dict:
+    """One provisioning file, parsed."""
+    return yaml.safe_load(
+        (root / GRAFANA / "provisioning" / kind / name).read_text()
+    )
+
+
+def queries(dashboard: dict) -> list[tuple[str, str, str, str]]:
+    """Every query the dashboard runs: its panel, its target, its SQL and the shape it
+    asks Grafana to read the answer back in."""
+    return [
+        (panel["title"], target["refId"], target["rawSql"], target["format"])
+        for panel in dashboard["panels"]
+        for target in panel["targets"]
+    ]
+
+
+def test_the_dashboard_carries_the_charts_the_criterion_names_by_name(dashboard):
+    """*"Grafana dashboard, >=5 charts — including Validation-Gate rejections by reason
+    and metric-usage frequency"*. The count is the floor; the two are the requirement."""
+    titles = [panel["title"] for panel in dashboard["panels"]]
+    assert len(titles) >= 5
+    for named in NAMED_BY_THE_CRITERION:
+        assert any(named in title.lower() for title in titles), named
+    assert all(panel["targets"] for panel in dashboard["panels"])
+
+
+def test_every_panel_reads_the_datasource_the_repository_provisions(root, dashboard):
+    """A panel naming a datasource nobody provisioned renders *"Datasource not found"* —
+    on the demo, and nowhere before it."""
+    [datasource] = provisioned(root, "datasources", "question-log.yml")["datasources"]
+    named = {panel["datasource"]["uid"] for panel in dashboard["panels"]} | {
+        target["datasource"]["uid"]
+        for panel in dashboard["panels"]
+        for target in panel["targets"]
+    }
+    assert named == {datasource["uid"]}
+    assert datasource["type"] == "grafana-postgresql-datasource"
+
+
+def test_compose_hands_grafana_the_files_and_the_values_it_provisions_from(root):
+    """The three joints between this repository and that container, none of which fails
+    loudly: a dashboard directory mounted somewhere the provider does not read, a
+    datasource asking for an environment variable the service does not pass, and a home
+    dashboard named at a path that holds no file. Each leaves a Grafana that starts
+    cleanly and shows nothing.
+    """
+    compose = yaml.safe_load((root / "docker-compose.yml").read_text())
+    grafana = compose["services"]["grafana"]
+    mounted = dict(volume.split(":")[:2] for volume in grafana["volumes"])
+
+    [source] = provisioned(root, "dashboards", "veritas.yml")["providers"]
+    assert mounted[f"./{GRAFANA}/dashboards"] == source["options"]["path"]
+    assert mounted[f"./{GRAFANA}/provisioning"] == "/etc/grafana/provisioning"
+
+    wanted = set(
+        re.findall(
+            r"\$([A-Z_]+)",
+            (root / GRAFANA / "provisioning" / "datasources" / "question-log.yml").read_text(),
+        )
+    )
+    assert wanted and wanted <= set(grafana["environment"])
+
+    home = grafana["environment"]["GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH"]
+    assert home == f"{source['options']['path']}/{DASHBOARD}"
+    assert (root / GRAFANA / "dashboards" / DASHBOARD).exists()
+
+
+def test_no_panel_query_holds_a_macro(dashboard):
+    """What keeps the test below honest. Grafana expands `$__timeFilter` and its
+    relatives before sending a query, so a panel carrying one would be executed here as
+    something Grafana never runs — and the dashboard would be proven against a string of
+    the test's own making. No panel reads the time range; the dashboard hides the picker
+    rather than showing one that does nothing.
+    """
+    for title, ref, sql, _ in queries(dashboard):
+        assert "$__" not in sql, f"{title} [{ref}]"
+
+
+def test_every_panel_query_executes_against_the_schema(log, dashboard):
+    """Character for character what Grafana sends. A chart whose query breaks on the
+    next column to move should fail here rather than in front of somebody."""
+    broken = []
+    with psycopg.connect(log.conninfo) as connection:
+        for title, ref, sql, _ in queries(dashboard):
+            try:
+                with connection.transaction():
+                    connection.execute(sql)
+            except psycopg.Error as refused:
+                broken.append(f"{title} [{ref}]: {refused}")
+    assert broken == []
+
+
+# -- the chart claim, through Grafana --------------------------------------------
+
+GRAFANA_URL = "http://localhost:{port}"
+DEFAULT_GRAFANA_PORT = "3000"
+
+
+def grafana_settings() -> tuple[str, str, str]:
+    """Where Grafana is and who may edit it, from the environment or from `.env`.
+
+    Read here rather than from `veritas/`, because nothing in the application talks to
+    Grafana: the App writes rows and Grafana reads them, and the two never meet.
+    """
+    from dotenv import load_dotenv
+
+    load_dotenv(ENV_FILE)
+    return (
+        GRAFANA_URL.format(port=os.environ.get("GRAFANA_PORT", DEFAULT_GRAFANA_PORT)),
+        os.environ.get("GRAFANA_USER", ""),
+        os.environ.get("GRAFANA_PASSWORD", ""),
+    )
+
+
+@pytest.fixture(scope="module")
+def grafana():
+    """A caller for the Grafana `docker compose up` starts, or a skip.
+
+    Returns a function that reads one Application Programming Interface (API) path,
+    signed in as the administrator `.env` declares.
+    """
+    where, user, password = grafana_settings()
+    token = base64.b64encode(f"{user}:{password}".encode()).decode()
+
+    def call(path: str, body: dict | None = None):
+        request = urllib.request.Request(
+            f"{where}{path}",
+            data=None if body is None else json.dumps(body).encode(),
+            headers={
+                "Authorization": f"Basic {token}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=30) as answered:
+            return json.load(answered)
+
+    try:
+        call("/api/health")
+    except (urllib.error.URLError, TimeoutError) as unreachable:
+        pytest.skip(f"no Grafana at {where}: {unreachable}")
+    return call
+
+
+def test_grafana_serves_the_dashboard_this_repository_keeps(grafana, dashboard):
+    """Provisioned, not clicked together: the file in `grafana/dashboards/` is the
+    dashboard Grafana serves, under the identifier the file itself declares."""
+    served = grafana(f"/api/dashboards/uid/{dashboard['uid']}")
+    assert served["dashboard"]["title"] == dashboard["title"]
+    assert len(served["dashboard"]["panels"]) == len(dashboard["panels"])
+    assert served["meta"]["provisioned"] is True
+
+
+def test_grafana_runs_every_panel_through_the_datasource_compose_gave_it(
+    log, grafana, dashboard
+):
+    """The whole joint, end to end: the credentials `.env` holds reached Grafana, the
+    datasource file interpolated them, and each panel's query came back as data.
+
+    The panel queries are executed against Postgres directly by the test above this
+    section; what this adds is that Grafana is the one executing them, which is the only
+    way the interpolated password is proven to be the right one — a wrong one leaves a
+    dashboard that starts cleanly and shows nothing.
+
+    Under `-s` it prints what each panel came back holding, which is as close to reading
+    the dashboard as a terminal gets.
+    """
+    broken = []
+    print()
+    for title, ref, sql, shape in queries(dashboard):
+        answered = grafana(
+            "/api/ds/query",
+            {
+                "queries": [
+                    {
+                        "refId": ref,
+                        "datasource": {
+                            "type": "grafana-postgresql-datasource",
+                            "uid": dashboard["panels"][0]["datasource"]["uid"],
+                        },
+                        "format": shape,
+                        "rawQuery": True,
+                        "rawSql": sql,
+                    }
+                ],
+                "from": "now-90d",
+                "to": "now",
+            },
+        )
+        result = answered["results"][ref]
+        if result.get("status") != 200 or result.get("error"):
+            broken.append(f"{title} [{ref}]: {result.get('error', result)}")
+        elif not result.get("frames"):
+            broken.append(f"{title} [{ref}]: came back with no frame")
+        else:
+            [frame] = result["frames"]
+            values = frame["data"]["values"]
+            print(
+                f"  {len(values[0]) if values else 0:>3} rows  "
+                f"{'/'.join(field['name'] for field in frame['schema']['fields']):<34}"
+                f"{title} [{ref}]"
+            )
+    assert broken == []

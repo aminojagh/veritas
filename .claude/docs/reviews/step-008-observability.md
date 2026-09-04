@@ -630,3 +630,173 @@ because `GroundedAnswer.answered` already means the narrower thing — a refusal
 and is not answered — and the widget's local is `thumb`, the index Streamlit returns,
 leaving *verdict* to the prose where the Glossary uses it of both a Gate outcome and a
 Feedback.
+
+---
+
+## Sub-step 8.5 — The Grafana dashboard
+
+**Changed.** `grafana/` holds three provisioning files: the Question Log as a datasource,
+the provider that finds the dashboards, and `question-log.json` — seven panels, each one
+statement over 8.3's rows. `docker-compose.yml` gains Grafana, wired to the same `.env`
+credentials, serving the dashboard as its home page to a reader who signs in for nothing.
+`tests/test_observability.py` gains a third claim: the dashboard is a file, it carries the
+two charts the criterion names, and every query on it runs — first against the schema
+directly, then through Grafana itself.
+
+**Verified.**
+
+```
+$ docker compose up -d --wait && uv run pytest tests/test_observability.py
+collected 21 items
+tests/test_observability.py .....................                        [100%]
+============================== 21 passed in 2.72s ==============================
+
+$ docker compose down && uv run pytest tests/test_observability.py -q -rs
+SKIPPED [1] tests/test_observability.py:193: no Question Log to record to: the Question
+  Log at localhost:5432/veritas would not open: connection failed: … Connection refused
+  … twelve in all, one per row-claim test …
+SKIPPED [1] tests/test_observability.py:522: no Grafana at http://localhost:3000:
+  <urlopen error [Errno 111] Connection refused>
+7 passed, 14 skipped in 1.32s
+
+$ uv run pytest -q | tail -1                              # both services up again
+297 passed, 5 skipped in 114.31s (0:01:54)
+
+$ uv run python .claude/scripts/verify_framework.py | tail -1
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py | tail -1
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+**The page, opened.** Amino loaded `http://localhost:3000` on 2026-09-04 and the two
+images below are what it served — one column of seven panels, which is two screens.
+[DEBT-042](../debt-ledger.md#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered),
+opened by this Sub-step because no panel had been looked at, is **paid** by them: all
+seven draw, and the layer no test reaches — the panel `type`, its `options`, its
+`fieldConfig` — is the layer these are of.
+
+![The dashboard's first screen: questions over time by ending, Validation Gate rejections
+by Rejection Reason, metric-usage frequency](images/initial_dashboard_8.5_part1.png)
+
+![The dashboard's second screen: latency, cost by model, Feedback up against down, and
+endings without a number](images/initial_dashboard_8.5_part2.png)
+
+**They are the same forty questions the frames below count**, taken after the twenty of
+the third point below landed: the rejections panel holds the two bars those put there,
+metric usage names eight Certified Metrics, cost by model reads $0.0912, and Feedback is
+three each way. The page and the frame table can be read against each other line by line.
+
+**What the dashboard holds, 2026-09-04.** The committed test prints each panel's frame as
+Grafana returned it — its row count and the fields the panel is drawn from — which is the
+reproducible half of what the images show:
+
+```
+$ uv run pytest tests/test_observability.py -s -k through_the_datasource
+    6 rows  Time/answer/gate/generation/rewriteQuestions over time by ending [A]
+    2 rows  Rejection Reason/rejections       Validation Gate rejections by … [A]
+    8 rows  Certified Metric/answers          Metric-usage frequency [A]
+   40 rows  Time/waited                       Latency: what a person waited … [A]
+   40 rows  Time/in model calls               Latency: what a person waited … [B]
+    1 rows  model/cost                        Cost by model [A]
+    1 rows  up/down                           Feedback: up against down [A]
+    3 rows  ending/questions                  Endings without a number … [A]
+1 passed, 20 deselected in 2.29s
+```
+
+The traffic under it is forty questions asked through the App's own page against
+`gpt-5.4-mini` on 2026-09-03 and 2026-09-04, with six verdicts left through the widget —
+twenty-six answered, ten refused by the model, two asked back and two refused by the Gate.
+It cost about nine cents. **The traffic is the demo's data and not evidence**: it was
+driven by two throwaway scripts in `scratch/`, nothing in the repository reproduces it,
+and every claim about what the log holds is made by the committed tests above.
+
+**Debt.**
+[DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded)
+**closed `accepted`** on the route its own Trigger named — the five counting panels read
+`ended_by` and nothing else, so the gap is exactly the one it predicted and no wider.
+[DEBT-042](../debt-ledger.md#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered)
+opened and **paid** inside the Sub-step, on the second branch of its own Trigger.
+[DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)
+gains two instances found by the third point below, and no entry of its own: the shape is
+that entry's.
+
+**Extensions.** Two opened, both on Amino's ruling of 2026-09-04 and both `S`:
+[EXT-012](../extension-register.md#ext-012--the-dashboards-panels-read-the-dashboards-time-range)
+— no panel reads the dashboard's time range — and
+[EXT-013](../extension-register.md#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own)
+— Grafana reads the log with the App's own credentials and serves it to anyone. Points 2
+and 4 below are what they came from.
+
+**Sceptically.**
+
+1. **The images are one moment, and nothing holds them.** One person, one browser, the
+   traffic of that hour; no test asserts anything about how a panel *looks*, so a
+   `fieldConfig` edit that empties a panel still passes every check in the suite and the
+   next screenshot is the only thing that would catch it. That is the residue of DEBT-042
+   rather than the entry itself, which asked for the picture that is now here.
+2. **No panel reads the dashboard's time range** — the picker is hidden rather than left
+   showing a control that does nothing, and Amino's *"i can zoom into panels"* is right
+   about the two time-series panels: dragging across one narrows its **axis**, so the
+   picture zooms while the query stays over all of history, and the five counting panels
+   have no time axis to drag. It is filed as
+   [EXT-012](../extension-register.md#ext-012--the-dashboards-panels-read-the-dashboards-time-range),
+   which carries what adopting `$__timeFilter` costs. One correction to what I wrote
+   before that entry was worked out: the test that goes **through Grafana** would survive
+   the macro, because it posts to `/api/ds/query` with a `from` and a `to` and Grafana
+   expands it server-side; it is the direct-against-schema test that could not, since it
+   hands the string to psycopg. `test_no_panel_query_holds_a_macro` holds that line.
+3. **The rejections panel now holds two bars, and it took twenty questions to get them.**
+   `scratch/gate_rejection_hunt.py` — uncommitted, like the traffic script beside it —
+   asks twenty across five levers: arithmetic of the model's own, a route deep enough to
+   slip a join, a certified filter that is tempting to drop, a period on a date column the
+   metric does not key on, and an axis that has to be bucketed. Two were refused by the
+   Gate, on two different reasons: *"what is our average gross revenue per trade"* →
+   `shadow metric`, an `avg(...)` over the Gross Revenue expression that traces to
+   nothing; *"what was our net revenue by region and by instrument type in August 2026"* →
+   `uncertified route`, a `dim_instrument` join written for a second axis the statement
+   then failed to group by. They are the two bars in the first image. Five more were refused at generation and thirteen were
+   answered. **Two of those answers are the reason to read
+   [DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)
+   before the submission**: *"across every movement type"* was answered with the certified
+   `movement_type` filter still on, and *"by month in 2026"* was answered grouped by
+   `trade_date`, a day at a time. Both are the metric rather than the question, and the
+   Gate cannot see the difference.
+4. **Grafana reads the Question Log with the App's own Postgres credentials.** One set,
+   which is what makes `.env.example` enough for a fresh clone, and anonymous viewing is
+   on for the same reason — *"opens with nothing clicked"* — with the admin login in
+   `.env.example` for editing. Both are the
+   [Target State](../design/target-state.md#what-credential-free-means)'s *"Not obtained,
+   declared"* credentials, and both are wrong anywhere a second person can reach the page.
+   Filed as
+   [EXT-013](../extension-register.md#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own)
+   on Amino's ruling, against the same section's *"Cloud deployment is out of scope for
+   the slice regardless."*
+5. **The test reads `GRAFANA_*` from `.env` itself rather than through `veritas/`.**
+   Deliberate: nothing in the application talks to Grafana — the App writes rows, Grafana
+   reads them, and the two never meet — so putting a Grafana setting behind the
+   `QuestionLog` seam would be inventing a dependency to have a home for it.
+6. **Two panels are drawn from one bar's worth of data** — cost by model is one model and
+   Feedback is one pair. The shapes are right and the sample is a demo's. In particular
+   *"a cost nobody knows is not zero"* has no bar to show it: groq has never been asked a
+   question through the App, so the unpriced case is proven by
+   `test_an_unpriced_model_leaves_a_gap_in_the_cost_column_rather_than_a_zero` and is
+   invisible on the page. Amino ruled on 2026-09-04 that this is **neither debt nor an
+   extension** — an unpriced model is a thing of the demo's scope, and an extension is by
+   definition outside it — so nothing is filed and this sentence is the record.
+7. **Seven panels, and the criterion asks for five.** The two extra are the latency pair
+   and *"endings without a number"*, which is the same taxonomy as panel 1 totalled rather
+   than spread over time. I kept it because 8.3's split of the `no sql` ending is only
+   legible next to the others; it is the panel to drop if the page reads crowded.
+8. **`rewrite` sits under a panel titled for refusals.** The Glossary is explicit that a
+   Clarifying Question is *"Not a **refusal**"*, so the title says both and the panel
+   description says which is which — rather than the plan's *"refusals by reason across
+   every `EndedBy` member"*, which would have put a name on the bar that the Glossary
+   denies it.
+
+**Language.** None added, none proposed. The panel titles and the column aliases inside
+the statements are Glossary terms spelled as registered — `Validation Gate`,
+`Rejection Reason`, `Certified Metric`, `Clarifying Question`, `Question Log` — and
+`ending` is the word `EndedBy` already carries in `schema.sql`. The three files under
+`grafana/` are named for what they hold, and `question-log.json` is the dashboard's
+identifier as well as its filename, so the Grafana URL reads `/d/question-log/`.

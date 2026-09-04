@@ -1,11 +1,11 @@
-# The services Veritas runs beside the App. Postgres holds the Question Log; the App's
-# own container is Step 009's, and so is Grafana's.
+# The services Veritas runs beside the App. Postgres holds the Question Log and Grafana
+# charts it; the App's own container is Step 009's.
 #
 # Compose reads `.env` from this directory, and so does the App — one set of
 # credentials, so a reviewer who copied `.env.example` gets a server and an application
 # that agree without editing either.
 #
-#     docker compose up -d postgres
+#     docker compose up -d          # Postgres, then Grafana on http://localhost:3000
 #
 # Nothing in `tests/` starts or stops this server: the tests that record into it skip
 # when it is not up, and delete the rows they wrote when it is. The module docstring of
@@ -36,6 +36,38 @@ services:
       timeout: 3s
       retries: 10
 
+  grafana:
+    image: grafana/grafana:12.3.0
+    container_name: veritas-grafana
+    depends_on:
+      # Grafana provisions its datasource at start-up. Against a server still starting
+      # it would come up with a datasource that answers nothing until someone reloads.
+      postgres:
+        condition: service_healthy
+    environment:
+      # The datasource file interpolates these three from Grafana's own environment, so
+      # the charts read the server with the credentials that created it.
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      # The dashboard is what this Grafana is for, so it is the page the root URL
+      # serves and a reader signs in for nothing.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/question-log.json
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      # Read-only, both of them: the files in `grafana/` are the dashboard and the
+      # datasource, and a change made in the browser is a change no diff would show.
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+
 volumes:
   # Named, so `docker compose down` keeps the Question Log and `down -v` empties it.
   question-log:
+# Grafana gets no volume: its datasource, its dashboard and its login all come from
+# files and from `.env` on every start, so the only thing a volume would carry over is
+# state nobody set.
