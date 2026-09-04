@@ -19,7 +19,8 @@ attempted versus what shipped, which is where the Step Review gets its honesty.
 | [005](step-005-validation-gate.md) | Build the Validation Gate | 5 | done |
 | [006](step-006-retrieval-and-orchestrator.md) | Ask a question, get a Grounded Answer | 5 | done |
 | [007](step-007-evaluation.md) | Evaluation: measure Veritas over a Gold Question Set | 4 | done |
-| [008](step-008-observability.md) | Observability: record every question and chart it | 5 | active |
+| [008](step-008-observability.md) | Observability: record every question and chart it | 5 | done |
+| [009](step-009-containerization-and-readme.md) | Containerization and `README.md`: finish Veritas for submission | 5 | active |
 
 Statuses: `proposed` (written, not yet approved — no implementation may begin) ·
 `active` · `in review` · `done` · `abandoned` (with a note on why — an abandoned

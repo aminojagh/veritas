@@ -1,9 +1,9 @@
 # Step 008 — Observability: record every question and chart it
 
 **Status:** **done** — approved by Amino on 2026-09-03, by the commit that carries this
-plan and its two Term Proposals. All five Sub-steps are built: 8.1 (`2cf4170`), 8.2
-(`b75bdda`), 8.3 (`f9b7bef`) and 8.4 (`05e6b46`) are committed, and 8.5 is built and
-awaiting review. The dashboard is provisioned, every panel's query is tested, and the page
+plan and its two Term Proposals. All five Sub-steps are built and committed: 8.1
+(`2cf4170`), 8.2 (`b75bdda`), 8.3 (`f9b7bef`), 8.4 (`05e6b46`) and 8.5 (`f3b76f3`),
+the last approved on 2026-09-04. The dashboard is provisioned, every panel's query is tested, and the page
 has been opened and photographed — which paid
 [DEBT-042](../debt-ledger.md#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered)
 inside the Sub-step that opened it. Its verification is met as the plan wrote it.
