@@ -4,11 +4,12 @@ Three claims. The **grounding claim**: the prompt is built from retrieved entrie
 the identity asking, so a metric that was not retrieved publishes no expression to the
 model and no Warehouse table reaches the prompt except through an entry that names it.
 The **flow claim**: each of the five ways a question ends without a number comes back as
-a Grounded Answer saying which, and an answered one carries its SQL, its Lineage and the
-verdict it ran under — the Lineage naming what the statement used rather than what
-retrieval put in front of the model. The **contract claim**: a Grounded Answer cannot be built that
-says two things at once, or that carries a number without the statement and the verdict
-behind it.
+a Grounded Answer naming the step that ended it, and an answered one carries its SQL, its
+Lineage, the verdict it ran under and what it cost — the Lineage naming what the
+statement used rather than what retrieval put in front of the model. The **contract
+claim**: a Grounded Answer cannot be built that says two things at once, that carries a
+number without the statement and the verdict behind it, or that names an ending its own
+fields contradict.
 
 Every test here drives a scripted model, so the suite needs no key and no network. The
 one test that calls the configured provider spends real credit and runs only when
@@ -21,11 +22,12 @@ import re
 
 import pytest
 
-from veritas.llm import LIVE_VARIABLE
+from veritas.llm import LIVE_VARIABLE, ModelCall, Reply
 from veritas.orchestrator import (
     GROUNDED_FIELDS,
     PROMPT_FORMS,
     REWRITTEN_QUESTION,
+    EndedBy,
     GroundedAnswer,
     Lineage,
     Orchestrator,
@@ -39,6 +41,11 @@ from veritas.validation import ACCESS_AXIS, ANALYST, RejectionReason, Validation
 # A Warehouse identifier, as the corpus and a statement both spell one. Every table in
 # `veritas/warehouse/schema.sql` is `fct_` or `dim_` prefixed.
 TABLE = re.compile(r"\b(?:fct|dim)_[a-z_]+")
+
+# What a scripted model calls itself, so what the flow records of a call is checkable
+# without a provider. `stub` is priced by nothing, which is why a scripted question
+# costs `None` rather than 0.
+STUB_CALL = ModelCall("stub", "stub-model", prompt_tokens=1200, completion_tokens=90)
 
 # A question saying no Ambiguous Term, so the rewrite step costs no model call and the
 # only call in the flow is the generation one.
@@ -115,11 +122,11 @@ class ScriptedModel:
         ]
         self.calls: list[tuple[str, str, bool]] = []
 
-    def complete(self, system: str, user: str, json_object: bool = False) -> str:
+    def complete(self, system: str, user: str, json_object: bool = False) -> Reply:
         self.calls.append((system, user, json_object))
         if not self.replies:
             raise AssertionError(f"the model was called more times than scripted: {user!r}")
-        return self.replies.pop(0)
+        return Reply(self.replies.pop(0), STUB_CALL)
 
 
 def wrote(sql: str) -> dict[str, str]:
@@ -430,7 +437,66 @@ def test_a_question_no_metric_is_retrieved_for_costs_no_model_call(
     answer = orchestra.answer(UNAMBIGUOUS)
     assert not answer.answered
     assert "Certified Metric" in answer.refusal
+    assert answer.ended_by is EndedBy.RETRIEVAL
     assert orchestra.model.calls == []
+
+
+def test_the_two_refusals_with_no_statement_are_told_apart(
+    orchestrator, warehouse, gate, semantic
+):
+    """[DEBT-032](../.claude/docs/debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
+    paid where it is decided.
+
+    Nothing retrieved defining a Certified Metric and the model declining to write a
+    statement are one shape to a reader of the answer — a refusal, no SQL, no verdict —
+    and two different things to go and fix. Only the step that decided knows which, and
+    this is where it says so.
+    """
+
+    class NoMetrics:
+        def retrieve(self, question, strategy, top_k):
+            return [semantic.join_paths["trade_to_account"]]
+
+    nothing_retrieved = Orchestrator(
+        warehouse, model=ScriptedModel(), retriever=NoMetrics(), gate=gate
+    ).answer(UNAMBIGUOUS)
+    model_refused = orchestrator({"sql": None, "why": "no metric counts those"}).answer(
+        UNCOVERED
+    )
+    assert (nothing_retrieved.sql, model_refused.sql) == ("", "")
+    assert nothing_retrieved.ended_by is EndedBy.RETRIEVAL
+    assert model_refused.ended_by is EndedBy.GENERATION
+
+
+def test_every_ending_names_the_step_that_produced_it(orchestrator):
+    """What the Question Log records and the dashboard groups by, one member per way a
+    question can end."""
+    ended = {
+        EndedBy.REWRITE: orchestrator({"revenue": None}).answer("what was our revenue"),
+        EndedBy.GENERATION: orchestrator({"sql": None}).answer(UNCOVERED),
+        EndedBy.GATE: orchestrator(wrote(SHADOW)).answer(UNAMBIGUOUS),
+        EndedBy.ANSWER: orchestrator(wrote(CERTIFIED)).answer(UNAMBIGUOUS),
+    }
+    for ending, answer in ended.items():
+        assert answer.ended_by is ending, answer
+
+
+def test_an_answer_carries_the_calls_it_took_and_the_time_it_took(orchestrator):
+    """The Orchestrator measures and the App records: what a question cost travels back
+    with what it answered, so nothing has to ask a second time.
+
+    Two calls for a question that says an Ambiguous Term — resolving it, then writing
+    the statement — and one for a question that says none.
+    """
+    resolved = orchestrator({"revenue": "Net Revenue"}, wrote(CERTIFIED)).answer(
+        "what was our net revenue"
+    )
+    assert resolved.answered, resolved.refusal
+    assert resolved.calls == (STUB_CALL, STUB_CALL)
+    assert resolved.seconds > 0
+
+    unambiguous = orchestrator(wrote(CERTIFIED)).answer(UNAMBIGUOUS)
+    assert unambiguous.calls == (STUB_CALL,)
 
 
 # -- the contract claim ----------------------------------------------------------
@@ -439,19 +505,43 @@ def test_a_question_no_metric_is_retrieved_for_costs_no_model_call(
 def test_an_answer_cannot_both_refuse_and_ask_back():
     """A question gets one of the two."""
     with pytest.raises(ValueError, match="asks back"):
-        GroundedAnswer("q", refusal="no", clarifying_question="which?")
+        GroundedAnswer("q", EndedBy.REWRITE, refusal="no", clarifying_question="which?")
 
 
 def test_an_answered_question_carries_the_statement_that_answered_it():
     """*"Veritas never returns a bare number"*, as a construction error."""
     with pytest.raises(ValueError, match="bare number"):
-        GroundedAnswer("q", rows=((1,),))
+        GroundedAnswer("q", EndedBy.ANSWER, rows=((1,),))
 
 
 def test_an_answered_question_carries_the_verdict_it_ran_under():
     """A number with no allowing verdict behind it is a number past the Gate."""
     with pytest.raises(ValueError, match="Validation Gate outcome"):
-        GroundedAnswer("q", sql=CERTIFIED, rows=((1,),))
+        GroundedAnswer("q", EndedBy.ANSWER, sql=CERTIFIED, rows=((1,),))
+
+
+def test_an_ending_that_contradicts_the_answer_is_a_construction_error():
+    """`ended_by` is what a chart groups by, so it is held to what the fields show.
+
+    A refusal with no statement is the one case the fields cannot settle — the corpus
+    had nothing, or the model declined — and both members are accepted there. Everything
+    else has exactly one, and `provider` has none: a call that never came back produced
+    no Grounded Answer to carry it.
+    """
+    with pytest.raises(ValueError, match="'gate'"):
+        GroundedAnswer("q", EndedBy.GATE, refusal="nothing defines it")
+    with pytest.raises(ValueError, match="'provider'"):
+        GroundedAnswer("q", EndedBy.PROVIDER, refusal="the call failed")
+    for ending in (EndedBy.RETRIEVAL, EndedBy.GENERATION):
+        assert GroundedAnswer("q", ending, refusal="no").ended_by is ending
+
+
+def test_a_question_that_made_no_priced_call_costs_nothing_known():
+    """A cost missing one of its terms is a smaller number, not a less certain one, so
+    a chart is given a gap instead of an understatement."""
+    unpriced = GroundedAnswer("q", EndedBy.RETRIEVAL, refusal="no", calls=(STUB_CALL,))
+    assert unpriced.cost is None
+    assert GroundedAnswer("q", EndedBy.RETRIEVAL, refusal="no").cost == 0
 
 
 def test_lineage_reads_as_a_line_a_person_can_check(semantic):

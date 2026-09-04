@@ -128,7 +128,7 @@ KNOWN_NON_ABBREVIATIONS = {
     # Module-level constant names quoted in prose, e.g. "add its name to BUILDS".
     # EXEMPT is this file's own, and a review that sweeps the check scripts for
     # exemptions has to be able to name the one that is called that.
-    "BUILDS", "SEED", "EXEMPT",
+    "BUILDS", "SEED", "EXEMPT", "PRICES",
 }
 
 
@@ -151,7 +151,14 @@ def traded_universe_tokens() -> set[str]:
 
 
 def warehouse_sql_keywords() -> set[str]:
-    """Shouted keywords of the hand-authored SQL in `veritas/warehouse/`.
+    """Shouted keywords of the hand-authored `.sql` files under `veritas/`.
+
+    Named for the Warehouse because that is where the only such files were until
+    Sub-step 8.3 gave Observability a `schema.sql` of its own. The scan reads
+    `veritas/**/*.sql` rather than `veritas/warehouse/**/*.sql` for the same reason
+    it reads every build script rather than `schema.sql` alone: a derivation aimed
+    at one directory is one directory behind, and the alternative on the day a
+    second one appears is three DDL words typed into the remembered list below.
 
     Derived rather than remembered, for the reason the traded-universe tokens are.
     This group used to be a literal list, re-derived by hand from `schema.sql`
@@ -177,7 +184,7 @@ def warehouse_sql_keywords() -> set[str]:
     check_abbreviations() is `[A-Z]{2,6}`.
     """
     keywords: set[str] = set()
-    for path in sorted((REPO_ROOT / "veritas" / "warehouse").rglob("*.sql")):
+    for path in sorted((REPO_ROOT / "veritas").rglob("*.sql")):
         statements = "\n".join(
             line.split("--")[0] for line in path.read_text().splitlines()
         )

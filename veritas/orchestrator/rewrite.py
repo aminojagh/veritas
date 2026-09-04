@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cache
 
-from veritas.llm import LanguageModel, default_model, json_reply
+from veritas.llm import LanguageModel, ModelCall, default_model, json_reply
 from veritas.semantic import AmbiguousTerm, SemanticLayer, load_semantic_layer
 
 # The placeholder inside a registered term name. `how much does X have` is the one
@@ -64,12 +64,15 @@ class Rewrite:
     Metrics it resolved to, in the order the question says the terms.
     `clarifying_question` is the question Veritas asks back, and is `None` exactly when
     the question is ready to be retrieved for.
+    `calls` is what asking cost — empty for a question that said no Ambiguous Term,
+    because that one is resolved without a model.
     """
 
     question: str
     rewritten: str
     resolutions: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     clarifying_question: str | None = None
+    calls: tuple[ModelCall, ...] = ()
 
     @property
     def resolved(self) -> bool:
@@ -355,18 +358,22 @@ def rewrite(
         return Rewrite(question, question)
 
     model = default_model() if model is None else model
-    resolved = resolutions_in(
-        model.complete(
-            resolution_instruction(terms, question), question, json_object=True
-        ),
-        terms,
+    reply = model.complete(
+        resolution_instruction(terms, question), question, json_object=True
     )
+    resolved = resolutions_in(reply.text, terms)
     unresolved = [term for term in terms if term.name not in resolved]
     if unresolved:
         return Rewrite(
-            question, question, resolved, clarifying_question_for(unresolved, question)
+            question,
+            question,
+            resolved,
+            clarifying_question_for(unresolved, question),
+            (reply.call,),
         )
-    return Rewrite(question, rewritten_with(question, resolved, layer), resolved)
+    return Rewrite(
+        question, rewritten_with(question, resolved, layer), resolved, calls=(reply.call,)
+    )
 
 
 def _flat(text: str) -> str:

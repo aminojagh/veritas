@@ -26,7 +26,7 @@ import re
 
 import pytest
 
-from veritas.llm import LIVE_VARIABLE, LanguageModelError
+from veritas.llm import LIVE_VARIABLE, LanguageModelError, ModelCall, Reply
 from veritas.orchestrator import (
     DEFAULT_REWRITE_FORM,
     PLACEHOLDER,
@@ -41,6 +41,10 @@ from veritas.orchestrator import (
     said_as,
     spellings,
 )
+
+# What a stub model calls itself. A `Reply` names the call that produced it, because a
+# call that names no model is a Question Log row that cannot say what it cost.
+STUB_CALL = ModelCall("stub", "stub-model")
 
 # One question per registered Ambiguous Term, as a person would type it. Each says
 # exactly one term and does not say which meaning, which is the case Section D
@@ -96,15 +100,15 @@ class StubModel:
         self.reply = reply if isinstance(reply, str) else json.dumps(reply)
         self.calls: list[tuple[str, str, bool]] = []
 
-    def complete(self, system: str, user: str, json_object: bool = False) -> str:
+    def complete(self, system: str, user: str, json_object: bool = False) -> Reply:
         self.calls.append((system, user, json_object))
-        return self.reply
+        return Reply(self.reply, STUB_CALL)
 
 
 class UncalledModel:
     """A `LanguageModel` that fails the test if anything calls it."""
 
-    def complete(self, system: str, user: str, json_object: bool = False) -> str:
+    def complete(self, system: str, user: str, json_object: bool = False) -> Reply:
         raise AssertionError("the model was called for a question with no Ambiguous Term")
 
 

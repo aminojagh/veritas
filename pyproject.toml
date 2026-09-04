@@ -8,6 +8,7 @@ dependencies = [
     "fastembed>=0.8.0",
     "minsearch>=0.2.0",
     "openai>=3.6.0",
+    "psycopg[binary]>=3.3.5",
     "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
     "sqlglot>=30.15.0",

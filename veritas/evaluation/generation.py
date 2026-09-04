@@ -11,10 +11,11 @@ either tracks or does not.
 **The whole flow answers each question, not `generate` alone.** A Gold Question whose
 correct ending is a refusal or a Clarifying Question has no result set to compare, and
 what it claims is that Veritas ends that way — which is the Orchestrator's outcome
-rather than the generator's. So the unit scored is a `GroundedAnswer`, and `EndedBy`
-records which step produced it, because a question that scores zero because the
+rather than the generator's. So the unit scored is a `GroundedAnswer`, and the `EndedBy`
+it carries says which step produced it, because a question that scores zero because the
 Validation Gate refused a correct statement is not a generation failure and must not be
-read as one.
+read as one. That taxonomy is the Orchestrator's — this component reads it and no longer
+owns it, so what a sweep groups by and what Observability charts are one vocabulary.
 
 **One row per prompt per model.** The two settings this sweep varies are the
 [Zoomcamp criterion](../../.claude/docs/design/target-state.md#zoomcamp-criteria-map)'s
@@ -29,11 +30,11 @@ carries what one dated run of it printed.
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 
 from veritas.evaluation.gold import Expectation, GoldQuestion, same_result
 from veritas.llm import LanguageModel, LanguageModelError, json_reply
 from veritas.orchestrator import (
+    EndedBy,
     GroundedAnswer,
     Orchestrator,
     PromptForm,
@@ -66,42 +67,6 @@ correct statement has, is not.\
 """
 
 
-class EndedBy(StrEnum):
-    """Which step of the flow ended a question, read off the Grounded Answer it returned.
-
-    `flow.py`'s five ways a question ends without a number, plus the one that is not an
-    ending at all. Kept because a wrong answer and a refused-but-correct statement score
-    zero identically, and only this says which happened.
-
-    A `StrEnum` so the member survives into a table as the word a person reads.
-    """
-
-    ANSWER = "answer"
-    """A number came back, under a Validation Gate outcome that allowed it."""
-
-    REWRITE = "rewrite"
-    """The question said an Ambiguous Term and did not say which meaning, so Veritas
-    asked back."""
-
-    NO_SQL = "no sql"
-    """No statement was proposed. Two of `flow.py`'s five endings arrive here as one:
-    the model refused, and nothing retrieved defines a Certified Metric. A
-    `GroundedAnswer` carries both as a refusal with no SQL and no verdict, so nothing
-    short of reading the sentence tells them apart."""
-
-    GATE = "gate"
-    """The model wrote a statement and the Validation Gate refused it."""
-
-    ENGINE = "engine"
-    """The Gate allowed the statement and the Warehouse would not run it."""
-
-    PROVIDER = "provider"
-    """The call did not come back at all — no key, a timeout, a reply that is not JSON.
-    Not one of `flow.py`'s endings and deliberately kept apart from them: it says
-    nothing about the question, and a sweep carrying any of these has measured less than
-    it set out to."""
-
-
 def ended_as(answer: GroundedAnswer) -> Expectation:
     """Which of a Grounded Answer's three endings this one is.
 
@@ -113,17 +78,6 @@ def ended_as(answer: GroundedAnswer) -> Expectation:
     if answer.refusal:
         return Expectation.REFUSAL
     return Expectation.ANSWER
-
-
-def ended_by(answer: GroundedAnswer) -> EndedBy:
-    """Which step of the flow produced this Grounded Answer."""
-    if answer.clarifying_question is not None:
-        return EndedBy.REWRITE
-    if answer.answered:
-        return EndedBy.ANSWER
-    if not answer.sql:
-        return EndedBy.NO_SQL
-    return EndedBy.ENGINE if answer.outcome and answer.outcome.allowed else EndedBy.GATE
 
 
 def correctly_answered(gold: GoldQuestion, answer: GroundedAnswer) -> bool:
@@ -270,7 +224,7 @@ def judge(
 ) -> bool | None:
     """One judge's opinion of one answer, or `None` where it gave no usable one."""
     return judgement_of(
-        model.complete(JUDGE_RULES, judgement_text(gold, answer), json_object=True)
+        model.complete(JUDGE_RULES, judgement_text(gold, answer), json_object=True).text
     )
 
 
@@ -305,7 +259,7 @@ def score(
             verdict = judge(gold, answer, judge_model)
         except LanguageModelError:
             verdict = None
-    return Scored(gold, ended_by(answer), correct, answer, verdict)
+    return Scored(gold, answer.ended_by, correct, answer, verdict)
 
 
 def answerable_by_veritas(
@@ -372,13 +326,11 @@ def measure_generation(
 
 __all__ = [
     "JUDGE_RULES",
-    "EndedBy",
     "GenerationMeasures",
     "Scored",
     "answerable_by_veritas",
     "correctly_answered",
     "ended_as",
-    "ended_by",
     "judge",
     "judgement_of",
     "judgement_text",

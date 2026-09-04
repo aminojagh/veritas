@@ -8,9 +8,15 @@ Validation Gate outcome. **Never renders a bare number**"*, and `show` below is 
 sentence: the statement, the entries it was composed from and the verdict it ran under
 are laid out beneath every answer rather than folded away behind a control.
 
-`page` takes the Orchestrator it asks rather than reaching for one, so the same page a
-person loads is the page a test drives with a scripted model. Called with nothing it
-builds the real one, once per server process.
+`page` takes the Orchestrator it asks and the Question Log it records to rather than
+reaching for either, so the same page a person loads is the page a test drives with a
+scripted model and a doubled log. Called with nothing it builds both real ones, once per
+server process.
+
+**The App is the one caller that records.** The Orchestrator measures a question and
+returns what it took; writing that down is this side of the seam, so the Evaluation
+sweep drives the same flow a few hundred times and puts nothing on the dashboard —
+Observability is live traffic, and a sweep is not traffic.
 """
 
 import sys
@@ -31,11 +37,13 @@ from veritas.app.render import (
     lineage_lines,
     model_line,
     outcome_line,
+    recording_line,
     single_value,
     table,
     unit_line,
 )
 from veritas.llm import LanguageModelError
+from veritas.observability import QuestionLog, QuestionLogError, question_log
 from veritas.orchestrator import GroundedAnswer, Orchestrator
 from veritas.validation import ANALYST, AccessProfile
 from veritas.warehouse import WarehouseAdapter
@@ -60,6 +68,21 @@ def built() -> Orchestrator:
     every keystroke.
     """
     return Orchestrator(WarehouseAdapter())
+
+
+@st.cache_resource(show_spinner="Opening the Question Log…")
+def recording() -> tuple[QuestionLog | None, str]:
+    """The Question Log this server records to, and where it is — or nothing, and why.
+
+    Cached for the same reason the Orchestrator is: it holds a connection. An
+    installation with no server reaches this once and says so on every page load
+    afterwards, rather than retrying a connection per question in front of a person.
+    """
+    try:
+        log = question_log()
+    except QuestionLogError as unreachable:
+        return None, str(unreachable)
+    return log, str(log)
 
 
 def show(answer: GroundedAnswer) -> None:
@@ -107,12 +130,19 @@ def show(answer: GroundedAnswer) -> None:
 def page(
     orchestrator: Orchestrator | None = None,
     access_profile: AccessProfile = ANALYST,
+    log: QuestionLog | None = None,
 ) -> None:
-    """The whole page: who is asking, the question box, and the answer to the last
-    question asked."""
+    """The whole page: who is asking, the question box, the answer to the last question
+    asked, and the row that answer was recorded as.
+
+    `log` is taken the way `orchestrator` is, so a test drives the page against a double
+    and the server the page opens for itself is the one a person gets.
+    """
     st.set_page_config(page_title=TITLE, page_icon="⚖️")
     st.title(TITLE)
     st.caption(CAPTION)
+
+    recorder, where = (log, str(log)) if log is not None else recording()
 
     with st.sidebar:
         st.subheader("Asked as")
@@ -120,6 +150,8 @@ def page(
         st.caption(ENFORCEMENT_NOTE)
         st.subheader("Model")
         st.caption(model_line())
+        st.subheader("Question Log")
+        st.caption(recording_line(where, recorder is not None))
 
     with st.form("question"):
         question = st.text_input(PROMPT, placeholder=PLACEHOLDER)
@@ -139,6 +171,27 @@ def page(
         )
         return
     show(answer)
+    record(answer, access_profile, recorder)
+
+
+def record(
+    answer: GroundedAnswer,
+    access_profile: AccessProfile,
+    log: QuestionLog | None,
+) -> None:
+    """Put the question that was just answered in the Question Log.
+
+    **After the answer is on the page, and never instead of it.** A person asked a
+    question; whether Veritas managed to write it down is Veritas's problem, so a failed
+    write is a warning beside an answer rather than an error in place of one, and an
+    installation with no log at all says so in the sidebar and is otherwise silent.
+    """
+    if log is None:
+        return
+    try:
+        log.record(answer, access_profile)
+    except QuestionLogError as unrecorded:
+        st.warning(f"This answer was not recorded: {unrecorded}")
 
 
 if __name__ == "__main__":

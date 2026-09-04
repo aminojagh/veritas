@@ -10,16 +10,19 @@ and a third provider is
 [EXT-011](../../.claude/docs/extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam).
 Nothing outside this package names a provider, a model, a key or a message role.
 
-`LanguageModel` is the seam: a system instruction and a user message in, the text
-the model produced out. `ChatCompletions` is the one implementation that reaches a
-provider, and a caller that wants a different model passes its own.
+`LanguageModel` is the seam: a system instruction and a user message in, a `Reply`
+out — the text the model produced, and the `ModelCall` that produced it.
+`ChatCompletions` is the one implementation that reaches a provider, and a caller
+that wants a different model passes its own.
 """
 
 import json
 import os
 import re
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -82,6 +85,105 @@ TEMPERATURE = 0.0
 # One question at a time, in front of a person watching a browser tab.
 TIMEOUT_SECONDS = 30.0
 
+# Prices are quoted per million tokens, so a call's cost is its tokens over this.
+PER_TOKENS = Decimal(1_000_000)
+
+
+@dataclass(frozen=True, slots=True)
+class Price:
+    """What one model's tokens cost per million, and where the figure came from.
+
+    A price is neither a definition nor a measurement of Veritas: nothing in this
+    repository can refute it and nothing here can reproduce it, and it changes when a
+    vendor decides it does. So each row carries the date it was `read` and the `page`
+    it was read from, and a reader who needs to know whether a cost figure is current
+    checks the row rather than the code around it.
+    """
+
+    prompt: Decimal
+    completion: Decimal
+    read: str
+    page: str
+
+
+# The one page every row below was read from, and the day it was read.
+OPENAI_PRICING = "https://developers.openai.com/api/docs/pricing"
+OPENAI_PRICES_READ = "2026-09-03"
+
+# What a call costs, per provider and model. A model absent from this table is not
+# free — it is unpriced, and a call on it carries no cost rather than a cost of zero.
+#
+# The five OpenAI rows are the four candidates Sub-step 8.1 ranked plus the model they
+# replaced, all read on one day from one page. **groq is deliberately absent**: its
+# price is not on a page this project has read, and the free tier Veritas uses bills
+# none of it, so any figure here would be one of two wrong numbers.
+PRICES: dict[tuple[str, str], Price] = {
+    ("openai", "gpt-5.4-mini"): Price(
+        Decimal("0.75"), Decimal("4.50"), OPENAI_PRICES_READ, OPENAI_PRICING
+    ),
+    ("openai", "gpt-5.4-nano"): Price(
+        Decimal("0.20"), Decimal("1.25"), OPENAI_PRICES_READ, OPENAI_PRICING
+    ),
+    ("openai", "gpt-5-mini"): Price(
+        Decimal("0.25"), Decimal("2.00"), OPENAI_PRICES_READ, OPENAI_PRICING
+    ),
+    ("openai", "gpt-5.6-luna"): Price(
+        Decimal("0.20"), Decimal("1.20"), OPENAI_PRICES_READ, OPENAI_PRICING
+    ),
+    ("openai", "gpt-4o-mini"): Price(
+        Decimal("0.15"), Decimal("0.60"), OPENAI_PRICES_READ, OPENAI_PRICING
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ModelCall:
+    """One call to one model: who served it, how much text it read and wrote, and how
+    long it took.
+
+    What Observability records per model call, and what the Orchestrator hands it. It
+    carries no text: a Question Log row says what a question cost and how long it took,
+    and the prompt a model was shown is reproducible from the question and the corpus.
+
+    A provider that reports no usage leaves the tokens at zero, which is why `cost` is
+    `None` for an unpriced model rather than the zero those tokens would multiply out
+    to — a cost of nothing and a cost nobody knows are different things on a chart.
+    """
+
+    provider: str
+    model: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    seconds: float = 0.0
+
+    @property
+    def cost(self) -> Decimal | None:
+        """What this call cost, or `None` where the table does not price the model."""
+        price = PRICES.get((self.provider, self.model))
+        if price is None:
+            return None
+        return (
+            self.prompt_tokens * price.prompt + self.completion_tokens * price.completion
+        ) / PER_TOKENS
+
+
+@dataclass(frozen=True, slots=True)
+class Reply:
+    """What a model said, and the call that said it.
+
+    `complete` returns this rather than the text alone because every caller wants the
+    text and one caller — the Orchestrator, on behalf of the Question Log — wants what
+    the text cost. A call whose usage was thrown away at the seam cannot be costed
+    afterwards by anything.
+
+    `call` has no default, so a stub model naming itself is the cheapest thing it can
+    do and a stub model naming nothing is not available: an unattributed reply is a
+    Question Log row that says a model was asked and cannot say which.
+    """
+
+    text: str
+    call: ModelCall
+
 
 # A reply wrapped in a Markdown code fence. A provider asked for a JSON object mostly
 # returns one bare; an open model behind the same endpoint may fence it instead, and the
@@ -120,7 +222,9 @@ class LanguageModel(Protocol):
     caller that sets it still has to read what came back.
     """
 
-    def complete(self, system: str, user: str, json_object: bool = False) -> str: ...
+    def complete(
+        self, system: str, user: str, json_object: bool = False
+    ) -> Reply: ...
 
 
 class ChatCompletions:
@@ -142,12 +246,14 @@ class ChatCompletions:
         api_key: str = "",
         temperature: float = TEMPERATURE,
         timeout: float = TIMEOUT_SECONDS,
+        provider: str = DEFAULT_PROVIDER,
     ) -> None:
         from openai import OpenAI
 
         self.model = model
         self.base_url = base_url
         self.temperature = temperature
+        self.provider = provider
         self._client: OpenAI = OpenAI(
             api_key=api_key, base_url=base_url, timeout=timeout
         )
@@ -156,10 +262,18 @@ class ChatCompletions:
         """Model and endpoint, never the key."""
         return f"{type(self).__name__}({self.model!r} at {self.base_url!r})"
 
-    def complete(self, system: str, user: str, json_object: bool = False) -> str:
-        """The model's reply to one system instruction and one user message."""
+    def complete(self, system: str, user: str, json_object: bool = False) -> Reply:
+        """The model's reply to one system instruction and one user message, with what
+        the call read, wrote and took.
+
+        The clock is this side of the seam because the wall time a person waits is the
+        wall time the socket took, and a provider that reports no `usage` leaves the
+        tokens at zero — the field is optional in the API this speaks, and a reply with
+        no accounting on it is still a reply.
+        """
         from openai import OpenAIError
 
+        started = time.perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self.model,
@@ -172,11 +286,22 @@ class ChatCompletions:
             )
         except OpenAIError as error:
             raise LanguageModelError(f"{self!r} refused the call: {error}") from error
+        seconds = time.perf_counter() - started
 
         text = response.choices[0].message.content if response.choices else None
         if not text:
             raise LanguageModelError(f"{self!r} returned no text")
-        return text
+        usage = response.usage
+        return Reply(
+            text,
+            ModelCall(
+                provider=self.provider,
+                model=self.model,
+                prompt_tokens=usage.prompt_tokens if usage else 0,
+                completion_tokens=usage.completion_tokens if usage else 0,
+                seconds=seconds,
+            ),
+        )
 
 
 def model_for(provider: str, model: str | None = None) -> ChatCompletions:
@@ -208,6 +333,7 @@ def model_for(provider: str, model: str | None = None) -> ChatCompletions:
         model=model or chosen.default_model,
         base_url=chosen.base_url,
         api_key=key,
+        provider=chosen.name,
     )
 
 

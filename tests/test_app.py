@@ -1,18 +1,26 @@
 """What the App shows a person, and what it refuses to hide from them.
 
-Two claims. The **rendering claim**: a Grounded Answer becomes strings a person reads —
+Three claims. The **rendering claim**: a Grounded Answer becomes strings a person reads —
 values under the names the engine gave them, a single figure under the unit its
 Certified Metric is quoted in, a verdict that says which rules ran, and an identity that
 carries what its enforcement is worth. The **page claim**: every one
 of the four things a question can come back as reaches the page as itself, and none of
 them arrives without the statement, the Lineage and the Validation Gate outcome beside
 it — [`App`](../.claude/docs/glossary.md#a-the-system)'s *"never renders a bare
-number"*, as a test rather than as an intention.
+number"*, as a test rather than as an intention. The **recording claim**: the question a
+person just asked reaches the Question Log after it reaches the page, carrying the
+identity it was asked as — and a log that will not take it costs a warning rather than
+the answer.
 
 The page is driven through Streamlit's own `AppTest`, which runs the script and reports
 the elements it produced. Every run here answers with a prepared Grounded Answer, so
-the suite needs no key and no network; the one test that asks a real provider through
-the real flow runs only when `VERITAS_LIVE_MODEL` says so.
+the suite needs no key and no network, and the log is a double for every one of them.
+The two tests that ask a real provider through the real flow run only when
+`VERITAS_LIVE_MODEL` says so, and the second of those also needs a Postgres server —
+`docker compose up -d postgres`, which `tests/test_observability.py` describes the
+lifecycle of — because recording live traffic is the one claim a double cannot make. It
+skips when either the key or the server is absent. No other test in this file opens the
+Question Log this installation is configured for; an autouse fixture makes sure of it.
 """
 
 import os
@@ -31,12 +39,14 @@ from veritas.app import (
     labels,
     lineage_lines,
     outcome_line,
+    recording_line,
     single_value,
     table,
     unit_line,
 )
 from veritas.llm import LIVE_VARIABLE, LanguageModelError
-from veritas.orchestrator import GroundedAnswer, Lineage, Orchestrator
+from veritas.observability import PostgresQuestionLog, QuestionLogError
+from veritas.orchestrator import EndedBy, GroundedAnswer, Lineage, Orchestrator
 from veritas.validation import (
     ANALYST,
     RejectionReason,
@@ -118,6 +128,7 @@ def answered(allowed, lineage):
     """
     return GroundedAnswer(
         question=QUESTION,
+        ended_by=EndedBy.ANSWER,
         rewritten=QUESTION,
         sql=STATEMENT,
         columns=("slice", "answer"),
@@ -137,6 +148,7 @@ def figure(allowed, semantic):
     """
     return GroundedAnswer(
         question=FIGURE_QUESTION,
+        ended_by=EndedBy.ANSWER,
         rewritten=FIGURE_QUESTION,
         sql=FIGURE_STATEMENT,
         columns=("answer",),
@@ -151,8 +163,45 @@ def figure(allowed, semantic):
     )
 
 
-def driven(given=None):
-    """The App's page, answering with `given`.
+class Recorded:
+    """A Question Log that keeps what it was handed, or refuses to take it.
+
+    The double the page is driven against, so what the App writes and when is provable
+    without a server — and so that no test in this file can write into the Question Log
+    a person's own `.env` names.
+    """
+
+    WHERE = "localhost:5432/veritas"
+
+    def __init__(self, refusing: str = "") -> None:
+        self.rows: list[tuple[GroundedAnswer, object]] = []
+        self.refusing = refusing
+
+    def record(self, answer, access_profile):
+        if self.refusing:
+            raise QuestionLogError(self.refusing)
+        self.rows.append((answer, access_profile))
+        return len(self.rows)
+
+    def __str__(self) -> str:
+        return self.WHERE
+
+
+@pytest.fixture(autouse=True)
+def no_real_question_log(monkeypatch):
+    """Nothing here opens the Question Log this installation is configured for.
+
+    A page given no log builds one from `.env`, which on a machine with the compose file
+    up is a real server — and a test suite that wrote its questions into a person's own
+    Question Log would corrupt the only traffic the dashboard has.
+    """
+    from veritas.app import page as page_module
+
+    monkeypatch.setattr(page_module, "recording", lambda: (None, "no Question Log"))
+
+
+def driven(given=None, log=None):
+    """The App's page, answering with `given` and recording to `log`.
 
     Streamlit's `AppTest` runs the source of this function as the script, so it imports
     what it needs itself and takes everything else as an argument: a prepared Grounded
@@ -169,12 +218,17 @@ def driven(given=None):
                 raise given
             return given
 
-    page(orchestrator=given if isinstance(given, Orchestrator) else Asked())
+    page(
+        orchestrator=given if isinstance(given, Orchestrator) else Asked(),
+        log=log,
+    )
 
 
-def asked(given=None, question=QUESTION, timeout=30):
+def asked(given=None, question=QUESTION, timeout=30, log=None):
     """Load the page, type `question`, press Ask, and return what it rendered."""
-    page = AppTest.from_function(driven, kwargs={"given": given}, default_timeout=timeout)
+    page = AppTest.from_function(
+        driven, kwargs={"given": given, "log": log}, default_timeout=timeout
+    )
     page.run()
     if question:
         page.text_input[0].set_value(question)
@@ -231,8 +285,8 @@ def test_a_row_is_labelled_by_the_columns_it_came_back_under(answered):
 def test_two_columns_of_one_name_are_told_apart():
     """A statement may name two output columns the same thing, and neither may be
     dropped for it."""
-    twice = GroundedAnswer(question="q", sql=STATEMENT, columns=("answer", "answer"),
-                           rows=((1, 2),),
+    twice = GroundedAnswer(question="q", ended_by=EndedBy.ANSWER, sql=STATEMENT,
+                           columns=("answer", "answer"), rows=((1, 2),),
                            outcome=ValidationGateOutcome(allowed=True))
     assert labels(twice) == ["answer (0)", "answer (1)"]
     assert list(table(twice)) == ["answer (0)", "answer (1)"]
@@ -241,11 +295,12 @@ def test_two_columns_of_one_name_are_told_apart():
 def test_only_a_one_number_answer_is_shown_as_one(answered, allowed):
     """A breakdown is a table, and an empty result is neither."""
     assert single_value(answered) is None
-    one = GroundedAnswer(question="q", sql=STATEMENT, columns=("answer",),
-                         rows=((Decimal("67935.82"),),), outcome=allowed)
+    one = GroundedAnswer(question="q", ended_by=EndedBy.ANSWER, sql=STATEMENT,
+                         columns=("answer",), rows=((Decimal("67935.82"),),),
+                         outcome=allowed)
     assert single_value(one) == ("answer", "67,935.82")
-    empty = GroundedAnswer(question="q", sql=STATEMENT, columns=("answer",),
-                           outcome=allowed)
+    empty = GroundedAnswer(question="q", ended_by=EndedBy.ANSWER, sql=STATEMENT,
+                           columns=("answer",), outcome=allowed)
     assert single_value(empty) is None
 
 
@@ -356,6 +411,7 @@ def test_a_refusal_is_an_answer_and_says_which_rule_refused(rejected, lineage):
     the Validation Gate rather than reporting that nothing happened."""
     page = asked(GroundedAnswer(
         question=QUESTION,
+        ended_by=EndedBy.GATE,
         sql=STATEMENT,
         lineage=lineage,
         outcome=rejected,
@@ -372,6 +428,7 @@ def test_a_question_asked_back_is_shown_as_a_question(semantic):
     nothing about it looks like an answer."""
     page = asked(GroundedAnswer(
         question="what was our revenue",
+        ended_by=EndedBy.REWRITE,
         clarifying_question="Do you mean Gross Revenue or Net Revenue?",
     ), question="what was our revenue")
     assert page.warning[0].value == "Do you mean Gross Revenue or Net Revenue?"
@@ -386,6 +443,81 @@ def test_a_provider_that_cannot_be_reached_is_not_a_traceback():
     assert not page.exception
     assert "could not reach a model" in page.error[0].value
     assert "OPENAI_API_KEY" in page.error[0].value
+
+
+# -- the recording claim ---------------------------------------------------------
+
+
+def test_a_question_is_recorded_once_it_has_been_answered(answered):
+    """The App is the one caller that writes to the Question Log, and it writes the
+    answer a person was just shown — with the identity it was asked as, which the
+    Grounded Answer does not carry."""
+    log = Recorded()
+    page = asked(answered, log=log)
+    assert not page.exception
+    assert [(one.question, profile.role) for one, profile in log.rows] == [
+        (QUESTION, "analyst")
+    ]
+    assert log.rows[0][0] is answered
+
+
+def test_a_refusal_is_recorded_as_readily_as_an_answer(rejected, lineage):
+    """*"Every question a person asks"* — a refused one is traffic, and the ending is
+    what makes it a bar on a chart rather than a gap in one."""
+    log = Recorded()
+    page = asked(
+        GroundedAnswer(
+            question=QUESTION,
+            ended_by=EndedBy.GATE,
+            sql=STATEMENT,
+            lineage=lineage,
+            outcome=rejected,
+            refusal=rejected.explanation,
+        ),
+        log=log,
+    )
+    assert not page.exception and page.error
+    [(one, _)] = log.rows
+    assert one.ended_by is EndedBy.GATE
+
+
+def test_a_question_that_was_never_asked_is_never_recorded():
+    """A provider Veritas could not reach produced no Grounded Answer, so there is
+    nothing to record and the page says so instead."""
+    log = Recorded()
+    page = asked(LanguageModelError("no key for openai"), log=log)
+    assert "could not reach a model" in page.error[0].value
+    assert log.rows == []
+
+
+def test_a_log_that_will_not_take_the_row_does_not_take_the_answer_away(answered):
+    """A person asked a question; whether Veritas managed to write it down is Veritas's
+    problem. So a failed write is a warning beside the answer and never instead of it."""
+    page = asked(answered, log=Recorded(refusing="the server went away"))
+    assert not page.exception
+    assert page.dataframe[0].value["answer"].tolist() == ["412", "170", "61", "9"]
+    assert "was not recorded" in page.warning[0].value
+    assert "the server went away" in page.warning[0].value
+
+
+def test_the_page_says_whether_questions_are_being_recorded(answered):
+    """Said on the page rather than left to be discovered: an installation with no
+    Question Log answers exactly as well as one with it, and the only place the
+    difference shows is a dashboard nobody is looking at yet."""
+    assert recording_line(Recorded.WHERE, True) == f"recording to {Recorded.WHERE}"
+    assert recording_line("no POSTGRES_PASSWORD", False) == (
+        "not recording — no POSTGRES_PASSWORD"
+    )
+    assert f"recording to {Recorded.WHERE}" in shown(asked(answered, log=Recorded()))
+
+
+def test_a_page_with_no_question_log_says_so_and_records_nothing(answered):
+    """The installation the autouse fixture arranges: no server, and an App that
+    answers anyway."""
+    page = asked(answered)
+    assert not page.exception and not page.warning
+    assert "not recording — no Question Log" in shown(page)
+    assert page.dataframe
 
 
 def test_only_the_page_imports_streamlit(root):
@@ -424,3 +556,74 @@ def test_the_page_answers_a_real_question_end_to_end(warehouse, gate, retriever)
     assert page.code[0].value and page.success[0].value.startswith("allowed")
     print(f"\n  {page.metric[0].label if page.metric else ''} "
           f"{page.metric[0].value if page.metric else ''}\n  {page.code[0].value}")
+
+
+@pytest.mark.skipif(
+    not os.environ.get(LIVE_VARIABLE),
+    reason=f"spends a real key: set {LIVE_VARIABLE}=1 to run it",
+)
+def test_a_real_question_asked_on_the_page_becomes_a_row(warehouse, gate, retriever):
+    """The one claim no double can make: live traffic reaches the Question Log.
+
+    Both halves are real — the configured provider answers and Postgres takes the row —
+    so this needs a key **and** a server and skips without either. Two questions, so two
+    endings are recorded from one run: one answered, and one that says an Ambiguous Term
+    and is asked back. It deletes the rows it wrote, because a test that leaves traffic
+    behind is a test that changes what the dashboard says.
+    """
+    import psycopg
+
+    try:
+        opened = PostgresQuestionLog()
+    except QuestionLogError as unreachable:
+        pytest.skip(f"no Question Log to record to: {unreachable}")
+
+    class Watched:
+        """The real log, keeping the row identifiers it hands back."""
+
+        def __init__(self, log):
+            self.log = log
+            self.rows: list[int] = []
+
+        def record(self, answer, access_profile):
+            self.rows.append(self.log.record(answer, access_profile))
+            return self.rows[-1]
+
+        def __str__(self):
+            return str(self.log)
+
+    log = Watched(opened)
+    with opened:
+        for question in ("what was our gross revenue", "what was our revenue"):
+            page = asked(
+                Orchestrator(warehouse, retriever=retriever, gate=gate),
+                question=question,
+                timeout=120,
+                log=log,
+            )
+            assert not page.exception, shown(page)
+        assert f"recording to {opened}" in shown(page)
+        assert len(log.rows) == 2, "one row per question asked, whatever it came back as"
+
+        with psycopg.connect(opened.conninfo) as reading:
+            written = reading.execute(
+                "SELECT question_id, ended_by, row_count, "
+                "       round(seconds::numeric, 2), cost, "
+                "       (SELECT count(*) FROM lineage_entry e "
+                "         WHERE e.question_id = q.question_id), "
+                "       (SELECT count(*) FROM model_call c "
+                "         WHERE c.question_id = q.question_id), "
+                "       (SELECT round(sum(c.seconds)::numeric, 2) FROM model_call c "
+                "         WHERE c.question_id = q.question_id) "
+                "FROM question q WHERE question_id = ANY(%s) ORDER BY question_id",
+                (log.rows,),
+            ).fetchall()
+            print("\n  id  ended_by    rows  seconds  cost         lineage  calls  in calls")
+            for row in written:
+                print("  " + "  ".join(f"{value!s:<10}" for value in row))
+            reading.execute(
+                "DELETE FROM question WHERE question_id = ANY(%s)", (log.rows,)
+            )
+    endings = [row[1] for row in written]
+    assert endings == ["answer", "rewrite"], endings
+    assert all(row[6] >= 1 for row in written), "every question here calls a model"

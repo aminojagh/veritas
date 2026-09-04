@@ -176,9 +176,9 @@ def failures(rows: list[GenerationMeasures]) -> list[str]:
 
     A wrong answer and a correct statement the Validation Gate refused score zero
     identically, so a table of rates alone cannot say whether a low figure is the
-    generator's. This is what says. The sentence is printed because the step alone does
-    not distinguish the two refusals `EndedBy.NO_SQL` covers, and a run comparing one
-    prompt against another cannot be read without knowing which of them fired. A row that
+    generator's. This is what says. The sentence is printed because the step says which
+    of them refused and not what it said, and a run comparing one prompt against another
+    cannot be read from a count of refusals alone. A row that
     never reached a model prints what the provider said for the same reason: the step
     alone leaves a reader with a failed sweep and nothing to fix.
     """
@@ -187,7 +187,7 @@ def failures(rows: list[GenerationMeasures]) -> list[str]:
         lines.append(f"  {row.prompt_form} · {row.model}")
         for one in row.failed:
             lines.append(
-                f"    ended by {str(one.ended_by):<9} wanted "
+                f"    ended by {str(one.ended_by):<10} wanted "
                 f"{str(one.gold.expects):<19} {one.gold.name}"
             )
             if one.provider_error:

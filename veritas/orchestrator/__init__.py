@@ -7,7 +7,7 @@ Ambiguous Terms, and grounding a model in retrieved entries to compose SQL out o
 certified expressions; and `answer.py` is the Grounded Answer the whole flow returns.
 """
 
-from veritas.orchestrator.answer import GroundedAnswer, Lineage
+from veritas.orchestrator.answer import EndedBy, GroundedAnswer, Lineage
 from veritas.orchestrator.flow import Orchestrator
 from veritas.orchestrator.generate import (
     DEFAULT_PROMPT_FORM,
@@ -53,6 +53,7 @@ __all__ = [
     "GENERATION_RULES",
     "GENERATION_SHAPE",
     "GROUNDED_FIELDS",
+    "EndedBy",
     "Generated",
     "GroundedAnswer",
     "Lineage",

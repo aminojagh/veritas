@@ -291,7 +291,10 @@ is **opened** for the re-run the failed sweep owes.
    review, this one included. Nothing here is refuted, because the margins are wide;
    what is refuted is the reflex of treating one run as the number. Whether that is
    worth an entry is yours — I have not opened one, because the honest remedy is
-   repeated sampling and that costs the budget item 3 says is scarce.
+   repeated sampling and that costs the budget item 3 says is scarce. **Ruled 2026-09-04
+   by the approval recorded in 8.3 below: no entry.** What the point corrects is a habit
+   of reading, and it is recorded here where a later reader of a single-run table meets
+   it.
 5. **One prompt form ran the whole ranking.** The bar is on `rules`, the default; `shape`
    was in the table but never the criterion. `DEFAULT_PROMPT_FORM` stays `rules`, now
    backed by a margin rather than by 7.4's tie.
@@ -373,3 +376,156 @@ opened.
 under; `composed_from` and `certifying_paths` are process words. The
 [`Lineage`](../glossary.md#a-the-system) row is unamended: it always said *"which
 Semantic Entries … **produced** a Grounded Answer"*, and it was the code that disagreed.
+
+---
+
+## Sub-step 8.3 — Record every question a person asks
+
+**Changed.** `veritas/observability/` is the ninth component: `log.py` is the
+`QuestionLog` seam and the `QuestionLogError` every failure to record arrives as,
+`schema.sql` is three tables applied idempotently on connect, and `postgres.py` is the
+only module in the repository that imports `psycopg` — the shape
+[ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md) gave the Warehouse.
+`docker-compose.yml` creates the server from the same five `.env` variables the App
+connects with, so one set of credentials serves both and `.env.example` carries a
+generated password rather than a placeholder.
+
+Three seams moved to feed it. **The model seam's reply carries its usage**: `complete`
+returns a `Reply` — the text and the `ModelCall` that produced it — so a call can be
+costed at all; `PRICES` is five OpenAI rows read on 2026-09-03, each carrying that date
+and the page, and an unpriced model costs `None` rather than 0. **`EndedBy` moved to the
+Grounded Answer** and its `no sql` member split in two, which is
+[DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
+paid. **A Grounded Answer carries what it took** — `calls` and `seconds`, timed in
+`answer()` around a `_answered` that is the flow unchanged. The App records after it
+renders, says in the sidebar whether it is recording, and turns a failed write into a
+warning beside the answer.
+
+**Verified.**
+
+```
+$ docker compose up -d --wait postgres && \
+      uv run pytest tests/test_observability.py tests/test_app.py
+collected 37 items
+tests/test_observability.py ...........                                  [ 29%]
+tests/test_app.py ........................ss                             [100%]
+======================== 35 passed, 2 skipped in 12.40s ========================
+
+$ docker compose stop postgres && \
+      uv run pytest tests/test_observability.py tests/test_app.py -q -rs
+SKIPPED [1] tests/test_observability.py:182: no Question Log to record to: the Question
+  Log at localhost:5432/veritas would not open: connection failed: … Connection refused
+  … and seven more, one per row-claim test …
+SKIPPED [1] tests/test_app.py:538: spends a real key: set VERITAS_LIVE_MODEL=1 to run it
+SKIPPED [1] tests/test_app.py:561: spends a real key: set VERITAS_LIVE_MODEL=1 to run it
+27 passed, 10 skipped in 4.04s
+
+$ uv run pytest -q | tail -1                                # the server up again
+279 passed, 5 skipped in 351.14s (0:05:51)
+
+$ uv run python .claude/scripts/verify_framework.py | tail -1
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py | tail -1
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+Eight of the eleven Question Log tests need the server, and the two live tests in
+`tests/test_app.py` need a key as well — the second of them needs both. Each says which
+it is missing rather than failing. **Nothing in `tests/` starts or stops the container**:
+which tests need it, and what `docker compose down` and `down -v` each cost, is written
+in the module docstring of `tests/test_observability.py` and pointed at from
+`docker-compose.yml`.
+
+**Live traffic, 2026-09-03.** Recording real traffic is the one claim a double cannot
+make, so it is a committed test that needs a key **and** a server and skips without
+either. Two questions through the App's own page against `gpt-5.4-mini` and the built
+Warehouse, read back out of Postgres by a connection of the test's own, and deleted
+afterwards so a run does not change what the dashboard says:
+
+```
+$ VERITAS_LIVE_MODEL=1 uv run pytest tests/test_app.py -s -k becomes_a_row
+  id  ended_by    rows  seconds  cost         lineage  calls  in calls
+  77  answer      1     11.84    0.0027150    5        2      3.50
+  78  rewrite     None  0.86     0.00029625   0        1      0.86
+1 passed, 25 deselected in 17.34s
+```
+
+Row 77 is *"what was our gross revenue"* — answered, five Lineage entries, two model
+calls. Row 78 is *"what was our revenue"*, asked back after one call, with no statement
+and nothing in its Lineage. A third question, *"who is our biggest client"*, was asked
+the same way while the Sub-step was being built and recorded as `generation` — the
+**model** refusing, which under the old taxonomy shared a bar with a retrieval miss; it
+is not in the test because a question a capable model may one day answer is not a stable
+assertion.
+
+**Debt.**
+[DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
+**paid** on its own Trigger. Two opened, both foreseen by the plan:
+[DEBT-040](../debt-ledger.md#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves)
+— the price table is a page copied once, and groq is unpriced;
+[DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded)
+— a call that never came back is no Grounded Answer and therefore no row, against the
+Target State's *"every question"*.
+
+**Sceptically.**
+
+1. **`ended_by` is a field, not a derivation, and that is the whole design decision
+   here.** Four of the six endings are visible in the object; two are the same shape from
+   outside. I made the producer state it and `endings()` hold it against the fields,
+   rather than derive four and demand one — a value with two sources drifts. The price is
+   that every hand-built Grounded Answer in the suite now names its ending, which is
+   about thirty lines of test churn and the reason `GroundedAnswer(...)` gained a second
+   required argument.
+2. **A question's `seconds` is not the sum of its calls' seconds** — row 77 waited 11.84s
+   for 3.50s of model time, which is why the block above prints both. The rest is
+   retrieval, the Gate and the engine, and the first question in a process pays the
+   embedding model's warm-up. The column is what a person waited, which is the honest
+   thing to chart, but 8.5 must not label it *"model latency"*.
+3. **The Question Log stores no rows, only a row count.** A dashboard cannot show what an
+   answer was, only that there was one. Deliberate — the answer is reproducible from the
+   statement, and storing result sets makes the log a second copy of the Warehouse — but
+   it means Feedback in 8.4 attaches to a row whose number nobody can see again.
+4. **`reasons` is a `TEXT[]` on the question row rather than a fourth table.** The plan
+   says three tables and the Gate has never returned more than one reason; a chart
+   groups by `unnest(reasons)`. If a rule ever returns two, every chart still works and
+   every count is still right, so I do not think this is debt — but it is a shape chosen
+   for the plan's row list rather than for normalisation.
+5. **The tests write into the Question Log this installation is configured for** and
+   delete their own rows by id afterwards — which is why the ids above are in the
+   seventies on a log holding three rows. A separate test database would be cleaner and
+   needs a `CREATE DATABASE` path nothing else in the project has; `tests/test_app.py` is
+   protected differently, by an autouse fixture that stops any page in it opening a real
+   log at all.
+6. **I spent a key without being asked to**, for the live block above: five questions
+   across two runs, about a cent. The plan's verification does not require it, and I
+   judged that *"the App records live traffic"* is not provable against a double. It is a
+   committed gated test rather than a script, so the cost recurs only when someone opts
+   in — but the first spend was mine. Say if that was not mine to take.
+7. **I edited a frozen check script**, `check_language.py`, and it is the one call here
+   I would most like overruled if you disagree. It failed on `EXISTS`, `IF` and `TEXT`,
+   because `warehouse_sql_keywords()` derives the shouted SQL words a document may quote
+   from `veritas/warehouse/**/*.sql` and `veritas/observability/schema.sql` is a second
+   body of hand-authored SQL. I changed the scan to `veritas/**/*.sql` — one path — and
+   added `PRICES` to the list of module constants quoted in prose, beside `BUILDS` and
+   `SEED`. The alternative was typing three DDL keywords into the remembered list that
+   function's own docstring argues against, and the Delivery Mode freeze is about not
+   *growing* the apparatus rather than about letting a derivation go one directory stale.
+   Nothing new is checked; the same check reaches the file that moved.
+8. **The Python-environment row in Current State said "Seven declared dependencies" and
+   listed six**, having missed `streamlit` and `python-dotenv` in earlier Steps. It now
+   says ten and names them with the Sub-step each arrived in. Not this Sub-step's
+   staleness, but this Sub-step added the tenth.
+
+**Approved 2026-09-04, on all eight sceptical points and the two entries opened** —
+*"all changes and decisions inclduing the sceptical points and debt regsitration are
+approved"*. That rules the two points that asked for one: point 6, the key spent on the
+live block above, was mine to spend, and point 7's edit to the frozen `check_language.py`
+stands. It also rules the one question left open in 8.1 — see that section's fourth point.
+
+**Language.** None. `Question Log` and `Feedback` were registered with the plan on
+2026-09-03; `EndedBy`, `Reply` and `ModelCall` are process words the plan already ruled
+coin nothing. The two new members are named for the flow steps that produce them —
+`RETRIEVAL` and `GENERATION` — and the column names are the field names they carry:
+`role` is the Access Profile's, `reasons` the verdict's, `kind` and `version` the
+Semantic Entry's.

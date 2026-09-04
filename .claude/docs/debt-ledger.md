@@ -59,7 +59,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.2, 2026-09-01) |
 | [DEBT-030](#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) | The resolved meaning is appended to the question, and nothing has measured that against splicing it | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank — the same run as DEBT-027 — **🔴 fired** | **paid** (7.3, 2026-09-01) |
 | [DEBT-031](#debt-031--a-grounded-answer-carries-rows-with-no-column-names) | A Grounded Answer carries rows with no column names | S | Sub-step 6.5, where the App renders a breakdown — **🔴 fired** | **paid** (6.5, 2026-08-31) |
-| [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals | open |
+| [DEBT-032](#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by) | A refusal that is not the Gate's carries no reason a chart can group by | S | The Sub-step of Step 008 that charts refusals — **🔴 fired** | **paid** (8.3, 2026-09-03) |
 | [DEBT-033](#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it) | The generator's live evidence is five self-written questions, and four Certified Metrics never reach it | S | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-034](#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used) | Lineage records what the model was shown, not what the statement used | M | The Sub-step of Step 008 that logs Lineage or charts metric usage — **🔴 fired** | **paid** (8.2, 2026-09-03) |
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | L | The Sub-step of Step 007 that measures Execution Accuracy — **🔴 fired** | open |
@@ -67,8 +67,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | ~~S~~ M | 🔴 fired (8.1) — prose relabels the refusal, the honest fix crosses ADR-0001, and the generation sweep is the standing guard | **accepted** (8.1) |
 | [DEBT-038](#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | A capable model answers an ad-hoc row request instead of refusing it | S | Before the capstone is submitted | open |
 | [DEBT-039](#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished) | The published two-provider sweep failed its own runner and is not republished | S | The final documentation pass, a Sub-step that needs the published figures, or submission — whichever is first | open |
+| [DEBT-040](#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves) | The price table is a vendor's page copied once, and nothing notices when it moves | S | The final documentation pass, or the first cost figure quoted outside a review | open |
+| [DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded) | A question the provider never answered is not recorded | S | The Sub-step that charts refusals, or the first time a provider outage is invisible on the dashboard | open |
 
-**Open debt:** 14 · **Paid:** 21 · **Accepted:** 2 · **Moved:** 2
+**Open debt:** 15 · **Paid:** 22 · **Accepted:** 2 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2577,7 +2579,7 @@ generation rules lives in the rendering.
 
 ### DEBT-032 — A refusal that is not the Gate's carries no reason a chart can group by
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 8.3 (`.claude/docs/reviews/step-008-observability.md`)
 - **Opened:** Sub-step 6.4 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** S
 - **Location:** `veritas/orchestrator/answer.py` — `GroundedAnswer.refusal`, a sentence;
@@ -2620,6 +2622,23 @@ refusal and a Gate refusal from an Orchestrator one, because `clarifying_questio
 [Step 007 plan](plan/step-007-evaluation.md#one-route-decision-observability-moves-to-step-008)
 moved Observability to Step 008. The firing condition is unchanged.* If that Step charts
 only the Gate's reasons, this closes as *accepted* with that as the reason.
+
+**How it was paid, Sub-step 8.3 (2026-09-03).** `EndedBy` moved from
+`veritas/evaluation/` to the Grounded Answer it is read off, and its `no sql` member —
+which carried *"the model refused"* and *"nothing retrieved defines a Certified Metric"*
+as one bar — is now `RETRIEVAL` and `GENERATION`, decided in `flow.py` where the
+difference is known. The taxonomy is a **field** on the Grounded Answer rather than a
+derivation of it, because those two are the same shape from outside: a refusal, no
+statement, no verdict. `GroundedAnswer.endings()` holds what the producer said against
+what the fields show, so a wrong member is a construction error rather than a wrong bar.
+
+Two of the four refusals this entry names are now members; the other two are unchanged
+and were never this entry's to fix — the Gate's refusal is `RejectionReason`'s taxonomy
+already, and a model that *"wrote nothing readable"* raises `LanguageModelError` and
+produces no Grounded Answer, which is
+[DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded). The
+`ended_by` column is what Sub-step 8.5 groups *"questions over time by ending"* and
+*"refusals by reason across every `EndedBy` member"* by.
 
 ---
 
@@ -3143,3 +3162,101 @@ Monitoring or Evaluation figures — the same pass
 [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
 names — any Sub-step that needs the published two-provider generation table as evidence,
 or the capstone is submitted. Postpone until one of those fires.
+
+---
+
+### DEBT-040 — The price table is a vendor's page copied once, and nothing notices when it moves
+
+- **Status:** open
+- **Opened:** Sub-step 8.3 (`.claude/docs/reviews/step-008-observability.md`)
+- **Size:** S — one page re-read, five rows checked, one date changed
+- **Location:** `veritas/llm/model.py` — `PRICES`
+
+**What we did**
+
+Priced a model call by looking up `(provider, model)` in a table of five OpenAI rows read
+on **2026-09-03** from <https://developers.openai.com/api/docs/pricing> — the figures
+Sub-step 8.1 fetched to rank its candidates. Each row carries the date it was read and
+the page it was read from, which is the most a table in source can honestly do; nothing
+re-reads the page, and a price that changed the day after would produce cost figures that
+look exactly as authoritative as correct ones.
+
+**groq is deliberately unpriced**, so every groq call costs `None` rather than a number.
+That is the honest state — no page this project has read carries a figure for
+`openai/gpt-oss-120b`, and the free tier Veritas uses bills none of it — but it means the
+Question Log's cost column is blank for one of the two registered providers.
+
+**What we should have done**
+
+Nothing better is available inside this slice: a live price feed is a second vendor
+integration for a column on a demo dashboard, and there is no offline source. What is
+owed is a **re-read** before any cost figure leaves a Step Review, and a groq row if a
+page carrying one is found.
+
+**Why we deferred**
+
+The cost column exists to show that Observability records what a question costs, not to
+bill anyone. A figure that is three days stale demonstrates the mechanism exactly as well
+as a current one, and the row says when it was read.
+
+**Cost while unpaid**
+
+Every cost figure on the dashboard is *"what this would have cost at 2026-09-03 list
+prices"*, and nothing on the page says so. A reader who quotes one as a current cost is
+quoting a number no check re-derives — the failure mode
+[CLAUDE.md](../../CLAUDE.md)'s *"a measurement is dated evidence"* rule exists to prevent,
+here bounded to five rows that each carry their own date.
+
+**Trigger**
+
+Whichever comes first: the final documentation pass or README that quotes a cost figure —
+the same pass [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
+names — or a cost figure leaving a Step Review for anywhere else. Re-read the page, update
+the five rows and the date, and add groq if it is priced anywhere readable.
+
+---
+
+### DEBT-041 — A question the provider never answered is not recorded
+
+- **Status:** open
+- **Opened:** Sub-step 8.3 (`.claude/docs/reviews/step-008-observability.md`)
+- **Size:** S
+- **Location:** `veritas/app/page.py` — the `LanguageModelError` branch, which returns
+  before `record`
+
+**What we did**
+
+Recorded one row per Grounded Answer. A call that never came back produces none:
+`flow.py` raises `LanguageModelError` on purpose — *"this question cannot be answered"*
+and *"this installation cannot reach a model"* are different sentences — so the App shows
+the person why and returns before recording anything. `EndedBy.PROVIDER` exists, no
+Grounded Answer may carry it, and no Question Log row can hold it.
+
+**What we should have done**
+
+The [Target State](design/target-state.md) says Observability records *"every question"*,
+and a question that reached a provider and got nothing back **is** a question a person
+asked. It should be a row: the question, `provider` as the ending, the seconds it waited,
+what the provider said, and no statement, no verdict and no Lineage.
+
+**Why we deferred**
+
+The row shape is the Grounded Answer, and there is no Grounded Answer here. Widening
+`record` to take *either* an answer or an exception would put a second shape through the
+seam on the Sub-step that built it, for the one ending that says nothing about the
+question. Sub-step 8.1 measured what this hides — a model that rejects the pinned
+temperature answers **every** call with a 400 — so the case is real, but it is an
+installation fault and the App already says so on the page.
+
+**Cost while unpaid**
+
+An outage is invisible on the dashboard. *"Questions over time by ending"* undercounts by
+exactly the questions that failed, so a provider that is down looks like an afternoon when
+nobody asked anything, which is the opposite reading. The App tells the person in front of
+it and no one else.
+
+**Trigger**
+
+**The Sub-step that charts refusals** — 8.5 — or the first time a provider outage has to be
+explained from the dashboard. If 8.5's charts read the ending alone and the gap is
+acceptable there, this closes as *accepted* with that as the reason.

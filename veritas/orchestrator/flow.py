@@ -11,7 +11,9 @@ searches, `generate.py` grounds and asks, `veritas.validation` judges, and
 question said an Ambiguous Term and did not say which meaning; nothing retrieved defines
 a metric; the model refused; the Validation Gate refused; the engine refused. A caller
 reads which from the Grounded Answer rather than from an exception, because four of the
-five are Veritas working correctly.
+five are Veritas working correctly. Each is an `EndedBy` member the branch below names,
+and the two that look alike from outside — a refusal with no statement is either of the
+middle two — are told apart here, where the difference is known.
 
 **A provider that will not answer is the sixth way and is deliberately not one of
 them.** A missing key, a timeout or a reply that is not JSON raises `LanguageModelError`
@@ -20,9 +22,11 @@ reach a model"* are different sentences and only the first is about the question
 """
 
 from collections.abc import Mapping
+from dataclasses import replace
+from time import perf_counter
 
-from veritas.llm import LanguageModel
-from veritas.orchestrator.answer import GroundedAnswer, Lineage
+from veritas.llm import LanguageModel, ModelCall
+from veritas.orchestrator.answer import EndedBy, GroundedAnswer, Lineage
 from veritas.orchestrator.generate import (
     DEFAULT_PROMPT_FORM,
     PromptForm,
@@ -115,19 +119,35 @@ class Orchestrator:
     def answer(
         self, question: str, access_profile: AccessProfile = ANALYST
     ) -> GroundedAnswer:
-        """Run one question through the flow, and say what came of it.
+        """Run one question through the flow, and say what came of it and what it took.
 
         The Access Profile is an argument for the reason it is one on
         `ValidationGate.judge`: it is the identity a **question** is asked as, so one
         Orchestrator serves many identities. There is no default identity beyond the one
         Access Profile this slice declares.
+
+        The clock is here rather than in each branch because what a person waited is one
+        measurement whichever way the question ended, and a Grounded Answer that has to
+        be timed by its caller is one every caller times differently.
         """
+        started = perf_counter()
+        answered = self._answered(question, access_profile)
+        return replace(answered, seconds=perf_counter() - started)
+
+    def _answered(
+        self, question: str, access_profile: AccessProfile
+    ) -> GroundedAnswer:
+        """The flow itself: the six endings, and the model calls each one has made by
+        the time it is reached."""
         resolved = rewrite(question, self.model, self.gate.semantic)
+        calls: tuple[ModelCall, ...] = resolved.calls
         if not resolved.resolved:
             return GroundedAnswer(
                 question=question,
+                ended_by=EndedBy.REWRITE,
                 rewritten=resolved.rewritten,
                 clarifying_question=resolved.clarifying_question,
+                calls=calls,
             )
 
         entries = self.grounded_entries(resolved.rewritten)
@@ -135,32 +155,39 @@ class Orchestrator:
         if not any(isinstance(entry, MetricDefinition) for entry in entries):
             return GroundedAnswer(
                 question=question,
+                ended_by=EndedBy.RETRIEVAL,
                 rewritten=resolved.rewritten,
                 lineage=terms,
                 refusal="nothing retrieved for this question defines a Certified "
                         "Metric, and Veritas answers only with those",
+                calls=calls,
             )
 
         written = generate(
             resolved.rewritten, entries, access_profile, self.model, self.prompt_form
         )
+        calls += written.calls
         if not written.sql:
             return GroundedAnswer(
                 question=question,
+                ended_by=EndedBy.GENERATION,
                 rewritten=resolved.rewritten,
                 lineage=terms,
                 refusal=written.refusal,
+                calls=calls,
             )
 
         outcome = self.gate.judge(written.sql, access_profile)
         if not outcome.allowed:
             return GroundedAnswer(
                 question=question,
+                ended_by=EndedBy.GATE,
                 rewritten=resolved.rewritten,
                 sql=written.sql,
                 lineage=terms,
                 outcome=outcome,
                 refusal=outcome.explanation,
+                calls=calls,
             )
 
         lineage = self.lineage_of(resolved.resolutions, outcome)
@@ -169,21 +196,25 @@ class Orchestrator:
         except WarehouseError as refused:
             return GroundedAnswer(
                 question=question,
+                ended_by=EndedBy.ENGINE,
                 rewritten=resolved.rewritten,
                 sql=written.sql,
                 lineage=lineage,
                 outcome=outcome,
                 refusal=f"the Validation Gate allowed this statement and the engine "
                         f"would not run it: {refused}",
+                calls=calls,
             )
         return GroundedAnswer(
             question=question,
+            ended_by=EndedBy.ANSWER,
             rewritten=resolved.rewritten,
             sql=written.sql,
             columns=columns,
             rows=tuple(rows),
             lineage=lineage,
             outcome=outcome,
+            calls=calls,
         )
 
     def lineage_of(

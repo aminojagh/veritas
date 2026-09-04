@@ -5,13 +5,15 @@ these run with no key and no network. What they cannot prove is that a real
 provider answers a real question well — that is
 [DEBT-028](../.claude/docs/debt-ledger.md#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server)
 — but everything between `complete()` and the JSON on the socket is exercised
-here: the messages, the model name, the temperature, the JSON-object request, and
-the three ways a call comes back with nothing to read.
+here: the messages, the model name, the temperature, the JSON-object request, the
+three ways a call comes back with nothing to read, and what the reply says the call
+cost.
 """
 
 import json
 import os
 import threading
+from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -19,10 +21,12 @@ import pytest
 from veritas.llm import (
     DEFAULT_PROVIDER,
     MODEL_VARIABLE,
+    PRICES,
     PROVIDER_VARIABLE,
     PROVIDERS,
     ChatCompletions,
     LanguageModelError,
+    ModelCall,
     default_model,
     model_for,
     registered_models,
@@ -30,8 +34,12 @@ from veritas.llm import (
 from veritas.orchestrator import rewrite
 
 
-def completion(text: str) -> dict:
-    """One Chat Completions response carrying `text`."""
+def completion(text: str, usage: dict | None = None) -> dict:
+    """One Chat Completions response carrying `text`, and what it reports having cost.
+
+    `usage` is optional in the API this speaks, so it is optional here: a reply with no
+    accounting on it is a reply a caller still has to be able to read.
+    """
     return {
         "id": "stub",
         "object": "chat.completion",
@@ -44,6 +52,7 @@ def completion(text: str) -> dict:
                 "finish_reason": "stop",
             }
         ],
+        **({"usage": usage} if usage else {}),
     }
 
 
@@ -89,7 +98,7 @@ class StubEndpoint:
 def test_the_call_carries_the_two_messages_the_model_name_and_the_temperature():
     """The seam's two arguments become the two roles the API takes."""
     with StubEndpoint(completion("hello")) as provider:
-        assert provider.model().complete("be terse", "who are you") == "hello"
+        assert provider.model().complete("be terse", "who are you").text == "hello"
     [sent] = provider.requests
     assert sent["model"] == "stub-model"
     assert sent["temperature"] == 0.0
@@ -125,6 +134,55 @@ def test_a_reply_with_no_text_raises_rather_than_returns_nothing(reply):
     with StubEndpoint(reply) as provider:
         with pytest.raises(LanguageModelError, match="returned no text"):
             provider.model().complete("system", "user")
+
+
+def test_a_reply_carries_what_the_call_read_wrote_and_took():
+    """What the Question Log records per model call, measured where the call is made.
+
+    A caller that was handed the text alone could not cost the call afterwards, and the
+    wall time a person waited is the time this socket took.
+    """
+    usage = {"prompt_tokens": 1200, "completion_tokens": 90, "total_tokens": 1290}
+    with StubEndpoint(completion("hello", usage)) as provider:
+        reply = provider.model().complete("be terse", "who are you")
+    assert reply.text == "hello"
+    assert (reply.call.prompt_tokens, reply.call.completion_tokens) == (1200, 90)
+    assert reply.call.model == "stub-model" and reply.call.provider == DEFAULT_PROVIDER
+    assert reply.call.seconds > 0
+
+
+def test_a_provider_that_reports_no_usage_is_still_a_reply():
+    """`usage` is optional in the API Veritas speaks, and a missing count is zero
+    tokens rather than a failed call."""
+    with StubEndpoint(completion("hello")) as provider:
+        reply = provider.model().complete("be terse", "who are you")
+    assert reply.text == "hello"
+    assert (reply.call.prompt_tokens, reply.call.completion_tokens) == (0, 0)
+
+
+def test_a_call_costs_its_tokens_times_the_price_of_the_model_that_served_it():
+    """A million tokens in at $0.75 and a million out at $4.50 is $5.25, and the
+    arithmetic is exact because a price is a decimal and not a float."""
+    priced = ModelCall("openai", "gpt-5.4-mini", 1_000_000, 1_000_000)
+    assert priced.cost == Decimal("5.25")
+    assert ModelCall("openai", "gpt-5.4-mini", 1200, 90).cost == Decimal("0.001305")
+
+
+def test_an_unpriced_model_costs_nothing_known_rather_than_nothing():
+    """The registry serves a model this table does not price, and a chart must show a
+    gap there rather than a zero — the two are different claims about a call."""
+    unpriced = PROVIDERS["groq"]
+    assert (unpriced.name, unpriced.default_model) not in PRICES
+    assert ModelCall(unpriced.name, unpriced.default_model, 900, 40).cost is None
+
+
+def test_every_price_says_when_it_was_read_and_where_from():
+    """A price is neither a definition nor a measurement of Veritas: nothing here can
+    reproduce it and a vendor can change it, so each row carries its own provenance."""
+    for (provider, model), price in PRICES.items():
+        where = f"{provider} {model}"
+        assert price.read.startswith("20") and price.page.startswith("https://"), where
+        assert price.prompt > 0 and price.completion > 0, where
 
 
 def test_the_key_never_reaches_the_representation():

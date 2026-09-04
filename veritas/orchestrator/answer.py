@@ -17,12 +17,64 @@ contract.
 back as a Grounded Answer too — carrying the refusal, or the question Veritas asks back
 — because the alternative is a caller that has to tell a return value from an
 exception to know whether it was answered.
+
+**`EndedBy` is here for the same reason `Lineage` is.** It was
+`veritas/evaluation/`'s, where a sweep needed to tell a wrong answer from a correct
+statement the Gate refused; Observability needs the same word to group a chart by, and a
+taxonomy owned by the component that scores answers is a taxonomy the component that
+records them has to copy. It moved here, and splitting its coarsest member is
+[DEBT-032](../../.claude/docs/debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
+paid.
 """
 
 from dataclasses import dataclass, field
+from decimal import Decimal
+from enum import StrEnum
 
+from veritas.llm import ModelCall
 from veritas.semantic import SemanticEntry
 from veritas.validation import ValidationGateOutcome
+
+
+class EndedBy(StrEnum):
+    """Which step of the flow ended a question.
+
+    `flow.py`'s five ways a question ends without a number, the one that is not an
+    ending at all, and the answer itself. A closed taxonomy rather than a sentence,
+    because *"refusals by reason"* is a chart and prose is not a bar:
+    [ADR-0003](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md)
+    argued that for the Validation Gate's own reasons, and it applies here the moment
+    anything groups by it.
+
+    A `StrEnum` so the member survives into a table, a Postgres row and a Grafana
+    filter as the word a person reads.
+    """
+
+    ANSWER = "answer"
+    """A number came back, under a Validation Gate outcome that allowed it."""
+
+    REWRITE = "rewrite"
+    """The question said an Ambiguous Term and did not say which meaning, so Veritas
+    asked back."""
+
+    RETRIEVAL = "retrieval"
+    """Nothing retrieved for the question defines a Certified Metric."""
+
+    GENERATION = "generation"
+    """The model was shown entries that define one and refused to write a statement."""
+
+    GATE = "gate"
+    """The model wrote a statement and the Validation Gate refused it."""
+
+    ENGINE = "engine"
+    """The Gate allowed the statement and the Warehouse would not run it."""
+
+    PROVIDER = "provider"
+    """The call did not come back at all — no key, a timeout, a reply that is not JSON.
+    Not one of `flow.py`'s endings and deliberately kept apart from them: it says
+    nothing about the question, and it is the one member no Grounded Answer carries,
+    because there is none. A sweep scores it as a row of its own; Observability records
+    no row for it at all."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,15 +128,29 @@ class GroundedAnswer:
     Warehouse holds no rows for returns nothing and has still been answered, which is
     why `answered` reads the refusal and not the rows.
 
-    The four checks below are the contract rather than caution. A Grounded Answer that
+    **`calls` and `seconds` are what the question cost to answer**, and they are on the
+    answer because the Orchestrator measures and Observability records: what `answer()`
+    returns carries the measures, so nothing has to ask the Orchestrator a second
+    question to find out what the first one took.
+
+    **`ended_by` is stated, not inferred.** Four of the six endings are visible in the
+    fields — a question asked back, a number, a statement the Gate refused, a statement
+    the engine refused — and two are not: a refusal with no statement is either the
+    corpus having nothing that defines a Certified Metric or the model declining to
+    write one, and only the step that decided knows which. So the producer says, and
+    the fifth check below holds what it said against what the object shows.
+
+    The five checks are the contract rather than caution. A Grounded Answer that
     both refuses and asks back says two different things about one question; one that
     answers without SQL is the bare number the Glossary says Veritas never returns; one
     that answers under a verdict that is not an allowing verdict is a number that
-    reached a person past the Validation Gate; and one whose names do not label its
-    values is a table whose headings belong to a different query.
+    reached a person past the Validation Gate; one whose names do not label its
+    values is a table whose headings belong to a different query; and one whose ending
+    contradicts its own fields is a chart bar that counts the wrong questions.
     """
 
     question: str
+    ended_by: EndedBy
     rewritten: str = ""
     sql: str = ""
     columns: tuple[str, ...] = ()
@@ -93,6 +159,8 @@ class GroundedAnswer:
     outcome: ValidationGateOutcome | None = None
     refusal: str = ""
     clarifying_question: str | None = None
+    calls: tuple[ModelCall, ...] = ()
+    seconds: float = 0.0
 
     def __post_init__(self) -> None:
         if self.refusal and self.clarifying_question is not None:
@@ -116,8 +184,42 @@ class GroundedAnswer:
                 f"and these {len(self.columns)} names do not label "
                 f"{[len(row) for row in self.rows]}"
             )
+        if self.ended_by not in self.endings():
+            raise ValueError(
+                f"this answer says it ended by '{self.ended_by}' and its own fields "
+                f"say {' or '.join(f"'{one}'" for one in self.endings())}"
+            )
 
     @property
     def answered(self) -> bool:
         """Whether a number came back, as opposed to a refusal or a question."""
         return not self.refusal and self.clarifying_question is None
+
+    def endings(self) -> tuple[EndedBy, ...]:
+        """The endings these fields are consistent with — one, or the two a refusal
+        with no statement cannot be told apart by.
+
+        The whole of what a Grounded Answer can say about how it ended, which is why
+        `ended_by` is a field: everything below returns one member except the case
+        DEBT-032 splits, and that case is the reason the field exists.
+        """
+        if self.clarifying_question is not None:
+            return (EndedBy.REWRITE,)
+        if self.answered:
+            return (EndedBy.ANSWER,)
+        if not self.sql:
+            return (EndedBy.RETRIEVAL, EndedBy.GENERATION)
+        allowed = self.outcome is not None and self.outcome.allowed
+        return (EndedBy.ENGINE,) if allowed else (EndedBy.GATE,)
+
+    @property
+    def cost(self) -> Decimal | None:
+        """What answering this question cost, or `None` where any call was unpriced.
+
+        `None` rather than a partial sum, because a total missing one of its terms is a
+        smaller number and not a less certain one, and a cost chart reading it would
+        under-report rather than abstain. A question that made no model call at all
+        cost nothing, which is a total and not a gap.
+        """
+        costs = [call.cost for call in self.calls]
+        return None if None in costs else sum(costs, Decimal(0))

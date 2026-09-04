@@ -12,8 +12,9 @@ and [DEBT-030](../.claude/docs/debt-ledger.md#debt-030--the-resolved-meaning-is-
 were opened about are both varied, over the same questions and the same relevant sets.
 
 **Generation — three more.** The **ending claim**: which of a Grounded Answer's three
-endings came back, and which step of the flow produced it, are both read off the answer
-rather than guessed at. The **accuracy claim**: a question is right when it ends the way
+endings came back is read off the answer, and which step of the flow produced it is the
+`EndedBy` the answer already carries — one taxonomy, the Orchestrator's, rather than a
+copy kept here. The **accuracy claim**: a question is right when it ends the way
 the set says and, where that ending is a number, returns the gold result — and a
 question whose own gold statement the Validation Gate refuses is nobody's generation
 failure and is left out. The **judge claim**: the judge is shown the statements and
@@ -33,14 +34,12 @@ from decimal import Decimal
 import pytest
 
 from veritas.evaluation import (
-    EndedBy,
     Expectation,
     GenerationMeasures,
     Scored,
     answerable_by_veritas,
     correctly_answered,
     ended_as,
-    ended_by,
     gold_resolutions,
     judgement_of,
     judgement_text,
@@ -50,17 +49,20 @@ from veritas.evaluation import (
     measures_of,
     reciprocal_rank,
     relevant_entries,
+    score,
     scored,
     searchable_relevant_set,
     searched_as,
 )
 from veritas.evaluation.__main__ import failures, generation_table
 from veritas.evaluation.generation import JUDGE_RULES
-from veritas.llm import LanguageModelError
+from veritas.llm import LanguageModelError, ModelCall, Reply
 from veritas.orchestrator import (
     PROMPT_FORMS,
     RESOLUTION_RULES,
+    EndedBy,
     GroundedAnswer,
+    Orchestrator,
     PromptForm,
     RewriteForm,
     ambiguous_terms_in,
@@ -75,6 +77,9 @@ from veritas.validation import ANALYST, ValidationGate
 # one that scores the last are told apart.
 RANKED = ["revenue", "Net Revenue", "by trade date", "Gross Revenue", "by region"]
 RELEVANT = {"Net Revenue", "Gross Revenue"}
+
+# What a stub model calls itself, so a reply names the call that produced it.
+STUB_CALL = ModelCall("stub", "stub-model")
 
 
 @pytest.fixture(scope="module")
@@ -260,13 +265,14 @@ class GoldenModel:
                 else {"sql": None, "why": "no entry below computes this"}
             )
 
-    def complete(self, system: str, user: str, json_object: bool = False) -> str:
+    def complete(self, system: str, user: str, json_object: bool = False) -> Reply:
         self.calls.append((system, user))
         if system.startswith(RESOLUTION_RULES):
-            return self._for(self.resolved, user)
+            return Reply(self._for(self.resolved, user), STUB_CALL)
         if system.startswith(JUDGE_RULES):
-            return json.dumps({} if self.verdict is None else {"correct": self.verdict})
-        return self._for(self.written, user)
+            verdict = {} if self.verdict is None else {"correct": self.verdict}
+            return Reply(json.dumps(verdict), STUB_CALL)
+        return Reply(self._for(self.written, user), STUB_CALL)
 
     @staticmethod
     def _for(replies: dict[str, str], user: str) -> str:
@@ -299,38 +305,39 @@ def test_which_of_the_three_endings_came_back_is_read_off_the_answer(allowing):
     """The same three words a Gold Question is written with, so the two are comparable."""
     sql, outcome = allowing
     assert ended_as(
-        GroundedAnswer(question="q", clarifying_question="which?")
+        GroundedAnswer(question="q", ended_by=EndedBy.REWRITE, clarifying_question="which?")
     ) is Expectation.CLARIFYING_QUESTION
-    assert ended_as(GroundedAnswer(question="q", refusal="no")) is Expectation.REFUSAL
+    assert ended_as(GroundedAnswer(question="q", ended_by=EndedBy.GENERATION, refusal="no")) is Expectation.REFUSAL
     assert ended_as(
-        GroundedAnswer(question="q", sql=sql, columns=("answer",), outcome=outcome)
+        GroundedAnswer(
+            question="q", ended_by=EndedBy.ANSWER, sql=sql,
+            columns=("answer",), outcome=outcome,
+        )
     ) is Expectation.ANSWER
 
 
-def test_which_step_ended_the_question_is_read_off_the_answer(allowing, gate):
-    """Five of `flow.py`'s endings, each from the Grounded Answer shape it produces.
+def test_a_scored_question_carries_the_ending_the_answer_named(
+    scorable, warehouse, gate, retriever
+):
+    """One taxonomy, owned by the Orchestrator and read here.
 
-    The Gate's and the engine's differ only in whether the verdict allowed the statement
-    that produced no number, which is the distinction this pins.
+    A sweep and a dashboard grouping by two copies of `EndedBy` would report the same run
+    as two different pictures, which is why this component no longer owns one — and
+    `PROVIDER` is the only member it adds, for the row that has no Grounded Answer to
+    read an ending off at all.
     """
-    sql, outcome = allowing
-    refused = gate.judge(f"SELECT count(*) * 2 AS answer FROM ({sql})", ANALYST)
-    assert not refused.allowed
-    endings = {
-        EndedBy.REWRITE: GroundedAnswer(question="q", clarifying_question="which?"),
-        EndedBy.NO_SQL: GroundedAnswer(question="q", refusal="nothing defines it"),
-        EndedBy.GATE: GroundedAnswer(
-            question="q", sql=sql, outcome=refused, refusal=refused.explanation
+    one = next(item for item in scorable if item.answerable)
+    judged = score(
+        one,
+        Orchestrator(
+            warehouse,
+            model=GoldenModel(scorable, gate),
+            retriever=retriever,
+            gate=gate,
         ),
-        EndedBy.ENGINE: GroundedAnswer(
-            question="q", sql=sql, outcome=outcome, refusal="the engine would not run it"
-        ),
-        EndedBy.ANSWER: GroundedAnswer(
-            question="q", sql=sql, columns=("answer",), outcome=outcome
-        ),
-    }
-    for step, answer in endings.items():
-        assert ended_by(answer) is step, step
+    )
+    assert judged.answer is not None
+    assert judged.ended_by is judged.answer.ended_by is EndedBy.ANSWER
 
 
 # -- the accuracy claim ----------------------------------------------------------
@@ -341,14 +348,15 @@ def test_a_question_is_right_only_when_it_ends_as_the_set_says(gold, allowing):
     the number is, which is the whole reason a refusal is a Gold Question at all."""
     sql, outcome = allowing
     answered = GroundedAnswer(
-        question="q", sql=sql, columns=("answer",), outcome=outcome
+        question="q", ended_by=EndedBy.ANSWER, sql=sql, columns=("answer",),
+        outcome=outcome,
     )
     refused = 0
     for one in gold:
         if one.expects is Expectation.REFUSAL:
             refused += 1
             assert not correctly_answered(one, answered)
-            assert correctly_answered(one, GroundedAnswer(question="q", refusal="no"))
+            assert correctly_answered(one, GroundedAnswer(question="q", ended_by=EndedBy.GENERATION, refusal="no"))
     assert refused, "no Gold Question expects a refusal — this check proved nothing"
 
 
@@ -366,8 +374,8 @@ def test_an_answered_question_is_right_only_when_its_result_is_the_gold_result(
 
     def came_back(returned):
         return GroundedAnswer(
-            question=one.question, sql=one.sql, columns=columns,
-            rows=tuple(returned), outcome=outcome,
+            question=one.question, ended_by=EndedBy.ANSWER, sql=one.sql,
+            columns=columns, rows=tuple(returned), outcome=outcome,
         )
 
     assert correctly_answered(one, came_back(rows))
@@ -472,7 +480,7 @@ def test_a_question_that_never_reached_a_model_says_what_the_provider_said(
     step name alone reports as twenty-three unanswered questions.
     """
     class Unreachable:
-        def complete(self, system: str, user: str, json_object: bool = False) -> str:
+        def complete(self, system: str, user: str, json_object: bool = False) -> Reply:
             raise LanguageModelError("temperature 0.0 is not supported by this model")
 
     rows = measure_generation(
@@ -515,7 +523,8 @@ def test_the_judge_is_shown_the_statements_and_never_the_two_result_sets(
     said = judgement_text(
         one,
         GroundedAnswer(
-            question=one.question, sql=one.sql, columns=columns, rows=tuple(rows),
+            question=one.question, ended_by=EndedBy.ANSWER, sql=one.sql,
+            columns=columns, rows=tuple(rows),
             outcome=gate.judge(one.sql, ANALYST),
         ),
     )
@@ -531,14 +540,14 @@ def test_what_the_judge_is_shown_of_a_question_that_was_not_answered(gold):
     judge is shown — beside the ending the set calls correct, and no statement, because
     there is none to show."""
     refused = next(one for one in gold if one.expects is Expectation.REFUSAL)
-    said = judgement_text(refused, GroundedAnswer(question="q", refusal="no entry does"))
+    said = judgement_text(refused, GroundedAnswer(question="q", ended_by=EndedBy.GENERATION, refusal="no entry does"))
     assert "no entry does" in said and str(Expectation.REFUSAL) in said
 
     asking = next(
         one for one in gold if one.expects is Expectation.CLARIFYING_QUESTION
     )
     said = judgement_text(
-        asking, GroundedAnswer(question="q", clarifying_question="which?")
+        asking, GroundedAnswer(question="q", ended_by=EndedBy.REWRITE, clarifying_question="which?")
     )
     assert "which?" in said and str(Expectation.CLARIFYING_QUESTION) in said
 

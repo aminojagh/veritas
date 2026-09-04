@@ -156,3 +156,13 @@ def model_line() -> str:
         return default_model().model
     except LanguageModelError as unreachable:
         return str(unreachable)
+
+
+def recording_line(where: str, recording: bool) -> str:
+    """Whether questions are being recorded and where, or why they are not.
+
+    Said on the page rather than left to be discovered, because an installation with no
+    Question Log answers questions exactly as well as one with a Question Log, and the
+    only place the difference shows is a dashboard nobody is looking at yet.
+    """
+    return f"recording to {where}" if recording else f"not recording — {where}"

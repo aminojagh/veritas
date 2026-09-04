@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
 
-from veritas.llm import LanguageModel, default_model, json_reply
+from veritas.llm import LanguageModel, ModelCall, default_model, json_reply
 from veritas.semantic import (
     AmbiguousTerm,
     DimensionDefinition,
@@ -186,11 +186,14 @@ class Generated:
 
     Exactly one of the two is set. `sql` is a proposal and nothing more — it has not
     been near the Validation Gate — and `refusal` is the model saying the entries it was
-    shown cannot answer what was asked.
+    shown cannot answer what was asked. `calls` is what asking cost, which is always
+    one call: unlike the rewrite step, this one has no path that answers without a
+    model.
     """
 
     sql: str = ""
     refusal: str = ""
+    calls: tuple[ModelCall, ...] = ()
 
 
 def field_text(value: object) -> str:
@@ -382,19 +385,19 @@ def generate(
     unanswerable, and the two must not arrive at a caller as the same thing.
     """
     model = default_model() if model is None else model
-    reply = json_reply(
-        model.complete(
-            generation_instruction(entries, access_profile, form),
-            question,
-            json_object=True,
-        )
+    reply = model.complete(
+        generation_instruction(entries, access_profile, form),
+        question,
+        json_object=True,
     )
-    sql = reply.get("sql")
+    written = json_reply(reply.text)
+    sql = written.get("sql")
     if isinstance(sql, str) and sql.strip():
-        return Generated(sql=sql.strip())
-    why = reply.get("why")
+        return Generated(sql=sql.strip(), calls=(reply.call,))
+    why = written.get("why")
     return Generated(
         refusal=" ".join(why.split())
         if isinstance(why, str) and why.strip()
-        else "the model wrote no statement and gave no reason"
+        else "the model wrote no statement and gave no reason",
+        calls=(reply.call,),
     )

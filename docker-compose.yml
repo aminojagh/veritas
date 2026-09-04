@@ -1,0 +1,41 @@
+# The services Veritas runs beside the App. Postgres holds the Question Log; the App's
+# own container is Step 009's, and so is Grafana's.
+#
+# Compose reads `.env` from this directory, and so does the App — one set of
+# credentials, so a reviewer who copied `.env.example` gets a server and an application
+# that agree without editing either.
+#
+#     docker compose up -d postgres
+#
+# Nothing in `tests/` starts or stops this server: the tests that record into it skip
+# when it is not up, and delete the rows they wrote when it is. The module docstring of
+# `tests/test_observability.py` says which those are and what `down` and `down -v` cost.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: veritas-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # The App connects over the published port, so `POSTGRES_PORT` is the one value
+      # both sides read: change it here and the App follows.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # The whole directory rather than `data/` under it: from Postgres 18 the image
+      # keeps its data in a major-version subdirectory, and a volume mounted one level
+      # down leaves the server refusing to start on an "unused mount/volume".
+      - question-log:/var/lib/postgresql
+    healthcheck:
+      # `docker compose up` returns before Postgres is ready to answer, and a first
+      # question asked in that window would be answered and not recorded.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  # Named, so `docker compose down` keeps the Question Log and `down -v` empties it.
+  question-log:
