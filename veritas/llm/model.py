@@ -1,8 +1,9 @@
 """The one boundary through which Veritas calls a Large Language Model.
 
 Veritas supports two providers and no others — OpenAI, which the Large Language
-Model Zoomcamp already asks a grader for, and Groq, whose free tier supplies the
-second model the evaluation criterion needs. Both speak the OpenAI Chat
+Model Zoomcamp already asks a grader for, and Groq, a second registered provider
+whose free tier costs a reader nothing and which no published figure depends on.
+Both speak the OpenAI Chat
 Completions API, so `PROVIDERS` is a two-row registry and one client serves both;
 the decision, its alternatives and its costs are
 [ADR-0005](../../.claude/docs/adr/0005-one-openai-compatible-endpoint-for-every-provider.md),
@@ -84,6 +85,14 @@ TEMPERATURE = 0.0
 
 # One question at a time, in front of a person watching a browser tab.
 TIMEOUT_SECONDS = 30.0
+
+# How many times a refused call is tried again. A free tier meters tokens per minute
+# and answers a call over that meter with a 429 saying how long to wait; the client
+# waits that long and asks again, and this is how many times it may. The number is
+# above the two the library defaults to because the caller that meets the meter is the
+# Evaluation sweep, which asks a few hundred questions as fast as they come back: a
+# call it drops is a question its published table then scores as one no model answered.
+MAX_RETRIES = 8
 
 # Prices are quoted per million tokens, so a call's cost is its tokens over this.
 PER_TOKENS = Decimal(1_000_000)
@@ -247,6 +256,7 @@ class ChatCompletions:
         temperature: float = TEMPERATURE,
         timeout: float = TIMEOUT_SECONDS,
         provider: str = DEFAULT_PROVIDER,
+        max_retries: int = MAX_RETRIES,
     ) -> None:
         from openai import OpenAI
 
@@ -255,7 +265,10 @@ class ChatCompletions:
         self.temperature = temperature
         self.provider = provider
         self._client: OpenAI = OpenAI(
-            api_key=api_key, base_url=base_url, timeout=timeout
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
         )
 
     def __repr__(self) -> str:
@@ -347,31 +360,43 @@ def default_model() -> ChatCompletions:
 
 
 def registered_models(
-    providers: Sequence[str] | None = None, model: str | None = None
+    providers: Sequence[str] | None = None, models: Sequence[str] | None = None
 ) -> dict[str, ChatCompletions]:
-    """One client per supported provider, each on that provider's own default model.
+    """One client per model a sweep runs, keyed by the provider and the model that name
+    it — `"openai gpt-5.4-mini"`.
 
-    What a comparison across models is run over, keyed by provider name — the whole of
-    `PROVIDERS` rather than a list written somewhere else, so a third provider reaches
-    an evaluation by being registered here and not by being named twice.
+    Unnarrowed, that is every supported provider on its own default model: the whole of
+    `PROVIDERS` rather than a list written somewhere else, so a provider reaches an
+    evaluation by being registered here and not by being named twice.
 
-    `providers` narrows that to a named subset and `model` replaces the model the one
-    named serves, which is what a sweep ranking one provider's models against each other
-    runs over: it costs that provider alone. Neither widens what is supported — an
-    unregistered name raises through `model_for` exactly as it does anywhere else.
+    `providers` narrows that to a named subset, and `models` replaces the model the one
+    named serves with **as many of its models as are asked for** — which is what a sweep
+    comparing one provider's models against each other runs over, and it costs that
+    provider alone. Neither widens what is supported: an unregistered provider raises
+    through `model_for` exactly as it does anywhere else.
+
+    The key carries the provider because two providers can serve models of the same
+    name, and a table of rows that cannot say which endpoint answered is a comparison
+    of nothing.
 
     Raises `LanguageModelError` for the first provider with no key, because a sweep that
-    quietly dropped an arm would publish a comparison it never made, and for a model
+    quietly dropped an arm would publish a comparison it never made, and for models
     asked of more than one provider, because a model name belongs to the provider that
     serves it.
     """
     chosen = tuple(PROVIDERS if providers is None else providers)
-    if model is not None and len(chosen) != 1:
+    if models and len(chosen) != 1:
         raise LanguageModelError(
-            f"{model!r} is one provider's name for one of its models, so it can be "
+            f"{', '.join(map(repr, models))} name one provider's models, so they can be "
             f"asked of one provider and not of {len(chosen)}"
         )
-    return {name: model_for(name, model) for name in chosen}
+    wanted = (
+        [(chosen[0], model) for model in models]
+        if models
+        else [(name, None) for name in chosen]
+    )
+    built = [(name, model_for(name, model)) for name, model in wanted]
+    return {f"{name} {client.model}": client for name, client in built}
 
 
 def json_reply(reply: str) -> dict[str, object]:

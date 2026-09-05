@@ -66,12 +66,12 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice — **🔴 fired** | **paid** (7.4, 2026-09-02) |
 | [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | ~~S~~ M | 🔴 fired (8.1) — prose relabels the refusal, the honest fix crosses ADR-0001, and the generation sweep is the standing guard | **accepted** (8.1) |
 | [DEBT-038](#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | A capable model answers an ad-hoc row request instead of refusing it | S | Before the capstone is submitted | open |
-| [DEBT-039](#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished) | The published two-provider sweep failed its own runner and is not republished | S | The final documentation pass, a Sub-step that needs the published figures, or submission — whichever is first | open |
+| [DEBT-039](#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished) | The published two-provider sweep failed its own runner and is not republished | S | 🔴 fired (9.2) — the final documentation pass reached it | **accepted** (9.2, 2026-09-05) — the criterion it protected does not exist, and the table that does exist passes |
 | [DEBT-040](#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves) | The price table is a vendor's page copied once, and nothing notices when it moves | S | The final documentation pass, or the first cost figure quoted outside a review | open |
 | [DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded) | A question the provider never answered is not recorded | S | 🔴 fired (8.5) — the charts read the ending alone, and the gap is the one the entry predicted | **accepted** (8.5) |
 | [DEBT-042](#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered) | No panel of the dashboard has been seen rendered | S | Before the capstone is submitted, or the first time the dashboard is opened — **🔴 fired** | **paid** (8.5, 2026-09-04) |
 
-**Open debt:** 13 · **Paid:** 24 · **Accepted:** 3 · **Moved:** 2
+**Open debt:** 12 · **Paid:** 24 · **Accepted:** 4 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -3138,10 +3138,14 @@ README states the limitation. Re-measured by every generation sweep.
 
 ### DEBT-039 — The published two-provider sweep failed its own runner and is not republished
 
-- **Status:** open
+- **Status:** **accepted** (Sub-step 9.2, 2026-09-05) — **attempted twice**, 2026-09-03
+  and 2026-09-05, each time failing the runner on a different one of Groq's two limits,
+  and then closed without a third attempt because the criterion it was protecting turned
+  out not to exist. **See [How this closed](#how-this-closed) at the end of the entry.**
 - **Opened:** Sub-step 8.1 (`.claude/docs/reviews/step-008-observability.md`)
 - **Size:** S — one command, once, on a day Groq's budget is unspent, and the table
-  pasted into the Sub-step review that runs it
+  pasted into the Sub-step review that runs it. **The 2026-09-05 attempt proved that
+  description incomplete**: an unspent daily budget is necessary and was not sufficient.
 
 **What we did**
 
@@ -3154,6 +3158,15 @@ questions that got through before the cap, not of questions answered. The run pr
 `FAIL`, and the
 [8.1 review](reviews/step-008-observability.md#sub-step-81--choose-the-openai-default-model-by-measurement)
 carries it as such.
+
+**The second attempt, 2026-09-05, corrected the diagnosis above.** The free tier meters
+**twice** — the 200,000 per day this entry names, and 8,000 per minute it did not — and
+only the first resets overnight. So a day with an unspent budget is not enough, and
+Sub-step 9.2 failed the runner again on 2 of Groq's 46 questions. The client now waits
+out a meter rather than dropping the call: `veritas/llm/model.py` carries `MAX_RETRIES`,
+above the `openai` library's default of two. The run, the two failures in the provider's
+own words, and the test that fails at the old default are in the
+[9.2 review](reviews/step-009-containerization-and-readme.md#sub-step-92--republish-the-two-provider-generation-sweep).
 
 **What we should have done**
 
@@ -3171,6 +3184,12 @@ rehearsal. Groq's cap means the full two-provider sweep runs at most about twice
 so the re-run is booked against a budget reset rather than spent now on a Sub-step that
 does not need it.
 
+**Still deferred after 2026-09-05, and now by arithmetic rather than by choice.** One
+sweep spends most of a day's 200,000 tokens, so the day a sweep fails is a day it cannot
+be run again — the third attempt is booked for the morning of **2026-09-06**, the next
+reset, with the retry fix in place. The Step 009 plan's *"a `FAIL` books the next
+morning"* is the route, and it is taken.
+
 **Cost while unpaid**
 
 The *"≥2 models"* criterion has no valid published table — the only one is labelled
@@ -3185,6 +3204,34 @@ Monitoring or Evaluation figures — the same pass
 [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
 names — any Sub-step that needs the published two-provider generation table as evidence,
 or the capstone is submitted. Postpone until one of those fires.
+
+**Fired 2026-09-05**, on the first of those: Sub-step 9.2 is the documentation pass.
+
+#### How this closed
+
+**`accepted`, and the cost was dissolved rather than paid.** The remedy above — one more
+two-provider run — was never taken. What the entry was protecting is the Zoomcamp
+*"≥2 models"* row, and on 2026-09-05 that row was found to be the project's own invention:
+the published rubric's LLM-evaluation criterion reads *"2 points: Multiple approaches are
+evaluated, and the best one is used"*, and its 1-point row gives its own example of an
+approach — *"Only one approach (e.g., one prompt) is evaluated"*. No second model, no
+second provider. So the **cost this entry names cannot be incurred**: there is no
+criterion whose published table is missing.
+
+Amino ruled the same day that the published table becomes the **(model, prompt) grid over
+OpenAI** and that Groq is demoted from a measured alternative to a second registered
+provider. That grid ran and **passed its own runner** — six rows, three models against two
+prompts, the shipped combination the joint best of the six. The
+[9.2 review](reviews/step-009-containerization-and-readme.md#sub-step-92--publish-the-generation-grid-over-openai-and-demote-groq)
+carries it.
+
+**What is genuinely given up**, and it is not nothing: no published figure now compares
+Veritas across two vendors' models, so the *"different vendor's family"* half of
+[ADR-0005](adr/0005-one-openai-compatible-endpoint-for-every-provider.md)'s reason for
+Groq is unevidenced. A reader who wants it can run
+`VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation` unnarrowed, which
+still sweeps both providers; it is simply not what any published number rests on. That is
+a smaller loss than a table labelled `FAIL`, which is what the entry had.
 
 ---
 

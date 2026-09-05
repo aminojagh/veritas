@@ -59,9 +59,14 @@ def completion(text: str, usage: dict | None = None) -> dict:
 class StubEndpoint:
     """A stub OpenAI-compatible endpoint that records what was posted to it."""
 
-    def __init__(self, reply: dict, status: int = 200) -> None:
+    def __init__(self, reply: dict, status: int = 200, throttled: int = 0) -> None:
         self.reply = reply
         self.status = status
+        self.throttled = throttled
+        """How many of the first calls are answered 429 before `status` is, which is
+        what a free tier's per-minute token meter does to a caller asking faster than
+        it refills."""
+
         self.requests: list[dict] = []
         recorder = self
 
@@ -69,10 +74,21 @@ class StubEndpoint:
             def do_POST(self) -> None:
                 length = int(self.headers["Content-Length"])
                 recorder.requests.append(json.loads(self.rfile.read(length)))
-                body = json.dumps(recorder.reply).encode()
-                self.send_response(recorder.status)
+                over = len(recorder.requests) <= recorder.throttled
+                body = json.dumps(
+                    {"error": {"message": "rate limit", "code": "rate_limit_exceeded"}}
+                    if over
+                    else recorder.reply
+                ).encode()
+                self.send_response(429 if over else recorder.status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
+                if over:
+                    # How long to wait, the way a metered provider says it. Ten
+                    # milliseconds rather than the seconds a real one asks for, so a
+                    # test of how many times the client waits does not take as long as
+                    # the waiting.
+                    self.send_header("Retry-After-Ms", "10")
                 self.end_headers()
                 self.wfile.write(body)
 
@@ -90,9 +106,11 @@ class StubEndpoint:
         self._server.shutdown()
         self._server.server_close()
 
-    def model(self, name: str = "stub-model") -> ChatCompletions:
+    def model(self, name: str = "stub-model", **kwargs) -> ChatCompletions:
         """A `ChatCompletions` pointed at this server."""
-        return ChatCompletions(name, base_url=self.base_url, api_key="not-a-key")
+        return ChatCompletions(
+            name, base_url=self.base_url, api_key="not-a-key", **kwargs
+        )
 
 
 def test_the_call_carries_the_two_messages_the_model_name_and_the_temperature():
@@ -124,6 +142,28 @@ def test_a_provider_that_refuses_raises_rather_than_returns():
     with StubEndpoint({"error": {"message": "no"}}, status=400) as provider:
         with pytest.raises(LanguageModelError, match="refused the call"):
             provider.model().complete("system", "user")
+
+
+def test_a_call_a_provider_throttles_is_asked_again_rather_than_dropped():
+    """A 429 is a pause, not an answer, and the sweep that meets one asks again.
+
+    Two of the 46 Groq calls of the 2026-09-05 generation sweep died on a per-minute
+    token meter, and a dropped call is scored as a question no model answered — which
+    is a published figure that understates the model rather than measures it.
+    """
+    with StubEndpoint(completion("hello"), throttled=4) as provider:
+        reply = provider.model().complete("system", "user")
+    assert reply.text == "hello"
+    assert len(provider.requests) == 5
+
+
+def test_a_provider_that_throttles_past_the_retries_raises():
+    """The waiting is bounded: a meter that never clears is still a failed call, and a
+    caller must not be left holding a reply nobody sent."""
+    with StubEndpoint(completion("hello"), throttled=5) as provider:
+        with pytest.raises(LanguageModelError, match="refused the call"):
+            provider.model(max_retries=1).complete("system", "user")
+    assert len(provider.requests) == 2
 
 
 @pytest.mark.parametrize(
@@ -283,7 +323,8 @@ def test_a_sweep_over_the_registry_runs_every_provider_on_its_own_model(
         monkeypatch.setenv(provider.key_variable, "not-a-key")
     clients = registered_models()
     assert {name: client.model for name, client in clients.items()} == {
-        name: provider.default_model for name, provider in PROVIDERS.items()
+        f"{name} {provider.default_model}": provider.default_model
+        for name, provider in PROVIDERS.items()
     }
 
 
@@ -294,9 +335,22 @@ def test_a_sweep_can_be_narrowed_to_one_provider_and_one_of_its_models(
     alone, on the model being ranked rather than on the registered one."""
     monkeypatch.setenv(PROVIDERS["openai"].key_variable, "not-a-key")
     monkeypatch.delenv(PROVIDERS["groq"].key_variable, raising=False)
-    clients = registered_models(["openai"], "a-candidate")
+    clients = registered_models(["openai"], ["a-candidate"])
     assert {name: client.model for name, client in clients.items()} == {
-        "openai": "a-candidate"
+        "openai a-candidate": "a-candidate"
+    }
+
+
+def test_one_provider_can_be_swept_over_several_of_its_models(monkeypatch, no_env_file):
+    """The published generation grid is every (model, prompt) combination, so the models
+    axis has to hold more than one model of the same provider — which the registry,
+    keyed by provider and holding one model each, cannot say by itself."""
+    monkeypatch.setenv(PROVIDERS["openai"].key_variable, "not-a-key")
+    monkeypatch.delenv(PROVIDERS["groq"].key_variable, raising=False)
+    clients = registered_models(["openai"], ["one-model", "another-model"])
+    assert {name: client.model for name, client in clients.items()} == {
+        "openai one-model": "one-model",
+        "openai another-model": "another-model",
     }
 
 
@@ -306,7 +360,7 @@ def test_a_model_asked_of_more_than_one_provider_is_refused(monkeypatch, no_env_
     for provider in PROVIDERS.values():
         monkeypatch.setenv(provider.key_variable, "not-a-key")
     with pytest.raises(LanguageModelError, match="asked of one provider"):
-        registered_models(model="a-candidate")
+        registered_models(models=["a-candidate"])
 
 
 def test_a_key_in_the_env_file_is_read_when_the_environment_has_none(

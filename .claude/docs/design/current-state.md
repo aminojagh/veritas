@@ -164,7 +164,7 @@ a Postgres server skip without one.
 ## Resume here
 
 - **Step 009 — Containerization and `README.md`, the final Step — is `active`, and
-  Sub-step 9.1 is done and ruled** — the commit that carries this file is 9.1's. It added
+  Sub-steps 9.1 and 9.2 are done and ruled.** 9.1 is committed as `4e2e250`; it added
   `Dockerfile`, `.dockerignore`, the `app` service, `python -m veritas.retrieval`,
   `Retriever.warm()` and `tests/test_container.py`, and paid
   [DEBT-026](../debt-ledger.md#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted)
@@ -179,10 +179,30 @@ a Postgres server skip without one.
   `docker compose exec` from pytest are accepted, the 2.77 GB image is left as it is, and
   a container running as root is accepted rather than filed. The seventh closed itself —
   Amino opened the containerized page in a browser that day and it answered correctly.
-  **The next Sub-step is 9.2, the Groq re-run.**
-  [The plan](../plan/step-009-containerization-and-readme.md#92--republish-the-two-provider-generation-sweep)
-  puts it on the morning of 2026-09-05 — that morning has passed with the sweep unrun, so
-  it is the first thing to do, before anything else spends the Groq budget.
+  **Sub-step 9.2 is done, in two attempts on 2026-09-05.** The first ran the two-provider
+  sweep and failed its own runner a second time, on Groq's **8,000-tokens-per-minute**
+  meter rather than the daily cap; it left `MAX_RETRIES` in `veritas/llm/model.py`, above
+  the two the `openai` library defaults to, so a metered call is waited out rather than
+  dropped. It also produced the finding that **the Zoomcamp row the Groq dependency
+  existed for does not exist**: the rubric's LLM-evaluation criterion reads *"Multiple
+  approaches are evaluated, and the best one is used"* and offers *"one prompt"* as its
+  own example of an approach. On that, **Amino ruled the same day** — correct the criteria
+  map, publish the table as **(model, prompt) combinations over OpenAI**, and demote Groq
+  from a measured alternative to a second registered provider that no published figure
+  depends on. The second attempt did all three and **passed**: three models against two
+  prompts, six rows, the shipped pair `rules` + `gpt-5.4-mini` the joint best.
+  [DEBT-039](../debt-ledger.md#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished)
+  is **closed `accepted`** — its cost dissolved rather than paid, which the entry says in
+  those words. The two 9.2 reviews carry the failed run and
+  [the published grid](../reviews/step-009-containerization-and-readme.md#sub-step-92--publish-the-generation-grid-over-openai-and-demote-groq).
+  **All nine sceptical points across the two attempts are ruled**, on 2026-09-05: both
+  attempts are one Sub-step and one commit rather than split, Groq stays registered, and
+  the run-to-run variance — `ten trades` passed at 15:01 and failed at 16:17 on the same
+  pinned temperature — is accepted without a repeat sweep to quantify it.
+  **The next Sub-step is 9.3, the `README.md`**, which is no longer blocked: it quotes the
+  grid above, and two of those rulings land in it — **every published figure is one run**,
+  and the models axis is *"every candidate that can run at a pinned temperature"* rather
+  than every candidate.
   The plan was approved by Amino on 2026-09-04 with both rulings taken:
   [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
   is stated in the README rather than paid, and 9.2 goes first.
@@ -254,9 +274,11 @@ a Postgres server skip without one.
   table justified the *provider* — *"The key the course already asks a grader for"* — and
   said nothing about the model, unlike the groq row beside it. Four OpenAI models were
   measured cheapest first; `gpt-5.4-mini` took the row and that ADR now carries why.
-  **groq stayed exactly as it is**, which keeps the registry provider-keyed and the
-  [Zoomcamp](../design/target-state.md#zoomcamp-criteria-map) *"≥2 models"* row intact;
-  retiring it would need the seam reworked and is not bought before the deadline. The
+  **groq stayed exactly as it is**, which keeps the registry provider-keyed;
+  retiring it would need the seam reworked and is not bought before the deadline.
+  *(The "≥2 models" row this cited was corrected on 2026-09-05 — the rubric sets no such
+  bar — and `registered_models` now builds one client per (provider, model) pair, though
+  `PROVIDERS` is still keyed by provider.)* The
   option weighed and dropped — publishing the Warehouse's date coverage into the prompt,
   against [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md)'s *"corpus
   rather than a schema dump"* — is in the
@@ -670,13 +692,12 @@ to move it, the honest fix is barred, and the generation sweep is the guard. But
 nearest Certified Metric, and the Gate passes it because it traces
 ([DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)):
 the Gate checks that a statement computes a metric correctly, not that it answers the
-question asked. **The two-provider table itself is not yet republished**: the sweep that
-would carry it hit Groq's 200,000-tokens-per-day cap on 2026-09-03 and failed its own
-runner, so the Groq half of that run is not a measurement and one re-run is owed
+question asked. **The published generation table is OpenAI-only**, six rows of
+three models against two prompts, and no figure anywhere rests on Groq: two two-provider
+sweeps failed their own runner on the free tier's two meters, and the criterion that
+dependency existed for was found not to exist
 ([DEBT-039](../debt-ledger.md#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished),
-postponable) — the
-[8.1 review](../reviews/step-008-observability.md#sub-step-81--choose-the-openai-default-model-by-measurement)
-carries the failed run and the command. Both measures are also narrow: retrieval's
+closed `accepted` in 9.2). Both measures are also narrow: retrieval's
 **hit rate is 1.000 in every cell**, so only MRR separates those settings, over twelve
 questions in steps of 1/24; generation's Execution Accuracy is over **eleven** questions,
 so one of them is worth 0.09. The dated tables and the commands that produce them are in

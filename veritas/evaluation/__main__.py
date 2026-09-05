@@ -3,9 +3,11 @@
     uv run python -m veritas.evaluation retrieval                        # hit rate, MRR
     VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation  # accuracy
 
-    # one provider, one of its models, no judge — what a run ranking models costs
+    # one provider, as many of its models as are named — the published grid is every
+    # (model, prompt) combination of these; --no-judge halves the calls when a run is
+    # only ranking candidates against each other
     VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation \\
-        --provider openai --model <name> --no-judge
+        --provider openai --model <name> --model <another>
 
 Prints the Evaluation Measures for one part of Veritas over the Gold Question Set. It
 computes nothing itself: `retrieval.py` and `generation.py` hold the measures and the
@@ -233,11 +235,11 @@ def generation(warehouse: WarehouseAdapter, options: argparse.Namespace) -> int:
     beyond = excluded(questions, gate)
     scorable = [gold for gold in questions if gold not in beyond]
 
-    clients = registered_models(options.provider, options.model)
-    models = {f"{name} {client.model}": client for name, client in clients.items()}
+    models = registered_models(options.provider, options.model)
     judge_model = None if options.no_judge else default_model()
-    # What Veritas does today is the configured provider on its **registered** model, so
-    # a row running a candidate under `--model` is never marked as today's setting.
+    # What Veritas does today is the configured provider on its **registered** model. A
+    # run that names candidates marks the row that is that pair and no other, so a grid
+    # comparing the shipped setting against the rest says which one ships.
     configured = os.environ.get(PROVIDER_VARIABLE) or DEFAULT_PROVIDER
     today = f"{configured} {PROVIDERS[configured].default_model}"
 
@@ -300,8 +302,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--model",
-        help="the model to run on the named provider instead of the one its registry "
-             "row serves; needs exactly one --provider",
+        action="append",
+        help="a model to run on the named provider instead of the one its registry row "
+             "serves, repeatable; needs exactly one --provider",
     )
     parser.add_argument(
         "--no-judge",

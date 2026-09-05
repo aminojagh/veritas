@@ -3,7 +3,8 @@
 **Status:** **active** — written 2026-09-04 and approved by Amino the same day, by the
 commit that carries this plan, with both [rulings](#rulings-at-approval) taken:
 DEBT-035 is stated in the README, not paid, and 9.2 runs on the morning of
-2026-09-05. **9.1 is done**, its seven sceptical points ruled on 2026-09-05; 9.2 is next.
+2026-09-05. **9.1 and 9.2 are done**, all sixteen of their sceptical points ruled on
+2026-09-05, 9.2 in two attempts and under [ruling 3](#rulings-in-flight); 9.3 is next.
 
 **Goal.** Put the App in the compose file beside Postgres and Grafana, write the
 `README.md` a grader runs Veritas from, pay every Ledger entry whose Trigger names the
@@ -29,7 +30,9 @@ and
 [DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)
 on its README branch — and
 [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
-is stated, not paid, by the first ruling.
+is stated, not paid, by the first ruling. *(DEBT-039 closed `accepted` rather than paid,
+under [ruling 3](#rulings-in-flight): the criterion its missing table served does not
+exist, so four are paid and one is dissolved.)*
 
 ---
 
@@ -92,6 +95,13 @@ question asked at `http://localhost:8501` and seen on the dashboard at `:3000`. 
 size and build time are measured in the review, not guessed here.
 
 ### 9.2 — Republish the two-provider generation sweep
+
+> **⚠ Superseded 2026-09-05 by [ruling 3](#rulings-in-flight).** The two-provider sweep
+> failed its runner twice, and the criterion it was run for turned out not to exist. What
+> 9.2 delivers instead is the **(model, prompt) grid over OpenAI**, and Groq is demoted
+> from a measured alternative to a second registered provider. The Sub-step below is kept
+> as written because it is what was approved and what the first attempt executed; the
+> route now is the ruling.
 
 Pays DEBT-039 on its Trigger. One command, unchanged, first thing on a day Groq's
 200,000-token budget is unspent — nothing else calls Groq that day before it:
@@ -215,6 +225,23 @@ the clone; `verify_framework.py` and `check_language.py`.
   row is claimed on, and the README points at it.
 
 ---
+
+## Rulings in flight
+
+3. **The Target State's LLM-evaluation row is corrected, the published generation table
+   becomes OpenAI-only as (model, prompt) combinations, and Groq is demoted from being a
+   measured alternative** — Amino, 2026-09-05, after the second failed sweep. The rubric
+   fetched that day from
+   <https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md> reads *"2 points:
+   Multiple approaches are evaluated, and the best one is used"* and gives *"one prompt"*
+   as its own example of an approach — it names no second model and no second provider,
+   so the *"≥2 prompts and ≥2 models"* the criteria map carried was the project's own
+   invention and the Groq dependency was never required. Alternatives priced the same
+   day and rejected: a paid OpenAI-compatible provider in Groq's place — DeepInfra at
+   $0.037/$0.17 per million tokens, or OpenRouter, which also takes AliPay and a
+   stablecoin —
+   both about a cent a sweep, but both trade a free optional key for a paid one against
+   the credential rule.
 
 ## Rulings at approval
 

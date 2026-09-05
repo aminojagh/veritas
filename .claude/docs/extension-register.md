@@ -790,8 +790,10 @@ it is the whole of what the credential rule permits. The
 [Target State](design/target-state.md#what-credential-free-means) allows *"a
 credential the grader already has by virtue of taking the course"*, which is the
 OpenAI key and nothing else; Groq rides along because its free tier costs a
-reviewer nothing and the *"≥2 models"* criterion cannot be met with one provider's
-default alone.
+reviewer nothing. *(Corrected 2026-09-05: this read "and the `≥2 models` criterion
+cannot be met with one provider's default alone" — the rubric sets no such
+criterion, and Groq is now a second registered provider rather than a measured
+alternative. The extension is unchanged: a third provider is still a row.)*
 
 **Why this is an extension and not debt**
 

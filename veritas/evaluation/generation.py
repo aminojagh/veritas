@@ -17,10 +17,12 @@ Validation Gate refused a correct statement is not a generation failure and must
 read as one. That taxonomy is the Orchestrator's — this component reads it and no longer
 owns it, so what a sweep groups by and what Observability charts are one vocabulary.
 
-**One row per prompt per model.** The two settings this sweep varies are the
-[Zoomcamp criterion](../../.claude/docs/design/target-state.md#zoomcamp-criteria-map)'s
-— *"Execution Accuracy across ≥2 prompts and ≥2 models"* — the two `PromptForm`s and
-the two providers `veritas/llm/`'s registry holds.
+**One row per (model, prompt) combination.** The two axes this sweep varies are what
+the [Zoomcamp criterion](../../.claude/docs/design/target-state.md#zoomcamp-criteria-map)
+calls approaches — *"Multiple approaches are evaluated, and the best one is used"* — the
+`PromptForm`s and whichever models the run names. Unnarrowed that is every registered
+provider on its own default model; the published grid is one provider's models against
+each other, and the best combination is what ships.
 
 **Every call here is real.** Unlike `retrieval.py`, which derives its rewrites from the
 gold SQL and costs nothing, this sweep is the measure of what a model actually writes,

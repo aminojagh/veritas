@@ -22,6 +22,23 @@ Step 007 has to run a second model through the same code and compare the numbers
 so the model is a value that varies at run time rather than a library that is
 imported.
 
+> **⚠ Amended 2026-09-05 — the paragraph above cites a bar the rubric does not
+> set.** The published rubric's LLM-evaluation row reads *"2 points: Multiple
+> approaches are evaluated, and the best one is used"*, and its 1-point row gives
+> its own example of an approach: *"Only one approach (e.g., one prompt) is
+> evaluated"*. It never mentions models or providers. *"≥2 prompts and ≥2 models"*
+> was the criteria map's own stricter wording, and this ADR then read it back as
+> the rubric's requirement — which is how a second provider came to look mandatory
+> when it was optional. The criteria map row is corrected, and Amino demoted Groq
+> the same day. **The decision below is unchanged**: the registry still holds two
+> providers and the seam is still one client. What changes is why the second row is
+> there — a demonstration that a provider is a registry row, not a criterion's
+> price. The rubric text was read from
+> <https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md> on
+> 2026-09-05; the
+> [second 9.2 review](../reviews/step-009-containerization-and-readme.md#sub-step-92--publish-the-generation-grid-over-openai-and-demote-groq)
+> carries the quotation and the run that replaced the two-provider table.
+
 Three more calls are coming behind this one — SQL generation in 6.4, and Step
 007's second model and LLM-as-judge — and all of them are text in, text out. None
 of them needs streaming, embeddings (Retrieval has its own models), or a
@@ -69,7 +86,9 @@ client. Its free tier needs no card and no billing account, which keeps the
 credential rule's *obtained versus assumed* line as short as it can be for a key
 that is optional anyway. And it serves a different model — `openai/gpt-oss-120b`,
 open weights on Groq's own hardware, against OpenAI's hosted model — which is what
-makes Step 007's *"≥2 models"* two models rather than one model twice.
+makes Step 007's *"≥2 models"* two models rather than one model twice. *(Amended
+2026-09-05: that criterion was misread — see the note in Context. Groq's row stays
+for the reason this paragraph gives, minus the criterion.)*
 
 **Why that model and not the one this ADR first named.** The row read
 `llama-3.3-70b-versatile` until a key existed to call it, and the first call was a
@@ -98,7 +117,11 @@ per-candidate figures are in the
 [Sub-step 8.1 review](../reviews/step-008-observability.md#sub-step-81--choose-the-openai-default-model-by-measurement).
 **Groq's row is untouched.** The registry is keyed by provider and holds one model
 each, so carrying a second *OpenAI* model instead of it is not something this seam can
-express, and reworking the seam is not bought before the deadline.
+express, and reworking the seam is not bought before the deadline. *(Amended
+2026-09-05: `PROVIDERS` is still keyed by provider and still holds one model each —
+what changed is that `registered_models` builds one client per **(provider, model)**
+pair a sweep names, so several of one provider's models can be swept together. The
+registry did not move; the function that reads it did.)*
 
 ## Alternatives considered
 
