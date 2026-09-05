@@ -65,13 +65,13 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | L | The Sub-step of Step 007 that measures Execution Accuracy — **🔴 fired** | open |
 | [DEBT-036](#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one) | Splicing writes over the first mention of a term and leaves every later one | S | Sub-step 7.4, or the first Gold Question that says one term twice — **🔴 fired** | **paid** (7.4, 2026-09-02) |
 | [DEBT-037](#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse) | Nothing tells the generator that a date it has never heard of is not a reason to refuse | ~~S~~ M | 🔴 fired (8.1) — prose relabels the refusal, the honest fix crosses ADR-0001, and the generation sweep is the standing guard | **accepted** (8.1) |
-| [DEBT-038](#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | A capable model answers an ad-hoc row request instead of refusing it | S | Before the capstone is submitted | open |
+| [DEBT-038](#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | A capable model answers an ad-hoc row request instead of refusing it | S | Before the capstone is submitted — **🔴 fired** | **paid** (9.3, 2026-09-05) — on the README branch its own Trigger names |
 | [DEBT-039](#debt-039--the-published-two-provider-sweep-failed-its-own-runner-and-is-not-republished) | The published two-provider sweep failed its own runner and is not republished | S | 🔴 fired (9.2) — the final documentation pass reached it | **accepted** (9.2, 2026-09-05) — the criterion it protected does not exist, and the table that does exist passes |
-| [DEBT-040](#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves) | The price table is a vendor's page copied once, and nothing notices when it moves | S | The final documentation pass, or the first cost figure quoted outside a review | open |
+| [DEBT-040](#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves) | The price table is a vendor's page copied once, and nothing notices when it moves | S | The final documentation pass, or the first cost figure quoted outside a review — **🔴 fired** | **paid** (9.3, 2026-09-05) |
 | [DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded) | A question the provider never answered is not recorded | S | 🔴 fired (8.5) — the charts read the ending alone, and the gap is the one the entry predicted | **accepted** (8.5) |
 | [DEBT-042](#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered) | No panel of the dashboard has been seen rendered | S | Before the capstone is submitted, or the first time the dashboard is opened — **🔴 fired** | **paid** (8.5, 2026-09-04) |
 
-**Open debt:** 12 · **Paid:** 24 · **Accepted:** 4 · **Moved:** 2
+**Open debt:** 10 · **Paid:** 26 · **Accepted:** 4 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -340,6 +340,16 @@ there.** The dependency is mitigated, not removed. Three things stay true:
 - **The window is fixed at two years by `YAHOO_RANGE`.** Widening it needs the
   endpoint alive. That is a refresh-time dependency, which is exactly where this
   entry wanted the dependency to end up.
+
+**Trigger 2 fired, Sub-step 9.3 (2026-09-05), and the entry stays `paid`.** `README.md`
+now makes a reproducibility claim, and it is the wording this entry allows — *"reproducible
+from committed snapshots, not from the sources"* — with the endpoint named as unofficial
+and unversioned, the dependency described as mitigated rather than removed, and both
+residual costs above stated in
+[What Veritas will not do](../../README.md#what-veritas-will-not-do-and-what-it-gets-wrong):
+that widening the window needs the endpoint alive, and that a stale snapshot is silent.
+Nothing was owed but the wording, so nothing changed in the code. **Trigger 3 is still
+live** — a non-200 for a symbol in the traded universe would reopen this.
 
 ---
 
@@ -644,6 +654,12 @@ fails if the two ever differ.
 **`README.md` is still unwritten, and this entry no longer waits for it.** The Trigger
 was *"whichever comes first"*, and the App came first; the README will make the same
 claim in Step 008 and has this sentence to make it with.
+
+**It made it, Sub-step 9.3 (2026-09-05), and the entry stays `paid`.** `README.md` states
+the qualification as a block quote in this entry's own words, and `tests/test_readme.py`
+reads it out of this file and fails if the two ever differ — the same check
+`tests/test_app.py` already makes for the sidebar. The claim and its limit are now in the
+two places a reader meets them, from one source.
 
 ---
 
@@ -2865,6 +2881,18 @@ model writes, so the measure would report a generation failure that is a Gate fa
 7.4 runs without it being paid, the entry stays open and the Step Review states that
 `Account Value` is excluded from the accuracy figure and why.
 
+**Stated in the README rather than paid, Sub-step 9.3 (2026-09-05), and the entry stays
+open.** Amino ruled on 2026-09-04, with the approval of the
+[Step 009 plan](plan/step-009-containerization-and-readme.md#rulings-at-approval), that
+this is stated and not paid: the schedule's slack before the deadline is one `L` wide and
+paying this would spend all of it on one of nine metrics.
+[What Veritas will not do](../../README.md#what-veritas-will-not-do-and-what-it-gets-wrong)
+says `Account Value` is unanswerable, why the Gate refuses the only correct statement for
+it, that both Ambiguous Terms resolving to it therefore reach nothing, and that the Gold
+Question Set carries the correct statement so the Gate is measurably behind a written
+specification. Nothing here is paid by saying so — the metric is still unanswerable and
+the exclusion still costs a question out of every generation figure.
+
 **7.4 ran without paying it, 2026-09-02**, and the second branch is what happened: the
 question is named in the sweep's own header line and in the Step Review. Widening the
 tracing rule is not the whole repayment any more, which is the finding that Sub-step
@@ -3066,7 +3094,8 @@ this entry is the note that says what the guard is for.
 
 ### DEBT-038 — A capable model answers an ad-hoc row request instead of refusing it
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 9.3, 2026-09-05, on the second of the two branches its
+  own Trigger names. **See [How it was paid](#how-it-was-paid) at the end of the entry.**
 - **Opened:** Sub-step 8.1 (`.claude/docs/reviews/step-008-observability.md`)
 - **Size:** S — stating the limitation in the Step 009 README is the likely repayment,
   an hour; an enforcement fix at the generation boundary is `M`
@@ -3133,6 +3162,25 @@ ad-hoc-exploration probes that found it.
 Before the capstone is submitted. Either the boundary fix lands — the Orchestrator
 refuses a question that grounds out to a metric it was not asked for — or the Step 009
 README states the limitation. Re-measured by every generation sweep.
+
+#### How it was paid
+
+**Sub-step 9.3, 2026-09-05.** The second branch: `README.md` states the limitation, in
+[What Veritas will not do](../../README.md#what-veritas-will-not-do-and-what-it-gets-wrong),
+beside the [DEBT-006](#debt-006--no-ad-hoc-exploration--accepted-permanently) boundary it
+undercuts rather than in a section of its own — a reader meets *"no ad-hoc database
+browsing"* and the exception to it in the same breath, which is the only ordering that
+does not read as a promise followed by a retraction. It names the failing probe, says
+that it is the single miss of the shipped model across the whole published grid, gives
+the two live instances 8.5 found, and states the cause: **the one thing the Validation
+Gate cannot check is that the statement answers the question that was asked.**
+
+**The boundary fix was not taken**, and it is the repayment this entry would have
+preferred. Nothing enforces the boundary; a reader is told about it. The `M` sizing of
+that fix stands, the Step 009 plan lists it under *"Not in this Step"*, and the standing
+guard is unchanged — every generation sweep re-measures `ten trades` and prints it in the
+failure list, so a model or a prompt that fixes this will show it as a row that stops
+appearing.
 
 ---
 
@@ -3237,7 +3285,9 @@ a smaller loss than a table labelled `FAIL`, which is what the entry had.
 
 ### DEBT-040 — The price table is a vendor's page copied once, and nothing notices when it moves
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 9.3, 2026-09-05. **See
+  [How it was paid](#how-it-was-paid-1) at the end of the entry**, including the one
+  thing paying it did *not* buy.
 - **Opened:** Sub-step 8.3 (`.claude/docs/reviews/step-008-observability.md`)
 - **Size:** S — one page re-read, five rows checked, one date changed
 - **Location:** `veritas/llm/model.py` — `PRICES`
@@ -3283,6 +3333,32 @@ Whichever comes first: the final documentation pass or README that quotes a cost
 the same pass [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
 names — or a cost figure leaving a Step Review for anywhere else. Re-read the page, update
 the five rows and the date, and add groq if it is priced anywhere readable.
+
+#### How it was paid
+
+**Sub-step 9.3, 2026-09-05**, on the first branch of the Trigger — the README quotes a
+cost figure. All three things it asks for were done, and the evidence is in the
+[9.3 review](reviews/step-009-containerization-and-readme.md#sub-step-93--readmemd-with-every-credential-and-every-limitation):
+
+- **The page was re-read.** <https://developers.openai.com/api/docs/pricing>, 2026-09-05.
+  **None of the five rows moved**, so `OPENAI_PRICES_READ` is the only figure that
+  changed — which is what a re-read that finds nothing looks like, and is why the date is
+  a field rather than a comment.
+- **groq is now priced.** <https://console.groq.com/docs/model/openai/gpt-oss-120b>
+  carries $0.15 and $0.60 per million tokens for the model the registry serves, so the
+  sixth row exists and the cost column has no provider-shaped hole in it. Every row is a
+  **list price**: a call served on a free tier bills its holder nothing and still carries
+  the figure, which the table now says in one line above itself.
+- **The README states what a cost figure is** — *"what this would have cost at 2026-09-05
+  list prices"* — which is the sentence the **Cost while unpaid** paragraph above says
+  nothing on the page was saying.
+
+**What paying it does not buy.** Nothing re-reads either page, and nothing ever will
+inside this slice: a live price feed is still a second vendor integration for a column on
+a demo dashboard. A price that moves tomorrow still produces figures that look exactly as
+authoritative as correct ones, and the only thing standing between a reader and that is
+the date each row carries. This entry is paid because the pass its Trigger names has
+happened and the table is current as of it — not because the mechanism improved.
 
 ---
 

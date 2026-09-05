@@ -115,17 +115,23 @@ class Price:
     page: str
 
 
-# The one page every row below was read from, and the day it was read.
+# The pages the rows below were read from, and the day each was read. One page per
+# provider, because each publishes its own.
 OPENAI_PRICING = "https://developers.openai.com/api/docs/pricing"
-OPENAI_PRICES_READ = "2026-09-03"
+OPENAI_PRICES_READ = "2026-09-05"
+GROQ_PRICING = "https://console.groq.com/docs/model/openai/gpt-oss-120b"
+GROQ_PRICES_READ = "2026-09-05"
 
 # What a call costs, per provider and model. A model absent from this table is not
 # free — it is unpriced, and a call on it carries no cost rather than a cost of zero.
 #
+# Every row is a **list price**, so a cost is what the call would have been billed at
+# rather than what anybody was billed: a call served on a free tier costs its holder
+# nothing and still carries the figure below.
+#
 # The five OpenAI rows are the four candidates Sub-step 8.1 ranked plus the model they
-# replaced, all read on one day from one page. **groq is deliberately absent**: its
-# price is not on a page this project has read, and the free tier Veritas uses bills
-# none of it, so any figure here would be one of two wrong numbers.
+# replaced. groq's row is its default model, which is the only groq model Veritas has
+# a page for.
 PRICES: dict[tuple[str, str], Price] = {
     ("openai", "gpt-5.4-mini"): Price(
         Decimal("0.75"), Decimal("4.50"), OPENAI_PRICES_READ, OPENAI_PRICING
@@ -141,6 +147,9 @@ PRICES: dict[tuple[str, str], Price] = {
     ),
     ("openai", "gpt-4o-mini"): Price(
         Decimal("0.15"), Decimal("0.60"), OPENAI_PRICES_READ, OPENAI_PRICING
+    ),
+    ("groq", "openai/gpt-oss-120b"): Price(
+        Decimal("0.15"), Decimal("0.60"), GROQ_PRICES_READ, GROQ_PRICING
     ),
 }
 

@@ -209,11 +209,12 @@ def test_a_call_costs_its_tokens_times_the_price_of_the_model_that_served_it():
 
 
 def test_an_unpriced_model_costs_nothing_known_rather_than_nothing():
-    """The registry serves a model this table does not price, and a chart must show a
-    gap there rather than a zero — the two are different claims about a call."""
-    unpriced = PROVIDERS["groq"]
-    assert (unpriced.name, unpriced.default_model) not in PRICES
-    assert ModelCall(unpriced.name, unpriced.default_model, 900, 40).cost is None
+    """A provider serves more models than this table prices — every candidate a sweep
+    can name with `--model`, for one — and a chart must show a gap on those rather
+    than a zero, because the two are different claims about a call."""
+    unpriced = ("openai", "a-model-no-page-here-carries-a-price-for")
+    assert unpriced not in PRICES
+    assert ModelCall(*unpriced, 900, 40).cost is None
 
 
 def test_every_price_says_when_it_was_read_and_where_from():

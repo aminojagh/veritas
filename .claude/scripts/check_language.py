@@ -115,7 +115,7 @@ KNOWN_NON_ABBREVIATIONS = {
     # country shorthand used to describe data sources. Universally read.
     "EU", "UK", "US", "APAC",
     # Proper nouns that are not abbreviations.
-    "EXANTE", "DB",
+    "DB",
     # Legal-form suffixes inside registered company names. These arrive in the
     # data — `dim_instrument.instrument_name` holds "SAP SE" and "MICROSOFT CORP"
     # — and get quoted in reviews as evidence of what actually loaded. They are

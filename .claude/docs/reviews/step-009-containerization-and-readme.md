@@ -349,3 +349,134 @@ asked a question carry the ruling.
 spelled in the two axes the sweep already varies — `PromptForm` and the model string — and
 coins nothing; `registered_models`, `--model` and the `"provider model"` key are technical.
 `check_language.py` passes.
+
+---
+
+## Sub-step 9.3 — `README.md`, with every credential and every limitation
+
+**Changed.** `README.md` — the grader's document, in the rubric's order, opening with an
+index table from each criterion to the section that earns it. `tests/test_readme.py` is
+what makes it checkable at all: neither committed checker reads it, so the credential list
+is asserted in both directions, the access-control sentence is read out of the Ledger, and
+every relative link in `README.md` and `docs/*.md` is resolved with its anchor —
+under `verify_framework.py`'s own `heading_anchors`, **imported** rather than reimplemented,
+so the two documents cannot disagree about what an anchor is. `veritas/llm/model.py`
+gained a sixth price row and a new read-date.
+
+**Also in this commit, on Amino's instruction of 2026-09-05: the name of the company whose
+job specification the Product Brief was distilled from is gone from the repository.** Four
+occurrences — the brief's *Provenance* line, one sentence in the Step 000 review and one in
+the Step 001 review, and a row in `check_language.py`'s `KNOWN_NON_ABBREVIATIONS` that
+existed only to let the other three pass. The domain survives every cut: *a multi-asset
+brokerage*, *real brokerage usage*.
+
+**Verified.** Every command run on 2026-09-05 on the tree as it stands.
+
+```
+$ uv run pytest
+316 passed, 6 skipped in 166.33s (0:02:46)   (from 311 passed, 6 skipped at 9.2)
+
+$ uv run pytest tests/test_readme.py -v
+tests/test_readme.py::test_every_declared_variable_is_named_in_the_readme PASSED
+tests/test_readme.py::test_the_readme_names_no_variable_it_does_not_declare PASSED
+tests/test_readme.py::test_the_readme_exemptions_are_still_true PASSED
+tests/test_readme.py::test_the_readme_qualifies_access_control_in_the_ledgers_own_words PASSED
+tests/test_readme.py::test_every_relative_link_in_the_public_documents_resolves PASSED
+5 passed in 2.66s
+
+$ uv run python .claude/scripts/verify_framework.py | tail -4
+  links      1725 links, 1406 anchors 88 documents and python files
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py | tail -3
+  abbreviations: 28 registered in the Glossary, 15 exempt, 0 unrecognised
+
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+**Every one of those is the re-run**, after the name removal above and after this review
+and Current State were written to their final wording — so the figures are the tree Amino
+commits and not an earlier one. The counts moved only where new links were added.
+
+The full run **failed once first**, on the second point below —
+`tests/test_observability.py::test_an_unpriced_model_leaves_a_gap_in_the_cost_column_rather_than_a_zero`,
+whose `UNPRICED` constant was groq's default model. Fixed in the same Sub-step and
+re-run above.
+
+**One deliberate deviation from the plan.** The plan gives 9.3 *"one line at
+`docs/decisions.md`"*. That line is **not** written, because the file does not exist until
+9.4 and `test_every_relative_link_in_the_public_documents_resolves` would fail on it —
+committing a link a Sub-step's own test proves dead is not a Sub-step that verified. 9.4
+adds the file and the line together, which is the ordering its own verification step
+(*"`uv run pytest tests/test_readme.py` (the links)"*) already assumes.
+
+**Debt.** Five entries touched, two of them **paid**; each carries its own note, and the
+two measurements behind DEBT-040 are the pages read on 2026-09-05:
+<https://developers.openai.com/api/docs/pricing>, where **none of the five rows moved**,
+and <https://console.groq.com/docs/model/openai/gpt-oss-120b>, which prices groq's default
+model at $0.15 and $0.60 per million tokens.
+
+| Entry | What happened |
+|---|---|
+| [DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it) | **paid** — second branch: the README states the limitation, and nothing enforces it |
+| [DEBT-040](../debt-ledger.md#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves) | **paid** — both pages re-read, `PRICES` gains a sixth row, nothing re-reads them next time |
+| [DEBT-002](../debt-ledger.md#debt-002--market-prices-depend-on-an-unofficial-endpoint) | trigger 2 fired; stays `paid` on the allowed wording. Trigger 3 still live |
+| [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers) | already paid at 6.5; the README makes the claim with the same sentence, held by a test |
+| [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | **stated, not paid**, on the plan's first ruling. Still open |
+
+No new entry, and none opened.
+
+**Sceptically**, ranked — **the six below were ruled by Amino on 2026-09-05**, and the two
+that asked a question carry the ruling. The seventh was raised after that ruling, by the
+change that ruling came with, so it is out of rank and unruled.
+
+1. **Adding a groq price row was not in the plan, and it changes what the dashboard
+   shows.** DEBT-040's Trigger says *"add groq if it is priced anywhere readable"*, and it
+   is — but the entry's own reason for leaving it out was two-part, and only half of it
+   dissolved: the free tier still bills nothing, so a groq call now carries a figure
+   nobody was charged. I took it because the alternative reading makes the column mean two
+   different things by provider; the column is now uniformly *"what this would have cost at
+   list prices"*, which is what the README says it is. **If you would rather groq stayed
+   unpriced, reverting is one dictionary row and one test.** **Ruled: the groq row stays**,
+   and with it the column's single meaning.
+2. **It forced two test rewrites, one of which I did not see coming.** Both
+   `tests/test_llm.py` and `tests/test_observability.py` used groq's default model as
+   their example of an unpriced one; the second was found by the full run failing, not by
+   reading the diff. Both now name a model string no page carries a price for. The claim
+   is unchanged and better stated — pinning *"unpriced"* to a particular registry row was
+   always coupling a general rule to an accident — but two files depending on that
+   accident is the measure of how far a price row reaches.
+3. **Only the generation table carries the one-run caveat.** The retrieval table does not,
+   because nothing has ever observed it varying — which is an absence of evidence rather
+   than evidence, and it is one `uv run python -m veritas.evaluation retrieval` away from
+   being either if you want it settled. **Ruled: not settled** — no repeat sweep is
+   bought, and the retrieval table stands uncaveated with that as its reason.
+4. **The rubric index table at the top is navigation I invented**, not in the plan. It
+   duplicates no argument — links only, no "how it earns" column — but it is a second
+   place that must stay true when a section is renamed, which is why the link test resolves
+   in-document anchors too.
+5. **The two dashboard images are linked out of `.claude/docs/reviews/images/`** rather
+   than copied. One copy is the rule, and the cost is that the README's illustrations live
+   under the working record: remove `.claude/` from the public tree and two images and
+   several links go with it.
+6. **Nobody has read the README against a clean machine yet.** Every command in it is one
+   this repository has run; the document as a *set of instructions* is unrehearsed, which
+   is what 9.5 is for.
+7. **The company name is out of the working tree and still in the history.** `git log -S`
+   finds it in the commits that first carried those three documents, and only a rewrite of
+   every commit since would change that — which invalidates every hash a review cites. So
+   the claim this Sub-step can make is *the repository as checked out carries no such
+   name*, not *the repository never carried one*. If the second is what you want, say so
+   before submission: it is cheapest while nobody has cloned this. Two of the three prose
+   edits are also to **committed Step Reviews**, which are otherwise append-only — what a
+   review said on its date is usually the point of it. Neither sentence carried evidence or
+   a ruling; both were asides, so nothing dated changed meaning. The fourth edit deletes an
+   allowlist row from a frozen check script, which is a row that had gone dead rather than
+   one still excusing something — nothing was ported out and nothing was added.
+
+**Language.** No Term Proposal. `README_NOT_IN_ENV`, `PUBLIC_DOCS`, `DECLARED`, `NAMED_IN_README`
+and `GROQ_PRICING` are technical and carry no domain meaning. The README expands **LLM**,
+**MRR** and **ONNX** on first use as a fresh document must, and uses the Glossary's
+spelling for every domain noun it names.

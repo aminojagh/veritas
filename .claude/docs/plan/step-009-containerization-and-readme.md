@@ -3,8 +3,8 @@
 **Status:** **active** — written 2026-09-04 and approved by Amino the same day, by the
 commit that carries this plan, with both [rulings](#rulings-at-approval) taken:
 DEBT-035 is stated in the README, not paid, and 9.2 runs on the morning of
-2026-09-05. **9.1 and 9.2 are done**, all sixteen of their sceptical points ruled on
-2026-09-05, 9.2 in two attempts and under [ruling 3](#rulings-in-flight); 9.3 is next.
+2026-09-05. **9.1, 9.2 and 9.3 are done**, all twenty-two of their sceptical points ruled on
+2026-09-05, 9.2 in two attempts and under [ruling 3](#rulings-in-flight); 9.4 is next.
 
 **Goal.** Put the App in the compose file beside Postgres and Grafana, write the
 `README.md` a grader runs Veritas from, pay every Ledger entry whose Trigger names the

@@ -70,9 +70,14 @@ STATEMENT = (
     "WHERE dim_client.client_region = 'EU'"
 )
 
-# One call to a model the price table prices, and one to a model it does not.
+# One call to a model the price table prices, and one to a model it does not — a
+# provider serves more models than any page this repository has read carries a figure
+# for, and `--model` on the Evaluation sweep will name one sooner or later.
 PRICED = ModelCall("openai", "gpt-5.4-mini", prompt_tokens=1200, completion_tokens=90)
-UNPRICED = ModelCall("groq", "openai/gpt-oss-120b", prompt_tokens=900, completion_tokens=40)
+UNPRICED = ModelCall(
+    "openai", "a-model-no-page-here-carries-a-price-for",
+    prompt_tokens=900, completion_tokens=40,
+)
 
 ALL_FIVE = (
     HOST_VARIABLE,

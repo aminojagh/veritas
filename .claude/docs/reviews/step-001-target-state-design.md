@@ -72,7 +72,7 @@ in `target-state.md` traces to a Glossary entry.
    definitions there are wrong, the product is wrong. Please read those eight
    properly even if you skim the rest. I am most exposed on **Accounting
    Movement**: I have defined it as accrual-basis recognition on the date value
-   is *earned*, versus Cash Movement on the date money moves. If EXANTE-style
+   is *earned*, versus Cash Movement on the date money moves. If real
    brokerage usage differs, correct me.
 2. **Synthetic client activity may read as a weaker dataset** to a peer
    reviewer, even though the rubric explicitly permits generated data. The

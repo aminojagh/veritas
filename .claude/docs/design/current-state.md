@@ -16,12 +16,14 @@ Sub-step adds what is now true, and the story of how it got there stays in the r
 Step before it. Nine of the nine Target State components exist, a question typed into a
 browser comes back as a Grounded Answer, that question is written down, and what Veritas
 does at runtime is a chart rather than a description. Step 009 is `active`: the App has
-its own image, and `docker compose up -d --build` is the whole of Veritas.**
+its own image, `docker compose up -d --build` is the whole of Veritas, and **`README.md`
+exists** — the grader's document, in the rubric's order, listing every credential and
+every limitation.**
 Evaluation measures both halves of the flow:
 `data/gold/` holds the Gold Question Set, `veritas/evaluation/` reads it, Retrieval is
 scored over it by hit rate and Mean Reciprocal Rank, and what Veritas *answers* is scored
 by Execution Accuracy and an LLM-as-judge's agreement with it, across two prompts and
-both registered providers. A question that says an Ambiguous Term in any spelling
+every model a sweep names. A question that says an Ambiguous Term in any spelling
 [Glossary Section D](../glossary.md#d-ambiguous-terms) registers is detected as saying it,
 not only in the registered name. **Observability** is the ninth component: the OpenAI
 default model is `gpt-5.4-mini`, chosen by
@@ -163,8 +165,38 @@ a Postgres server skip without one.
 
 ## Resume here
 
-- **Step 009 — Containerization and `README.md`, the final Step — is `active`, and
-  Sub-steps 9.1 and 9.2 are done and ruled.** 9.1 is committed as `4e2e250`; it added
+- **Step 009 — Containerization and `README.md`, the final Step — is `active`.
+  Sub-step 9.3 is done and ruled and awaits only Amino's commit; 9.1 and 9.2 are done,
+  ruled and committed.**
+  9.3 wrote `README.md` and `tests/test_readme.py`, and closed the four Ledger entries the
+  documentation pass was holding: **[DEBT-038](../debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it)
+  paid** on its README branch — the limitation is stated, the boundary fix is not taken —
+  and **[DEBT-040](../debt-ledger.md#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves)
+  paid** by re-reading both vendors' pages on 2026-09-05: none of the five OpenAI rows
+  moved, and **groq is now priced** from a page that carries it, so `PRICES` has a sixth
+  row and every row is a list price. `README.md` also fired
+  [DEBT-002](../debt-ledger.md#debt-002--market-prices-depend-on-an-unofficial-endpoint)'s
+  second Trigger — the reproducibility claim is the wording that entry allows,
+  *"reproducible from committed snapshots"* — and made
+  [DEBT-008](../debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s
+  qualification for the second time, in the Ledger's own words with a test holding it
+  there. **[DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
+  is stated and stays open**, on Amino's ruling with the plan.
+  **The one deliberate deviation from the plan**: the line pointing at `docs/decisions.md`
+  is **not** in the README yet, because the file does not exist until 9.4 and a Sub-step
+  may not commit a link its own test proves dead. 9.4 adds the file and the line together.
+  **All six of 9.3's sceptical points are ruled**, on 2026-09-05: the groq price row stays,
+  so the cost column means one thing for every provider, and the retrieval table's missing
+  one-run caveat is left unsettled rather than bought with a repeat sweep.
+  **The same ruling took the company name out of the repository** — the brokerage whose job
+  specification the [Product Brief](product-brief.md) was distilled from is named nowhere in
+  the working tree: not in the brief's *Provenance* line, not in the Step 000 or Step 001
+  reviews, and not in `check_language.py`'s allowlist, which held it only so those three
+  would pass. The domain is untouched. Git history still carries it, which the
+  [9.3 review](../reviews/step-009-containerization-and-readme.md#sub-step-93--readmemd-with-every-credential-and-every-limitation)'s
+  seventh point raises as the one thing this cannot reach.
+  **The next Sub-step is 9.4, `docs/decisions.md`.**
+  9.1 is committed as `4e2e250`; it added
   `Dockerfile`, `.dockerignore`, the `app` service, `python -m veritas.retrieval`,
   `Retriever.warm()` and `tests/test_container.py`, and paid
   [DEBT-026](../debt-ledger.md#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted)
@@ -199,8 +231,7 @@ a Postgres server skip without one.
   attempts are one Sub-step and one commit rather than split, Groq stays registered, and
   the run-to-run variance — `ten trades` passed at 15:01 and failed at 16:17 on the same
   pinned temperature — is accepted without a repeat sweep to quantify it.
-  **The next Sub-step is 9.3, the `README.md`**, which is no longer blocked: it quotes the
-  grid above, and two of those rulings land in it — **every published figure is one run**,
+  Two of those rulings landed in the README — **every published figure is one run**,
   and the models axis is *"every candidate that can run at a pinned temperature"* rather
   than every candidate.
   The plan was approved by Amino on 2026-09-04 with both rulings taken:
@@ -290,7 +321,7 @@ a Postgres server skip without one.
   on 2026-09-03 and are [Glossary](../glossary.md#a-the-system) Section A rows; 7.1's
   **`Gold Question`** and **`Relevant Set`** were agreed on 2026-09-01, and 7.2's
   Section D column the same day. **The debt picture:
-  thirteen open, twenty-four paid, three accepted, two moved — and the Extension
+  ten open, twenty-six paid, four accepted, two moved — and the Extension
   Register holds fourteen open, two of them 8.5's and one 9.1's.**
   [DEBT-032](../debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
   is **paid** by 8.3 and
@@ -359,8 +390,9 @@ a Postgres server skip without one.
 A fully designed project with all nine of its components built, a question asked in a
 browser comes back as a Grounded Answer, Evaluation measures both halves of that flow
 over a committed Gold Question Set, and Observability writes every question down and
-charts it. All three services run in `docker compose`. What the project still lacks is
-the `README.md` a grader runs it from — Step 009, the final Step.
+charts it. All three services run in `docker compose`, and `README.md` is the document a
+grader runs them from. What the project still lacks is the public decision register and
+the fresh-clone rehearsal — the last two Sub-steps of Step 009, the final Step.
 The framework is in place and the Target State is `agreed`, so there is a fixed point
 to build toward: a natural-language analytics copilot over a brokerage warehouse, whose
 answers are grounded in a certified Semantic Layer and checked by a deterministic
@@ -484,11 +516,15 @@ verdict survives retargeting to BigQuery and one type does not.
 | Observability | ✅ working | `veritas/observability/` — `log.py` and `postgres.py` behind an `__init__.py` that re-exports both, plus `schema.sql`, laid out like `veritas/warehouse/`. `log.py` is the `QuestionLog` seam — a Protocol with two methods, `record(answer, access_profile) -> int`, returning the row's identifier because Feedback is left against an answer and never against a question string, and `leave_feedback(question_id, feedback)`, which takes that identifier back — plus `Feedback`, a frozen `up` and `note` in the Glossary's own words, and `QuestionLogError`, the one type every failure to record arrives as, so a store that is absent, unconfigured or refusing is one thing to a caller. `postgres.py` is **the only module in the repository that imports `psycopg`**, checked by `tests/test_observability.py` the way the App's Streamlit import is; it reads five variables — `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, the last three spelled as the `postgres` image itself reads them — from the environment or `.env`, defaults the host and the port to what compose publishes, names every missing value at once, and assembles the connection string through the driver rather than by formatting. It holds one connection for the process, applies `schema.sql` on connect, and writes one question in one transaction. `schema.sql` is **four tables**: `question` — one row per question asked through the App, carrying the question and the rewritten question, the `ended_by` member, the Access Profile's role, the statement, the row count, the verdict as `allowed`, `explanation` and a `reasons` array of Rejection Reason values, the refusal or the Clarifying Question, the seconds and the cost; `lineage_entry` — one row per Lineage entry, in the order the answer cites them, with its kind and the version it was read at; `model_call` — one row per call, with the provider, the model, the prompt and completion tokens, the seconds and the cost; and `feedback` — at most one row per question, carrying `up`, the optional `note` and the time it was left, keyed by the question so that a second verdict replaces the first in place and a question deleted takes its Feedback with it. Every `CREATE TABLE` is `IF NOT EXISTS`, so a fresh container and one with a month of traffic reach the same state and nothing is run by hand. A cost is `NULL` for a model `PRICES` does not price, never 0. `docker-compose.yml` is the server — `postgres:18-alpine`, the volume mounted at `/var/lib/postgresql` rather than `data/` under it, a `pg_isready` healthcheck, and the same five variables — and `.env.example` carries a generated password rather than a placeholder, so `docker compose up -d postgres` works on a fresh clone with nothing typed. **The App is the one caller that records**, and the one that takes Feedback: it writes after it renders, so a failed write is a warning beside an answer rather than an error in place of one, its sidebar says whether questions are being recorded and where, and the verdict a person leaves under an answer goes to that answer's own row. `grafana/` charts these rows: the datasource and the dashboard provider as provisioning files, and `question-log.json` — seven panels, each one statement over the log, every panel's query executed by `tests/test_observability.py` against the schema and then through Grafana, and all seven seen rendered on 2026-09-04. No row is written for a question the provider never answered ([DEBT-041](../debt-ledger.md#debt-041--a-question-the-provider-never-answered-is-not-recorded), `accepted`). |
 | Evaluation | ✅ working | `data/gold/` — **twenty-four Gold Questions**, one file each, and `veritas/evaluation/` reads them. A Gold Question carries the question as a person asks it, `expects` — which of a Grounded Answer's three endings is correct, one of `answer`, `refusal`, `clarifying question` — and, where a number is correct, the gold SQL and the gold result. The dataclass field list is the file format, as it is for a Semantic Entry: an unknown key fails to load, and a question that expects no answer may not carry a statement. **The relevant Semantic Entries are derived, never listed**: the Certified Metrics a statement's projections trace to, the certified axes it groups by or filters on, and the Join Paths those two declare — three readings, all through `veritas/validation/`'s own readers, so a Relevant Set is never a second opinion about what a statement computes. `tests/test_gold.py` compares the Join Paths derived that way against the joins the statement itself carries. **Coverage is read off the statements**: all nine Certified Metrics are computed by one, every gold statement keys on its own metric's `date_column` and on no other date, `by region` and `by instrument type` are both sliced, all five Ambiguous Terms are asked about, and all three endings are present. `RESULT_TOLERANCE` is how close two result sets must be to be the same answer — relative, because the metrics span a count of dozens and a notional of tens of millions — and it is what [DEBT-004](../debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal) and [DEBT-011](../debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level) are measured against: the test executes both halves of each Section C pair a Gold Question turns on. **One gold statement the Gate refuses** — `Account Value`, whose only correct form adds the two halves the corpus's `derives_from` describes, which the Gate reads as a Shadow Metric ([DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)); `REFUSED_TODAY` in the test names it, so paying that entry breaks the exemption. **Retrieval is measured.** `veritas/evaluation/retrieval.py` computes hit rate and Mean Reciprocal Rank (MRR) over the twelve Gold Questions that should come back as a number, and `uv run python -m veritas.evaluation retrieval` prints one row per Retrieval Strategy per setting. A ranking is scored against the **searchable part** of a Relevant Set — Join Paths publish no searchable text and no search can return one, so they are dropped rather than counted as misses — and both measures come off one number per question, `reciprocal_rank`, so a hit is a reciprocal rank above zero and the two cannot disagree about what a hit is. The question a ranking is scored for is the rewritten one a **correct** rewrite step would have produced, derived from the gold SQL's own metrics, so the sweep costs no model call and no key. The two settings it varies are the two the Ledger left open: `SearchableForm` and `RewriteForm`, both re-runnable rather than deleted, and their defaults are what the sweep chose ([DEBT-027](../debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) and [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it) paid). **What Veritas answers is measured too.** `veritas/evaluation/generation.py` runs the whole flow — rewrite, retrieve, ground, generate, validate, execute — once per `PromptForm` per registered provider, and `uv run python -m veritas.evaluation generation` prints one row per cell. Three measures come off each run: the **ending** the set calls correct, **Execution Accuracy** over the questions whose ending is a number, and an **LLM-as-judge's agreement** with the first. `EndedBy` names the step of the flow that ended each question — read off the Grounded Answer, which owns the taxonomy since Sub-step 8.3, and extended here by `provider` alone for a call that never came back — so a Gate refusal is not scored as a wrong number and a provider that never replied is not scored at all. A question is compared under the same `RESULT_TOLERANCE` the gold set's own constraints were built against; one gold-labelled a refusal or a Clarifying Question scores by ending the same way. The judge is shown the question, the correct statement and what Veritas did, and **not** the two result sets — comparing numbers is `same_result`'s job, and a judge given them would make the agreement a measure of nothing. `answerable_by_veritas` asks the Gate whether it would allow each Gold Question's **own gold statement** and drops the ones it refuses, so [DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)'s cost is derived and names no question: the day the Gate stops refusing it, the sweep scores one question more with no line edited. The sweep needs keys and is opt-in behind `VERITAS_LIVE_MODEL`; the dated table it printed is in the [Step 007 review](../reviews/step-007-evaluation.md#sub-step-74--measure-generation-execution-accuracy-and-llm-as-judge). |
 | Containerization | ✅ working | `docker-compose.yml` — **all three services the [Target State row](target-state.md#components) names**: `app`, Postgres and Grafana. Postgres holds the Question Log; Grafana is provisioned read-only from `grafana/`, starts once Postgres is healthy, and serves the dashboard as its home page to a reader who signs in for nothing. The App is built from `Dockerfile`: the interpreter `.python-version` pins, the locked dependencies, the Warehouse replayed from `data/snapshots/` at image build, and both Retrieval models under `FASTEMBED_CACHE_PATH` — so a container reaches no network to answer except the model provider's, which `docker run --rm --network none veritas-app python -m veritas.retrieval` is the standing check on. `.env` never enters a layer: the service reads it through `env_file` and overrides two values inside the network, `POSTGRES_HOST` to the service name and `POSTGRES_PORT` to the port Postgres listens on rather than the one compose publishes. Published on `${APP_PORT:-8501}`, started once Postgres is healthy, health-checked on Streamlit's own `/_stcore/health`. `POSTGRES_HOST` still defaults to `localhost` in `.env.example`, because that is the developer path: `uv run streamlit run veritas/app/page.py` on the host reaches the published port. |
+| Public documentation | ✅ working | `README.md` — the grader's document, in the rubric's order, with an index table from each criterion to the section that earns it. It carries the problem as the Gross-against-Net example, the seven-step flow with the rewrite step, the hybrid search and the re-ranker each named, both bring-up paths, **every credential `.env.example` declares and no credential it does not**, the two measured tables with their commands and dates, the seven dashboard panels with the two images the [8.5 review](../reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard) holds, and one section of nothing but limitations. `tests/test_readme.py` is what makes those claims checkable: neither `verify_framework.py` nor `check_language.py` reads `README.md`, so the credential list is checked in both directions, the access-control sentence is read out of the Ledger, and every relative link in `README.md` and `docs/*.md` is resolved — anchors included, under `verify_framework.py`'s own `heading_anchors`, imported rather than rewritten. |
 
 ## Repository layout
 
 ```
 veritas/
+├── README.md                  # the public face — the grader's document, in the rubric's
+│                              # order: the problem, the flow, bring-up, every credential,
+│                              # both measured tables, the dashboard, every limitation
 ├── CLAUDE.md                  # operating agreement (root: Claude Code auto-loads it)
 ├── pyproject.toml, uv.lock, .python-version, .gitignore
 ├── .env.example               # the two provider keys and the Postgres and Grafana
@@ -648,6 +684,10 @@ veritas/
 │   │                          # Streamlit's AppTest — two live tests, skipped with no key
 │   ├── test_observability.py  # the seam, the rows, the dashboard — the row and chart
 │   │                          # claims need Postgres and Grafana up, and skip without
+│   ├── test_container.py      # what the compose file declares and what the image
+│   │                          # carries; the tests that ask a running App skip without one
+│   ├── test_readme.py         # every credential listed both ways, the access-control
+│   │                          # sentence the Ledger's, every public link resolving
 │   └── test_llm.py            # what goes on the wire, against a stub server on localhost
 └── .claude/
     ├── skills/                # 5 framework skills
@@ -682,7 +722,7 @@ veritas/
 **What Veritas answers is measured, and since Sub-step 8.1 the default provider answers
 every answerable Gold Question.** Both halves are scored over the Gold Question Set —
 hit rate and Mean Reciprocal Rank for Retrieval, Execution Accuracy and an LLM-as-judge's
-agreement for generation, across two prompts and both registered providers.
+agreement for generation, across two prompts and every model a sweep names.
 `gpt-5.4-mini` answers **eleven of the eleven** answerable Gold Questions correctly under
 both prompts, against `gpt-4o-mini`'s two, which is why the registry row changed.
 [DEBT-037](../debt-ledger.md#debt-037--nothing-tells-the-generator-that-a-date-it-has-never-heard-of-is-not-a-reason-to-refuse)

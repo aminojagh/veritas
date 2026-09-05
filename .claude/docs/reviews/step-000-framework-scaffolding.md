@@ -71,7 +71,7 @@ entire point.
    two things at once. I would rather start strict and loosen with evidence.
 3. **Framework docs originally lived at `docs/`, not under `.claude/`.** I read
    the state and design documents as genuine project artefacts worth surfacing —
-   an EXANTE reviewer reading this repo sees an ADR log and a glossary, itself
+   a reviewer reading this repo sees an ADR log and a glossary, itself
    evidence for the role. *Resolved 2026-07-23:* Amino chose to keep the whole
    working record under `.claude/`, so it now lives in `.claude/docs/` with only
    `CLAUDE.md` at the root (where Claude Code auto-loads it). See the closure

@@ -12,7 +12,7 @@ Once this brief, the Glossary, and the Target State hold everything material, th
 original job description is redundant and can be removed from the repo.
 
 **Provenance:** distilled from a Senior Data Scientist specification at a
-multi-asset brokerage (EXANTE) — "AI on top of the enterprise data warehouse".
+multi-asset brokerage — "AI on top of the enterprise data warehouse".
 Kept here as system context, not as recruitment copy.
 
 ---
