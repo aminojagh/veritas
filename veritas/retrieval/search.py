@@ -17,11 +17,12 @@ searchable text, so no search can score one.
 searchable text is empty is left out of both indexes rather than sitting in them
 at score zero.
 
-The two models are loaded on first use and cached for the life of the process.
-Both are ONNX models fetched from the Hugging Face hub on first run and cached on
-disk, and neither takes a credential — but neither is snapshotted into the
-repository the way the data sources are, which is
-[DEBT-026](../../.claude/docs/debt-ledger.md#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted).
+The two models are loaded on first use and cached for the life of the process, or
+loaded up front by `Retriever.warm`. Both are ONNX models fetched from the Hugging
+Face hub and cached on disk under `FASTEMBED_CACHE_PATH`, and neither takes a
+credential. `Dockerfile` makes that fetch at image build, so a container carries
+both and searches with no network at all; a checkout run with `uv` fetches them the
+first time something searches.
 """
 
 from collections import defaultdict
@@ -256,6 +257,17 @@ class Retriever:
             self.records,
         )
         return index
+
+    def warm(self) -> None:
+        """Embed the corpus and load both models now, rather than on the first search
+        that needs them.
+
+        What the App calls as its page loads. Everything a `RERANKED` search reaches
+        for is built here, so a model that is not on disk is a failure at start-up
+        rather than one in front of somebody who has just typed a question.
+        """
+        _ = self._vector_index
+        _ = reranker()
 
     def rank(
         self,

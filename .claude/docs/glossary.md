@@ -416,6 +416,7 @@ domain meaning belongs in a section above, with a definition and a status.
 | **ADR** | Architecture Decision Record | Also a Process Language term |
 | **BAAI** | Beijing Academy of Artificial Intelligence | Publishes `bge-small-en-v1.5`, the sentence-embedding model `Retrieval` searches with |
 | **BI** | Business Intelligence | The dashboard layer metric logic is being moved *out* of |
+| **CI** / **CD** | Continuous Integration / Continuous Delivery | The pipeline [EXT-014](extension-register.md#ext-014--the-container-tests-run-as-pipeline-stages-before-and-after-a-deploy) would run `tests/` in, and the release it would verify afterwards |
 | **CIK** | Central Index Key | Securities and Exchange Commission's issuer identifier |
 | **CUSIP** | Committee on Uniform Securities Identification Procedures | North American security identifier |
 | **DDD** | Domain-Driven Design | Where the ubiquitous-language discipline comes from |

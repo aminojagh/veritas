@@ -53,7 +53,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-023](#debt-023--two-proving-systems-run-side-by-side) | Two proving systems run side by side | L | Delivery Mode ends, 2026-09-09 | open |
 | [DEBT-024](#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit) | Source and Step documents carry prose Delivery Mode would not admit | L | Delivery Mode ends, 2026-09-09 | open |
 | [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) | The nine Certified Metrics are implemented twice | M | Any change to a Certified Metric's expression | open |
-| [DEBT-026](#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted) | The retrieval models are downloaded rather than snapshotted | S | The Step that containerizes Veritas, or any offline claim in `README.md` | open |
+| [DEBT-026](#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted) | The retrieval models are downloaded rather than snapshotted | S | The Step that containerizes Veritas, or any offline claim in `README.md` — **🔴 fired** | **paid** (9.1, 2026-09-05) |
 | [DEBT-027](#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match) | The searchable text is one flat field, so a name match cannot outrank a description match | S | The Sub-step of Step 007 that computes hit rate and Mean Reciprocal Rank for Retrieval — **🔴 fired** | **paid** (7.3, 2026-09-01) |
 | [DEBT-028](#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server) | No test reaches a real provider, so the live path is proven only by a stub server | S | Sub-step 6.4, or the first key available | **paid** (6.3, 2026-08-30) |
 | [DEBT-029](#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently) | Ambiguous Term detection is literal, so every other phrasing of a registered word passes silently | M | The Sub-step of Step 007 that writes the Gold Question Set — **🔴 fired** | **paid** (7.2, 2026-09-01) |
@@ -71,7 +71,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded) | A question the provider never answered is not recorded | S | 🔴 fired (8.5) — the charts read the ending alone, and the gap is the one the entry predicted | **accepted** (8.5) |
 | [DEBT-042](#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered) | No panel of the dashboard has been seen rendered | S | Before the capstone is submitted, or the first time the dashboard is opened — **🔴 fired** | **paid** (8.5, 2026-09-04) |
 
-**Open debt:** 14 · **Paid:** 23 · **Accepted:** 3 · **Moved:** 2
+**Open debt:** 13 · **Paid:** 24 · **Accepted:** 3 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2221,7 +2221,8 @@ Any change to a Certified Metric's `expression` field — or repayment of
 
 ### DEBT-026 — The retrieval models are downloaded rather than snapshotted
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 9.1, 2026-09-05
+  (`.claude/docs/reviews/step-009-containerization-and-readme.md`)
 - **Opened:** Sub-step 6.2 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
 - **Size:** S
 - **Location:** `veritas/retrieval/search.py` — `EMBEDDING_MODEL`, `RERANKER_MODEL`
@@ -2256,6 +2257,18 @@ after bring-up appeared to succeed.
 **Trigger**
 The Step that containerizes Veritas — Step 008 — or any claim in `README.md` that
 Veritas runs without network access, whichever comes first.
+
+**How it was paid, Sub-step 9.1 (2026-09-05).** Both halves of *what we should have
+done*, and the Step that containerizes Veritas turned out to be 009 rather than 008.
+`Dockerfile` runs `python -m veritas.retrieval` at image build, a new entry point that
+loads both models into the directory `FASTEMBED_CACHE_PATH` names and uses each once —
+so a fetch that half-succeeds fails the build rather than the first question. The
+[9.1 review](reviews/step-009-containerization-and-readme.md#sub-step-91--the-app-runs-in-docker-compose-beside-postgres-and-grafana)
+carries `docker run --rm --network none veritas-app python -m veritas.retrieval`, which
+is the claim made with the network off. `Retriever.warm()` is the second half: the App
+calls it as its page loads, so a machine without the weights says so under a spinner
+instead of at a question. Not snapshotted into the repository — the entry says why, and
+151.5 MiB in an image layer is where they belong.
 
 ### DEBT-027 — The searchable text is one flat field, so a name match cannot outrank a description match
 

@@ -1,0 +1,28 @@
+# What the build context must not carry. Two kinds: what the image builds for itself,
+# and what would put a secret or the working record inside a layer.
+
+# The key, and anything else a person filled in locally.
+.env
+*.local.json
+
+# Built here by `python -m veritas.ingestion`, from `data/snapshots/`, which stays.
+data/veritas.duckdb
+data/raw/
+data/interim/
+
+# A host virtual environment for a host interpreter — `uv sync` builds the image's own.
+.venv/
+
+# The working record, the scratch directory and the history. None of it is read at
+# run time, and `README.md` points a reader at the repository for all three.
+.claude/
+.git/
+.github/
+scratch/
+
+# Test and cache artefacts.
+tests/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/

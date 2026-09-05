@@ -1,17 +1,57 @@
-# The services Veritas runs beside the App. Postgres holds the Question Log and Grafana
-# charts it; the App's own container is Step 009's.
+# The whole of Veritas, as three services. The App answers questions on
+# http://localhost:8501, Postgres holds the Question Log, and Grafana charts it on
+# http://localhost:3000.
 #
 # Compose reads `.env` from this directory, and so does the App — one set of
 # credentials, so a reviewer who copied `.env.example` gets a server and an application
 # that agree without editing either.
 #
-#     docker compose up -d          # Postgres, then Grafana on http://localhost:3000
+#     docker compose up -d --build          # all three; the first build fetches models
 #
 # Nothing in `tests/` starts or stops this server: the tests that record into it skip
 # when it is not up, and delete the rows they wrote when it is. The module docstring of
 # `tests/test_observability.py` says which those are and what `down` and `down -v` cost.
 
 services:
+  app:
+    # Everything a question needs is in the image — see `Dockerfile`. What is not is
+    # the key, which arrives from `.env` below.
+    build: .
+    container_name: veritas-app
+    env_file: .env
+    environment:
+      # The two values that are not what `.env` says once the App is inside this
+      # network. `POSTGRES_HOST` is the service name rather than `localhost`, and
+      # `POSTGRES_PORT` is the port Postgres listens on rather than the one compose
+      # publishes it as — which are the same number until somebody changes `.env` to
+      # free up 5432. Set here rather than in the file because `settings()` reads the
+      # environment first, so this wins for the container and the file still holds
+      # what `uv run streamlit …` on the host should use.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    depends_on:
+      # The App applies `schema.sql` when it first records. Against a server still
+      # starting, the first question would be answered and not written down.
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8501}:8501"
+    healthcheck:
+      # Streamlit's own endpoint, called with the interpreter already in the image —
+      # `curl` is not, and installing it to ask one question would be a layer for a
+      # one-line script. `--wait` reads this, so `up --wait` returning means the page
+      # is being served rather than that the container started.
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      # Streamlit answers this endpoint as soon as it is listening, before any page has
+      # been loaded — so what the start period covers is the server booting, not the
+      # Warehouse, the indexes or the models. Those are built when the first page loads,
+      # under a spinner a person can see.
+      start_period: 30s
+
   postgres:
     image: postgres:18-alpine
     container_name: veritas-postgres

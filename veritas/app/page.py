@@ -92,15 +92,24 @@ class Shown(NamedTuple):
     question_id: int | None
 
 
-@st.cache_resource(show_spinner="Opening the Warehouse and indexing the Semantic Layer…")
+@st.cache_resource(
+    show_spinner="Opening the Warehouse, indexing the Semantic Layer and loading the "
+                 "Retrieval models…"
+)
 def built() -> Orchestrator:
-    """The Orchestrator this server answers with, built on the first question asked.
+    """The Orchestrator this server answers with, built as the page first loads.
 
     Cached as a resource because it holds the Warehouse connection and the Retriever's
     fitted indexes, and a page that rebuilt those per question would pay the index on
     every keystroke.
+
+    Retrieval is warmed here rather than left to the first search, so an installation
+    whose Retrieval models are not on disk says so under a spinner instead of failing
+    at a question somebody has just typed.
     """
-    return Orchestrator(WarehouseAdapter())
+    orchestrator = Orchestrator(WarehouseAdapter())
+    orchestrator.retriever.warm()
+    return orchestrator
 
 
 @st.cache_resource(show_spinner="Opening the Question Log…")
@@ -180,6 +189,7 @@ def page(
     st.title(TITLE)
     st.caption(CAPTION)
 
+    answering = built() if orchestrator is None else orchestrator
     recorder, where = (log, str(log)) if log is not None else recording()
 
     with st.sidebar:
@@ -198,9 +208,7 @@ def page(
     fresh = None
     if asked and question.strip():
         try:
-            fresh = (built() if orchestrator is None else orchestrator).answer(
-                question.strip(), access_profile
-            )
+            fresh = answering.answer(question.strip(), access_profile)
         except LanguageModelError as unreachable:
             st.session_state.pop(SHOWN, None)
             st.error(

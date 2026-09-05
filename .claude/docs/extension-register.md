@@ -50,8 +50,9 @@ reason) · `superseded`.
 | [EXT-011](#ext-011--more-large-language-model-providers-behind-the-seam) | More Large Language Model providers behind the seam | `veritas/llm/`'s `PROVIDERS` registry · the `LanguageModel` seam | S | open |
 | [EXT-012](#ext-012--the-dashboards-panels-read-the-dashboards-time-range) | The dashboard's panels read the dashboard's time range | each panel's `rawSql` · `question.asked_at` | S | open |
 | [EXT-013](#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own) | Grafana reads the Question Log with credentials of its own | the Grafana datasource file · the `POSTGRES_*` values `.env` declares | S | open |
+| [EXT-014](#ext-014--the-container-tests-run-as-pipeline-stages-before-and-after-a-deploy) | The container tests run as pipeline stages, before and after a deploy | `tests/test_container.py`'s `app` and `container` fixtures · `docker compose up -d --build --wait` | M | open |
 
-**Open:** 13 · **Built:** 0 · **Dropped:** 0
+**Open:** 14 · **Built:** 0 · **Dropped:** 0
 
 ### Target State extension path, mapped
 
@@ -942,3 +943,103 @@ Any one of:
    is the entry that says what the access story is and is not.
 3. A second dashboard or a second reader arrives, at which point one role per reader is
    cheaper than one credential set shared by all of them.
+
+### EXT-014 — The container tests run as pipeline stages, before and after a deploy
+
+- **Status:** open
+- **Opened:** Sub-step 9.1 (`.claude/docs/reviews/step-009-containerization-and-readme.md`)
+- **Seam it lands against:** `tests/test_container.py`'s two runtime fixtures — `app`,
+  which skips when nothing answers on the published port, and `container`, which skips
+  when `docker compose exec` reaches no App — and `docker compose up -d --build --wait`
+  as a bring-up something other than a person performs
+- **Size:** M
+- **Motivated by:** Amino's question at the 9.1 ruling (2026-09-05): *"as far as i know,
+  tests happen before app is served in a CI/CD pipeline, but we're testing the app itself
+  after it's deployed and even execute something inside it. what do the best practices of
+  CI/CD say about this"* — and
+  [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration), whose Readiness is
+  the same pipeline
+
+**What the full system needs**
+
+Continuous integration and continuous delivery (CI/CD) does not sort tests by *whether
+the application is running*. It sorts them by **which environment they are allowed to
+touch**, and the ordinary shape is four stages against one artefact:
+
+| Stage | Environment | What runs there | What it may do |
+|---|---|---|---|
+| Build | the runner | `docker compose build` — the image every later stage uses | — |
+| Unit and static | the runner, nothing serving | this file's claims about `docker-compose.yml`, the `Dockerfile` and `.dockerignore`, and the rest of `tests/` | anything |
+| Integration | a stack the pipeline brings up and destroys | the claims that need a server: the health endpoint, the published port, the page driven through `docker compose exec` | anything — write rows, open a shell, spend a budgeted key |
+| Smoke, or deployment verification | the real deployment, after release | the health endpoint and one canary question | read-only or self-cleaning, idempotent, fast |
+
+Four rules make that ordering mean something.
+
+1. **Build once, test that artefact.** The image the pipeline releases is the image every
+   later stage ran against. A stage that rebuilds has tested something else.
+2. **Running the App is not deploying it.** What makes an environment pre-deploy is that
+   it is disposable and nobody real reaches it — not that nothing is listening. A stage
+   that runs `docker compose up -d --wait`, runs the suite against it and then
+   `docker compose down -v` is the standard integration stage, and `docker compose exec`
+   is the right tool inside it: reaching into the container proves the image's own
+   interpreter, its installed dependencies and its wiring to the network's `postgres`,
+   which nothing asked from outside the port can. So the shape Sub-step 9.1 wrote is
+   pre-deploy work that happens to have no runner yet, not a test misfiled after a
+   deploy.
+3. **After the release, far less, under stricter rules.** Deployment verification asks
+   the deployed instance for its health endpoint and one canary answer, and its result
+   decides the rollout — which is why progressive delivery (canary or blue-green, with
+   automatic rollback) is what gives the stage somewhere to put a failure. Its tests must
+   be idempotent and either read-only or self-cleaning, because the environment is shared
+   and real, and that constraint is exactly why the whole suite never runs there. The
+   same check repeated on a schedule afterwards is synthetic monitoring rather than a
+   test.
+4. **The key comes from the pipeline, not from a file.** The one test that spends a real
+   provider key reads it from `env_file` today; a pipeline reads it from a secret store,
+   and the post-deploy canary spends against a budget somebody has agreed to.
+
+The split has one consequence in the test file: the `docker compose exec` test belongs to
+the integration stage and can never be the post-deploy one, because a real deployment
+offers a port and no shell. Whatever runs after a release has to go through the published
+interface.
+
+**What the slice does instead, and why that is correct here**
+
+Both stages exist as tests and the runner is a person. The file-level claims run
+everywhere; the runtime claims skip — naming what was missing — rather than fail when
+there is no stack, so `uv run pytest` from a fresh clone stays green, and the one that
+spends a key is gated on `VERITAS_LIVE_MODEL` as well. Because the stack it runs against
+is the developer's own rather than disposable, that test already keeps the discipline the
+post-deploy stage would impose on it: it deletes the row it wrote, since the Question Log
+it writes to is the one the Grafana dashboard charts.
+
+**Why this is an extension and not debt**
+
+The tests are right as they stand — the same argument
+[EXT-008](#ext-008--the-data-checks-run-in-continuous-integration) makes about the two
+data checks. There is no shortcut inside them to repay: they assert what they claim, they
+skip only on an absent dependency, and their fixtures are already the contract a runner
+would satisfy. What is missing is a pipeline to run them in, and a **deploy** for a
+post-deploy stage to verify — Veritas runs where the person who started it is sitting, so
+"after the deploy" has no subject. A trigger that cannot fire until the slice becomes
+something else is a wish, which is the test that puts this here rather than on the Ledger.
+
+It lands as pure addition: a workflow file running commands that already exist, plus a
+marker separating the two runtime tests into their stages. No fixture, no assertion and
+no name moves.
+
+**Readiness**
+
+Any one of:
+
+1. A pipeline exists in the repository for any reason —
+   [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration)'s first condition.
+   Its two data checks and this file's build-time claims are the same stage, so whichever
+   entry is built first should place both.
+2. Veritas is deployed anywhere that outlives the session which started it, which is what
+   gives "after the deploy" something to verify.
+   [EXT-013](#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own)'s first
+   Readiness names the same moment from the credentials' side, and the two would be built
+   together: a canary question against a deployment writes a real row.
+3. A second person can push, so "Amino ran the suite before committing" stops being the
+   runner.
