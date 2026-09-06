@@ -36,6 +36,7 @@ from streamlit.testing.v1 import AppTest
 from veritas.app import (
     ENFORCEMENT_NOTE,
     NOTHING,
+    NOTHING_USED,
     formatted,
     identity_lines,
     labels,
@@ -451,7 +452,11 @@ def test_a_refusal_is_an_answer_and_says_which_rule_refused(rejected, lineage):
 
 def test_a_question_asked_back_is_shown_as_a_question(semantic):
     """An Ambiguous Term the question did not settle comes back as a question, and
-    nothing about it looks like an answer."""
+    nothing about it looks like an answer.
+
+    Its Lineage is empty, and what the page says about that is what Lineage means: no
+    statement was allowed, so nothing was used. Not that nothing was retrieved — a
+    question that retrieves no Certified Metric ends before a statement is written."""
     page = asked(GroundedAnswer(
         question="what was our revenue",
         ended_by=EndedBy.REWRITE,
@@ -460,6 +465,7 @@ def test_a_question_asked_back_is_shown_as_a_question(semantic):
     assert page.warning[0].value == "Do you mean Gross Revenue or Net Revenue?"
     assert not page.metric and not page.dataframe and not page.code
     assert "no statement reached the Validation Gate" in shown(page)
+    assert NOTHING_USED in shown(page) and "retrieved" not in shown(page)
 
 
 def test_a_provider_that_cannot_be_reached_is_not_a_traceback():

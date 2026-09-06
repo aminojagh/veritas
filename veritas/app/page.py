@@ -36,6 +36,7 @@ import streamlit as st
 
 from veritas.app.render import (
     ENFORCEMENT_NOTE,
+    NOTHING_USED,
     identity_lines,
     lineage_lines,
     model_line,
@@ -161,7 +162,7 @@ def show(answer: GroundedAnswer) -> None:
     st.subheader("Lineage")
     st.markdown(
         "\n".join(f"- {line}" for line in lineage_lines(answer))
-        or "- nothing was retrieved for this question"
+        or f"- {NOTHING_USED}"
     )
 
     st.subheader("Validation Gate")

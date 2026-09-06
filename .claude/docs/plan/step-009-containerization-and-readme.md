@@ -1,12 +1,22 @@
 # Step 009 — Containerization and `README.md`: finish Veritas for submission
 
-**Status:** **active** — written 2026-09-04 and approved by Amino the same day, by the
+**Status:** **done** — written 2026-09-04 and approved by Amino the same day, by the
 commit that carries this plan, with both [rulings](#rulings-at-approval) taken:
 DEBT-035 is stated in the README, not paid, and 9.2 runs on the morning of
 2026-09-05. **9.1, 9.2 and 9.3 are done**, all twenty-two of their sceptical points ruled on
 2026-09-05, 9.2 in two attempts and under [ruling 3](#rulings-in-flight). **9.4 is done**,
 its six sceptical points ruled on 2026-09-06, paying the last of the four Ledger entries
-this Step settles; 9.5 is next.
+this Step settles. **9.5 is done and every Sub-step with it**: the fresh-clone rehearsal
+found that `Account Value` was answered with one operand of itself, and Amino ruled on
+2026-09-06 to fix it rather than state it — the
+[9.5 review](../reviews/step-009-containerization-and-readme.md#sub-step-95--fresh-clone-rehearsal-and-the-step-closes)
+carries the fix, the question asked again in a browser after it, and ten sceptical
+points — the last two found after the other eight were ruled, one by that screenshot and
+one by counting the Ledger's Index, and both ruled the same day: the App's empty-Lineage
+line fixed, the count check filed as
+[DEBT-044](../debt-ledger.md#debt-044--the-ledgers-running-counts-are-arithmetic-nothing-checks).
+**Nothing is outstanding, and the Step closes with the commit that carries 9.5** — which
+is the commit the capstone is submitted as.
 
 **Goal.** Put the App in the compose file beside Postgres and Grafana, write the
 `README.md` a grader runs Veritas from, pay every Ledger entry whose Trigger names the

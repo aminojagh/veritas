@@ -27,6 +27,12 @@ ENFORCEMENT_NOTE = (
 # and from a rendering bug.
 NOTHING = "—"
 
+# What an empty Lineage says. Lineage records what the *allowed* statement was composed
+# from, so a question that reached no allowing verdict has none — which is not the same
+# thing as nothing having been retrieved, and a page that says the second one blames
+# retrieval for a refusal the Validation Gate made.
+NOTHING_USED = "nothing was used: no statement was allowed to run"
+
 
 def formatted(value: object) -> str:
     """One value out of the Warehouse, as a person reads it.

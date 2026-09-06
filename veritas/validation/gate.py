@@ -172,6 +172,12 @@ DATE_TYPE = "DATE"
 # a read-only, dynamic view of a dictionary**.
 NO_CERTIFIED_EXPRESSIONS: Mapping[str, str] = MappingProxyType({})
 
+# What a `Reading` was given when nobody named the composed metrics — `{name: the
+# Certified Metrics its value adds to its own expression}`, for the corpus's
+# `derives_from`. Empty is the honest default: a Reading built without it judges no
+# metric as composed, which is what every rule did before Sub-step 9.5.
+NO_COMPOSED_METRICS: Mapping[str, tuple[str, ...]] = MappingProxyType({})
+
 
 @dataclass(frozen=True)
 class Reading:
@@ -224,6 +230,7 @@ class Reading:
     refusal: str = ""
     catalogue: Callable[[], Schema] | None = None
     certified_expressions: Mapping[str, str] = NO_CERTIFIED_EXPRESSIONS
+    composed_metrics: Mapping[str, tuple[str, ...]] = NO_COMPOSED_METRICS
 
     @property
     def statement(self) -> exp.Expression:
@@ -301,6 +308,7 @@ def read(
     sql: str,
     catalogue: Callable[[], Schema] | None = None,
     certified_expressions: Mapping[str, str] = NO_CERTIFIED_EXPRESSIONS,
+    composed_metrics: Mapping[str, tuple[str, ...]] = NO_COMPOSED_METRICS,
 ) -> Reading:
     """Parse the statement, or record that it could not be parsed.
 
@@ -327,12 +335,14 @@ def read(
             refusal=str(refusal),
             catalogue=catalogue,
             certified_expressions=certified_expressions,
+            composed_metrics=composed_metrics,
         )
     return Reading(
         sql=sql,
         statements=tuple(s for s in parsed if s is not None),
         catalogue=catalogue,
         certified_expressions=certified_expressions,
+        composed_metrics=composed_metrics,
     )
 
 
@@ -1457,6 +1467,24 @@ class ValidationGate:
         corpus = reading.corpus
         allowed, hit, untraced = certified_metrics_only(expressions, corpus)
         if allowed:
+            # Tracing is necessary and not sufficient for a **composed** metric, whose
+            # `expression` is one operand of its definition rather than the whole of it.
+            # Projecting that operand alone traces perfectly and answers with a fraction
+            # of the metric, so the one shape `certified_metrics_only` cannot judge is
+            # caught here, where the corpus's `derives_from` is in scope.
+            partial = [
+                name for name in dict.fromkeys(hit) if name in reading.composed_metrics
+            ]
+            if partial:
+                adds = ", ".join(
+                    f"{name} adds {' and '.join(reading.composed_metrics[name])}"
+                    for name in partial
+                )
+                return (RejectionReason.INCOMPLETE_CERTIFIED_METRIC,), (
+                    f"{adds} to its own expression, and this statement computes that "
+                    f"expression alone — so it would answer with part of "
+                    f"{' and '.join(partial)} rather than {' and '.join(partial)}"
+                )
             return None
         # Past here the statement is rejected and the branches only choose which
         # reason says so. The verdict itself is `certified_metrics_only`'s, so the
@@ -2118,6 +2146,11 @@ class ValidationGate:
             certified_expressions={
                 name: metric.expression
                 for name, metric in self.semantic.metrics.items()
+            },
+            composed_metrics={
+                name: tuple(metric.derives_from)
+                for name, metric in self.semantic.metrics.items()
+                if metric.derives_from
             },
         )
         ran: list[str] = []

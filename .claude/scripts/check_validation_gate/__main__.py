@@ -69,8 +69,9 @@ def main() -> int:
         "what would carry a Restricted Column into the answer, what computes a "
         "certified metric across a route or over a period or without a filter the "
         "corpus does not certify for it, what slices a metric by an axis no route "
-        "reaches, and what is not scoped to the Access Profile asking; and it allows "
-        "every Certified Metric, sliced by an axis that reaches it"
+        "reaches, what computes one operand of a composed metric and calls it the "
+        "metric, and what is not scoped to the Access Profile asking; and it allows "
+        "every uncomposed Certified Metric, sliced by an axis that reaches it"
     )
     return 0
 

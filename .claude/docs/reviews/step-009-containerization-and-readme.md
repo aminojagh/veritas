@@ -565,3 +565,291 @@ question carry the ruling.
 [plan's Language section](../plan/step-009-containerization-and-readme.md#language); the
 document uses the Glossary's spelling for every domain noun and expands FX and MRR on
 first use as a fresh public document must.
+
+---
+
+## Sub-step 9.5 — Fresh-clone rehearsal, and the Step closes
+
+**Changed.** Amino ran the rehearsal on 2026-09-06 and I did not: the tree was cleaned to
+what a clone holds — every Docker image, volume and cache gone, `uv cache clean` — and
+`README.md` was followed verbatim on both paths. Both work. It found one defect, in the
+one place this project claims to be different from an LLM writing SQL, and Amino ruled the
+same day to fix it rather than state it. So this Sub-step is the rehearsal, the fix, and
+the documents the fix made true — and then, after the first eight points below were
+ruled, a browser confirming the fix, a second one-line fix the screenshot exposed, and
+one entry filed.
+
+**The defect.** `Account Value` was **answered rather than refused**, with 45% of itself.
+It is the one composed metric: its `expression` field is the Positions operand and the
+Cash Balance operand is reached through `derives_from`, which `ValidationGate.traces`
+never read. So the two shapes failed in opposite directions — the correct statement adds
+two scalar subqueries and was refused as a Shadow Metric, and the partial statement
+matched a registered expression exactly and was **allowed**. Asked *"what is our account
+value as of 10 August 2026"*, Veritas returned **15,613,821.53** against **34,972,516.94**,
+labelled `Account Value — money, in EUR`, with `Account Value — metric v1` in the Lineage
+and *"allowed — 8 rules ran"* from the Gate. Neither the model nor the Gate misbehaved:
+the corpus published half a definition and both believed it.
+
+**The fix.** `Reading` carries `composed_metrics` — `{name: what its value adds}`, read
+off the corpus beside the certified expressions it already held — and `traces` refuses a
+statement whose traced metrics include a composed one. New Rejection Reason,
+`incomplete certified metric`, its own member rather than `SHADOW_METRIC` because a
+Shadow Metric is arithmetic the generator invented and this expression was published by
+the corpus. What a person reads is the Gate's own sentence:
+
+```
+Account Value adds Cash Balance to its own expression, and this statement computes that
+expression alone — so it would answer with part of Account Value rather than Account Value
+```
+
+**Verified.** The rehearsal first, run by Amino on 2026-09-06 from the cleaned tree:
+
+```
+$ time docker compose up -d --build          # no images, no uv cache, nothing warm
+ PASS — the Warehouse is built · dim_instrument holds 19 Instruments · fct_instrument_price holds 9554 Market Prices across all 19 …
+real    3m29.003s
+
+$ docker images veritas-app          veritas-app:latest   2.76GB disk   716MB content
+$ uv sync                            9.353s, 99 packages
+$ uv run python -m veritas.ingestion 22.953s, PASS
+```
+
+Then the fix, on the tree Amino commits:
+
+```
+$ uv run pytest tests/test_gold.py -k "composed or allowed_by_the_gate" -q -s
+  Account Value as of 10 August 2026 — refused both ways
+    composed  34972516.937747                shadow metric
+    partial   15613821.52770105587254000000  incomplete certified metric
+2 passed, 21 deselected in 1.87s
+
+$ uv run pytest                              318 passed, 6 skipped in 79.01s
+$ uv run python .claude/scripts/check_validation_gate      PASS
+$ uv run python .claude/scripts/check_validation_feasibility.py   PASS
+$ uv run python .claude/scripts/check_semantic_layer.py    PASS
+$ uv run python .claude/scripts/check_warehouse.py         PASS
+$ uv run python .claude/scripts/verify_framework.py        PASS
+$ uv run python .claude/scripts/check_language.py          PASS
+
+$ docker compose up -d --build && docker compose exec app python -c "…judge the partial statement…"
+veritas-app  Up 9 seconds (healthy)
+allowed : False
+reasons : ('incomplete certified metric',)
+
+$ uv run pytest tests/test_container.py tests/test_observability.py
+32 passed, 1 skipped in 2.00s
+```
+
+The suite was also run with the services stopped and started around it, because the
+README quotes both: **302 passed, 22 skipped** with nothing running, **318 passed, 6
+skipped** with `docker compose up -d`. The six that never come back are the six
+`VERITAS_LIVE_MODEL` guards, named by `pytest -rs`.
+
+**The frozen Gate probes caught the change on the first run, which is what they are
+for.** Three of the five modules asserted the behaviour the fix removes: `traces.py`
+expected every metric's own-fields statement to be allowed, and `route.py` and
+`access.py` used those statements as vehicles for their own rules. Six failures, all
+`Account Value`. All three now read `derives_from` the way the rule does — the traces
+probe asks the composed metric for the refusal, the other two skip it, because a
+statement refused three rules earlier measures the earlier rule. No probe was deleted,
+nothing was ported out, and no metric name was written into any of them. Probe count
+**79 → 77**; the taxonomy is **13 → 14** members.
+
+**The four questions and the dashboard**, from the rehearsal. Three behaved as the README
+says: `gross revenue in Q2 2026` answered with its SQL, Lineage and verdict; `revenue in
+Q2 2026` asked back *"could mean Gross Revenue or Net Revenue"*; `what columns are in
+fct_trade` refused. The fourth was the defect. Feedback submitted on the clarification
+came back *"recorded against this answer"*. Grafana opened on `:3000` with no sign-in and
+five of seven panels carried the traffic; `Validation Gate rejections by Rejection Reason`
+read `No data`, correctly — none of the four was refused by the Gate.
+
+**Then the fourth question was asked again at `:8501`, after the fix** — Amino, later on
+2026-09-06, in the browser, against a real model call. What a person sees is the Gate's
+sentence in red above the SQL and `rejected — incomplete certified metric` under
+**Validation Gate**: [screenshot](images/step-009-app-account-value-refused.png). The App
+recorded both runs of the one question, on one day, either side of the fix — which is the
+Question Log being a record rather than a second story:
+
+```
+$ docker compose exec -T postgres psql -U veritas -d veritas -x -c "SELECT question_id, asked_at, question, ended_by, allowed, reasons, seconds, cost FROM question WHERE question ILIKE '%account value%' ORDER BY question_id;"
+-[ RECORD 1 ]------------------------------------------------
+question_id | 4
+asked_at    | 2026-09-06 14:21:20.39783+00
+question    | what is our account value as of 10 August 2026
+ended_by    | answer
+allowed     | t
+reasons     | {}
+seconds     | 2.8099646150003537
+cost        | 0.00261225
+-[ RECORD 2 ]------------------------------------------------
+question_id | 104
+asked_at    | 2026-09-06 16:26:29.006643+00
+question    | what is our account value as of  10 august 2026
+ended_by    | gate
+allowed     | f
+reasons     | {"incomplete certified metric"}
+seconds     | 4.1226978070008045
+cost        | 0.0025815
+```
+
+The identifiers are 4 and 104 because the suite records into this same database between
+them and deletes its rows by identifier, which the sequence does not give back. And the
+panel that read `No data` no longer does — its own `rawSql` from
+`grafana/dashboards/question-log.json`, run against that database:
+
+```
+$ docker compose exec -T postgres psql -U veritas -d veritas -c "SELECT reason AS \"Rejection Reason\", count(*) AS \"rejections\" FROM question, unnest(reasons) AS reason WHERE allowed IS FALSE GROUP BY 1 ORDER BY 2 DESC"
+      Rejection Reason       | rejections
+-----------------------------+------------
+ incomplete certified metric |          1
+```
+
+**The second fix, and the image rebuilt on it.** The ninth point below, ruled the same
+day it was raised:
+
+```
+$ uv run pytest tests/test_app.py
+32 passed, 2 skipped in 9.83s
+
+$ uv run pytest
+318 passed, 6 skipped in 124.56s
+
+$ docker compose up -d --build
+ Container veritas-app Recreated · Started          app  Up 13 seconds (healthy)
+
+$ docker compose exec -T app python -c "from veritas.app import NOTHING_USED; print(NOTHING_USED)"
+nothing was used: no statement was allowed to run
+
+$ uv run pytest tests/test_container.py tests/test_observability.py
+32 passed, 1 skipped in 3.15s
+
+$ uv run python .claude/scripts/verify_framework.py
+PASS — 1769 links, 1442 anchors, 88 documents and python files
+
+$ uv run python .claude/scripts/check_language.py
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+The suite total does not move, because the claim went into a test that already existed:
+the clarification path already rendered a page with an empty Lineage, and what it asserts
+now is what that page says about one. The constant was read back through the **container's
+own interpreter** for the same reason the Gate rule was — it is the shipped image, not the
+working tree, that a grader runs.
+
+**Debt.**
+[DEBT-043](../debt-ledger.md#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it)
+opened and **paid in the same Sub-step**, `M`, on Amino's ruling.
+[DEBT-035](../debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
+stays **open**, and its **Cost while unpaid was rewritten**: it had claimed since 7.1
+that the metric was *unanswerable*, which was the thing that turned out not to be true,
+and four documents quoted it. `Account Value` is unanswerable now — refused at both
+shapes rather than answered at one. Nothing else opened.
+
+**The running counts were wrong in three places and are corrected here**, off the Index
+table itself. The Ledger read *10 open · 27 paid* over a table holding 9 and 28 — it had
+counted DEBT-043 as open after this Sub-step paid it. Current State carried two more
+copies: *"ten open, twenty-six paid"*, stale by a Sub-step, and *"Open debt: 13"*, stale
+by four — the second in the paragraph whose own first sentence is *"this file does not
+keep a second copy"*. All three now read **10 open · 28 paid · 4 accepted · 2 moved**,
+which is 44 entries with the one below included. The Register's fourteen open extensions
+were counted the same way and are right.
+
+[DEBT-044](../debt-ledger.md#debt-044--the-ledgers-running-counts-are-arithmetic-nothing-checks)
+**opened**, `S`, on Amino's ruling of 2026-09-06: the recount was by hand and nothing
+checks the next one. Trigger 2026-09-09, alongside DEBT-023, DEBT-024 and DEBT-025 —
+what defers it is the deadline and nothing else.
+
+**Sceptically**, ranked.
+
+1. **I edited three frozen check scripts, which Delivery Mode forbids adding to.** The
+   rule reads *"nothing new goes into them and nothing is ported out of them"*, and I
+   read that as being about not investing in the old proving system rather than about
+   leaving it red — a probe whose premise a correctness fix has falsified either gets
+   corrected or fails forever, and a permanently failing check proves nothing. The edits
+   are the minimum: a branch on `derives_from` in each of the three places that assumed
+   every metric behaves alike. **If you would rather they had been left failing with a
+   note, reverting is three hunks.**
+2. **A new Rejection Reason is a taxonomy change three days before submission.** It is
+   additive to a `StrEnum`, nothing enumerates the members exhaustively, and the Grafana
+   panel groups by whatever is in the array — so the blast radius is the two counts in
+   Current State I corrected. The alternative was reusing `SHADOW_METRIC`, which costs
+   nothing and says the wrong thing: DEBT-035's original complaint was an explanation
+   *"true about the parse tree and misleading about the cause"*, and reusing it would
+   have reproduced exactly that while claiming to fix it.
+3. **The rule refuses on the metric, not on the arithmetic.** Anything projecting a
+   composed metric's own expression is now refused, including a statement that went on to
+   add the cash half in some form the corpus does not describe. That is fail-closed and I
+   think correct — there is no certified composed shape to recognise until DEBT-035 is
+   paid — but it is broader than *"this statement is missing an operand"*, and it is why
+   paying DEBT-035 has to touch this rule rather than sit beside it.
+4. **`docs/decisions.md` lost the row it gained an hour earlier.** I added one for the
+   wrong number while the defect stood; the number no longer exists, and a decision
+   register is not a changelog, so the row is deleted rather than annotated. The
+   register's contract is *what to conclude when you meet this number*, and there is no
+   longer a number to meet.
+5. **The rehearsal was `git clean -xdf`, not `git clone` into `scratch/` as the plan
+   wrote it.** With a clean tree the two leave the same files, and `clean -xdf` is the
+   stronger of the two for the failure that matters — a file the build needs that was
+   never committed — because it removes ignored files a clone would simply not have. What
+   only a push proves is that the remote holds what the working tree does.
+6. **Closed the same day it was raised: a person has now asked it at `:8501`.** It was
+   written open — the stack had been rebuilt on the fix and the verdict read back through
+   the **container's own interpreter**, which is what proves the shipped image carries the
+   rule rather than the working tree (`allowed: False · ('incomplete certified metric')`),
+   but no browser and no real model call had touched it. Both are above, with the row the
+   App wrote. What that reached and the container check could not is the pair of things no
+   test asserts: that the model still writes the partial statement when a person asks in
+   their own words, and that the page puts the Gate's sentence where the answer would have
+   been. Nothing was changed to make it pass.
+7. **The doubled cue is real and was predicted in writing before it was seen.** The App's
+   *"read as"* line on the first question read *"what was our gross **Gross Revenue** in
+   Q2 2026"*.
+   [DEBT-030](../debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)
+   named that exact string as the known cost of the splicing arm, before Step 007
+   measured that arm and chose it. No entry: the sweep that picked splicing was run with
+   this in it. It is still the first thing a grader reads on the first question they ask.
+8. **The README's Monitoring section is unchanged and the governance panel starts
+   empty.** It already says the dashboard images are *"the demo's data, not evidence"*, so
+   nothing there is wrong; a grader who asks four sensible questions still sees the
+   rejections panel empty. One line naming a question that fills it would be worth the
+   sentence. Not taken — the README is not wrong, and you asked for it not to grow.
+9. **Found by the screenshot, after the rulings: under **Lineage** the page says
+   *"nothing was retrieved for this question"*, and something was retrieved.** The
+   refusal was generated from the `Account Value` Metric Definition — a question that
+   retrieved no metric ends three steps earlier, at `EndedBy.RETRIEVAL`. What is empty is
+   the Lineage, correctly: 8.2 made it mean *what the allowed statement used*, paying
+   [DEBT-034](../debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used),
+   and a rejected statement used nothing. The caption is older than that meaning — it
+   arrived in 6.5 (`814b07b`), when Lineage was everything the model was shown, and
+   nothing was watching it when the meaning moved underneath. Ranked last because it
+   misleads about provenance and never about a number. **Fixed on your ruling the same
+   day, and the class with it**: the sentence left `page.py` for `render.py` as
+   `NOTHING_USED` — beside `ENFORCEMENT_NOTE` and the `outcome_line(None)` sentence it is
+   the twin of, which is where this file already keeps a string a person reads — and
+   `tests/test_app.py` holds it on the clarification path, where the Lineage really is
+   empty, together with the absence of the word *retrieved* anywhere on that page. What
+   allowed the drift was a sentence with no test and no home next to the thing it
+   describes, and that is what changed; the wording alone would have been the symptom.
+10. **I corrected three counts inside a diff you had already approved, and did not add
+    the check that would have caught them.** They are arithmetic over a table in the same
+    file, so the correction is mechanical and reversible by reading the Index — but it is
+    still an edit after the ruling, and it is the second thing this Step found by looking
+    rather than by running something. A dozen lines in `tests/` would count the Index's
+    status column and assert the header, the way `tests/test_readme.py` already parses
+    `.env.example`. **Filed rather than added, on your ruling** —
+    [DEBT-044](../debt-ledger.md#debt-044--the-ledgers-running-counts-are-arithmetic-nothing-checks),
+    due 2026-09-09 with
+    [DEBT-023](../debt-ledger.md#debt-023--two-proving-systems-run-side-by-side), because
+    a new test on submission day is a new thing to review and nothing moves a status
+    between here and the commit that closes the project.
+
+**Language.** No Term Proposal. `incomplete certified metric` is built from the
+registered term **Certified Metric** and a plain adjective, the way `missing certified
+filter` and `no metric expression` already are, and the Glossary's
+[Rejection Reason](../glossary.md#a-the-system) row puts the members *"in
+`veritas/validation/`, where the Gate enumerates them, and deliberately not in this
+cell"* — so it takes no Glossary row. `composed_metrics`, `derives_from` and `traces`
+are existing identifiers or built from them; *composed metric* is the phrase
+[`semantic/metrics/account_value.yaml`](../../../semantic/metrics/account_value.yaml)
+and DEBT-035 already use. `NOTHING_USED` carries no domain noun and is named for
+`NOTHING` beside it, which it sits under. `check_language.py` passes.

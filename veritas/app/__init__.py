@@ -8,6 +8,7 @@ them and is the only module in the repository permitted to import `streamlit`.
 from veritas.app.render import (
     ENFORCEMENT_NOTE,
     NOTHING,
+    NOTHING_USED,
     formatted,
     identity_lines,
     labels,
@@ -23,6 +24,7 @@ from veritas.app.render import (
 __all__ = [
     "ENFORCEMENT_NOTE",
     "NOTHING",
+    "NOTHING_USED",
     "formatted",
     "identity_lines",
     "labels",

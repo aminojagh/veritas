@@ -170,10 +170,20 @@ def predicate_probes(gate: ValidationGate) -> tuple[AccessProbe, ...]:
 
     Both halves are built from the corpus, so a tenth Metric Definition is a tenth pair
     with no edit here.
+
+    **A composed metric contributes no pair**, and skipping it is what keeps these probes
+    about this rule. Its `expression` is one operand of its value, so the tracing rule —
+    three rules earlier — refuses the statement built from its own fields as an
+    `incomplete certified metric`, and both halves of the pair would come back rejected
+    for a reason this module is not measuring. `traces.py` is where that refusal is
+    asked for. Read off `derives_from` rather than by name, so a second composed metric
+    needs no edit here either.
     """
     predicate = written_predicate(gate, ANALYST)
     built: list[AccessProbe] = []
     for name in sorted(gate.semantic.metrics):
+        if gate.semantic.metrics[name].derives_from:
+            continue
         scoped = certified_statement(gate, name, ANALYST)
         built.append(
             AccessProbe(

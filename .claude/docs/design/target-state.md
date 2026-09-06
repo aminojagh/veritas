@@ -225,18 +225,24 @@ Two Debt Ledger entries already fire on the README being written
 [DEBT-008](../debt-ledger.md) on the access-control claim), so this list belongs
 in the same pass as both.
 
-**This reading is Claude's and has not been checked against the rubric text**,
-which is not in the repository. Amino settled the practical question on
-2026-08-30: the OpenAI key is the one the course asks for, so it is the one
-Veritas assumes, and the local-model fallback that used to stand behind that
-assumption is gone rather than dormant.
+**Checked against the rubric text on 2026-09-04 and again on 2026-09-05**, fetched
+both days from <https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md>.
+The map holds, with one row corrected: LLM evaluation, whose *"≥2 prompts and ≥2
+models"* was this project's own invention and not the rubric's bar — the second
+reading is what
+[ruling 3](../plan/step-009-containerization-and-readme.md#rulings-in-flight) acted
+on. The credential reading above is unchanged by it: the rubric sets no credential
+rule, so the table is this project's own standard rather than a criterion, and Amino
+settled the practical question on 2026-08-30 — the OpenAI key is the one the course
+asks for, so it is the one Veritas assumes, and the local-model fallback that used to
+stand behind that assumption is gone rather than dormant.
 
 ---
 
 ## Extension path to the full proposal
 
-The slice is shaped so the MVP for `final_proposal_target.md` is addition, not
-rewrite. Each of these lands against an existing seam:
+The slice is shaped so the MVP for the [Product Brief](product-brief.md) is addition,
+not rewrite. Each of these lands against an existing seam:
 
 | Full-MVP capability | Seam it plugs into |
 |---|---|

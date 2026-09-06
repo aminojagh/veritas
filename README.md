@@ -180,9 +180,10 @@ The first build takes a few minutes and the image is large, because everything a
 question needs is built into it: the interpreter [`.python-version`](.python-version)
 pins, the dependencies [`uv.lock`](uv.lock) locks, the **Warehouse replayed from the
 committed snapshots**, and **both Retrieval models**. The key is the only thing that
-arrives at run time, from `.env`, and it never enters a layer. Measured on
-2026-09-05: `docker compose build --no-cache app` in 3m35s, a 2.77 GB image — the
-command and the breakdown are in the
+arrives at run time, from `.env`, and it never enters a layer.
+
+Expect **3m29s** to all three services and a **2.76 GB** image — measured 2026-09-06
+with no Docker or `uv` cache at all. The layer-by-layer breakdown is in the
 [9.1 review](.claude/docs/reviews/step-009-containerization-and-readme.md#sub-step-91--the-app-runs-in-docker-compose-beside-postgres-and-grafana).
 
 The first page load takes about fifteen seconds — the Warehouse, the text index, the
@@ -205,6 +206,12 @@ it holds; the App does it for you on first load if they are not there yet. The
 Question Log is optional here — `docker compose up -d postgres grafana` gives you one,
 and without it the App says in its sidebar that it is not recording and answers
 questions exactly as before.
+
+**`uv run pytest` skips what it cannot reach, and says so.** With nothing else running:
+**302 passed, 22 skipped**. After `docker compose up -d`: **318 passed, 6 skipped** — the
+sixteen that come back drive a running App and read the Question Log. The last six need
+a model and stay skipped unless `VERITAS_LIVE_MODEL=1` is set, because they spend the
+key. Measured 2026-09-06.
 
 Everything is pinned: the interpreter in `.python-version`, every dependency and
 transitive dependency in `uv.lock`, the Postgres and Grafana image tags in
@@ -477,16 +484,24 @@ forgets to route through the Gate — bypasses it completely. The App renders th
 paragraph in its sidebar beside the identity, character for character.
 ([DEBT-008](.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers))
 
-**`Account Value` is unanswerable today.** It is the one *composed* metric in the
-corpus — cash plus positions marked to market — and the only correct statement for it
-adds two scalar subqueries. The Gate reads that outer addition as an expression it
-cannot trace and refuses it as a Shadow Metric. So a Certified Metric that both
-`balance` and *"how much does X have"* resolve to has no statement Veritas will run,
-and a question that asks for it is refused with an explanation that is true about the
-parse tree and misleading about the cause. It is written into the Gold Question Set
-with its correct statement and correct result, so the specification is on record and
-the Gate is measurably behind it.
-([DEBT-035](.claude/docs/debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows))
+**`Account Value` cannot be answered, and the refusal is the honest one.** It is the one
+*composed* metric in the corpus — cash plus positions marked to market — and its
+definition carries the positions expression plus a `derives_from` field naming
+`Cash Balance`. Both shapes a statement can take are refused. The **correct** one adds
+two scalar subqueries, and the Gate reads that outer addition as an expression it cannot
+trace: a Shadow Metric. The **partial** one computes the positions expression alone,
+which traces perfectly and would answer with roughly 45% of the metric; the Gate refuses
+it as an `incomplete certified metric` and tells the reader *"Account Value adds Cash
+Balance to its own expression … so it would answer with part of Account Value rather
+than Account Value"*.
+
+So a Certified Metric that both `balance` and *"how much does X have"* resolve to has no
+statement Veritas will run, and asking for it gets a refusal rather than a number. The
+Gold Question Set carries the correct statement and the correct result, so the
+specification is on record and the Gate is measurably behind it; `tests/test_gold.py`
+pins both refusals.
+([DEBT-035](.claude/docs/debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows),
+[DEBT-043](.claude/docs/debt-ledger.md#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it))
 
 **Cost figures are list prices on the day the vendor's page was last read.** The
 dashboard's cost column is *"what this would have cost at 2026-09-05 list prices"* —

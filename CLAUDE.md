@@ -1,8 +1,8 @@
 # CLAUDE.md — Operating Agreement
 
 **Veritas** — an end-to-end LLM application. Capstone for the DataTalks.Club LLM
-Zoomcamp, and a deliberately minimal slice of a larger system proposed in
-`final_proposal_target.md`.
+Zoomcamp, and a deliberately minimal slice of the larger system in
+[`.claude/docs/design/product-brief.md`](.claude/docs/design/product-brief.md).
 
 > **Design settled, building against a deadline.** The Glossary's Domain Language
 > and the Target State are both `agreed`. Steps 000–005 are built and committed:

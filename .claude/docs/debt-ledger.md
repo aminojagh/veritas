@@ -70,8 +70,10 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-040](#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves) | The price table is a vendor's page copied once, and nothing notices when it moves | S | The final documentation pass, or the first cost figure quoted outside a review — **🔴 fired** | **paid** (9.3, 2026-09-05) |
 | [DEBT-041](#debt-041--a-question-the-provider-never-answered-is-not-recorded) | A question the provider never answered is not recorded | S | 🔴 fired (8.5) — the charts read the ending alone, and the gap is the one the entry predicted | **accepted** (8.5) |
 | [DEBT-042](#debt-042--no-panel-of-the-dashboard-has-been-seen-rendered) | No panel of the dashboard has been seen rendered | S | Before the capstone is submitted, or the first time the dashboard is opened — **🔴 fired** | **paid** (8.5, 2026-09-04) |
+| [DEBT-043](#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it) | The Gate certifies half of a composed metric as the whole of it | M | Before the capstone is submitted, or the first Sub-step that changes a `ValidationGate` rule — **🔴 fired** | **paid** (9.5, 2026-09-06) |
+| [DEBT-044](#debt-044--the-ledgers-running-counts-are-arithmetic-nothing-checks) | The Ledger's running counts are arithmetic nothing checks | S | Delivery Mode ends, 2026-09-09 | open |
 
-**Open debt:** 10 · **Paid:** 26 · **Accepted:** 4 · **Moved:** 2
+**Open debt:** 10 · **Paid:** 28 · **Accepted:** 4 · **Moved:** 2
 
 DEBT-005 through DEBT-008 were opened by Sub-step 1.3 and resolved by Amino's
 review on 2026-08-04, which is why three of the four are no longer open debt:
@@ -2893,12 +2895,22 @@ measurably behind it.
 
 **Cost while unpaid**
 
-`Account Value` is unanswerable. It is a Certified Metric, it is the answer to *"how much
-does this Client have"* that Cash Balance is not, both Ambiguous Terms that resolve to it
-— `balance` and `how much does X have` — can resolve to it, and there is no statement
-Veritas will run that computes it. A question that asks for it is refused by the Gate
-with an explanation about Shadow Metrics, which is true about the parse tree and
-misleading about the cause.
+`Account Value` is unanswerable: the one statement that computes it correctly is the one
+statement Veritas will not run. It is a Certified Metric, it is the answer to *"how much
+does this Client have"* that Cash Balance is not, and both Ambiguous Terms that resolve
+to it — `balance` and `how much does X have` — resolve to a metric with no statement
+behind it. A question asking for it is refused.
+
+**This entry's cost was mis-stated until 2026-09-06**, and the correction is worth
+keeping because it is what the rehearsal bought. The sentence above was written as
+though refusing were the *only* thing that could happen. It was not: the partial
+statement — the metric's own `expression` field, which is one operand of its value —
+traced perfectly and was **allowed**, so the metric answered with 45% of itself under
+its own name. That was a second defect,
+[DEBT-043](#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it),
+**paid in Sub-step 9.5**; the refusal this entry describes is now what actually happens,
+at both shapes. Paying this one allows the composed statement and makes the metric
+answerable, and DEBT-043's rule is then what keeps the partial one refused.
 
 It also puts a **scoped exemption** in `tests/test_gold.py`: `REFUSED_TODAY` names the
 one Gold Question whose statement the Gate refuses, by name, so the test asserts today's
@@ -2923,11 +2935,8 @@ open.** Amino ruled on 2026-09-04, with the approval of the
 this is stated and not paid: the schedule's slack before the deadline is one `L` wide and
 paying this would spend all of it on one of nine metrics.
 [What Veritas will not do](../../README.md#what-veritas-will-not-do-and-what-it-gets-wrong)
-says `Account Value` is unanswerable, why the Gate refuses the only correct statement for
-it, that both Ambiguous Terms resolving to it therefore reach nothing, and that the Gold
-Question Set carries the correct statement so the Gate is measurably behind a written
-specification. Nothing here is paid by saying so — the metric is still unanswerable and
-the exclusion still costs a question out of every generation figure.
+carries the statement, and names both refusals since Sub-step 9.5. Nothing here is paid
+by saying so, and the exclusion still costs a question out of every generation figure.
 
 **7.4 ran without paying it, 2026-09-02**, and the second branch is what happened: the
 question is named in the sweep's own header line and in the Step Review. Widening the
@@ -3531,3 +3540,144 @@ are of. Nothing in the list above was found wrong. The images were retaken after
 twenty questions of that review's third sceptical point, so what they show is the log the
 frame table beside them counts — the two pictures and the eight frames can be read against
 each other.
+
+---
+
+### DEBT-043 — The Gate certifies half of a composed metric as the whole of it
+
+- **Status:** **paid** — Sub-step 9.5, 2026-09-06, in the Sub-step that opened it
+- **Opened:** Sub-step 9.5 (`.claude/docs/reviews/step-009-containerization-and-readme.md`)
+- **Size:** M
+- **Location:** `veritas/validation/gate.py` — `ValidationGate.traces`, and
+  `semantic/metrics/account_value.yaml`, whose `expression` is one of the metric's two
+  halves
+
+**What we did**
+
+Registered a composed metric whose `expression` field holds only its own half — the
+Positions marked to market — with the other half reached through `derives_from`. Every
+reader of that field takes it for the whole metric. The tracing rule matches a
+projection against `expression` and certifies it; the entry Retrieval hands the
+generator publishes the same field as the metric's SQL. So the statement a model
+naturally writes for *"what is our account value"* is the half, and the Gate stamps it
+allowed.
+
+**What we should have done**
+
+Refuse it, or compute it. The narrow correctness fix is one clause in `traces`: a
+projection that matches the `expression` of a metric with a non-empty `derives_from` is
+**not** that metric, because the metric is the sum its `derives_from` names — so the
+statement is refused rather than certified, and `Account Value` becomes genuinely
+unanswerable, which is what every document already claims and what `REFUSED_TODAY`
+already expects. The full fix is [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows):
+read `derives_from` and allow the composed statement, which makes the metric answerable
+and this entry moot.
+
+**Why we deferred**
+
+Not deferred. Found by the fresh-clone rehearsal and paid in the same Sub-step, on
+Amino's ruling of 2026-09-06 against the alternative of stating it in the README and
+shipping it: a metric that answers wrongly is a worse thing to submit than one that
+refuses.
+
+**Cost while unpaid**
+
+**Veritas answers `Account Value` with a number that is not `Account Value`, and
+presents it as certified.** Asked *"what is our account value as of 10 August 2026"* on
+2026-09-06 it returned **15,613,821.53** against a correct **34,972,516.94** — 45% of
+the answer, short by the whole Cash Balance half — under the label *"Account Value —
+money, in EUR"*, with the Gate's *"allowed — 8 rules ran"* beneath it and
+`Account Value — metric v1` in the Lineage. Both Ambiguous Terms that resolve to it,
+`balance` and `how much does X have`, reach the same half.
+
+This is the failure Veritas exists to prevent, produced by Veritas: a confidently wrong
+number with a provenance trail that reads as if it were checked. It is worse than the
+`unanswerable` this was believed to cost, because a refusal is visible and this is not.
+
+`tests/test_gold.py::test_the_gate_certifies_half_of_the_composed_metric_as_the_whole_of_it`
+holds it, prints both numbers and their difference, and breaks when either this entry or
+DEBT-035 is paid.
+
+**Trigger**
+
+**Before the capstone is submitted**, or the first Sub-step that changes a rule in
+`ValidationGate` — whichever is first. Fired and paid on the first.
+
+**How DEBT-043 was paid, Sub-step 9.5 (2026-09-06).** `Reading` carries
+`composed_metrics` — `{name: what its value adds}`, read off the corpus beside the
+certified expressions it already carried — and `ValidationGate.traces` refuses a
+statement whose traced metrics include a composed one, with a new Rejection Reason,
+`incomplete certified metric`. It is its own member rather than `SHADOW_METRIC` because
+the two are different things to go and fix: a Shadow Metric is arithmetic the generator
+invented, and this expression was published by the corpus. What a person now reads is
+*"Account Value adds Cash Balance to its own expression, and this statement computes
+that expression alone — so it would answer with part of Account Value rather than
+Account Value"*.
+
+**Three of the frozen Gate probes asserted the behaviour this removed**, and caught the
+change on the first run — `traces.py` expected every metric's own-fields statement to be
+allowed, and `route.py` and `access.py` used those statements as their vehicles. All
+three now read `derives_from` the way the rule does: the traces probe asks a composed
+metric for the refusal, and the other two skip it, because a statement refused three
+rules earlier measures the earlier rule. No probe was deleted and no name was written
+into one.
+
+**What paying this does not buy.** `Account Value` is still unanswerable — it is now
+refused at both shapes instead of answered at one. That is
+[DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows),
+which stays open, and paying it makes this rule the only thing standing between a
+partial statement and a wrong number.
+
+
+---
+
+### DEBT-044 — The Ledger's running counts are arithmetic nothing checks
+
+- **Status:** open
+- **Opened:** Sub-step 9.5 (`.claude/docs/reviews/step-009-containerization-and-readme.md`)
+- **Size:** S
+- **Location:** `.claude/docs/debt-ledger.md` — the count line under the Index — and
+  `.claude/docs/design/current-state.md`, which quotes it in two places
+
+**What we did**
+
+Recounted by hand and moved on. Sub-step 9.5 found the Index reading *10 open · 27 paid*
+over a table holding 9 and 28 — it had counted [DEBT-043](#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it)
+as open after the same Sub-step paid it — and two further copies in Current State, one
+stale by a Sub-step and one by four. All three were rewritten from the table, and
+nothing was added that would catch the next one.
+
+**What we should have done**
+
+A test in `tests/` that reads the Index table, counts the status column, and asserts the
+count line against it, the way `tests/test_readme.py` already parses `.env.example` and
+holds the README to it. The same test covers the Extension Register, whose count line is
+the same shape. Then delete the two copies in Current State — that file's own paragraph
+says *"this file does not keep a second copy"*, and a count is exactly what it was
+keeping.
+
+**Why we deferred**
+
+The drift was found after Amino had read and staged the Step's diff, on the day the
+capstone is submitted. A new test is a new thing to review, and nothing moves a status
+between the fix and the commit that closes the project — so the corrected numbers stay
+correct without it. Amino ruled on 2026-09-06 to file it rather than take it.
+
+**Cost while unpaid**
+
+The three numbers a reader of the Ledger meets first are unchecked prose in a project
+whose second Non-Negotiable is that shortcuts are counted. They were wrong for at least
+two Sub-steps and nothing noticed; the only reason they are right now is that somebody
+counted 43 rows by eye. An open-debt figure that reads one too high is a wish on the
+Ledger — the precise thing the count exists to prevent — and a figure that reads too low
+would hide one. Current State's two copies make it three numbers to keep true by hand,
+and they are the ones a cold session reads first.
+
+**Trigger**
+
+Delivery Mode ends, 2026-09-09 — the date [DEBT-023](#debt-023--two-proving-systems-run-side-by-side),
+[DEBT-024](#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit)
+and [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) also come
+due. Dated rather than observable for DEBT-023's reason: what defers it is the deadline
+and nothing else. The first Sub-step after that date which changes any entry's status is
+where it is cheapest to pay, because that Sub-step has to touch the count anyway.

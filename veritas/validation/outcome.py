@@ -148,6 +148,30 @@ class RejectionReason(StrEnum):
     vacuous pass is half of what the spike achieved by accident.
     """
 
+    INCOMPLETE_CERTIFIED_METRIC = "incomplete certified metric"
+    """The statement computes part of a Certified Metric and calls it the metric.
+
+    A Metric Definition may name, in `derives_from`, the Certified Metrics whose value
+    is **added** to its own `expression`. For such a metric the `expression` field is
+    one operand and not the metric, so a statement projecting it alone traces
+    perfectly and answers with a fraction of the right number.
+
+    **Its own bar rather than `SHADOW_METRIC`'s**, and the distinction is the one this
+    taxonomy is for. A Shadow Metric is a metric *"computed inline in a query instead
+    of drawn from the Semantic Layer"* — the Glossary's words — and this expression was
+    drawn from the Semantic Layer, exactly as published. Charting it as a Shadow Metric
+    would tell a reader the generator invented arithmetic when what happened is that
+    the corpus published half a definition and the statement believed it.
+
+    **Nothing a caller can rewrite clears it**, which is the property it shares with
+    `UNREACHABLE_AXIS` rather than with `SHADOW_METRIC`: the only correct statement for
+    a composed metric adds a scalar subquery per operand, and the tracing rule refuses
+    that outer addition as a Shadow Metric. So a composed metric is unanswerable in
+    both directions until
+    [DEBT-035](../../.claude/docs/debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows)
+    is paid, and this member is what makes that fail loudly instead of quietly.
+    """
+
 
     RESTRICTED_COLUMN = "restricted column"
     """A column the Access Profile forbids reaches the statement's answer.

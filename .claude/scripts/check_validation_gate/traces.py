@@ -404,22 +404,43 @@ def certified_probes(gate: ValidationGate) -> tuple[Probe, ...]:
     **Since Sub-step 5.5 it is also scoped to the Access Profile**, because *"the
     simplest statement that computes this metric"* and *"the simplest statement that
     computes this metric and is allowed to run"* stopped being the same string that
-    Sub-step. These nine are the only probes in this module the Gate still allows, and
+    Sub-step. These are the only probes in this module the Gate still allows, and
     they are what makes *"a Gate that recognises three of nine rejects two thirds of the
     questions Veritas exists to answer"* a claim about the Gate's verdict rather than
     only about this rule's. The construction is `probes.certified_statement`, shared with
     `route.py` and `access.py` so the three ask the corpus one question.
+
+    **A composed metric is the one exception, and the corpus says which.** Where a Metric
+    Definition names other Certified Metrics in `derives_from`, its `expression` is one
+    operand of its value and not the whole of it — so the statement built from its own
+    fields computes part of the metric and answers with a fraction of the right number.
+    Sub-step 9.5 made the Gate refuse exactly that, as `incomplete certified metric`, and
+    this asks for the refusal by reading the same field the rule reads. Still one probe
+    per metric, still no name written here.
     """
     return tuple(
         Probe(
             name=name,
             sql=certified_statement(gate, name, ANALYST),
-            verdict=ALLOWED,
-            why=f"{name} is certified, so the statement that computes it the way its "
-                f"own Metric Definition says — reached through the `{ACCESS_AXIS}` "
-                f"route and narrowed to the permitted region — has to be allowed",
+            verdict=REJECTED if metric.derives_from else ALLOWED,
+            reasons=(
+                (RejectionReason.INCOMPLETE_CERTIFIED_METRIC,)
+                if metric.derives_from
+                else ()
+            ),
+            why=(
+                f"{name} is composed — it derives from "
+                f"{', '.join(metric.derives_from)} — so the statement built from its "
+                f"own fields computes one operand of it. It has to be refused, and "
+                f"named incomplete rather than a Shadow Metric, which its expression "
+                f"is not: the corpus published it"
+                if metric.derives_from
+                else f"{name} is certified, so the statement that computes it the way "
+                f"its own Metric Definition says — reached through the `{ACCESS_AXIS}` "
+                f"route and narrowed to the permitted region — has to be allowed"
+            ),
         )
-        for name in sorted(gate.semantic.metrics)
+        for name, metric in sorted(gate.semantic.metrics.items())
     )
 
 

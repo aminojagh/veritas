@@ -58,6 +58,23 @@ from veritas.validation import (
 # breaks this test and the exemption goes with it.
 REFUSED_TODAY = {"Account Value as of 10 August 2026": (RejectionReason.SHADOW_METRIC,)}
 
+# The statement Veritas ran when a person asked it for `Account Value`, read out of the
+# Question Log rather than retyped. It is the metric's own `expression` over the metric's
+# own `join_paths` — one operand of a composed definition — and it executes to a fraction
+# of the metric. The Gate refused it from Sub-step 9.5 on, which is
+# [DEBT-043](../.claude/docs/debt-ledger.md#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it);
+# before that it was allowed, and the App answered with it.
+ACCOUNT_VALUE_WITHOUT_THE_CASH = """\
+SELECT sum(CAST(fct_position_snapshot.quantity AS DECIMAL(38, 6)) * fct_instrument_price.market_price * fct_fx_rate.fx_rate) AS answer
+FROM fct_position_snapshot
+JOIN dim_instrument ON dim_instrument.instrument_id = fct_position_snapshot.instrument_id
+JOIN fct_instrument_price ON fct_instrument_price.price_date = fct_position_snapshot.snapshot_date AND fct_instrument_price.instrument_id = fct_position_snapshot.instrument_id
+JOIN fct_fx_rate ON fct_fx_rate.rate_date = fct_position_snapshot.snapshot_date AND fct_fx_rate.from_currency = dim_instrument.quotation_currency AND fct_fx_rate.to_currency = 'EUR'
+JOIN dim_account ON dim_account.account_id = fct_position_snapshot.account_id
+JOIN dim_client ON dim_client.client_id = dim_account.client_id
+WHERE dim_client.client_region = 'EU' AND fct_position_snapshot.snapshot_date = DATE '2026-08-10'\
+"""
+
 # The Gold Question each Section C pair below is measured on, by name.
 KEYED_ON_TRADE_DATE = "Gross Revenue in the second quarter of 2026"
 VALUED_AT_EXECUTION_PRICE = "Traded Notional on 18 March 2025"
@@ -115,6 +132,55 @@ def test_every_gold_sql_is_allowed_by_the_gate(gold, gate):
         if not gate.judge(question.sql, ANALYST).allowed
     }
     assert refused == REFUSED_TODAY
+
+
+def test_a_composed_metric_is_refused_in_both_directions(
+    gold, gate, warehouse, semantic
+):
+    """Neither statement for `Account Value` is allowed, and they fail differently.
+
+    The test above says the **composed** statement — the only correct one — is refused
+    as a Shadow Metric, which is
+    [DEBT-035](../.claude/docs/debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows).
+    This says the **partial** one is refused too, as an `incomplete certified metric`,
+    which is
+    [DEBT-043](../.claude/docs/debt-ledger.md#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it)
+    paid. Together they are the whole of what a composed metric can do today: a metric
+    with no answer, failing loudly at both shapes rather than quietly at one.
+
+    The number is asserted as well as the verdict, because what made this worth a rule
+    is not that the statement was uncertified — it is that it executes, and to a
+    fraction of the metric. Paying DEBT-035 breaks this test, which is the point.
+    """
+    definition = semantic.metrics["Account Value"]
+    assert definition.derives_from, "this is the composed metric or the test is moot"
+    # The README and `docs/decisions.md` both tell a reader this reaches one metric and
+    # no other, which is only true while one metric is composed.
+    composed_metrics = [
+        name for name, metric in semantic.metrics.items() if metric.derives_from
+    ]
+    assert composed_metrics == ["Account Value"], composed_metrics
+    assert " ".join(definition.expression.split()) in " ".join(
+        ACCOUNT_VALUE_WITHOUT_THE_CASH.split()
+    ), "the recorded statement no longer carries the metric's own expression"
+
+    verdict = gate.judge(ACCOUNT_VALUE_WITHOUT_THE_CASH, ANALYST)
+    assert verdict.reasons == (RejectionReason.INCOMPLETE_CERTIFIED_METRIC,), (
+        verdict.explanation
+    )
+
+    question = next(one for one in gold if one.name in REFUSED_TODAY)
+    correct = Decimal(str(question.result[0][0]))
+    partial = warehouse.query(ACCOUNT_VALUE_WITHOUT_THE_CASH)[0][0]
+    assert not same_result(question.result, [[partial]]), (
+        "the refused statement now returns the composed result, so the two shapes have "
+        "stopped differing and this test is measuring nothing"
+    )
+    print(
+        f"\n  {question.name} — refused both ways"
+        f"\n    composed  {correct}  shadow metric"
+        f"\n    partial   {partial}  incomplete certified metric"
+    )
 
 
 def test_every_gold_sql_executes_to_its_gold_result(gold, gate, warehouse):

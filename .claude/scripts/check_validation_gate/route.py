@@ -675,6 +675,17 @@ def check_every_certified_metric_stays_on_its_route(
     metric that proves the route and the date readings walk every scope rather than only
     the outermost one.
     """
+    # A composed metric never reaches this rule. Its `expression` is one operand of its
+    # value, the tracing rule three rules earlier refuses the statement built from its
+    # own fields as an `incomplete certified metric`, and a probe refused before this
+    # rule runs measures the earlier rule — which is the distinction
+    # `check_this_rule_ran` below exists to keep. Read off `derives_from` rather than
+    # by name, so a second composed metric needs no edit here.
+    reaching = {
+        name: metric
+        for name, metric in sorted(gate.semantic.metrics.items())
+        if not metric.derives_from
+    }
     ran = allowed = 0
     for name, metric in sorted(gate.semantic.metrics.items()):
         sql = certified_statement(gate, name, ANALYST)
@@ -682,7 +693,7 @@ def check_every_certified_metric_stays_on_its_route(
         if rule in outcome.rules:
             ran += 1
             allowed += outcome.allowed
-        if not outcome.allowed:
+        if not outcome.allowed and name in reaching:
             problems.append(
                 f"{name} computed the way its own Metric Definition says is rejected by "
                 f"the Gate at {outcome.rules[-1]!r}: {outcome.explanation}\n      {sql}"
@@ -696,14 +707,16 @@ def check_every_certified_metric_stays_on_its_route(
             f"{len(metric.filters)} certified filter(s) · starts at "
             f"{', '.join(sorted(required.from_tables))}"
         )
+    composed = len(gate.semantic.metrics) - len(reaching)
     report.say(
         f"this rule ran on {ran} of {len(gate.semantic.metrics)} Certified Metrics and "
-        f"allowed {allowed} of them"
+        f"allowed {allowed} of them — {composed} composed metric(s) are refused at "
+        f"'traces' and never reach it"
     )
-    if allowed != len(gate.semantic.metrics):
+    if allowed != len(reaching):
         problems.append(
-            "this rule refused a Certified Metric computed exactly as its own entry "
-            "says, so what it is enforcing is not what the corpus certifies"
+            "this rule refused an uncomposed Certified Metric computed exactly as its "
+            "own entry says, so what it is enforcing is not what the corpus certifies"
         )
 
 
