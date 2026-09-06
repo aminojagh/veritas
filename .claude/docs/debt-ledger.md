@@ -40,7 +40,7 @@ A trigger that can only fire after Veritas becomes something else is a wish.
 | [DEBT-010](#debt-010--movement_type-has-no-registered-value-vocabulary) | `movement_type` has no registered value vocabulary | S | The first Cash Movement row is generated | **paid** (Sub-step 2.1) |
 | [DEBT-011](#debt-011--execution-price-against-market-price-cancels-at-book-level) | Execution Price against Market Price cancels at book level | S | Building the Gold Question Set — **🔴 fired** | **paid** (7.1, 2026-09-01) |
 | [DEBT-012](#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes) | The price table is sparse, so the Snapshot calendar has holes | M | The first "as of" date chosen by anything but the Snapshot calendar | open |
-| [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review | open |
+| [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews) | The decisions that move a number live only in internal reviews | M | The final documentation pass, before peer review — **🔴 fired** | **paid** (9.4, 2026-09-05) |
 | [DEBT-014](#debt-014--the-spike-allows-a-query-the-gate-must-reject) | The spike allows a query the Gate must reject | S | The Sub-step that builds the Validation Gate — **🔴 fired** | **paid** (Sub-step 5.4) |
 | [DEBT-015](#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast) | The dialect scan names functions, and the loss measured was in a cast | S | The first Metric Definition carrying a cast — **🔴 fired** | **paid** (Sub-step 4.3) |
 | [DEBT-016](#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type) | The Semantic Layer check cannot name the engine's error type | S | The first component outside `.claude/scripts/` that handles a failed query — **🔴 fired** | **paid** (Sub-step 5.1) |
@@ -1113,7 +1113,9 @@ indistinguishable from not having noticed."*
 
 ### DEBT-013 — The decisions that move a number live only in internal reviews
 
-- **Status:** open
+- **Status:** **paid** — Sub-step 9.4, 2026-09-05. **See
+  [How DEBT-013 was paid](#how-debt-013-was-paid) at the end of the entry**, including
+  what paying it does not buy.
 - **Opened:** Sub-step 2.5, on Amino's instruction (2026-08-13)
 - **Size:** M
 - **Location:** `.claude/docs/reviews/` (where the decisions are), `README.md` (not
@@ -1179,6 +1181,40 @@ The final documentation pass — when `README.md` is written for peer review and
 evaluation. That is the same pass [DEBT-008](#debt-008--the-access-control-story-promises-more-than-it-delivers)
 fires on, and they should be paid together: both are about a public document
 saying exactly what is true and no more.
+
+#### How DEBT-013 was paid
+
+**Sub-step 9.4, 2026-09-05**, on its own Trigger — the final documentation pass. The
+evidence is in the
+[9.4 review](reviews/step-009-containerization-and-readme.md#sub-step-94--docsdecisionsmd-the-decisions-that-move-a-number).
+
+- **The register exists**, as `docs/decisions.md`: thirteen rows in two tables — what a
+  Certified Metric means, and what the published measurements mean — each naming the
+  decision, the number it moves, what a reader should conclude when they meet that
+  number, and the dated review that argued it, in the reader's terms rather than ours.
+- **All four decisions this entry listed are rows**, and the list grew as the entry said
+  it would: nine more, swept out of the Step 002–008 reviews.
+- **`README.md` sends a reader to it**, which is the half of the remedy that makes the
+  other half reachable — held by
+  `tests/test_readme.py::test_the_readme_points_at_every_document_beside_it`, and every
+  link inside the register is resolved with its anchor by the link test beside it.
+  [CLAUDE.md](../../CLAUDE.md)'s Documents table names the file and its cadence.
+- **The code comment this entry's Location names points at the register.**
+  `read_market_data`'s fourteen lines arguing the Snapshot calendar are four that say
+  which calendar the query builds and where the argument lives — one explanation, one
+  home, and one fewer citation of a plan ruling in source.
+
+**What paying it does not buy.** Nothing checks that a *new* number-moving decision gets
+a row: the register is kept current by the same discipline as the rest of the working
+record, and its Cadence line in CLAUDE.md is the whole mechanism. And the sweep behind it
+is a reading of eight Steps' reviews by the party that wrote them — a decision nobody
+recorded as a decision is exactly the one it would miss.
+
+The other code comments that argue a decision at length, and the source links into
+`plan/` and `reviews/` that Delivery Mode no longer admits, are
+[DEBT-024](#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit)'s,
+whose Trigger is 2026-09-09. Only the comment this entry named by name was touched here.
+
 ### DEBT-014 — The spike allows a query the Gate must reject
 
 - **Status:** **paid** (Sub-step 5.4, 2026-08-28)
@@ -3095,7 +3131,8 @@ this entry is the note that says what the guard is for.
 ### DEBT-038 — A capable model answers an ad-hoc row request instead of refusing it
 
 - **Status:** **paid** — Sub-step 9.3, 2026-09-05, on the second of the two branches its
-  own Trigger names. **See [How it was paid](#how-it-was-paid) at the end of the entry.**
+  own Trigger names. **See [How DEBT-038 was paid](#how-debt-038-was-paid) at the end of
+  the entry.**
 - **Opened:** Sub-step 8.1 (`.claude/docs/reviews/step-008-observability.md`)
 - **Size:** S — stating the limitation in the Step 009 README is the likely repayment,
   an hour; an enforcement fix at the generation boundary is `M`
@@ -3163,7 +3200,7 @@ Before the capstone is submitted. Either the boundary fix lands — the Orchestr
 refuses a question that grounds out to a metric it was not asked for — or the Step 009
 README states the limitation. Re-measured by every generation sweep.
 
-#### How it was paid
+#### How DEBT-038 was paid
 
 **Sub-step 9.3, 2026-09-05.** The second branch: `README.md` states the limitation, in
 [What Veritas will not do](../../README.md#what-veritas-will-not-do-and-what-it-gets-wrong),
@@ -3286,7 +3323,7 @@ a smaller loss than a table labelled `FAIL`, which is what the entry had.
 ### DEBT-040 — The price table is a vendor's page copied once, and nothing notices when it moves
 
 - **Status:** **paid** — Sub-step 9.3, 2026-09-05. **See
-  [How it was paid](#how-it-was-paid-1) at the end of the entry**, including the one
+  [How DEBT-040 was paid](#how-debt-040-was-paid) at the end of the entry**, including the one
   thing paying it did *not* buy.
 - **Opened:** Sub-step 8.3 (`.claude/docs/reviews/step-008-observability.md`)
 - **Size:** S — one page re-read, five rows checked, one date changed
@@ -3334,7 +3371,7 @@ the same pass [DEBT-013](#debt-013--the-decisions-that-move-a-number-live-only-i
 names — or a cost figure leaving a Step Review for anywhere else. Re-read the page, update
 the five rows and the date, and add groq if it is priced anywhere readable.
 
-#### How it was paid
+#### How DEBT-040 was paid
 
 **Sub-step 9.3, 2026-09-05**, on the first branch of the Trigger — the README quotes a
 cost figure. All three things it asks for were done, and the evidence is in the

@@ -219,9 +219,10 @@ cold session must be able to resume from the files alone. The contract:
 | `.claude/docs/plan/step-NNN-*.md` | The one active Step | Once per Step |
 | `.claude/docs/reviews/step-NNN-*.md` | Handoff notes for Amino's review | Every Sub-step |
 | `tests/` | What each component must do, as executable claims | Every Sub-step with behaviour |
+| [`docs/decisions.md`](docs/decisions.md) | Public: every decision that moves a number a reader sees, each pointing at the dated review that argued it | Whenever a decision moves such a number |
 
-`README.md` is the public face for Zoomcamp reviewers. The `.claude/docs/` tree is the
-working record. Keep them separate — do not turn the README into a changelog.
+`README.md` and `docs/` are the public face for Zoomcamp reviewers. The `.claude/docs/`
+tree is the working record. Keep them separate — do not turn the README into a changelog.
 
 ### Writing conventions
 

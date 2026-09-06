@@ -4,7 +4,9 @@
 commit that carries this plan, with both [rulings](#rulings-at-approval) taken:
 DEBT-035 is stated in the README, not paid, and 9.2 runs on the morning of
 2026-09-05. **9.1, 9.2 and 9.3 are done**, all twenty-two of their sceptical points ruled on
-2026-09-05, 9.2 in two attempts and under [ruling 3](#rulings-in-flight); 9.4 is next.
+2026-09-05, 9.2 in two attempts and under [ruling 3](#rulings-in-flight). **9.4 is done**,
+its six sceptical points ruled on 2026-09-06, paying the last of the four Ledger entries
+this Step settles; 9.5 is next.
 
 **Goal.** Put the App in the compose file beside Postgres and Grafana, write the
 `README.md` a grader runs Veritas from, pay every Ledger entry whose Trigger names the

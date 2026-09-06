@@ -269,6 +269,11 @@ trades, 5,921 cash movements, 4,654 accounting movements, 61,907 position snapsh
 and 15,402 balance snapshots. Two runs are byte-identical. A `--refresh` moves these
 figures, which is why they are dated evidence there rather than a standing claim here.
 
+**Every judgement call that moves a number you will see** — average-cost Cost Basis,
+Realised P&L gross of Commission, which of two dates a period filter keys on, what a
+published accuracy counts as correct — is one table in
+[`docs/decisions.md`](docs/decisions.md), each row with the dated review that argued it.
+
 ---
 
 ## The App

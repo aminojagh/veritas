@@ -480,3 +480,88 @@ change that ruling came with, so it is out of rank and unruled.
 and `GROQ_PRICING` are technical and carry no domain meaning. The README expands **LLM**,
 **MRR** and **ONNX** on first use as a fresh document must, and uses the Glossary's
 spelling for every domain noun it names.
+
+---
+
+## Sub-step 9.4 — `docs/decisions.md`: the decisions that move a number
+
+**Changed.** `docs/decisions.md` is the user-facing decision register
+[DEBT-013](../debt-ledger.md#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
+has owed since Sub-step 2.5: thirteen rows, each naming the decision, the number it
+moves, what a reader should conclude when they meet that number, and the dated review
+that argued it. `README.md` sends a reader to it from the end of Ingestion;
+`tests/test_readme.py` gains the test that keeps that pointer alive; CLAUDE.md's
+Documents table names the file and its cadence. `read_market_data`'s fourteen lines
+arguing the Snapshot calendar — the comment the entry's **Location** names — are now four
+and a link to the register.
+
+**Verified.** 2026-09-05, on the tree as it stands.
+
+```
+$ uv run pytest tests/test_readme.py -v | tail -8
+tests/test_readme.py::test_every_declared_variable_is_named_in_the_readme PASSED [ 16%]
+tests/test_readme.py::test_the_readme_names_no_variable_it_does_not_declare PASSED [ 33%]
+tests/test_readme.py::test_the_readme_exemptions_are_still_true PASSED   [ 50%]
+tests/test_readme.py::test_the_readme_qualifies_access_control_in_the_ledgers_own_words PASSED [ 66%]
+tests/test_readme.py::test_the_readme_points_at_every_document_beside_it PASSED [ 83%]
+tests/test_readme.py::test_every_relative_link_in_the_public_documents_resolves PASSED [100%]
+
+============================== 6 passed in 1.97s ===============================
+
+$ uv run pytest -q | tail -1
+317 passed, 6 skipped in 124.71s (0:02:04)   (from 316 passed, 6 skipped at 9.3)
+
+$ uv run python .claude/scripts/verify_framework.py | tail -3
+  links      1736 links, 1414 anchors 88 documents and python files
+  python     3.14.4                 /home/amino/Projects/veritas/.venv/bin/python3
+
+PASS — framework is wired up correctly
+
+$ uv run python .claude/scripts/check_language.py | tail -1
+PASS — documents agree with the Glossary and the writing conventions
+```
+
+The new test was made to fail before it was trusted: with the README's one line at
+`docs/decisions.md` removed it fails with `assert not ['docs/decisions.md']`, and the
+README was restored byte-for-byte.
+
+**Debt.**
+[DEBT-013](../debt-ledger.md#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
+**paid** on its own Trigger, with a **How DEBT-013 was paid** section that says what
+paying it does not buy. Nothing opened.
+
+**Sceptically** — **all six ruled by Amino on 2026-09-06**, and the two that asked a
+question carry the ruling.
+
+1. **Two tables, where the plan says one** — *the numbers in an answer* against *the
+   numbers Veritas publishes about itself*, because a reader arrives with one of those
+   two questions and not the other. One column set, one register; merging is deleting
+   two headings.
+2. **Nine rows beyond the four DEBT-013 listed, and the sweep is mine.** The entry said
+   the list would grow; the nine come from reading the Step 002–008 reviews, by the party
+   that wrote them, so what it misses is a decision nobody recorded as a decision.
+3. **I rewrote a code comment the plan did not mention.** The entry's Location names
+   `read_market_data` and its remedy says such a comment points at the register instead,
+   so leaving it pays the visible half only. Comment-only; reverting is one edit.
+   **Ruled: the rewritten comment stays.** The other source links into `plan/` and
+   `reviews/` are
+   [DEBT-024](../debt-ledger.md#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit)'s,
+   trigger 2026-09-09, and were left alone.
+4. **I renamed two headings in committed Ledger entries.** `#### How it was paid` was
+   about to appear three times, and those anchors are positional: an entry inserted
+   *above* the other two silently renumbers `#how-it-was-paid-1`. `verify_framework.py`
+   catches it, which is how I found it. All three now carry their entry's number; no
+   wording changed.
+5. **Three figures in a public document are single measurements** — 1.94% between the two
+   date readings, MRR 0.750 → 0.833, sixty-six dates without a Snapshot. Each carries its
+   date and its review, the generation rows say in the register that a rate is one sample,
+   and the warehouse figures reproduce from committed snapshots.
+6. **What I judged *not* to be a reader's number**, so the boundary is visible rather than
+   implied: `TOP_K` and the closure that adds what a retrieved entry names, sweeps kept
+   out of the Question Log, and `ended_by`. **Ruled: none of the three joins the table**,
+   so the boundary stands where this Sub-step drew it.
+
+**Language.** No Term Proposal. *Decision register* and `decisions.md` were ruled by the
+[plan's Language section](../plan/step-009-containerization-and-readme.md#language); the
+document uses the Glossary's spelling for every domain noun and expands FX and MRR on
+first use as a fresh public document must.

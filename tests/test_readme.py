@@ -144,6 +144,26 @@ def test_the_readme_qualifies_access_control_in_the_ledgers_own_words(readme):
 # -- the link claim --------------------------------------------------------------
 
 
+def test_the_readme_points_at_every_document_beside_it(readme):
+    """A public document nothing links to is a document nobody reads.
+
+    [DEBT-013](../.claude/docs/debt-ledger.md#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
+    is paid by `docs/decisions.md` *and* by `README.md` sending a reader to it: a
+    register a domain expert cannot find leaves them exactly where the entry says
+    they are, reading a figure with nowhere to look.
+    """
+    beside = sorted(PUBLIC_DOCS.rglob("*.md")) if PUBLIC_DOCS.exists() else []
+    unlinked = [
+        str(doc.relative_to(ROOT))
+        for doc in beside
+        if f"({doc.relative_to(ROOT)})" not in readme
+    ]
+    assert not unlinked, (
+        f"README.md links to none of {unlinked} — a document under docs/ that "
+        f"nothing points at is unreachable from the public face"
+    )
+
+
 def public_documents() -> list[Path]:
     """`README.md` and anything under `docs/` — the public face, in full."""
     beside = sorted(PUBLIC_DOCS.rglob("*.md")) if PUBLIC_DOCS.exists() else []

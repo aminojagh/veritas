@@ -359,26 +359,12 @@ def read_market_data(warehouse: WarehouseAdapter) -> MarketData:
         prices[(instrument_id, price_date)] = market_price
         dates_by_instrument[instrument_id].append(price_date)
 
-    # The dates every Instrument has a Market Price on, not the dates some
-    # Instrument does.
-    #
-    # R13 fixed that a Snapshot is written *"on every date the Warehouse holds a
-    # Market Price for"*, which reads two ways once the table spans five exchange
-    # calendars, and the two differ by dozens of dates — `--sources` prints both.
-    # The intersection is the one that makes a Snapshot markable: on a date the
-    # union includes but the intersection does not, some Instrument did not trade,
-    # so a Position in it has no Market Price on that date and an Account Value
-    # containing it is silently short by a holding. Taking the union would mean
-    # either marking that Position at a stale price — a fill-forward pushed into
-    # every future metric, which is precisely what storing FX Rates densely avoids
-    # — or leaving a row out, which makes "what was held as of D" answer zero for
-    # something that was held.
-    #
-    # The cost is real and worth stating: dates on which some markets traded are
-    # absent from the Snapshot series, so a Position Change across one of them is
-    # attributed to the next Snapshot date. That is the Snapshot term's own
-    # limitation — *"a Snapshot cannot see between its own dates"* — rather than a
-    # new one.
+    # The Snapshot calendar: the dates every Instrument has a Market Price on —
+    # the intersection of the exchange calendars, not their union — so every
+    # Position in a Snapshot is markable at a price of its own date. Which reading
+    # was chosen, what it costs a reader, and why the union is worse:
+    # [docs/decisions.md](../../docs/decisions.md). `check_warehouse.py --sources`
+    # prints how far apart the two readings are today.
     snapshot_dates = tuple(
         date
         for (date,) in warehouse.query(
