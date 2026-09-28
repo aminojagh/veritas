@@ -7,20 +7,20 @@ published expression that has never been executed is a claim rather than a metri
 
 A corpus cannot be proved by running it, only by running what it claims. Nineteen
 checks do that. Five are the ones
-[Sub-step 4.1](../docs/plan/step-004-semantic-layer.md#41--publish-the-semantic-entry-format-on-one-metric-definition)
+Sub-step 4.1
 names; the sixth is Non-Negotiable #1 applied to the one place this corpus can coin
 a domain noun by accident. Checks 7 to 11 arrived with
-[Sub-step 4.2](../docs/plan/step-004-semantic-layer.md#42--write-the-remaining-metric-definitions),
+Sub-step 4.2,
 which is where the corpus stopped being one entry: two are that Sub-step's own
 bullets, two are what the shape
-[R8](../docs/plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
+R8
 decided has to be checked for, and the eleventh is what keeps a claim in that ruling
 reproducible. Checks 12 to 14 arrived with
-[Sub-step 4.4](../docs/plan/step-004-semantic-layer.md#44--write-the-ambiguous-terms)
+Sub-step 4.4
 and are the only ones in this file that execute nothing: they are claims about
 **language** rather than about arithmetic, so they fail when a word is wrong while
 every number is right. Checks 15 to 18 arrived with
-[Sub-step 4.5](../docs/plan/step-004-semantic-layer.md#45--write-the-dimension-definitions),
+Sub-step 4.5,
 the last entry type, and read the **Warehouse** rather than the rest of the corpus:
 a Dimension Definition is a leaf, so nothing above it would notice if one were wrong.
 
@@ -34,7 +34,7 @@ a Dimension Definition is a leaf, so nothing above it would notice if one were w
      here, for the reason `check_warehouse.py` derives its table set the same way: a
      list typed here would only prove that two files agree with each other. This is
      the check that mechanises
-     [R1](../docs/plan/step-004-semantic-layer.md#r1--cash-balance-becomes-a-certified-metric--approved-by-amino-2026-08-21),
+     R1,
      which was found by hand — `Cash Balance` is a Certified Metric whose registered
      home was a Warehouse table, so writing its Metric Definition fails this check
      until the Glossary row is amended.
@@ -43,14 +43,14 @@ a Dimension Definition is a leaf, so nothing above it would notice if one were w
      entry's own route, certified filters and date column, executed through the
      Warehouse Adapter, and returns a number. Pasted rather than rebuilt: a check that re-derives the
      expression proves the rebuild, not the file
-     ([C1](../docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)).
+     ([C1](../docs/adr/0003-validation-gate-is-deterministic-code.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)).
      The date column is what makes this more than "the SQL runs": the same metric is
      asked twice more with a period filter on it, either side of one date, and the
      two halves must add up to the whole.
 
   4. That number equals the one `check_warehouse.py` computes for itself, in SQL
      that never reads `semantic/`
-     ([R2](../docs/plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)).
+     (R2).
      **Twice**: once over the whole Warehouse, which checks the arithmetic, and once
      over one period, which checks the date predicate — the two are separate
      mistakes and the second is invisible to a check that only ever asks for a
@@ -66,7 +66,7 @@ a Dimension Definition is a leaf, so nothing above it would notice if one were w
      whose unit is not money must state no currency at all.
 
   6. An expression that does not parse **fails the run**, rather than being skipped —
-     [C6](../docs/design/validation-feasibility.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)'s
+     [C6](../docs/adr/0003-validation-gate-is-deterministic-code.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)'s
      echo in a Step that builds no Gate. Two probes give the rule teeth on every
      run, because a rule that has only ever seen valid input reads the same whether
      it works or does nothing, and they run against a composed metric as well as a
@@ -83,7 +83,7 @@ a Dimension Definition is a leaf, so nothing above it would notice if one were w
 
   9. The three expressions the Sub-step 3.2 spike measured are **exactly** what
      `semantic/metrics/` publishes, which is
-     [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)'s
+     R4's
      pin: the spike stays pointed at its own literals so its dated verdict keeps its
      inputs, and this assertion is what stops that verdict quietly becoming about
      expressions the project no longer uses.
@@ -144,7 +144,7 @@ a Dimension Definition is a leaf, so nothing above it would notice if one were w
      nobody joined, and the chain ends at a table one of the axis's columns lives in.
      Check 8 for a Dimension Definition, with the last clause that only an axis can
      get wrong. It arrived with
-     [Sub-step 5.5](../docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020),
+     Sub-step 5.5,
      which gave an axis a `routes` field and so gave it an edge to the rest of the
      corpus for the first time. An empty route is checked too — `[]` claims the
      column is already on that table, which is a claim like any other. Five probes
@@ -215,7 +215,7 @@ from check_validation_feasibility import (  # noqa: E402
 )
 # The three expressions the Sub-step 3.2 spike measured, as Python literals. Check 9
 # pins them to the corpus rather than re-pointing the spike at it, which is
-# [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21).
+# R4.
 
 # Every Certified Metric and the function that produces its second, independently
 # written figure. Sub-step 4.2 filled this table out to all nine: a metric absent
@@ -700,7 +700,7 @@ def rows_from(
     ADR-0002 puts the dialect inside the Warehouse Adapter and an engine's exception
     types are part of its dialect, so until the adapter had an error type of its own
     the only expressible catch here was `Exception`. That was
-    [DEBT-016](../docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type),
+    DEBT-016,
     and it is paid: a `WarehouseError` is the engine refusing SQL a caller supplied,
     and a bug anywhere else in this script now surfaces as a traceback rather than as
     a false accusation against a YAML file that is fine.
@@ -969,7 +969,7 @@ def disambiguation_problem(
         two things and can compute only one of them, which is a worse failure than
         not asking — it has spent the user's turn to arrive nowhere. This is the
         check that would have failed had
-        [R1](../docs/plan/step-004-semantic-layer.md#r1--cash-balance-becomes-a-certified-metric--approved-by-amino-2026-08-21)
+        R1
         gone the other way, since `Cash Balance` was a Warehouse column before it was
         a Certified Metric and two of these five terms resolve to it;
       * fewer than two meanings, which is not an ambiguity. A one-meaning entry
@@ -1130,7 +1130,7 @@ def check_alias_collisions(layer: SemanticLayer) -> None:
     """Check 14 — an alias resolves to exactly one metric, and never to a Section D word.
 
     Sub-step 4.2 decided that no metric's `aliases` would contain an Ambiguous Term,
-    and the [4.2 review](../docs/reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)
+    and the 4.2 review
     recorded that the decision was *"invisible in the files, and nothing checks
     it"*, naming this Sub-step as where the check belongs. This is it, and it is one
     rule read in both directions:
@@ -1727,7 +1727,7 @@ def check_period_split(
     [Section C](../docs/glossary.md#c-distinctions-we-must-not-blur) says that pair
     does — so a check that asked only for the total would agree with itself all the
     way to the wrong answer. That is the failure
-    [R2](../docs/plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)
+    R2
     describes, and it needs two independently written period filters to see.
     """
     dates = rows_from(
@@ -1892,7 +1892,7 @@ def check_widening_cast(
     rather than this docstring counting them. Without the cast the engine computes
     the product in DECIMAL(18) and raises on overflow, so the cast is what makes
     the metric computable at all — and
-    [DEBT-015](../docs/debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)
+    DEBT-015
     is the Ledger entry about a dialect scan that cannot see it.
 
     A cast nobody can see the need for is a cast somebody eventually removes. So
@@ -1928,10 +1928,10 @@ def check_spike_pin(layer: SemanticLayer) -> None:
     """Check 9: what the spike measured is what the corpus publishes — expression **and
     route**.
 
-    [R4](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+    R4
     keeps `check_validation_feasibility.py`'s certified expressions as Python
     literals rather than re-pointing the spike at `semantic/`, because
-    `validation-feasibility.md` carries output from one dated run and *"evidence
+    the spike's verdict is output from one dated run and *"evidence
     whose inputs move is not evidence"*. Pinning alone has the mirror-image failure —
     the go/no-go could end up being about expressions the project no longer uses —
     and this is the assertion that closes it.
@@ -1944,7 +1944,7 @@ def check_spike_pin(layer: SemanticLayer) -> None:
     gave the spike a second pinned declaration: `CERTIFIED_ROUTES`, the `from_table` and
     the Join Path conditions each pinned metric is computed across. Claim 1's verdict now
     reads the route as well as the projection — which is what turned the blind spot
-    [DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+    DEBT-014
     records into a rejection — and a pinned route nothing compares against `semantic/` is
     exactly the second corpus this check exists to prevent.
     """
@@ -1955,14 +1955,14 @@ def check_spike_pin(layer: SemanticLayer) -> None:
         if metric is None:
             problems.append(
                 f"the spike measured {name!r} and no file under {METRIC_HOME} "
-                f"publishes it, so validation-feasibility.md's verdict is about an "
+                f"publishes it, so the spike's verdict is about an "
                 f"expression the corpus does not have"
             )
             continue
         if metric.expression != measured:
             problems.append(
                 f"{name!r}: the spike measured one expression and the Semantic Layer "
-                f"publishes another, so the GO recorded in validation-feasibility.md "
+                f"publishes another, so the spike's GO "
                 f"is about a statement this project no longer uses. Re-run the spike "
                 f"and update the verdict, or put the Metric Definition back\n"
                 f"      spike     {measured}\n"

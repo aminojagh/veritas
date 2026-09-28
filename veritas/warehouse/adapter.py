@@ -17,7 +17,7 @@ be deferred is the boundary itself.
 
 The absent error handling was on that list too, and Sub-step 5.1 took it back off:
 `WarehouseError` below is the type
-[DEBT-016](../../.claude/docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)
+DEBT-016
 was opened for, because a caller that may not import `duckdb` may not name the
 engine's exceptions either. It wraps only the methods that hand the engine text a
 caller supplied; a failure in SQL this package wrote is still an unhandled
@@ -79,7 +79,7 @@ PLAN_ROWS = "Estimated Cardinality"
 class WarehouseError(Exception):
     """The engine refused a statement the caller supplied.
 
-    The type [DEBT-016](../../.claude/docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)
+    The type DEBT-016
     was opened for the absence of. A caller outside this package cannot name
     DuckDB's own exception classes — an engine's exception types are part of its
     dialect, and `check_warehouse.py` fails the run on a `duckdb` import anywhere
@@ -208,7 +208,7 @@ class WarehouseAdapter:
         """Every table's columns and declared types, in the shape sqlglot calls a schema.
 
         The live catalogue, read at run time, which is what
-        [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)
+        [C4](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c4--the-gate-reads-the-schema-at-run-time)
         requires of the Validation Gate: *"the Gate's interface therefore takes the
         schema, not just the statement, and reads it through the Warehouse Adapter —
         which keeps it on the right side of ADR-0002's seam."* Read here rather than
@@ -216,7 +216,7 @@ class WarehouseAdapter:
         exists rather than against a second reading of the file that made it.
 
         It lives in the adapter rather than in the caller under
-        [R2 of Step 005](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25):
+        R2 of Step 005:
         *"the logic that belongs to veritas must be only accessible from veritas once
         its containing component is built."* `check_validation_feasibility.py` held
         this as `warehouse_schema` while `veritas/warehouse/` was the only thing that

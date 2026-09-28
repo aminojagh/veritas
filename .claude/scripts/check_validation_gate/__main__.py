@@ -7,7 +7,7 @@ bounded-read rule asks the engine to plan a statement, and an engine with no tab
 refuses every one of them.
 
 **A package rather than a file**, by
-[R8](../../docs/plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25):
+R8:
 one module per Gate rule, added with the Sub-step that adds the rule. The three checks
 grown by the method this one inherits are each well over a thousand lines and none of
 them was ever *decided* to be a monolith; each became one by having a rule added five

@@ -1,8 +1,6 @@
 # ADR-0002 — DuckDB is the Warehouse, reached only through an adapter
 
 - **Status:** accepted
-- **Date:** 2026-08-03
-- **Decided in:** Step 001, Sub-step 1.3
 
 ## Context
 
@@ -16,10 +14,11 @@ Veritas cannot use it. Two constraints rule it out, and both are load-bearing
 rather than convenient:
 
 1. **Reproducibility (2 rubric points, and the project's own claim).** Veritas
-   must come up from a `git clone` with no credentials. Sub-step 1.2 already
-   spent real effort keeping every data source key-free and snapshotting the
-   results into the repository; requiring a Google Cloud account at the warehouse
-   layer would throw that away at the last step.
+   must come up from a `git clone` with no credentials. Every data source is
+   key-free and snapshotted into the repository
+   ([ADR-0004](0004-snapshot-and-replay-and-where-dlt-stops.md)); requiring a
+   Google Cloud account at the warehouse layer would throw that away at the last
+   step.
 2. **Containerization (2 rubric points).** `docker-compose up` must produce a
    working system. A cloud warehouse is not a container.
 
@@ -100,8 +99,8 @@ today, while there is nothing on either side of it.
 - Fast local analytical queries, which matters more than it first appears: the
   evaluation loop runs the whole Gold Question Set repeatedly, and its speed
   determines how often we are willing to run it.
-- DuckDB reads Parquet and CSV directly, so the snapshotted source data from
-  Sub-step 1.2 is ingestible with very little machinery.
+- DuckDB reads Parquet and CSV directly, so the snapshotted source data is
+  ingestible with very little machinery.
 - The engine swap on the extension path becomes an adapter implementation plus a
   sqlglot dialect parameter, instead of a rewrite of everything that emits SQL.
 
@@ -112,12 +111,22 @@ today, while there is nothing on either side of it.
   not total.** Anything the generated SQL comes to rely on that has no BigQuery
   equivalent is a migration cost that stays invisible until the migration. The
   adapter contains the *connection*, not the dialect risk.
-  → **Accepted.** Unavoidable given the engine choice, and the mitigation is
-  discipline: prefer portable constructs in generated SQL, and treat any
-  DuckDB-only **construct** in a Metric Definition as a review comment — a
-  function name, a type, or anything else whose meaning does not survive the trip
-  to the target engine. *Construct* rather than *function* since 2026-08-23; the
-  note below says what was measured and what changed the word.
+  → **Accepted.** Unavoidable given the engine choice. On every statement
+  `check_validation_feasibility.py` builds, both parse-tree verdicts survive a
+  DuckDB → BigQuery round trip; what does not always survive is a **type**: the
+  widening cast `Traded Notional` needs, `DECIMAL(38, 6)`, retargets to the single
+  word `NUMERIC`, and so does the `DECIMAL(18, 6)` it widens from. The mitigation
+  is to prefer portable constructs in generated SQL, and to treat any DuckDB-only **construct** in a Metric Definition — a function name, a
+  type, or anything else whose meaning does not survive the trip — as a review
+  comment. `check_warehouse.py`'s `check_seam` performs it, reading the SQL every
+  module emits and every Semantic Entry publishes twice: **by name**, where a
+  DuckDB-only function outside the adapter fails the run, and **by type**,
+  retargeting each statement to BigQuery and printing every type that arrives
+  saying less than it says at home. The two readings are blind to disjoint
+  classes, so neither replaces the other. A lossy type is a review comment rather
+  than a failure because the corpus needs one: an expression whose product
+  overflows `DECIMAL(18)` must widen, and `check_semantic_layer.py` runs each
+  uncast and prints the engine's refusal.
 
 - **The Validation Gate's cost check is much weaker than the real system's, and
   the gap is worth being precise about.** In BigQuery, the check that matters is
@@ -161,10 +170,16 @@ today, while there is nothing on either side of it.
   check is **removed** when it lands rather than kept as defence-in-depth, since
   two enforcement points for one rule is two places to drift and the weaker one
   supplies false assurance about the stronger one's coverage.
-  → **Debt: [DEBT-008](../debt-ledger.md)** for what fires inside this project —
-  the README and App must say the enforcement is application-layer over
-  synthetic data, because an unqualified claim invites a reader to believe a
-  guarantee that does not exist.
+  → **Accepted, with the claim qualified.** Application-layer enforcement
+  protects exactly one path: anything reaching the Warehouse another way — a
+  notebook, a debugging session, a component that forgets to route through the
+  Gate — bypasses it, and the engine hands over every row. So every
+  access-control claim carries this sentence, word for word — the App renders it
+  beside the identity a question is asked as, and `README.md` quotes it:
+
+  > Access Profile enforcement is applied in the application layer, over synthetic
+  > data. It demonstrates the mechanism; it is not a production access control, and
+  > it does not protect the Warehouse from being read another way.
 
 - **The adapter is overhead unless the engine is ever swapped.** If Veritas lives
   and dies on DuckDB, the indirection bought nothing.
@@ -187,13 +202,7 @@ today, while there is nothing on either side of it.
   holds.** The signal it has stopped holding: the simulator's output no longer
   fitting comfortably in memory, or bring-up requiring a second writing process.
 
-### Clarification, 2026-08-05 — what the sqlglot commitment forbids
-
-Not a change of decision. Step 002 asked whether hand-authored Data Definition
-Language (DDL) inside the adapter is allowed under *"sqlglot is the only place SQL
-is parsed or rendered"*, the answer was not obvious from the sentence, and every
-later Step inherits the reading. Recorded here rather than in the plan, because
-the plan will be closed and this will still be binding.
+## What the sqlglot commitment forbids
 
 **The commitment is about SQL that code assembles, not about SQL a human wrote
 once.** The sentence's own justification says so — *"if any component starts
@@ -283,85 +292,9 @@ That is one file, known in advance, against a schema that is legible to every
 reviewer for the whole life of the project.
 → **Accepted.**
 
-**How this stops being a promise.** ADR-0002 already named the signal —
-*"a `duckdb` import or a DuckDB-specific function name anywhere outside the
-adapter module"* — but nothing ran it. Step 002's `check_warehouse.py` performs
-that scan, so the commitment is checked on every run rather than asserted in a
-review.
-
-### Status note, 2026-08-20 — the retargeting claim was measured, and the mitigation names the wrong unit
-
-Not a change of decision, and the status stays `accepted`. The fourth claim of
-[Step 003](../plan/step-003-validation-feasibility.md)'s spike belongs to this ADR
-rather than to ADR-0003, because it is this one that put sqlglot in charge of
-retargeting and conceded in the same breath that transpilation is *"good but not
-total"*. The full findings and the command that reproduces them are in
-[validation-feasibility.md](../design/validation-feasibility.md#4-dialect-retargeting---every-verdict-survives-one-type-does-not).
-
-**The verdicts survive completely.** All 25 statements the spike builds keep both
-parse-tree verdicts through a DuckDB → BigQuery round trip: a Gate reading a
-retargeted statement reaches the same decision as one reading the original.
-
-**One type does not.** `Traded Notional`'s widening cast to `DECIMAL(38, 6)` — proved
-necessary on every run, since the engine refuses the uncast expression — retargets to
-the single word `NUMERIC`, and so does `DECIMAL(18, 6)`, the width
-`fct_trade.quantity` is stored at. The two arrive in BigQuery as the same statement.
-Nothing here executes against BigQuery, so this is a statement about the SQL that
-would be sent and not about the number that would come back.
-
-**The mitigation above is written in the wrong unit.** The first accepted cost says
-to *"treat any DuckDB-only function in a Metric Definition as a review comment"*. The
-one construct where meaning was measurably lost is a **cast**, and a cast is not a
-function call — so neither that sentence nor `check_seam`'s name-based dialect scan
-reaches it. Opened as
-[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast),
-whose repayment is the name list **plus** a round-trip comparison over types: the same
-Sub-step measured that a round trip passes 39 of the 50 measurable DuckDB-only names
-straight through, so the two detectors are blind to disjoint classes and neither
-replaces the other. The wording above is left as written for now, with this note
-beside it, which is how the 2026-08-05 clarification above was handled — **and was
-changed on 2026-08-23, when the debt was paid; see the note below.**
-
-**A related question it also settles.**
-[DEBT-009](../debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
-left open in writing whether transpilation-level checking would be the better scan.
-**It would not** — not strictly better, for the reason in the paragraph above.
-
-### Status note, 2026-08-23 — the mitigation now says *construct*, and a run performs it
-
-Not a change of decision, and the status stays `accepted`. The note above recorded
-that the first accepted cost's mitigation named the wrong unit and left the sentence
-as written, because there was nothing to scan: the Semantic Layer did not exist, so
-no Metric Definition existed, and the only cast outside `veritas/warehouse/` was a
-Python literal in the spike that measured it. Sub-step 4.2 wrote the corpus, and
-Sub-step 4.3 paid
-[DEBT-015](../debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast).
-
-**Two things changed, and the second is what makes the first more than a word.**
-
-The mitigation says **construct** where it said *function*, so the sentence covers a
-cast — the one construct the spike measured meaning being lost in.
-
-And `check_seam` performs it rather than asking a reviewer to. It reads the SQL every
-Semantic Layer entry publishes as well as the SQL a module emits, and reads all of it
-twice: **by name**, as before, and **by type**, retargeting each statement to
-BigQuery and reporting every type construct that arrives there saying less than it
-says at home. The two readings are blind to disjoint classes and neither replaces the
-other, which is the note above's finding and is why the repayment was *the name list
-plus a round trip* rather than a swap.
-
-**The two readings end differently, deliberately.** A DuckDB-only function name
-outside the adapter fails the run; a lossy type is printed as a **review comment**,
-which is the word this mitigation has used since the ADR was written. The reason is
-that this corpus carries a lossy type it cannot do without: the published expressions
-whose product overflows `DECIMAL(18)` widen the cast to `DECIMAL(38, 6)`, and
-`check_semantic_layer.py` runs each of them uncast on every run and prints the
-engine's refusal. A check that failed on a construct the engine requires could only be
-satisfied by publishing an expression that does not execute.
-
-What the review comment names on the current corpus, and the mutations that show both
-readings have teeth, are in the
-[Sub-step 4.3 review](../reviews/step-004-semantic-layer.md#sub-step-43--pay-debt-015-the-dialect-scan-reads-type-constructs).
+**How this stops being a promise.** The signal named above — *"a `duckdb` import
+or a DuckDB-specific function name anywhere outside the adapter module"* — is
+`check_warehouse.py`'s `check_seam`, so the commitment is checked on every run.
 
 ## Related
 
@@ -371,6 +304,6 @@ readings have teeth, are in the
 - [Target State](../design/target-state.md) — Extension path: "BigQuery instead
   of DuckDB — Warehouse is behind one adapter; SQL is generated via sqlglot,
   which retargets dialects."
-- Glossary: `Warehouse` is used as a component name in `target-state.md` but has
-  no Glossary row — raised as a Term Proposal in the Step 001 review, together
-  with the other unregistered component names.
+- [ADR-0004](0004-snapshot-and-replay-and-where-dlt-stops.md) — the build SQL
+  lives inside the adapter, under the licence the section above gives `schema.sql`.
+- Glossary: `Warehouse`, `Warehouse Adapter`.

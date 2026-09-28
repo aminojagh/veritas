@@ -42,10 +42,6 @@
 --
 --   * The daily grain is a floor imposed by the sources, not a choice this schema
 --     made. It is not a shortcut and there is nothing here to repay.
---
---     Both points are argued in full, with the cases that go wrong, in the Step
---     Review — "What `snapshot` means here" and "Was daily the problem?":
---     .claude/docs/reviews/step-002-warehouse-and-ingestion.md
 
 -- ---------------------------------------------------------------------------
 
@@ -137,7 +133,6 @@ CREATE TABLE fct_fx_rate (
 -- file. It is dated evidence, produced by a committed script and reproducible
 -- offline:
 --     uv run python .claude/scripts/check_data_availability.py
---     .claude/docs/reviews/step-001-target-state-design.md  ("What it checks")
 CREATE TABLE fct_instrument_price (
     price_date     DATE           NOT NULL,
     instrument_id  BIGINT         NOT NULL REFERENCES dim_instrument(instrument_id),
@@ -259,10 +254,8 @@ CREATE TABLE fct_balance_snapshot (
 --               and a short alike.
 --
 -- Snapshotted rather than derived from fct_trade, and cost_basis stored rather
--- than folded out of it. Both are correctness decisions, not conveniences, and
--- the three worked examples that show why a fold returns a plausible wrong number
--- are in the Step Review — "Why Cost Basis is stored, in three examples":
--- .claude/docs/reviews/step-002-warehouse-and-ingestion.md
+-- than folded out of it. Both are correctness decisions, not conveniences: a fold
+-- returns a plausible wrong number.
 --
 -- The CHECK below says a closed Position cost nothing to hold: without it a
 -- zero-quantity row could keep a stale basis and report P&L on nothing.

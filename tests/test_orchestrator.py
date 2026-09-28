@@ -274,7 +274,7 @@ def test_a_question_the_corpus_covers_returns_a_number_and_its_lineage(orchestra
 
 
 def test_lineage_cites_what_the_statement_used_and_not_what_was_retrieved(orchestrator):
-    """[DEBT-034](../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    """DEBT-034
     paid at the end that reads it.
 
     Retrieval shows the model several Certified Metrics — that is its job, and one of
@@ -325,7 +325,7 @@ def test_a_question_the_gate_refuses_cites_the_terms_alone(orchestrator):
 def test_an_answered_breakdown_carries_the_names_its_values_came_back_under(
     orchestrator, semantic
 ):
-    """[DEBT-031](../.claude/docs/debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names)
+    """DEBT-031
     paid: the labels come off the engine, beside the rows they label.
 
     A breakdown is a tuple of an axis value and a number, and which position is which
@@ -444,7 +444,7 @@ def test_a_question_no_metric_is_retrieved_for_costs_no_model_call(
 def test_the_two_refusals_with_no_statement_are_told_apart(
     orchestrator, warehouse, gate, semantic
 ):
-    """[DEBT-032](../.claude/docs/debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
+    """DEBT-032
     paid where it is decided.
 
     Nothing retrieved defining a Certified Metric and the model declining to write a

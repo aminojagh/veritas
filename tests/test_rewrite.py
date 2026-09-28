@@ -170,7 +170,7 @@ def test_a_question_with_no_ambiguous_term_calls_no_model(semantic):
 
 @pytest.mark.parametrize("name", sorted(SAID_ANOTHER_WAY))
 def test_a_phrasing_that_is_not_the_registered_name_is_detected(name, semantic):
-    """[DEBT-029](../.claude/docs/debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently),
+    """DEBT-029,
     paid: the question is asked back about rather than answered silently.
 
     The four classes the entry named, each said as a person says it and each
@@ -439,7 +439,7 @@ def test_the_spliced_form_writes_over_every_mention_of_a_term(semantic):
     """A term said twice is written over twice: an ambiguous word left in the question is
     the cue resolving it was supposed to remove.
 
-    Paid [DEBT-036](../.claude/docs/debt-ledger.md#debt-036--splicing-writes-over-the-first-mention-of-a-term-and-leaves-every-later-one),
+    Paid DEBT-036,
     which pinned the first mention alone.
     """
     assert rewritten_with(

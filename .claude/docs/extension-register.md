@@ -14,10 +14,10 @@ means:
 | Fires… | inside this project's life | when the slice becomes the full system |
 | Carries a… | **Trigger** — a condition that will fire | **Readiness** — what must be true first |
 
-Keeping them apart protects both. If extensions live in the Ledger, "open debt:
-8" stops meaning "8 shortcuts to repay" and the number loses its bite; and
-extensions arrive with triggers like *"when we build the full MVP"*, which the
-framework itself calls a wish rather than debt.
+Keeping them apart protects both. If extensions live in the Ledger, the Ledger
+stops meaning "shortcuts to repay"; and extensions arrive with triggers like
+*"when we build the full MVP"*, which the framework itself calls a wish rather
+than debt.
 
 **Every entry names the seam it lands against.** That is the load-bearing field.
 It is what makes the Target State's claim — *addition, not rewrite* — a checkable
@@ -28,31 +28,31 @@ admitted to yet.
 boundary it answers. An extension that cannot be traced back to a decision is
 speculation, and speculation belongs in the product brief, not here.
 
-**Status:** `open` · `built` (with the Step that built it) · `dropped` (with the
-reason) · `superseded`.
+**Only open entries live here.** An entry that is built, dropped, or moved to the
+Ledger is deleted, with every link to it; git keeps it. Numbers are never reused.
+
+**Next free number:** EXT-015
 
 ---
 
 ## Index
 
-| ID | Extension | Seam it lands against | Size | Status |
-|---|---|---|---|---|
-| [EXT-001](#ext-001--warehouse-native-security-and-concurrency) | Warehouse-native security and concurrency | Warehouse adapter · Validation Gate Access Profile check | L | open |
-| [EXT-002](#ext-002--semantic-layer-drift-detection) | Semantic Layer drift detection | Semantic Entry schema · continuous integration | M | open |
-| [EXT-003](#ext-003--metric-authoring-at-scale) | Metric authoring at scale | `semantic/` file format · retrieval index build | L | open |
-| [EXT-004](#ext-004--coverage-miss-capture) | Coverage-miss capture | Question Log · Grounded Answer refusal path | M | open |
-| [EXT-005](#ext-005--semantic-layer-coherence-checks) | Semantic Layer coherence checks | Metric Definition fields · the same sqlglot parse as EXT-002 | M | open |
-| [EXT-006](#ext-006--position-change-attribution) | Position Change attribution | `fct_position_snapshot` · the `Position Change` Metric Definition | M | open |
-| [EXT-007](#ext-007--corporate-actions) | Corporate actions | `fct_instrument_price` · `fct_position_snapshot` · the P&L Metric Definitions | M | open |
-| [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration) | The data checks run in continuous integration | `check_warehouse.py` · `check_data_availability.py` · the one-command bring-up | M | open |
-| [EXT-009](#ext-009--the-join-path-entry-type-at-warehouse-scale) | The Join Path entry type at Warehouse scale | `semantic/joins/` file format · a Metric Definition's `join_paths` | M | open |
-| [EXT-010](#ext-010--a-metric-certified-over-more-than-one-date-column) | A metric certified over more than one date column | `ValidationGate.routed`'s date half · a Metric Definition's `date_column` | S | open |
-| [EXT-011](#ext-011--more-large-language-model-providers-behind-the-seam) | More Large Language Model providers behind the seam | `veritas/llm/`'s `PROVIDERS` registry · the `LanguageModel` seam | S | open |
-| [EXT-012](#ext-012--the-dashboards-panels-read-the-dashboards-time-range) | The dashboard's panels read the dashboard's time range | each panel's `rawSql` · `question.asked_at` | S | open |
-| [EXT-013](#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own) | Grafana reads the Question Log with credentials of its own | the Grafana datasource file · the `POSTGRES_*` values `.env` declares | S | open |
-| [EXT-014](#ext-014--the-container-tests-run-as-pipeline-stages-before-and-after-a-deploy) | The container tests run as pipeline stages, before and after a deploy | `tests/test_container.py`'s `app` and `container` fixtures · `docker compose up -d --build --wait` | M | open |
-
-**Open:** 14 · **Built:** 0 · **Dropped:** 0
+| ID | Extension | Seam it lands against | Size |
+|---|---|---|---|
+| [EXT-001](#ext-001--warehouse-native-security-and-concurrency) | Warehouse-native security and concurrency | Warehouse adapter · Validation Gate Access Profile check | L |
+| [EXT-002](#ext-002--semantic-layer-drift-detection) | Semantic Layer drift detection | Semantic Entry schema · continuous integration | M |
+| [EXT-003](#ext-003--metric-authoring-at-scale) | Metric authoring at scale | `semantic/` file format · retrieval index build | L |
+| [EXT-004](#ext-004--coverage-miss-capture) | Coverage-miss capture | Question Log · Grounded Answer refusal path | M |
+| [EXT-005](#ext-005--semantic-layer-coherence-checks) | Semantic Layer coherence checks | Metric Definition fields · the same sqlglot parse as EXT-002 | M |
+| [EXT-006](#ext-006--position-change-attribution) | Position Change attribution | `fct_position_snapshot` · the `Position Change` Metric Definition | M |
+| [EXT-007](#ext-007--corporate-actions) | Corporate actions | `fct_instrument_price` · `fct_position_snapshot` · the P&L Metric Definitions | M |
+| [EXT-008](#ext-008--the-data-checks-run-in-continuous-integration) | The data checks run in continuous integration | `check_warehouse.py` · `check_data_availability.py` · the one-command bring-up | M |
+| [EXT-009](#ext-009--the-join-path-entry-type-at-warehouse-scale) | The Join Path entry type at Warehouse scale | `semantic/joins/` file format · a Metric Definition's `join_paths` | M |
+| [EXT-010](#ext-010--a-metric-certified-over-more-than-one-date-column) | A metric certified over more than one date column | `ValidationGate.routed`'s date half · a Metric Definition's `date_column` | S |
+| [EXT-011](#ext-011--more-large-language-model-providers-behind-the-seam) | More Large Language Model providers behind the seam | `veritas/llm/`'s `PROVIDERS` registry · the `LanguageModel` seam | S |
+| [EXT-012](#ext-012--the-dashboards-panels-read-the-dashboards-time-range) | The dashboard's panels read the dashboard's time range | each panel's `rawSql` · `question.asked_at` | S |
+| [EXT-013](#ext-013--grafana-reads-the-question-log-with-credentials-of-its-own) | Grafana reads the Question Log with credentials of its own | the Grafana datasource file · the `POSTGRES_*` values `.env` declares | S |
+| [EXT-014](#ext-014--the-container-tests-run-as-pipeline-stages-before-and-after-a-deploy) | The container tests run as pipeline stages, before and after a deploy | `tests/test_container.py`'s `app` and `container` fixtures · `docker compose up -d --build --wait` | M |
 
 ### Target State extension path, mapped
 
@@ -74,10 +74,28 @@ motivating cost exists is speculation.
 
 ## Entries
 
+<!--
+Copy this template for each new entry, take the next free number, and advance it.
+Keep entries in ID order.
+
+### EXT-NNN — <the capability, phrased as what the full system does>
+
+- **Size:** S | M | L
+- **Seam:** the name, interface or file format it lands against
+- **Motivated by:** the ADR cost, non-goal or scope boundary it answers, linked
+
+**What the full system needs**
+The capability, specifically enough to build.
+
+**What the slice does instead, and why that is correct here**
+The current code, and why it is right for this scope rather than cheap.
+
+**Readiness**
+What must be true before it is built. An observable condition, not a date.
+-->
+
 ### EXT-001 — Warehouse-native security and concurrency
 
-- **Status:** open
-- **Opened:** Sub-step 1.3 (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** L
 - **Seam:** the Warehouse adapter ([ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md)),
   and the Validation Gate's Access Profile check
@@ -125,16 +143,16 @@ Any one of:
 
 1. The Warehouse migrates to an engine with native row- and column-level
    security. This is the natural home.
-2. Real, non-synthetic client data is in scope — see the note on what "real data"
-   means in [DEBT-008](debt-ledger.md), which is the debt-shaped half of this.
+2. Real, non-synthetic client data is in scope. Until then, every access-control
+   claim carries the qualification
+   [ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
+   states, word for word.
 3. More than one concurrent user is required.
 
 ---
 
 ### EXT-002 — Semantic Layer drift detection
 
-- **Status:** open
-- **Opened:** Sub-step 1.3 (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** M
 - **Seam:** the Semantic Entry file format, and the continuous-integration check
 - **Motivated by:** [ADR-0001](adr/0001-semantic-layer-as-the-retrieval-corpus.md),
@@ -180,8 +198,6 @@ the duplication this register exists to prevent.
 
 ### EXT-003 — Metric authoring at scale
 
-- **Status:** open
-- **Opened:** Sub-step 1.3 (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** L
 - **Seam:** the `semantic/` file format, and the retrieval index build
 - **Motivated by:** [ADR-0001](adr/0001-semantic-layer-as-the-retrieval-corpus.md),
@@ -229,8 +245,6 @@ and collides with [EXT-002](#ext-002--semantic-layer-drift-detection).
 
 ### EXT-004 — Coverage-miss capture
 
-- **Status:** open
-- **Opened:** Sub-step 1.3 (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** M
 - **Seam:** the Question Log, and the Grounded Answer refusal path
 - **Motivated by:** [ADR-0001](adr/0001-semantic-layer-as-the-retrieval-corpus.md),
@@ -276,9 +290,6 @@ Question Set being replayed, which teaches nothing.
 
 ### EXT-005 — Semantic Layer coherence checks
 
-- **Status:** open
-- **Opened:** Sub-step 1.3, after the knowledge-graph question was decided
-  (`.claude/docs/reviews/step-001-target-state-design.md`)
 - **Size:** M
 - **Seam:** the Metric Definition's declared fields, and the same sqlglot parse
   that [EXT-002](#ext-002--semantic-layer-drift-detection) needs
@@ -304,8 +315,7 @@ Concretely, the rules a growing corpus can violate:
 
 **The design decision, already taken**
 
-A **knowledge graph** was proposed and **rejected** — agreed 2026-08-04. Not
-because the relationships are unreal, but because a graph *database* answers an
+A **knowledge graph** was proposed and **rejected**. Not because the relationships are unreal, but because a graph *database* answers an
 infrastructure question when the open one was a modelling question. Three
 reasons: the corpus is hundreds of entries, not millions, so any structure works;
 a separate graph store would be a *third* representation of metrics, which is the
@@ -326,52 +336,24 @@ normalisation, not a description-logic problem.
 few fixed edge types, or a semantic layer orders of magnitude larger than
 assumed. Either would earn a property graph, and would then deserve its own ADR.
 
-**`derives_from` was taken for a different edge — amended 2026-08-22 (Sub-step 4.2)**
+**`derives_from` carries a composition, so rule 2 needs an edge of its own.**
+Rule 2 needs an edge meaning *"`Net Revenue` is `Gross Revenue` minus Rebate and
+Fee"* — a **declared identity**, checked so the two cannot drift apart.
+`derives_from` means something else: *"`Account Value` is `Cash Balance` **added
+to** this metric's own expression"* — a **composition**, which the check that
+executes a Metric Definition assembles a query from. One is read to compare, the
+other to compute, so rule 2's edge arrives under its own name, in the same YAML,
+beside `derives_from` and `disambiguates`. The composition adds and never
+subtracts, and walks one level rather than a chain; a rule-2 edge arriving into a
+corpus that has outgrown either is arriving into a different problem.
 
-Rule 2 above needs an edge meaning *"`Net Revenue` is `Gross Revenue` minus Rebate
-and Fee"* — a **declared identity**, checked so that nothing lets the two drift
-apart. Sub-step 4.2 needed an edge meaning *"`Account Value` is `Cash Balance`
-**added to** this metric's own expression"* — a **composition**, which the check
-that executes a Metric Definition actually assembles a query from. Both are
-relationships between two Certified Metrics and they are not the same
-relationship: one is read to compare, the other is read to compute, and a metric
-declaring the first under the field that means the second would be assembled into
-arithmetic nobody wrote.
-
-`derives_from` now carries the composition, decided in
-[R8](plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
-and enforced by `check_semantic_layer.py`. **So this entry's rule 2 needs a second
-edge type when it is built** — under its own name, in the same YAML, alongside
-`derives_from` and `disambiguates`. Recorded here rather than left to be
-rediscovered, because the cost of discovering it later is a corpus in which one
-field means two things and only one of them is checked.
-
-Two further limits the composition carries, both stated because they are what a
-coherence check would otherwise assume: it adds and never subtracts, and it walks
-**one** level rather than a chain. Neither is a shortcut behind a seam that this
-project owes repayment on — the corpus has one composed metric, it adds, and its
-part composes nothing — but a rule-2 edge type arriving into a corpus that has
-grown either of those is arriving into a different problem.
-
-**Rule 4 was built early, in Sub-step 4.4 — this entry stays open on the other three**
-
-*"Ambiguous Term completeness"* above is now a loop in `check_semantic_layer.py`:
-every Certified Metric an Ambiguous Term names must exist as a Metric Definition,
-and there must be at least two distinct ones. It was taken out of the extension
-rather than with it because it costs one pass over five entries and because the
-Sub-step that wrote the first Ambiguous Term could not honestly publish one without
-it — an entry that asks the user to choose between two meanings and can compute
-only one has spent the user's turn to arrive nowhere. The
-[Step 004 plan's scope boundary](plan/step-004-semantic-layer.md#not-in-this-step)
-says so in those terms: *"4.4 takes one of EXT-005's four rules because it is a
-single loop."*
-
-**Nothing about the other three changed.** Synonym detection, the rule-2 edge type
-this entry gained on 2026-08-22, and orphaned dependencies all still need the parse
-step and the in-memory graph, and none of them is a single loop. What rule 4's early
-build does establish is the shape the rest inherit: the relationship is declared in
+**Rule 4 is built.** *"Ambiguous Term completeness"* is a loop in
+`check_semantic_layer.py`: every Certified Metric an Ambiguous Term names exists as a
+Metric Definition, and there are at least two distinct ones. Synonym detection, the
+rule-2 edge type and orphaned dependencies still need the parse step and the
+in-memory graph. Rule 4 sets the shape they inherit: the relationship is declared in
 the YAML, the check reads it against the rest of the corpus, and the failure names
-the entry and the missing thing rather than reporting a count.
+the entry and the missing thing.
 
 **Readiness**
 
@@ -379,14 +361,11 @@ When the Semantic Layer has enough entries for a human to stop holding the whole
 set in their head — in practice the same threshold as
 [EXT-003](#ext-003--metric-authoring-at-scale), around 50 entries — or as soon as
 a second author can add entries. Build with EXT-002; they share the parse step.
-Rule 4 above is already built and does not wait for this.
 
 ---
 
 ### EXT-006 — Position Change attribution
 
-- **Status:** open
-- **Opened:** Sub-step 2.1, on Amino's review of the snapshot design (2026-08-06)
 - **Size:** M
 - **Seam:** `fct_position_snapshot`, and the `Position Change` Metric Definition
 - **Motivated by:** the [Section C](glossary.md#c-distinctions-we-must-not-blur)
@@ -436,20 +415,15 @@ A Certified Metric, Dimension Definition or Gold Question needs to attribute a
 Position Change to a cause — in practice, the first question of the form "how
 much of this move was trading?".
 
-**Not to be confused with** making the trap *real in the data*, which is a much
-smaller thing and belongs to Sub-step 2.5 — numbered 2.3 when this entry was
-written, renumbered by R16 on 2026-08-10: the simulator emitting a few transfers
-so that a snapshot delta and a sum of Trades actually disagree somewhere. That
-needs no new table, and without it the Section C distinction is asserted rather
-than demonstrated.
+**Not to be confused with** making the trap *real in the data*, which the simulator
+already does: it emits a few transfers, so a snapshot delta and a sum of Trades
+disagree somewhere, and the Section C distinction is demonstrated rather than
+asserted.
 
 ---
 
 ### EXT-007 — Corporate actions
 
-- **Status:** open
-- **Opened:** Sub-step 2.1, when Amino approved simulating transfers but not
-  corporate actions and asked where the excluded half belongs (2026-08-06)
 - **Size:** M
 - **Seam:** `fct_instrument_price`, `fct_position_snapshot`, and the
   `Realised P&L` / `Unrealised P&L` Metric Definitions
@@ -479,8 +453,7 @@ which is a Semantic Layer and pricing concern, not a generator concern.
 3. **Cost Basis carried through the action.** A split changes quantity without
    changing what the holding cost, so `cost_basis` must survive unchanged while
    quantity multiplies. A dividend does the opposite. Getting this wrong misstates
-   both P&L metrics, which is the failure `data-availability.md` already measured
-   for the adjusted-close route.
+   both P&L metrics, which is the failure the adjusted-close route produces.
 4. **Never by reaching for `Adjusted Close`**, which is the tempting shortcut and
    is registered as an anti-pattern precisely because it rewrites history and makes
    an Account Value irreproducible.
@@ -488,10 +461,8 @@ which is a Semantic Layer and pricing concern, not a generator concern.
 **What the slice does instead, and why that is correct here**
 
 Holds no corporate actions and, more importantly, **holds no data containing
-one** — the price window for held Instruments is kept split-free, and Sub-step
-**2.3**'s `--sources` check is required to verify that rather than assume it. It
-was Sub-step 2.2's until R16 split the price load into its own Sub-step on
-2026-08-10, which is where the check now naturally belongs. Client
+one** — the price window for held Instruments is kept split-free, and
+`check_warehouse.py --sources` verifies that rather than assuming it. Client
 activity is synthetic and we choose the instruments, so this costs nothing. It is
 correct for the slice because a corporate action here would force the choice
 between building the machinery above and holding knowingly incoherent data, and
@@ -516,9 +487,6 @@ reason other than our convenience.
 
 ### EXT-008 — The data checks run in continuous integration
 
-- **Status:** open
-- **Opened:** Sub-step 2.5, on Amino's question about where the two data checks
-  belong (2026-08-13)
 - **Size:** M
 - **Seam:** `.claude/scripts/check_warehouse.py` and
   `.claude/scripts/check_data_availability.py` as command-line programs that carry
@@ -564,9 +532,9 @@ Warehouse. Nothing today runs any of them except a person remembering to.
 
 **What the slice does instead, and why that is correct here**
 
-The scripts are written, committed, and run by hand — their output is pasted into
-the Step Review that made the claim, with the command that produced it, which is
-what Non-Negotiable #4 requires. That is genuinely sufficient at this scale: one
+The scripts are written, committed, and run by hand — their output goes into the
+commit message of the Sub-step that made the claim, with the command that produced
+it, which is what Non-Negotiable #4 requires. That is genuinely sufficient at this scale: one
 author, one machine, and a review of every Sub-step by the person who commits it.
 Continuous integration adds nothing a review by Amino does not already do, on a
 repository where every change passes through him.
@@ -604,14 +572,12 @@ Any one of:
 
 ### EXT-009 — The Join Path entry type at Warehouse scale
 
-- **Status:** open
-- **Seam it lands against:** the `semantic/joins/` file format · a Metric Definition's
+- **Seam:** the `semantic/joins/` file format · a Metric Definition's
   `join_paths` list
 - **Size:** M
-- **Motivated by:**
-  [R9's fourth ruling](plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23),
-  which answers the [Sub-step 4.2 review](reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)'s
-  observation that most published Join Paths have exactly one user
+- **Motivated by:** the [Glossary](glossary.md#a-the-system)'s `Join Path` — *"a
+  certified route between two warehouse tables, so the model never invents a
+  join"* — and the fact that most published Join Paths have exactly one user
 
 **What the full system needs**
 
@@ -624,9 +590,9 @@ full system needs on top of what exists here is the machinery that only matters 
 routes are genuinely shared:
 
 - **a naming rule for the directory**, so a route's name says what separates it from its
-  neighbours by construction rather than per file. Sub-step 4.2 renamed two routes onto
-  the currency axis and left a third on the date axis, each locally correct and the set
-  mixed — which is what a rule would prevent;
+  neighbours by construction rather than per file. Today two routes are named for the
+  currency axis and a third for the date axis, each locally correct and the set mixed —
+  which is what a rule would prevent;
 - **reuse as a checkable property.** A route with no second user is not wrong, but at
   scale it is the signal that a metric author wrote a private join and gave it a public
   name, which is the copy-paste the entry type exists to prevent;
@@ -640,8 +606,7 @@ It publishes flat, ordered lists of named routes and checks them structurally: e
 named Join Path exists, starts at a table the route has reached, arrives somewhere new,
 and reaches back only to tables already joined. `check_semantic_layer.py` prints every
 metric's full route on every run, so how much reuse there actually is can be counted from
-its output rather than asserted here; the count as measured on 2026-08-22 is in the
-Sub-step 4.2 review. The honest reading of that count is that **this Warehouse has few
+its output rather than asserted here. The honest reading of that count is that **this Warehouse has few
 tables and few ways between them** — ten tables in
 [Glossary Section B](glossary.md#b-the-warehouse) — so most routes having one user is a
 fact about the Warehouse, not a flaw in the entry type.
@@ -655,9 +620,7 @@ serves, instead of inside a query nobody sees. The trigger test settles it — *
 routes have more than one user"* cannot fire inside this project's life, because the
 number of tables is fixed by the Warehouse and the number of metrics is fixed at nine by
 Glossary Section B. Acting now would be tuning a design against a corpus too small to
-show whether the tuning helps, which is
-[R9](plan/step-004-semantic-layer.md#r9--aminos-four-rulings-on-the-42-review--decided-2026-08-23)'s
-*"premature optimizing"* precisely.
+show whether the tuning helps — premature optimizing.
 
 **Readiness**
 
@@ -669,22 +632,19 @@ Any one of:
    [EXT-003](#ext-003--metric-authoring-at-scale)'s subject, and a generator needs the
    naming rule as input rather than as review commentary.
 3. A Join Path is wanted that this format cannot express: a branching route, a shared
-   prefix, or a route from a table to itself — the shape
-   [`Position Change`](reviews/step-004-semantic-layer.md#sub-step-42--write-the-remaining-metric-definitions)
-   already needs and reaches with a correlated subquery instead.
+   prefix, or a route from a table to itself — the shape `Position Change` already
+   needs and reaches with a correlated subquery instead.
 
 ---
 
 ### EXT-010 — A metric certified over more than one date column
 
-- **Status:** open
-- **Opened:** Sub-step 5.4 (`.claude/docs/reviews/step-005-validation-gate.md`)
-- **Seam it lands against:** the date half of `ValidationGate.routed` · a Metric
+- **Seam:** the date half of `ValidationGate.routed` · a Metric
   Definition's `date_column`
 - **Size:** S
-- **Motivated by:** the eighth sceptical item of the
-  [Sub-step 5.4 review](reviews/step-005-validation-gate.md#sub-step-54--pay-debt-014-the-gate-checks-the-route-and-the-date-predicate),
-  ruled on in [R15](plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+- **Motivated by:**
+  [C2](adr/0003-validation-gate-is-deterministic-code.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate),
+  which puts one date column on a Metric Definition for the Gate to check
 
 **What the full system needs**
 
@@ -693,9 +653,7 @@ column any WHERE clause in a statement computing that metric may key on. That co
 two different things which happen to be the same one today:
 
 - **the period axis** — the column a *question's* period narrows on, which is what
-  `date_column` is for and what
-  [C2](design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
-  put on the entry;
+  `date_column` is for and what C2 put on the entry;
 - **the date predicates the metric's own expression carries**, which are part of the
   certified computation and have nothing to do with the question.
 
@@ -736,12 +694,10 @@ fixed by [Glossary Section B](glossary.md#b-the-warehouse) and no Step in this p
 writes a tenth. Building the list shape now would be a permission list with one source
 and nothing to widen it for.
 
-**Not the same question as `by settlement date`.** [R11's second ruling of Step
-004](plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
-deferred a `by settlement date` **axis** to the Step that grounds a query, because
-certifying it *"would let one question be sliced on one date while being filtered on
-another."* That is about what the corpus may certify as a slice, and a slice puts the
-column in a GROUP BY. This entry is about what a metric's own **expression** may key on
+**Not the same question as `by settlement date`.**
+[ADR-0006](adr/0006-every-certified-metric-follows-one-stated-book-convention.md)
+certifies no `by settlement date` **axis**, and that is about what the corpus may
+certify as a slice, which puts the column in a GROUP BY. This entry is about what a metric's own **expression** may key on
 in a WHERE. The two meet only if a metric is later certified over both dates, which is
 Readiness 2 below.
 
@@ -753,28 +709,23 @@ Any one of:
    own `date_column` — the direct trigger, and the one that needs a tenth metric or an
    edit to one of the nine.
 2. A metric is certified over **two** period axes, so `date_column` stops being a single
-   value at all. That is the corpus-side half of R11's deferred question and is decided
-   where R11 sent it.
+   value at all — which ADR-0006 would have to be rewritten to allow.
 3. The date half of the route rule is widened for any other reason and gains the list
    shape `permitted_route` already has, at which point this costs one more source rather
    than a new mechanism.
 
 ### EXT-011 — More Large Language Model providers behind the seam
 
-- **Status:** open
-- **Opened:** Sub-step 6.3 (`.claude/docs/reviews/step-006-retrieval-and-orchestrator.md`)
-- **Seam it lands against:** the `PROVIDERS` registry in `veritas/llm/model.py` ·
+- **Seam:** the `PROVIDERS` registry in `veritas/llm/model.py` ·
   the `LanguageModel` seam it sits behind
 - **Size:** S
 - **Motivated by:** [ADR-0005](adr/0005-one-openai-compatible-endpoint-for-every-provider.md)'s
-  last stated cost, and Amino's ruling of 2026-08-30 that closed the list:
-  *"we should restrict the supported LLM providers to these two for now and make
-  it an extension to support more options."*
+  last stated cost, and the ruling it records: support stops at two providers, and
+  *"make it an extension to support more options"*
 
 **What the full system needs**
 
-Veritas talks to two providers: OpenAI, and Groq for the second model the
-evaluation criterion needs. A system serving people who are not this project's
+Veritas talks to two providers: OpenAI, and Groq as an optional second. A system serving people who are not this project's
 graders reaches more of them — Anthropic and Google are the two named most often,
 and a deployment inside a bank reaches whichever one its procurement approved and
 no other. Some of those are one more row in `PROVIDERS`; Anthropic's own
@@ -790,10 +741,7 @@ it is the whole of what the credential rule permits. The
 [Target State](design/target-state.md#what-credential-free-means) allows *"a
 credential the grader already has by virtue of taking the course"*, which is the
 OpenAI key and nothing else; Groq rides along because its free tier costs a
-reviewer nothing. *(Corrected 2026-09-05: this read "and the `≥2 models` criterion
-cannot be met with one provider's default alone" — the rubric sets no such
-criterion, and Groq is now a second registered provider rather than a measured
-alternative. The extension is unchanged: a third provider is still a row.)*
+reviewer nothing.
 
 **Why this is an extension and not debt**
 
@@ -822,15 +770,12 @@ Any one of:
 
 ### EXT-012 — The dashboard's panels read the dashboard's time range
 
-- **Status:** open
-- **Opened:** Sub-step 8.5 (`.claude/docs/reviews/step-008-observability.md`)
-- **Seam it lands against:** each panel's `rawSql` in
+- **Seam:** each panel's `rawSql` in
   `grafana/dashboards/question-log.json` · `question.asked_at`, the column the two
   time-series panels already plot along
 - **Size:** S
-- **Motivated by:** the second sceptical item of the
-  [Sub-step 8.5 review](reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard),
-  and Amino's ruling of 2026-09-04: *"i can zoom into panels when i open the dashboard.
+- **Motivated by:** a dashboard over live traffic whose panels all read the whole
+  log, and Amino's ruling on it: *"i can zoom into panels when i open the dashboard.
   however, if this is really a limitation, open an extension for it"*
 
 **What the full system needs**
@@ -844,8 +789,7 @@ and every panel here answers it over all of history.
 **What the slice does instead, and why that is correct here**
 
 Every panel reads the whole log, and the picker is hidden rather than left showing a
-control that changes nothing. What a reader can still do is what Amino did on 2026-09-04:
-drag across either time-series panel, which narrows the **axis** to the dragged range —
+control that changes nothing. What a reader can still do is drag across either time-series panel, which narrows the **axis** to the dragged range —
 the picture zooms, the query does not, and the five counting panels are unaffected
 because they carry no time axis to zoom.
 
@@ -859,8 +803,7 @@ narrowed.
 The trigger test settles it: traffic big enough for a period to matter cannot arrive
 inside this project's life. Rows enter the Question Log one question at a time, from a
 person typing into the App, and the Evaluation sweep — the one thing here that asks
-hundreds of questions — deliberately writes none of them
-([Step 008 plan](plan/step-008-observability.md#three-route-decisions), route decision 1).
+hundreds of questions — deliberately writes none of them.
 A Ledger entry would carry *"when Veritas serves real traffic"*, which is a wish.
 
 **What adopting it costs**, since that is what makes it `S`: one line per panel, the
@@ -888,15 +831,12 @@ Any one of:
 
 ### EXT-013 — Grafana reads the Question Log with credentials of its own
 
-- **Status:** open
-- **Opened:** Sub-step 8.5 (`.claude/docs/reviews/step-008-observability.md`)
-- **Seam it lands against:** `grafana/provisioning/datasources/question-log.yml` · the
+- **Seam:** `grafana/provisioning/datasources/question-log.yml` · the
   `POSTGRES_*` values `.env` declares and `veritas/observability/postgres.py` reads
 - **Size:** S
-- **Motivated by:** the fourth sceptical item of the
-  [Sub-step 8.5 review](reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard),
-  and Amino's ruling of 2026-09-04 on it: *"it's ok for now. you can also make an
-  extension for this if you see fit."*
+- **Motivated by:** the [Target State](design/target-state.md#what-credential-free-means)'s
+  ruling on service credentials, and Amino's on this use of them: *"it's ok for now.
+  you can also make an extension for this if you see fit."*
 
 **What the full system needs**
 
@@ -941,21 +881,19 @@ Any one of:
    makes anonymous viewing a decision rather than a convenience.
 2. The Question Log holds anything that is not synthetic. It holds real questions today
    in the sense that a person typed them, but nothing in it is about a real client;
-   [DEBT-008](debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-   is the entry that says what the access story is and is not.
+   [ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences) says
+   what the access story is and is not.
 3. A second dashboard or a second reader arrives, at which point one role per reader is
    cheaper than one credential set shared by all of them.
 
 ### EXT-014 — The container tests run as pipeline stages, before and after a deploy
 
-- **Status:** open
-- **Opened:** Sub-step 9.1 (`.claude/docs/reviews/step-009-containerization-and-readme.md`)
-- **Seam it lands against:** `tests/test_container.py`'s two runtime fixtures — `app`,
+- **Seam:** `tests/test_container.py`'s two runtime fixtures — `app`,
   which skips when nothing answers on the published port, and `container`, which skips
   when `docker compose exec` reaches no App — and `docker compose up -d --build --wait`
   as a bring-up something other than a person performs
 - **Size:** M
-- **Motivated by:** Amino's question at the 9.1 ruling (2026-09-05): *"as far as i know,
+- **Motivated by:** Amino's question: *"as far as i know,
   tests happen before app is served in a CI/CD pipeline, but we're testing the app itself
   after it's deployed and even execute something inside it. what do the best practices of
   CI/CD say about this"* — and
@@ -985,8 +923,8 @@ Four rules make that ordering mean something.
    `docker compose down -v` is the standard integration stage, and `docker compose exec`
    is the right tool inside it: reaching into the container proves the image's own
    interpreter, its installed dependencies and its wiring to the network's `postgres`,
-   which nothing asked from outside the port can. So the shape Sub-step 9.1 wrote is
-   pre-deploy work that happens to have no runner yet, not a test misfiled after a
+   which nothing asked from outside the port can. So the shape `tests/test_container.py`
+   has is pre-deploy work that happens to have no runner yet, not a test misfiled after a
    deploy.
 3. **After the release, far less, under stricter rules.** Deployment verification asks
    the deployed instance for its health endpoint and one canary answer, and its result

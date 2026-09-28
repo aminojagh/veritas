@@ -129,7 +129,7 @@ def test_the_app_is_published_on_the_port_env_example_documents(compose, declare
 def test_the_image_builds_the_warehouse_and_fetches_both_retrieval_models(dockerfile):
     """The two expensive things a question needs, made once at build rather than
     at the first question — which is what
-    [DEBT-026](../.claude/docs/debt-ledger.md#debt-026--the-retrieval-models-are-downloaded-rather-than-snapshotted)
+    DEBT-026
     was opened against."""
     assert "python -m veritas.ingestion" in dockerfile
     assert "python -m veritas.retrieval" in dockerfile

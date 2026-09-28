@@ -26,8 +26,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # makes ownership obvious.
 SNAPSHOT_DIR = REPO_ROOT / "data" / "snapshots" / "ingestion"
 
-# A descriptive agent with a contact address, for three separate reasons, all of
-# them recorded in data-availability.md: Frankfurter returns HTTP 403 to the
+# A descriptive agent with a contact address, for three separate reasons:
+# Frankfurter returns HTTP 403 to the
 # default `Python-urllib` agent, the SEC's fair-access policy requires contact
 # details, and anonymous scraping of a source we depend on is rude.
 USER_AGENT = "veritas-capstone/0.1 (aminojaghi93@gmail.com)"

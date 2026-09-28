@@ -2,7 +2,7 @@
 stays inside the scan ceiling.
 
 The first of the five modules
-[R8](../../docs/plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
+R8
 lays out, one per Gate rule. It covers three things beyond putting probes in front of
 the Gate, and each is a claim the plan makes that would otherwise be prose:
 
@@ -22,7 +22,7 @@ the Gate, and each is a claim the plan makes that would otherwise be prose:
     table's real row count is what makes that loud.
 
 It also holds the payment probes for
-[DEBT-016](../../docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type),
+DEBT-016,
 which this Sub-step fires and pays.
 """
 
@@ -83,7 +83,7 @@ THESE_RULES = ("parses", "one statement", "a read", "bounded")
 # Every statement here is a string literal inside `.claude/scripts/`, which is one of
 # `check_warehouse.py`'s scanned roots, so the dialect scan Sub-step 2.6 built reads
 # each one it can parse as a statement. Under
-# [R3 of Step 003](../../docs/plan/step-003-validation-feasibility.md#r3--an-exemption-names-the-file-as-well-as-the-symbol--approved-and-widened-by-amino-2026-08-15)
+# R3 of Step 003
 # this file passes that scan **without claiming an exemption**.
 PROBES = (
     Probe(
@@ -202,7 +202,7 @@ PROBES = (
         why="a question an analyst would call ordinary and the Semantic Layer does "
             "not certify: `Trade Count` is `count(fct_trade.trade_id)`, so `count(*)` "
             "is a paraphrase, and "
-            "[C1](../../docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes) "
+            "[C1](../../docs/adr/0003-validation-gate-is-deterministic-code.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes) "
             "chose a pasteable form over a Gate that decides which paraphrases are "
             "safe. Sub-step 5.1 declared this `allowed` because nothing then judged "
             "an expression; Sub-step 5.2's tracing rule is what refuses it. The "

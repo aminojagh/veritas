@@ -1,8 +1,6 @@
 # ADR-0001 — The Semantic Layer is the retrieval corpus
 
 - **Status:** accepted
-- **Date:** 2026-08-03
-- **Decided in:** Step 001, Sub-step 1.3
 
 ## Context
 
@@ -25,13 +23,6 @@ reason is worth stating precisely: `fct_trade` carries `commission`, `rebate` an
 and entirely silent on which one the business means. The ambiguity does not live
 in the schema. Handing the model a better description of the tables is answering
 a question nobody asked.
-
-What was known at the time: the Domain Language was `agreed`, including
-`Semantic Layer`, `Semantic Entry`, `Metric Definition`, `Certified Metric` and
-`Shadow Metric`, and the data-availability check had confirmed the warehouse
-could be built from real Foreign Exchange (FX) Rates and Market Prices. What was
-not known: how many Semantic Entries the Gold Question Set would need, or which
-retrieval approach would win — both deliberately left to later Steps.
 
 ## Decision
 
@@ -98,8 +89,8 @@ available to the model.
   See [How the metric set stays coherent](#how-the-metric-set-stays-coherent).
 - **Ad-hoc exploration is out.** "What columns are in `fct_trade`?" has no answer,
   because the schema is not in the corpus.
-  → **Accepted permanently — decided 2026-08-04, [DEBT-006](../debt-ledger.md).**
-  Veritas is a metrics copilot, not a database browser. Both alternatives were
+  → **Accepted permanently.** Veritas is a metrics copilot, not a database
+  browser. Both alternatives were
   rejected; the more integrated one — schema as its own Semantic Entry type — is
   the more dangerous, because once schema sits in the same corpus as Metric
   Definitions the model can compose them and "revenue" gets computed from
@@ -117,7 +108,7 @@ available to the model.
 
 ## How the metric set stays coherent
 
-Raised by Amino on 2026-08-03 and **decided 2026-08-04.** The requirement: detect
+The requirement: detect
 when a question cannot be grounded, record it, and use those records to grow the
 certified vocabulary *continuously but coherently* — so the metric set never
 becomes a pile of one-off definitions that contradict each other.

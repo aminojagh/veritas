@@ -96,9 +96,9 @@ def nasdaq_symbols(*, refresh: bool) -> Iterator[dict[str, object]]:
             yield {
                 "instrument_symbol": symbol,
                 "security_name": row.get("Security Name", "").strip(),
-                # 'Y' for an exchange-traded fund. This is the flag
-                # data-availability.md picked the source for: it populates the
-                # instrument-type axis without anyone hand-labelling a row.
+                # 'Y' for an exchange-traded fund. This flag is why the source was
+                # picked: it populates the instrument-type axis without anyone
+                # hand-labelling a row.
                 "is_etf": row.get("ETF", "").strip(),
                 "is_test_issue": row.get("Test Issue", "").strip(),
                 "listing_file": listing,

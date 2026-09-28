@@ -50,7 +50,7 @@ until R8.
 | ID | Decision or work | Depends on | Produces | Status |
 |---|---|---|---|---|
 | R0 | One mode, and the new document model | — | `CLAUDE.md`, `.claude/skills/*` | done |
-| R1 | Purge history and derivable documents | R0 | a `.claude/docs/` tree holding only what R0 keeps | open |
+| R1 | Purge history and derivable documents | R0 | a `.claude/docs/` tree holding only what R0 keeps | done |
 | R2 | Frame the problem | R0 | draft purpose and scope in `design/target-state-next.md` | open |
 | R3 | Research prior art | R2 | research note, deleted once R4's ADRs cite what they use | open |
 | R4 | Core design | R2, R3 | ADRs, draft components and flow, proposed Glossary terms | open |
@@ -114,6 +114,19 @@ development into `CLAUDE.md`'s permanent sections. The plan and review templates
 product checks. Both would spend effort on code the redesign may delete. R7 scopes
 them to what survives.
 
+**Calls R1 took beyond the list above — each awaiting Amino.**
+
+1. **`design/data-availability.md` and `design/validation-feasibility.md` are
+   deleted.** Both are dated gate reports, which is history. The six constraints the
+   second placed on the Gate are C1–C6 in ADR-0003, under the same headings, so the
+   code's citations moved rather than broke.
+2. **`docs/decisions.md`'s reasons became two `proposed` ADRs**: ADR-0006, the book's
+   conventions, and ADR-0007, how Evaluation scores and picks defaults. The list-price
+   rule and the unlogged provider failure joined ADR-0005.
+3. **Accepted Ledger entries left their reasons in the ADR that causes them**:
+   DEBT-006 in ADR-0001, DEBT-008's sentence in ADR-0002, DEBT-037 in ADR-0007,
+   DEBT-041 in ADR-0005. DEBT-044 is paid by the next free number.
+
 ### R2 — Frame the problem
 
 These questions come before any research, so the research knows what it is for:
@@ -122,7 +135,7 @@ These questions come before any research, so the research knows what it is for:
 - What does connecting a new domain cost? That cost is what domain-agnostic
   measurably means.
 - **What does an answer promise?** The current thesis is to refuse rather than
-  guess, and [DEBT-006](../debt-ledger.md#debt-006--no-ad-hoc-exploration--accepted-permanently)
+  guess, and [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md#consequences)
   says *"Veritas is a metrics copilot, not a database browser."* "General and
   flexible" pulls the other way. R2 decides where Veritas sits between the two.
 - What is out of scope, and what number says the prototype works?
@@ -188,5 +201,5 @@ as keep, adapt or delete, against the new Target State.
 - **[DEBT-023](../debt-ledger.md#debt-023--two-proving-systems-run-side-by-side)'s
   port** covers only the checks whose component survives. The rest are deleted with
   their component.
-- **[DEBT-024](../debt-ledger.md#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit)'s
+- **[DEBT-024](../debt-ledger.md#debt-024--docstrings-argue-why-they-were-built-as-they-are)'s
   slimming** applies to surviving code only.

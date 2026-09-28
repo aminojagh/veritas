@@ -148,9 +148,10 @@ putting in a Step Review, it is worth committing to `tests/`. Never paste the
 output of a throwaway inline script into a document or a commit message:
 the reader cannot re-run it, the transcription can be wrong, and a summary count
 (*"checked 37 links, 0 broken"*) hides what was actually covered. **Before
-writing any new check, look for one that already does it** — `verify_framework.py`
-already validates document links **and the headings their anchors point at**,
-skills, and the interpreter. A review shows the command a reader can run and the
+writing any new check, look for one that already does it** — `tests/test_links.py`
+already validates every relative link **and the heading its anchor points at**, in
+the documents and the code, and `tests/test_framework.py` the skills and the
+interpreter. A review shows the command a reader can run and the
 output that command produced, nothing else.
 
 **Citations quote.** Any claim about what another document says must include the
@@ -257,9 +258,9 @@ Check the framework is wired up correctly at any time:
 
 ```bash
 uv run pytest                                          # what the code does
-uv run python .claude/scripts/verify_framework.py      # that the docs hang together
+uv run pytest tests/test_framework.py tests/test_links.py tests/test_language.py
 ```
 
-It checks structure, not content — that documents exist, links resolve, skills
-load, and the interpreter is the pinned one. Whether the content is any good is
+The second checks structure, not content — that documents exist, links resolve,
+skills load, the Glossary's rules hold, and the interpreter is the pinned one. Whether the content is any good is
 Amino's review.

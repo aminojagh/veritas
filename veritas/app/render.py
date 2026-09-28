@@ -13,7 +13,7 @@ from veritas.semantic import MetricDefinition
 from veritas.validation import AccessProfile, ValidationGateOutcome
 
 # What the App says about the enforcement it demonstrates, in the words
-# [DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+# [ADR-0002](../../.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
 # asks for rather than a paraphrase of them. It sits beside the identity on the page,
 # because a qualification a reader meets after the claim is a qualification most readers
 # never meet.
@@ -96,7 +96,7 @@ def unit_line(answer: GroundedAnswer) -> str:
     the number reaches a person labelled with nothing they can read a unit off. The
     metric is identifiable because Lineage now records what the statement used, which is
     the smaller thing
-    [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    DEBT-034
     was blocking: *"the figure is shown without its unit or its reporting currency,
     because the metric whose `unit` and `reporting_currency` would label it is not
     identifiable from a list that names two."*

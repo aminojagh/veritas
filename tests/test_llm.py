@@ -3,7 +3,7 @@
 The provider is a stub HTTP server speaking the OpenAI Chat Completions API, so
 these run with no key and no network. What they cannot prove is that a real
 provider answers a real question well — that is
-[DEBT-028](../.claude/docs/debt-ledger.md#debt-028--no-test-reaches-a-real-provider-so-the-live-path-is-proven-only-by-a-stub-server)
+DEBT-028
 — but everything between `complete()` and the JSON on the socket is exercised
 here: the messages, the model name, the temperature, the JSON-object request, the
 three ways a call comes back with nothing to read, and what the reply says the call

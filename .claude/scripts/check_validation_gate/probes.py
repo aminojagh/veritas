@@ -4,7 +4,7 @@ record, and the report every rule module writes into.
 Run the check with:  uv run python .claude/scripts/check_validation_gate/
 
 The container is
-[R8](../../docs/plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)'s:
+R8's:
 a runner, this module, and one module per rule added with the Sub-step that adds the
 rule. The three checks grown by the method this one inherits are each well over a
 thousand lines — `wc -l .claude/scripts/*.py` prints where they have got to — and none
@@ -227,7 +227,7 @@ def certified_statement(
 
     `with_filters=False` builds the statement the corpus does **not** certify, and it
     exists for
-    [DEBT-020](../../docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)'s
+    DEBT-020's
     pair alone. `sliced_by` names an axis to group by, and adds that axis's own route
     for the same `from_table`.
     """
@@ -297,9 +297,9 @@ def spike_statements(constant: str) -> dict[str, str]:
     importing — where what is actually depended on is a file at a path, held in this
     repository, whose statements are a **dated measurement** that must not move. The
     spike goes on importing the tracer and the detector from `veritas/validation/` under
-    [R2](../../docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25);
+    R2;
     nothing imports the spike. That is
-    [R14](../../docs/plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27).
+    R14.
 
     Adjacent string literals are folded by the parser, so a statement the spike writes
     across fifteen source lines comes back as the one string the spike compiled — which

@@ -7,9 +7,9 @@ scoring it would credit a search for a Join Path no search can reach.
 
 **One row per Retrieval Strategy per setting, and the settings are the two open
 questions.** Which form the corpus is indexed in is
-[DEBT-027](../../.claude/docs/debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match);
+DEBT-027;
 which form a resolved meaning is written into the question in is
-[DEBT-030](../../.claude/docs/debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it).
+DEBT-030.
 Neither can be settled by argument, so the sweep runs every combination of them and
 the numbers choose.
 

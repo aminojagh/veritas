@@ -65,8 +65,8 @@ GOLD_DIR = REPO_ROOT / "data" / "gold"
 # millions, and one absolute figure cannot mean the same thing at both ends.
 #
 # It is also the width inside which a wrong answer would score as correct, which is what
-# [DEBT-004](../../.claude/docs/debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
-# and [DEBT-011](../../.claude/docs/debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level)
+# DEBT-004
+# and DEBT-011
 # constrain a Gold Question against: `tests/test_gold.py` executes both halves of each
 # Glossary Section C pair a Gold Question turns on and fails the run if they are closer
 # together than this.
@@ -99,7 +99,7 @@ class PhrasingClass(StrEnum):
     """How a Gold Question spells a registered Ambiguous Term, when not as registered.
 
     The four classes of
-    [DEBT-029](../../.claude/docs/debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently)'s
+    DEBT-029's
     own table, carried on the question as data so that the entry's repayment is scored
     over the Gold Question Set rather than over four strings in a test.
     """

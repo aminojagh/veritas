@@ -1,29 +1,7 @@
-"""What `README.md` must be true about, since nothing else checks it.
-
-`README.md` is the public face for Zoomcamp reviewers, and it is the one document
-neither committed checker reads: `verify_framework.py` scans `.claude/docs/` and the
-code, and `check_language.py` scans `.claude/docs/` and `CLAUDE.md`. So the three
-claims a reader is entitled to make about it are made here instead.
-
-**Every credential is listed.** The
-[Target State](../.claude/docs/design/target-state.md#what-credential-free-means)
-requires it in those words — a grader who discovers a needed key halfway through
-bring-up has had a reproducibility failure whatever the repository technically
-supports. Checked in both directions: nothing `.env.example` declares is missing from
-the README, and nothing the README names is missing from `.env.example`.
-
-**The access-control sentence is the Ledger's.**
-[DEBT-008](../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-names the words the claim must be qualified with, and a paraphrase drifts in exactly
-the direction that entry exists to prevent. `tests/test_app.py` reads the same sentence
-out of the same entry for the sidebar.
-
-**Every relative link resolves**, file and anchor, under the rule a markdown renderer
-uses — which is `verify_framework.py`'s own `heading_anchors`, imported rather than
-rewritten so the two documents cannot disagree about what an anchor is.
+"""What `README.md` must be true about: every credential is listed, and the
+access-control claim carries its qualification word for word.
 """
 
-import importlib.util
 import re
 from pathlib import Path
 
@@ -32,11 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
 ENV_EXAMPLE = ROOT / ".env.example"
-LEDGER = ROOT / ".claude" / "docs" / "debt-ledger.md"
-
-# `docs/` is the public face beside `README.md`; `.claude/docs/` is the working record
-# and is checked by `verify_framework.py`.
-PUBLIC_DOCS = ROOT / "docs"
+ADR_0002 = ROOT / ".claude" / "docs" / "adr" / "0002-duckdb-as-the-warehouse-behind-an-adapter.md"
 
 # A variable is `NAME=` at the start of a line, live or commented out — `.env.example`
 # declares its optional settings as comments so a reviewer uncomments rather than
@@ -62,7 +36,7 @@ README_NOT_IN_ENV = {
 def normalised(text: str) -> str:
     """Markdown prose as one line, with block-quote markers off.
 
-    Both documents state the DEBT-008 sentence as a block quote and wrap it at
+    Both documents state the access-control sentence as a block quote and wrap it at
     different widths, so neither the `>` nor the line breaks may count as a
     difference. Nothing else about the sentence may differ.
     """
@@ -72,16 +46,6 @@ def normalised(text: str) -> str:
 @pytest.fixture(scope="module")
 def readme() -> str:
     return README.read_text()
-
-
-@pytest.fixture(scope="module")
-def heading_anchors():
-    """`verify_framework.py`'s anchor rule, imported from the file that owns it."""
-    path = ROOT / ".claude" / "scripts" / "verify_framework.py"
-    spec = importlib.util.spec_from_file_location("verify_framework", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.heading_anchors
 
 
 # -- the credential claim --------------------------------------------------------
@@ -123,74 +87,18 @@ def test_the_readme_exemptions_are_still_true():
 # -- the access-control claim ----------------------------------------------------
 
 
-def test_the_readme_qualifies_access_control_in_the_ledgers_own_words(readme):
-    """[DEBT-008](../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-    fires on *"the first access-control claim made anywhere a reader will see it"*,
-    and names the sentence that qualifies it. The App renders the same one.
+def test_the_readme_qualifies_access_control_in_the_adrs_own_words(readme):
+    """[ADR-0002](../.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
+    names the sentence every access-control claim carries. The App renders the same one.
     """
     from veritas.app.render import ENFORCEMENT_NOTE
 
     sentence = normalised(ENFORCEMENT_NOTE)
-    assert sentence in normalised(LEDGER.read_text()), (
-        "the sentence the App renders is no longer the Ledger's — this test and "
+    assert sentence in normalised(ADR_0002.read_text()), (
+        "the sentence the App renders is no longer ADR-0002's — this test and "
         "tests/test_app.py disagree about which document is the source"
     )
     assert sentence in normalised(readme), (
-        "README.md makes an access-control claim without DEBT-008's qualification, "
+        "README.md makes an access-control claim without ADR-0002's qualification, "
         "or with a paraphrase of it"
     )
-
-
-# -- the link claim --------------------------------------------------------------
-
-
-def test_the_readme_points_at_every_document_beside_it(readme):
-    """A public document nothing links to is a document nobody reads.
-
-    [DEBT-013](../.claude/docs/debt-ledger.md#debt-013--the-decisions-that-move-a-number-live-only-in-internal-reviews)
-    is paid by `docs/decisions.md` *and* by `README.md` sending a reader to it: a
-    register a domain expert cannot find leaves them exactly where the entry says
-    they are, reading a figure with nowhere to look.
-    """
-    beside = sorted(PUBLIC_DOCS.rglob("*.md")) if PUBLIC_DOCS.exists() else []
-    unlinked = [
-        str(doc.relative_to(ROOT))
-        for doc in beside
-        if f"({doc.relative_to(ROOT)})" not in readme
-    ]
-    assert not unlinked, (
-        f"README.md links to none of {unlinked} — a document under docs/ that "
-        f"nothing points at is unreachable from the public face"
-    )
-
-
-def public_documents() -> list[Path]:
-    """`README.md` and anything under `docs/` — the public face, in full."""
-    beside = sorted(PUBLIC_DOCS.rglob("*.md")) if PUBLIC_DOCS.exists() else []
-    return [README, *beside]
-
-
-def test_every_relative_link_in_the_public_documents_resolves(heading_anchors):
-    """File *and* anchor, because a dead anchor lands the reader at the top of the
-    right document, which reads as a vague citation rather than a broken one."""
-    anchors: dict[Path, set[str]] = {}
-    problems: list[str] = []
-    links = 0
-
-    for doc in public_documents():
-        for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", doc.read_text()):
-            if target.startswith(("http://", "https://", "mailto:")):
-                continue
-            relative, _, fragment = target.partition("#")
-            path = (doc.parent / relative).resolve() if relative else doc
-            links += 1
-            if not path.exists():
-                problems.append(f"{doc.name}: dead link -> {target}")
-            elif fragment and path.suffix == ".md":
-                if path not in anchors:
-                    anchors[path] = heading_anchors(path.read_text())
-                if fragment not in anchors[path]:
-                    problems.append(f"{doc.name}: dead anchor -> {target}")
-
-    assert links, "no relative links found — the pattern has rotted"
-    assert not problems, "\n".join(problems)

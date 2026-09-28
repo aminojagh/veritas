@@ -1,7 +1,7 @@
 """Sub-step 5.5's rule: the Access Profile's predicate is present, on every statement.
 
 The fifth and last of the modules
-[R8](../../docs/plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
+R8
 lays out, and the one that closes the
 [Target State's](../../docs/design/target-state.md#flow) list of what `VALIDATE`
 decides. It measures three things the Sub-step built, in the order the plan's own
@@ -29,15 +29,13 @@ was not.
 the analyst's slice is a third of a chart rather than a whole one. That is a property
 of a slice with one Access Profile in it, not a defect: a second role permitting a
 second region is a file edit rather than a field change, which the
-[Step 005 plan](../../docs/plan/step-005-validation-gate.md#not-in-this-step) files as
+Step 005 plan files as
 a scope boundary.
 
 **What this enforcement is and is not** is
-[DEBT-008](../../docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s
+[ADR-0002](../../docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)'s
 own sentence rather than a paraphrase of it: applied in the application layer, over
-synthetic data, demonstrating the mechanism. Nothing here claims more, and this module
-is not the entry's payment — its Trigger is the first access-control claim in
-`README.md`, the App or a demo script, and none of the three exists.
+synthetic data, demonstrating the mechanism. Nothing here claims more.
 
 **No probe here names a date at all**, which is how
 [DEBT-012](../../docs/debt-ledger.md#debt-012--the-price-table-is-sparse-so-the-snapshot-calendar-has-holes)'s
@@ -161,11 +159,11 @@ def predicate_probes(gate: ValidationGate) -> tuple[AccessProbe, ...]:
     Nine and not three, for the reason `traces.py` asks all nine: a Gate that enforces
     an identity on the trade-side metrics alone enforces it on four questions out of
     nine, which is the kind of partial control
-    [DEBT-008](../../docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+    [ADR-0002](../../docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
     is already about. The four fact tables the nine metrics start from each need their
     own first hop to `dim_account`, which is why the Sub-step added five Join Paths and
     not the two
-    [R11 of Step 004](../../docs/plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)
+    R11 of Step 004
     counted.
 
     Both halves are built from the corpus, so a tenth Metric Definition is a tenth pair
@@ -391,7 +389,7 @@ def check_this_rules_reading(gate: ValidationGate, report: Report) -> None:
 def check_a_profile_the_axis_cannot_certify(gate: ValidationGate, report: Report) -> None:
     """A region the `by region` axis does not register is refused before any rule runs.
 
-    [R1](../../docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
+    R1
     asks for a profile naming an uncertified region to be *"refused where it is loaded
     rather than where it is used"*. A profile is a constant in `veritas/validation/`
     and the corpus is not in scope there, so the first moment the two meet is a
@@ -448,7 +446,7 @@ def check_the_mutations(gate: ValidationGate, rule: str, report: Report) -> None
         which is exactly why the branch exists: the refusal a rule gives is half of what
         it is for;
       * **the certified-filter comparison removed** —
-        [DEBT-020](../../docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)'s
+        DEBT-020's
         statement goes back to being allowed, which is what proves the payment is a rule
         and not a renamed probe.
 

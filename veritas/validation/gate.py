@@ -4,13 +4,13 @@ executes.
 [ADR-0003](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md)
 decided what this is: code over a parse tree, and *"no LLM participates in the
 decision to allow or reject a query."*
-[Step 003](../../.claude/docs/design/validation-feasibility.md) spent five Sub-steps
+Step 003 spent five Sub-steps
 measuring whether that is possible on this schema and this data, and returned **GO**.
 This module is the thing that was measured for.
 
 **Five decisions, and all five have shipped.** The
 [Target State's flow](../../.claude/docs/design/target-state.md#flow) names what
-`VALIDATE` decides; the [Step 005 plan](../../.claude/docs/plan/step-005-validation-gate.md#what-the-gate-must-decide)
+`VALIDATE` decides; the Step 005 plan
 puts them in the order a statement meets them. Sub-step 5.1 shipped everything that
 needs neither the Semantic Layer nor a certified metric — can this be read at all, is
 it one statement, is it a read, will it stay inside the scan ceiling — Sub-step
@@ -31,19 +31,15 @@ refused at the last rule rather than allowed, which the check reads off
 not"*.
 
 **What the Access Profile enforcement here is, and is not.**
-[DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-is open on the honesty of that claim, and its own words are the ones to repeat rather
-than paraphrase:
+[ADR-0002](../../.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
+states the qualification every access-control claim carries, and its own words are the
+ones to repeat rather than paraphrase:
 
 > Access Profile enforcement is applied in the application layer, over synthetic
 > data. It demonstrates the mechanism; it is not a production access control, and
 > it does not protect the Warehouse from being read another way.
 
-The entry is not paid by this sentence sitting here — its Trigger is the first
-access-control claim in `README.md`, the App or a demo script, and none of the three
-exists. The sentence is here so that the first person to write one finds it beside the
-code instead of having to reconstruct it, and so that this module never reads as more
-than it is. When
+When
 [EXT-001](../../.claude/docs/extension-register.md#ext-001--warehouse-native-security-and-concurrency)
 lands, warehouse-native security **replaces** this check rather than joining it.
 
@@ -75,7 +71,7 @@ lands, warehouse-native security **replaces** this check rather than joining it.
     `date_column` and `filters`, and the `routes` of every axis the statement slices by.
     It is the only rule that needs a Metric Definition's fields rather than its
     expression, so it runs after the three that do not, and the flow's own order
-    ([5.4 after 5.3](../../.claude/docs/plan/step-005-validation-gate.md#what-the-gate-must-decide))
+    (5.4 after 5.3)
     is the same order. It matters where a statement is wrong in two ways at once: `net
     revenue by client` reaches `dim_client` through uncertified joins **and** projects a
     Client's name, and the leak is the more useful thing to be told about.
@@ -128,7 +124,7 @@ Schema = Mapping[str, Mapping[str, str]]
 DIALECT = "duckdb"
 
 # The optimizer rewrites the Gate trusts, and no more —
-# [C5](../../.claude/docs/design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
+# [C5](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
 # in one place, *"so that widening it is a visible decision rather than a default"*.
 # sqlglot's own `optimize()` runs fourteen; these two are what Sub-step 3.2 measured
 # the tracer to need, and each is a rewrite trusted to preserve meaning between the
@@ -189,12 +185,12 @@ class Reading:
 
     `statements` is `None` exactly when sqlglot refused the string, and `refusal`
     carries what it said. That is
-    [C6](../../.claude/docs/design/validation-feasibility.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)'s
+    [C6](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)'s
     requirement made structural: a rule reads *"the parse failed"* as a fact it was
     handed, not as an empty list it has to interpret.
 
     **Three more things are read at most once, and that is
-    [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
+    DEBT-019
     paid.** Until Sub-step 5.4 each parse-tree rule opened with its own
     `columns_by_table()` and its own `resolve()`, so one judgement read the catalogue
     twice and resolved one statement twice. The entry's own reason for that being wrong
@@ -242,7 +238,7 @@ class Reading:
     def schema(self) -> Schema:
         """The Warehouse's column list, read through the adapter once per judgement.
 
-        [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)
+        [C4](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c4--the-gate-reads-the-schema-at-run-time)
         is why it is read at run time at all, and why it comes through the Warehouse
         Adapter — *"which keeps it on the right side of ADR-0002's seam."*
 
@@ -358,7 +354,7 @@ Rule = Callable[[Reading], Rejected | None]
 def parses(reading: Reading) -> Rejected | None:
     """A statement sqlglot cannot read is rejected, by a rule.
 
-    [C6](../../.claude/docs/design/validation-feasibility.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)
+    [C6](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)
     exists because the spike fails closed *"incidentally"* — gibberish produces no
     projections, and a tracer that requires at least one projection to trace refuses
     it as a side effect. Sub-step 3.2's review measured exactly one mutation that
@@ -404,7 +400,7 @@ def a_read(reading: Reading) -> Rejected | None:
     Stated as what is allowed rather than as a list of what is not, because a list
     of forbidden verbs is a list somebody has to keep up with: `DROP`, `INSERT`,
     `COPY`, `PRAGMA` and `ATTACH` are the shapes
-    [5.1](../../.claude/docs/plan/step-005-validation-gate.md#the-six-shapes-read-only-has-to-cover)
+    5.1
     names, and `INSTALL`, `SET`, `EXPORT` and whatever the engine grows next are the
     ones it does not. Every one of them is refused here by not being a `SELECT`.
 
@@ -479,7 +475,7 @@ def resolve(
     of real columns.
 
     The two rules are `TRUSTED_REWRITES`, declared at the top of this module by
-    [C5](../../.claude/docs/design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
+    [C5](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
     and applied here for the first time. sqlglot's own `optimize()` runs fourteen.
 
     `optimize` parses a string and copies a tree before touching either, so the
@@ -496,7 +492,7 @@ def resolve(
     puts a statement in front of this function that does exactly that on every run.
     Catching it here is not catching everything: a `KeyError` out of a broken schema
     mapping still escapes, which is
-    [DEBT-016](../../.claude/docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)'s
+    DEBT-016's
     distinction kept — *"a query the engine will not plan is a rejection, and an adapter
     that cannot open the Warehouse is a broken installation."* What is caught is the
     library refusing a caller's statement, however it spells the refusal, because a Gate
@@ -571,7 +567,7 @@ def on_base_tables(
 # it belongs to.
 #
 # The middle element is
-# [DEBT-022](../../.claude/docs/debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
+# DEBT-022
 # paid: without it `JOIN dim_account ON …` and `LEFT JOIN dim_account ON …` are one
 # join, and a statement that keeps the fact rows the certified inner join drops matches
 # the corpus.
@@ -612,7 +608,7 @@ def joins_in(scope: Scope) -> dict[str, Join]:
     **Keeping both readings is what tells two joins to one table apart.** The alias is
     the only thing that separates `fct_fx_rate` reached on the Trade's Denomination
     Currency from `fct_fx_rate` reached on the Instrument's Quotation Currency, and
-    [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+    DEBT-021
     is what happens when only the base-table reading survives.
 
     A join with no condition — `FROM fct_trade AS left_side, fct_trade AS right_side` —
@@ -712,7 +708,7 @@ def projections_of(resolved: exp.Expression) -> list[exp.Expression]:
 
     The half of `projected_expressions` that reads a tree, split out in Sub-step 5.4 so
     that a judgement resolves once and every rule reads the same tree — see `Reading`,
-    and [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
+    and DEBT-019,
     which the split pays. The public function above keeps the signature the spike and
     the checks call it by.
     """
@@ -756,7 +752,7 @@ def metric_expressions_through(
     """Every metric expression, and the joins its own columns are read through.
 
     Two readings of one projection, which is
-    [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+    DEBT-021
     paid. The **form** is the projection written on base tables and canonicalised, which
     is what the corpus is keyed by and what makes the tracing rule blind to the alias a
     generator chose. The **joins** are read off those same aliases before they are
@@ -842,10 +838,10 @@ def certified_forms(
 
     It takes the expressions rather than reading `semantic/metrics/` itself so that
     `check_validation_feasibility.py` can go on tracing against the three pinned
-    literals [R4 of Step 004](../../.claude/docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+    literals R4 of Step 004
     froze, while the Gate traces against the corpus on disk. One tracer, two corpora,
     which is the whole point of
-    [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25).
+    R2.
     """
     return {
         certified_form(expression, schema, dialect): name
@@ -912,7 +908,7 @@ def columns_reaching_the_answer(
 
     **It adds no new trust.** `lineage` runs `qualify` and nothing else, so
     `TRUSTED_REWRITES` is still the whole of what
-    [C5](../../.claude/docs/design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
+    [C5](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
     names. It is handed the already-resolved statement so that a `SELECT *` is expanded
     before it starts.
 
@@ -980,7 +976,7 @@ def restricted_columns_in_projection(
     holds its own pinned declaration of the same column and judges nine shapes against it
     on every run, while the Gate judges against whatever the Access Profile it was built
     with carries. One detector, two declarations — which is
-    [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+    R2
     applied to the second of the two parse-tree rules, the same way 5.2 applied it to the
     first.
     """
@@ -1012,7 +1008,7 @@ class Route:
     The word is the Glossary's own: a
     [`Join Path`](../../.claude/docs/glossary.md#a-the-system) is *"a certified **route**
     between two warehouse tables, so the model never invents a join"*, and
-    [R8 of Step 004](../../.claude/docs/plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22)
+    R8 of Step 004
     is titled *"the route a Metric Definition carries"*. A Route here is the whole chain
     — one or more Join Paths, plus where the chain starts — read off a parse tree or
     built from a Metric Definition's fields, so that the two can be compared as values.
@@ -1118,7 +1114,7 @@ def certified_route(
     `check_validation_feasibility.py` pins its own declarations and judges its dated
     measurement against those, while the Gate reads `semantic/`. One reader, two
     declarations —
-    [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+    R2
     applied to the third of the Gate's parse-tree rules.
 
     A Metric Definition's `filters` are deliberately **not** assembled in. They are
@@ -1231,7 +1227,7 @@ def grouped_columns(resolved: exp.Expression) -> set[tuple[str, str]]:
 
     What a `GROUP BY` names is what the answer is **sliced** by, and a slice is the one
     thing that earns a statement the joins an axis's `routes` declare —
-    [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+    R1's
     second source of permission. Reaching an axis is permitted by grouping on it, never
     by mentioning its table: a statement that joins `dim_instrument` and groups by
     nothing has added a join for no certified reason, and the route rule refuses it.
@@ -1285,7 +1281,7 @@ def access_predicate(
     """The predicate that scopes a statement to one Access Profile, canonicalised.
 
     **The profile names the axis and the corpus holds everything else**, which is
-    [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)
+    R1
     and the reason `AccessProfile` carries a region rather than a column and a list of
     regions: the `by region` Dimension Definition already registers the column, the
     buckets and — since Sub-step 5.5 — the routes, and a profile restating any of them
@@ -1336,7 +1332,7 @@ class ValidationGate:
     """The Gate. Built once with what its rules read, then asked for a verdict.
 
     It takes the Warehouse Adapter rather than a statement alone because
-    [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)
+    [C4](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c4--the-gate-reads-the-schema-at-run-time)
     binds this Step: the Gate reads the live schema at run time and reads it
     *"through the Warehouse Adapter — which keeps it on the right side of ADR-0002's
     seam"*. Sub-step 5.1 uses the adapter for the planner's estimate only; 5.3 is
@@ -1350,7 +1346,7 @@ class ValidationGate:
     registers it as *"the identity Veritas runs a **question** as"* — per question, so
     one Gate serves many identities and an application process loads the corpus once for
     all of them. That is
-    [R14](../../.claude/docs/plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27),
+    R14,
     ruled against this class's first draft, where the profile was a second constructor
     argument: what a Gate is **built with** is what its rules read out of the world —
     the adapter, the corpus, the ceiling — and what a statement is **judged under** is
@@ -1367,7 +1363,7 @@ class ValidationGate:
     forms built from it are read again on every judgement.** `semantic/` is committed
     text that cannot change under a running Gate; the Warehouse's column list is live
     state that can, which is what
-    [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)
+    [C4](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c4--the-gate-reads-the-schema-at-run-time)
     means by *"at run time"*. The corpus's canonical forms are rebuilt with it, and
     that is correctness rather than caution: a certified expression and the statement
     computing it are compared as text, so both have to be resolved against the **same**
@@ -1402,7 +1398,7 @@ class ValidationGate:
         The estimate comes from the engine through the adapter, never from this
         module: `EXPLAIN` is dialect, and `check_warehouse.py`'s seam scan fails the
         run on a `duckdb` import outside `veritas/warehouse/` — correctly.
-        [R7](../../.claude/docs/plan/step-005-validation-gate.md#r7--the-bounded-read-uses-the-engines-estimate-if-the-adapter-can-reach-it--approved-by-amino-2026-08-25)
+        R7
         put two rules up and said the measurement chooses between them; this is the
         engine's estimate, which Sub-step 5.1 found reachable in a machine-readable
         plan, so the parse-tree fallback R7 pre-approved was not needed.
@@ -1412,7 +1408,7 @@ class ValidationGate:
         execution, and it is refused as unbounded because that is the honest verdict
         this rule can reach: the planner would not say how much it reads. That
         distinction is only expressible because
-        [DEBT-016](../../.claude/docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type)
+        DEBT-016
         was paid in the same Sub-step — a `WarehouseError` is the engine refusing a
         caller's SQL, where a bare `Exception` here would have swallowed a broken
         adapter and called it a bad query.
@@ -1442,7 +1438,7 @@ class ValidationGate:
 
         **The corpus comes from `semantic/metrics/` through the loader, not from
         Python literals.** That is the difference between the Gate and the spike, and
-        the reason [R2](../../.claude/docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25)
+        the reason R2
         matters: one tracer reads two corpora, and the spike's pins are what keep its
         dated measurement honest while this reads whatever `semantic/` now says.
 
@@ -1453,7 +1449,7 @@ class ValidationGate:
 
         The catalogue, the resolved tree and the corpus come off the `Reading`, which
         reads each of them at most once per judgement — see `Reading`, and
-        [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
+        DEBT-019,
         which Sub-step 5.4 paid.
         """
         try:
@@ -1524,7 +1520,7 @@ class ValidationGate:
 
         The [Target State](../../.claude/docs/design/target-state.md#flow)'s *"no
         restricted column in the projection"*, and the other half of
-        [C3](../../.claude/docs/design/validation-feasibility.md#c3--the-two-parse-tree-rules-ship-together),
+        [C3](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c3--the-two-parse-tree-rules-ship-together),
         which is why it is in the same Step as the tracing rule and not a Step later:
         *"a Step that builds certified-metrics-only alone and defers the Restricted
         Column check has not built half a Gate; it has built a Gate that passes the
@@ -1537,7 +1533,7 @@ class ValidationGate:
         around, and a Gate people route around protects nothing.
 
         `SELECT *` is the shape this rule cannot do without
-        [C4](../../.claude/docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)'s
+        [C4](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c4--the-gate-reads-the-schema-at-run-time)'s
         run-time schema read: it is *"the one shape whose restricted name exists nowhere
         in its own text"*, and only the live column list says what the star stands for.
 
@@ -1595,9 +1591,9 @@ class ValidationGate:
     def routed(self, reading: Reading) -> Rejected | None:
         """The statement reaches its rows the way the Metric Definition says, or reject.
 
-        [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+        [C2](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
         in one rule, and the payment of
-        [DEBT-014](../../.claude/docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject).
+        DEBT-014.
         The reason both exist is one sentence of C2's: *"a certified expression pins down
         the arithmetic and not the rows it is computed over."* The tracing rule reads the
         projection, and `Traded Notional` converted out of the Trade's Denomination
@@ -1605,7 +1601,7 @@ class ValidationGate:
         to the right one. Nothing the tracing rule can see separates them. The join does.
 
         **Both halves are one rule because C2 and DEBT-014 treat them as one question.**
-        [R4 of Step 003](../../.claude/docs/design/validation-feasibility.md#r4--debt-014-is-amended-to-name-the-date-predicate--approved-by-amino-2026-08-20)
+        R4 of Step 003
         settled that: the Trade Date / Settlement Date question *"is this entry's
         question, not a second one"*, because it is the same shape — two columns on
         `fct_trade`, a projection that cannot tell them apart, and a Section C pair that
@@ -1614,7 +1610,7 @@ class ValidationGate:
 
         **Permission comes from a list, and a join no entry names is a rejection.** The
         list has three sources and no fourth —
-        [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25):
+        R1:
         the metric's own `join_paths`, the `routes` of each axis the statement groups
         by, and the route the Access Profile's predicate needs, which is the `by region`
         axis's own `routes` read from the same field. The Gate never searches
@@ -1720,7 +1716,7 @@ class ValidationGate:
         """Each metric expression reads only through the joins its **own** Metric
         Definition names, or reject.
 
-        [DEBT-021](../../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+        DEBT-021
         paid, and the hole it was opened for in one sentence: the three comparisons
         above union every metric's route before comparing, so a statement asking for two
         metrics that convert through `fct_fx_rate` by different routes certifies **both**
@@ -1800,10 +1796,10 @@ class ValidationGate:
         WHERE clause is read.
 
         The third of the three fields
-        [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+        [C2](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
         puts on a Metric Definition to pin down which rows its expression is computed
         over, and the one Sub-step 5.4 did not read —
-        [DEBT-020](../../.claude/docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters),
+        DEBT-020,
         paid here. `Realised P&L` shares `fct_accounting_movement` with three other
         movement types and `filters` is the whole difference between them.
 
@@ -1944,7 +1940,7 @@ class ValidationGate:
         **`judge` calls it only where every rule has passed**, which is what makes the
         walks safe — a statement an earlier rule refused for being unreadable is one
         these would raise on — and is the shape
-        [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+        DEBT-034
         asks for: a refused statement composed nothing.
 
         **The access axis is in the third list and not the second.** Every statement
@@ -2039,7 +2035,7 @@ class ValidationGate:
         `check_validation_gate`.
 
         **What this enforcement is and is not** is
-        [DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s
+        [ADR-0002](../../.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)'s
         sentence, quoted in this module's docstring rather than paraphrased here: the
         application layer, over synthetic data, demonstrating the mechanism.
 
@@ -2120,7 +2116,7 @@ class ValidationGate:
         **One `Reading` per judgement, and it is where the catalogue, the resolved tree
         and the corpus are read.** Every rule below gets the same one, so the four that
         read a parse tree read the *same* tree qualified against the *same* catalogue —
-        [DEBT-019](../../.claude/docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again),
+        DEBT-019,
         whose own argument for this was never speed: *"a verdict assembled from two views
         of the Warehouse is a verdict about neither."* Nothing is read here, only made
         reachable — see `Reading` for why that distinction is the Gate's rule order.
@@ -2130,7 +2126,7 @@ class ValidationGate:
         does not certify is a broken installation and not a bad query — the call
         `certified_form` makes for a corpus that yields no metric expression — and
         catching it here is
-        [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25)'s
+        R1's
         *"refused where it is loaded rather than where it is used"* as close as this
         design allows: a profile is a constant in `profile.py` and the corpus is not in
         scope there, so the first moment the two meet is a judgement, and a judgement

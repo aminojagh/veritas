@@ -90,7 +90,7 @@ properly" is not a repayment plan.
 
 When a Trigger fires, repayment belongs *inside* the Step that fired it. Paying
 an entry deletes it: the entry, its Index row, and every link to it —
-`verify_framework.py` names each link left dead. The commit message names the
+`tests/test_links.py` names each link left dead. The commit message names the
 entry it paid; git keeps the text. The number is never reused.
 
 An entry that turns out to be an extension moves to the

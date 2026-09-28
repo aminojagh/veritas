@@ -2,7 +2,7 @@
 contract, before it is a return value.
 
 Both names are Glossary terms as of 2026-08-25
-([R3](../../.claude/docs/plan/step-005-validation-gate.md#r3--validation-gate-outcome-and-rejection-reason-get-glossary-rows--approved-by-amino-2026-08-25)),
+(R3),
 and they are here rather than in `gate.py` because three components that will never
 import a rule still have to read a verdict: a `Grounded Answer` carries one, the
 `App` renders one, and `Observability` charts *"Validation-Gate rejections by
@@ -30,7 +30,7 @@ metric, a certified filter the statement dropped, and the Access Profile's own
 predicate absent. Every member arrived with the rule that can produce it, because a
 member with no rule behind it would be a chart category nothing can ever fall into.
 The next member arrives with the next rule, and nothing in
-[Step 005](../../.claude/docs/plan/step-005-validation-gate.md) is left to add one.
+Step 005 is left to add one.
 
 **A rule may register more than one member.** Four rules and four members made them
 look paired; the tracing rule is one rule with three distinct failures behind it, and
@@ -58,7 +58,7 @@ class RejectionReason(StrEnum):
     UNPARSEABLE = "unparseable"
     """sqlglot could not read the statement at all.
 
-    [C6](../../.claude/docs/design/validation-feasibility.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)
+    [C6](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c6--fail-closed-on-parse-failure-by-a-rule-rather-than-by-accident)
     is the constraint that requires this to be its own reason rather than a
     consequence of finding nothing in an empty tree. The spike fails closed
     *"incidentally"*, and Sub-step 3.2's review measured one mutation that passes
@@ -83,7 +83,7 @@ class RejectionReason(StrEnum):
 
     Covers a write to the Warehouse, a write to the filesystem, engine
     introspection, and attaching a second database — the shapes
-    [Sub-step 5.1](../../.claude/docs/plan/step-005-validation-gate.md#the-six-shapes-read-only-has-to-cover)
+    Sub-step 5.1
     enumerates. They share a reason because they share a rule: the Gate does not ask
     what a statement would do, it asks whether it is the one kind of statement
     Veritas runs. What it *was* goes in the outcome's explanation, so a chart can
@@ -129,7 +129,7 @@ class RejectionReason(StrEnum):
     ones is still a rejection.
 
     A paraphrase that returns the identical number lands here too, by design.
-    [C1](../../.claude/docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
+    [C1](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
     chose a pasteable form over a normalising comparison precisely so the Gate does
     not have to decide which rewrites preserve meaning, and the price of that choice
     is that a commuted operand is a Shadow Metric.
@@ -178,7 +178,7 @@ class RejectionReason(StrEnum):
 
     The [Target State](../../.claude/docs/design/target-state.md#flow)'s second check on the
     parse tree, and the half of
-    [C3](../../.claude/docs/design/validation-feasibility.md#c3--the-two-parse-tree-rules-ship-together)
+    [C3](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c3--the-two-parse-tree-rules-ship-together)
     that a Step shipping certified-metrics-only alone would have left out: *"a Step that
     builds certified-metrics-only alone and defers the Restricted Column check has not
     built half a Gate; it has built a Gate that passes the leak."*
@@ -198,14 +198,14 @@ class RejectionReason(StrEnum):
     UNCERTIFIED_ROUTE = "uncertified route"
     """The statement reaches its rows through joins the Metric Definition does not name.
 
-    [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)'s
+    [C2](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)'s
     half of the Gate, and the reason it exists in one sentence: *"a certified expression
     pins down the arithmetic and not the rows it is computed over."* `Traded Notional`
     converted out of the Trade's Denomination Currency instead of the Instrument's
     Quotation Currency projects **identically** to the right one, so `SHADOW_METRIC`
     cannot fire on it and the number is wrong by a margin
     `check_validation_feasibility.py` prints on every run. That statement is
-    [DEBT-014](../../.claude/docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject),
+    DEBT-014,
     and this member is what pays it.
 
     **It fires in both directions, and both are the same failure.** A statement that
@@ -220,7 +220,7 @@ class RejectionReason(StrEnum):
     """The statement's period filter keys on a date column the metric does not certify.
 
     The other half of C2 and of DEBT-014, which
-    [R4 of Step 003](../../.claude/docs/design/validation-feasibility.md#r4--debt-014-is-amended-to-name-the-date-predicate--approved-by-amino-2026-08-20)
+    R4 of Step 003
     settled as *"this entry's question, not a second one"*: Trade Date and Settlement
     Date are two columns on `fct_trade`, a projection cannot tell them apart, and they
     are a
@@ -256,7 +256,7 @@ class RejectionReason(StrEnum):
     sold determinism on a stable taxonomy to preserve.
 
     It is also what makes
-    [R11 of Step 004](../../.claude/docs/plan/step-004-semantic-layer.md#r11--aminos-rulings-on-the-45-review--decided-2026-08-25)'s
+    R11 of Step 004's
     fourth ruling enforceable rather than argued. That ruling defends three date axes
     where the Glossary had one, on the grounds that *"an axis named `fct_trade.trade_date`
     applied to a Snapshot metric is a certified axis whose route never reaches the
@@ -267,7 +267,7 @@ class RejectionReason(StrEnum):
     MISSING_CERTIFIED_FILTER = "missing certified filter"
     """The statement computes a metric without the certified predicate that defines it.
 
-    [DEBT-020](../../.claude/docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+    DEBT-020
     paid. A Metric Definition carries **three** fields that pin down which rows its
     expression is computed over — `join_paths`, `date_column` and `filters` — and
     Sub-step 5.4 read two of them. `Realised P&L` shares `fct_accounting_movement` with
@@ -303,7 +303,7 @@ class RejectionReason(StrEnum):
     two powers and they fail differently: *"Determines which **rows** and **columns** the
     Validation Gate allows"*. A projected identity and an unscoped population are two
     bars a reader acts on differently, and
-    [DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
+    [ADR-0002](../../.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
     is honest about what both are worth: application-layer enforcement over synthetic
     data, demonstrating the mechanism.
     """
@@ -341,7 +341,7 @@ class ValidationGateOutcome:
     to know what a verdict covers reads this rather than assuming.
 
     `trusted_rewrites` is
-    [C5](../../.claude/docs/design/validation-feasibility.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
+    [C5](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c5--the-rewrites-the-gate-trusts-are-named-in-code-and-there-are-two)
     reported rather than declared. The rewrites themselves are `gate.TRUSTED_REWRITES`,
     where they are the callables a rule can actually run; what reaches a chart is their
     names, taken off those callables so there is no second list to drift. A verdict
@@ -351,7 +351,7 @@ class ValidationGateOutcome:
     **`metrics`, `dimensions` and `join_paths` are what the statement was composed
     from** — the Certified Metrics its expressions traced to, the certified axes it
     sliced by, and the Join Paths its route was certified by. They are
-    [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    DEBT-034
     paid: `Lineage` is read off the verdict rather than off what the model was shown, so
     an answer cites the entries that produced it and *"metric-usage frequency"* counts
     the metrics that were computed. The Gate's rules already decide all three on the way

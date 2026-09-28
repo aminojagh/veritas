@@ -92,7 +92,7 @@ def searchable_text(entry: SemanticEntry) -> str:
     for exactly what a hit on the unit counts for and nothing can weigh them apart.
     The alternative is `searchable_fields` above, kept apart and indexed apart, and
     which of the two Retrieval scores better is
-    [DEBT-027](../../.claude/docs/debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match).
+    DEBT-027.
     """
     return "\n".join(text for text in searchable_fields(entry).values() if text)
 

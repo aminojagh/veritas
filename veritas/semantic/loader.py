@@ -9,7 +9,7 @@ in a pull request"* at this scale. This package is the code that reads it, named
 the component the way `veritas/warehouse/` is named for the Warehouse it reaches.
 
 **Nothing here executes SQL, and that is a constraint rather than an omission.**
-[C1](../../.claude/docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
+[C1](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)
 says a Metric Definition *"publishes a form the Orchestrator pastes"* — so the
 expression is text this module hands over untouched, and assembling a query around
 it belongs to whatever pastes it. A loader that built the query would be re-deriving
@@ -104,7 +104,7 @@ class MetricDefinition(SemanticEntry):
     The fields past `SemanticEntry`'s three are the Glossary's own definition —
     *"its SQL expression, grain, filters, units, and the aliases people use for
     it"* — plus the two
-    [C2](../../.claude/docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
+    [C2](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
     requires, because *"a certified expression pins down the arithmetic and not the
     rows it is computed over"*:
 
@@ -133,7 +133,7 @@ class MetricDefinition(SemanticEntry):
     metric's own expression**, which is how `Account Value` is *"Cash Balance plus
     all Positions marked to market"* without restating the certified Cash Balance
     expression. It is narrower than the word suggests — see
-    [R8](../../.claude/docs/plan/step-004-semantic-layer.md#r8--the-route-a-metric-definition-carries--decided-in-sub-step-42-under-aminos-ruling-of-2026-08-22).
+    R8.
 
     The shape of the four fields above is R8's, decided in Sub-step 4.2 after reading
     all nine metrics against the shape Sub-step 4.1 published.
@@ -231,7 +231,7 @@ class DimensionDefinition(SemanticEntry):
                        definition.
 
     **`routes` is the fourth field, added in Sub-step 5.5** under
-    [R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25),
+    R1,
     and it is what makes an axis applicable rather than merely certified: the map
     from a metric's `from_table` to the Join Paths that reach this axis's columns
     from there. Three shapes and each is a different answer:
@@ -305,9 +305,8 @@ ROUTE_MAPS = frozenset({"routes"})
 # reaches the engine. Here rather than in whatever happens to need it, for the
 # reason the dataclasses above are the file format: a reader that decides for
 # itself which fields hold SQL is a second copy of the format, and the two go on
-# disagreeing after one of them is updated. Two readers already ask —
-# `check_warehouse.py`'s dialect scan and `check_language.py`'s keyword
-# derivation — and the Orchestrator that assembles a query will be the third.
+# disagreeing after one of them is updated. `check_warehouse.py`'s dialect scan
+# and the Orchestrator that assembles a query both ask.
 SQL_FIELDS: dict[type[SemanticEntry], tuple[str, ...]] = {
     MetricDefinition: ("expression", "filters"),
     JoinPath: ("on",),

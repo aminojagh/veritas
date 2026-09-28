@@ -183,8 +183,7 @@ committed snapshots**, and **both Retrieval models**. The key is the only thing 
 arrives at run time, from `.env`, and it never enters a layer.
 
 Expect **3m29s** to all three services and a **2.76 GB** image — measured 2026-09-06
-with no Docker or `uv` cache at all. The layer-by-layer breakdown is in the
-[9.1 review](.claude/docs/reviews/step-009-containerization-and-readme.md#sub-step-91--the-app-runs-in-docker-compose-beside-postgres-and-grafana).
+with no Docker or `uv` cache at all.
 
 The first page load takes about fifteen seconds — the Warehouse, the text index, the
 embedded corpus and two ONNX sessions, once per server process, under a spinner. Every
@@ -207,11 +206,10 @@ Question Log is optional here — `docker compose up -d postgres grafana` gives 
 and without it the App says in its sidebar that it is not recording and answers
 questions exactly as before.
 
-**`uv run pytest` skips what it cannot reach, and says so.** With nothing else running:
-**302 passed, 22 skipped**. After `docker compose up -d`: **318 passed, 6 skipped** — the
-sixteen that come back drive a running App and read the Question Log. The last six need
-a model and stay skipped unless `VERITAS_LIVE_MODEL=1` is set, because they spend the
-key. Measured 2026-09-06.
+**`uv run pytest` skips what it cannot reach, and says so.** The tests that drive a
+running App or read the Question Log come back after `docker compose up -d`; the ones
+that need a model stay skipped unless `VERITAS_LIVE_MODEL=1` is set, because they spend
+the key.
 
 Everything is pinned: the interpreter in `.python-version`, every dependency and
 transitive dependency in `uv.lock`, the Postgres and Grafana image tags in
@@ -269,17 +267,17 @@ real, client activity synthetic — never the reverse**:
   price the Warehouse already holds and converted through a real FX (Foreign Exchange)
   rate, so the synthetic half is consistent with the real half rather than beside it.
 
-Measured 2026-08-13 by the command above, which prints what it loaded, and recorded in
-the [Step 002 review](.claude/docs/reviews/step-002-warehouse-and-ingestion.md#sub-step-25--generate-seeded-synthetic-client-activity):
-12 clients, 24 accounts, 19 instruments, 9,554 market prices, 11,840 FX rates, 1,670
-trades, 5,921 cash movements, 4,654 accounting movements, 61,907 position snapshots
-and 15,402 balance snapshots. Two runs are byte-identical. A `--refresh` moves these
-figures, which is why they are dated evidence there rather than a standing claim here.
+The command prints what it loaded. On 2026-08-13 that was 12 clients, 24 accounts, 19
+instruments, 9,554 market prices, 11,840 FX rates, 1,670 trades, 5,921 cash movements,
+4,654 accounting movements, 61,907 position snapshots and 15,402 balance snapshots. Two
+runs are byte-identical, and a `--refresh` moves the figures.
 
-**Every judgement call that moves a number you will see** — average-cost Cost Basis,
-Realised P&L gross of Commission, which of two dates a period filter keys on, what a
-published accuracy counts as correct — is one table in
-[`docs/decisions.md`](docs/decisions.md), each row with the dated review that argued it.
+**Every judgement call that moves a number you will see** is recorded with the
+alternative it rejected: the book's conventions — average-cost Cost Basis, Realised P&L
+gross of Commission, which date a period filter keys on — in
+[ADR-0006](.claude/docs/adr/0006-every-certified-metric-follows-one-stated-book-convention.md),
+and what a published accuracy counts as correct in
+[ADR-0007](.claude/docs/adr/0007-evaluation-scores-within-a-tolerance-and-picks-defaults-by-measurement.md).
 
 ---
 
@@ -290,8 +288,8 @@ box, the identity the question is asked as, and the Grounded Answer laid out wit
 **nothing folded away** — the statement, the Lineage, and the Validation Gate outcome
 are under every answer, including a refusal and a question asked back.
 
-<img src=".claude/docs/reviews/images/step-006-app-answered.png" width="70%" height="70%" alt="The App answering 'what was our gross revenue by region'">
-<img src=".claude/docs/reviews/images/step-006-app-refused.png" width="70%" height="70%" alt="The App refusing 'what columns are in fct_trade'">
+<img src="docs/images/app-answered.png" width="70%" height="70%" alt="The App answering 'what was our gross revenue by region'">
+<img src="docs/images/app-refused.png" width="70%" height="70%" alt="The App refusing 'what columns are in fct_trade'">
 
 
 Under every answer it recorded there is a **Feedback** widget — up or down, and an
@@ -326,8 +324,7 @@ hand-list them to flatter the searcher.
 uv run python -m veritas.evaluation retrieval     # no key, no network
 ```
 
-Measured **2026-09-01** — the full run is in the
-[7.3 review](.claude/docs/reviews/step-007-evaluation.md#sub-step-73--measure-retrieval-hit-rate-and-mrr):
+Measured **2026-09-01** with the command above:
 
 ```
   gold          data/gold — 24 Gold Questions, 12 with a Relevant Set a search can return
@@ -361,8 +358,7 @@ VERITAS_LIVE_MODEL=1 uv run python -m veritas.evaluation generation \
 The rubric asks for multiple approaches evaluated and the best one used. An
 **approach** here is a **(model, prompt) combination**: two prompt forms — `rules`,
 which states the constraints, and `shape`, which is shorter — against every candidate
-model. Measured **2026-09-05**; the full run is in the
-[9.2 review](.claude/docs/reviews/step-009-containerization-and-readme.md#sub-step-92--publish-the-generation-grid-over-openai-and-demote-groq):
+model. Measured **2026-09-05** with the command above:
 
 ```
   gold          data/gold — 24 Gold Questions, 23 of them scored
@@ -430,15 +426,14 @@ is the seam and the only module that imports `psycopg`.
 7. **Endings without a number: refusals and Clarifying Questions.**
 
 
-<img src=".claude/docs/reviews/images/initial_dashboard_8.5_part1.png" width="70%" height="70%" alt="The dashboard's first screen">
-<img src=".claude/docs/reviews/images/initial_dashboard_8.5_part2.png" width="70%" height="70%" alt="The dashboard's second screen">
+<img src="docs/images/dashboard-1.png" width="70%" height="70%" alt="The dashboard's first screen">
+<img src="docs/images/dashboard-2.png" width="70%" height="70%" alt="The dashboard's second screen">
 
 The traffic in those images is forty questions asked through the App on 2026-09-03 and
 2026-09-04, with six Feedback verdicts left through the widget. **It is the demo's
 data, not evidence**: nothing in the repository reproduces it. What *is* evidence is
 `uv run pytest tests/test_observability.py`, which runs every panel's query — first
-against the schema, then through Grafana itself — and is in the
-[8.5 review](.claude/docs/reviews/step-008-observability.md#sub-step-85--the-grafana-dashboard).
+against the schema, then through Grafana itself.
 
 **Evaluation sweeps are deliberately not logged.** Observability is live traffic;
 a sweep driving the same flow a few hundred times is not traffic, and letting it onto
@@ -458,7 +453,7 @@ answer, and that is final rather than pending. Retrieval runs over Semantic Entr
 the schema is deliberately not in the corpus. Veritas is a metrics copilot, not a
 database browser — anyone wanting to explore the schema should open the Warehouse
 directly, which is the honest tool for that job.
-([DEBT-006](.claude/docs/debt-ledger.md#debt-006--no-ad-hoc-exploration--accepted-permanently))
+([ADR-0001](.claude/docs/adr/0001-semantic-layer-as-the-retrieval-corpus.md#consequences))
 
 **…and a capable model will occasionally answer one anyway.** *"Show me ten trades"* is
 a refusal-expected probe, and the shipped model sometimes reads it as the nearest
@@ -469,9 +464,9 @@ the question that was asked**: *"how many trades"* and *"show me ten trades"* gr
 to almost the same SQL. Two milder instances have been seen in live traffic — a
 question asked "across every movement type" answered with a certified filter still on,
 and one asked "by month" answered a day at a time.
-([DEBT-038](.claude/docs/debt-ledger.md#debt-038--a-capable-model-answers-an-ad-hoc-row-request-instead-of-refusing-it))
 
-**Access Profile enforcement is weaker than its name suggests**, in the Debt Ledger's
+**Access Profile enforcement is weaker than its name suggests**, in
+[ADR-0002](.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)'s
 own words:
 
 > Access Profile enforcement is applied in the application layer, over synthetic data.
@@ -482,7 +477,6 @@ Application-layer enforcement protects exactly one path. Anything reaching the
 Warehouse another way — a notebook, a debugging session, a future component that
 forgets to route through the Gate — bypasses it completely. The App renders that
 paragraph in its sidebar beside the identity, character for character.
-([DEBT-008](.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers))
 
 **`Account Value` cannot be answered, and the refusal is the honest one.** It is the one
 *composed* metric in the corpus — cash plus positions marked to market — and its
@@ -490,7 +484,7 @@ definition carries the positions expression plus a `derives_from` field naming
 `Cash Balance`. Both shapes a statement can take are refused. The **correct** one adds
 two scalar subqueries, and the Gate reads that outer addition as an expression it cannot
 trace: a Shadow Metric. The **partial** one computes the positions expression alone,
-which traces perfectly and would answer with roughly 45% of the metric; the Gate refuses
+which traces perfectly and would answer with part of the metric; the Gate refuses
 it as an `incomplete certified metric` and tells the reader *"Account Value adds Cash
 Balance to its own expression … so it would answer with part of Account Value rather
 than Account Value"*.
@@ -500,18 +494,17 @@ statement Veritas will run, and asking for it gets a refusal rather than a numbe
 Gold Question Set carries the correct statement and the correct result, so the
 specification is on record and the Gate is measurably behind it; `tests/test_gold.py`
 pins both refusals.
-([DEBT-035](.claude/docs/debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows),
-[DEBT-043](.claude/docs/debt-ledger.md#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it))
+([DEBT-035](.claude/docs/debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows))
 
 **Cost figures are list prices on the day the vendor's page was last read.** The
-dashboard's cost column is *"what this would have cost at 2026-09-05 list prices"* —
-six rows, each carrying the date it was read and the page it came from. Nothing
+dashboard's cost column is *"what this would have cost at list prices"* — one row per
+model, each carrying the date it was read and the page it came from. Nothing
 re-reads those pages, so a price that moved tomorrow would produce figures that look
 exactly as authoritative as correct ones; and a call served on a free tier is billed
 at nothing while still carrying its list price here. A model the table does not price
 costs `None` rather than a number, because a cost of nothing and a cost nobody knows
 are different things on a chart.
-([DEBT-040](.claude/docs/debt-ledger.md#debt-040--the-price-table-is-a-vendors-page-copied-once-and-nothing-notices-when-it-moves))
+([ADR-0005](.claude/docs/adr/0005-one-openai-compatible-endpoint-for-every-provider.md#consequences))
 
 **Reproducible from committed snapshots, not from the sources.** The market-price
 source is an unofficial, unversioned Yahoo endpoint with no stability guarantee — the
@@ -521,7 +514,7 @@ runs offline forever, but widening the two-year window needs the endpoint alive.
 nothing detects that a committed snapshot no longer matches what the source would
 return — a stale historical window is still a correct historical window, but it is
 stale silently.
-([DEBT-002](.claude/docs/debt-ledger.md#debt-002--market-prices-depend-on-an-unofficial-endpoint))
+([ADR-0004](.claude/docs/adr/0004-snapshot-and-replay-and-where-dlt-stops.md#consequences))
 
 **Not built, on purpose.** Veritas is narrow by design: one warehouse, one certified
 vocabulary, and no general text-to-SQL. It runs on **synthetic client activity only** —
@@ -544,8 +537,8 @@ Tests that need a real provider run only when `VERITAS_LIVE_MODEL` is set; tests
 need a Postgres server skip without one. Nothing in `tests/` starts, stops or builds a
 container.
 
-The **working record** — every design decision, every shortcut with the condition that
-forces its repayment, the plan for each Step and the review that closed it — is in
+The **working record** — every design decision that is expensive to reverse, and every
+open shortcut with the condition that forces its repayment — is in
 [`.claude/docs/`](.claude/docs/). It is checked into this repository on purpose. Start
 with the [Glossary](.claude/docs/glossary.md), the
 [Target State](.claude/docs/design/target-state.md), the

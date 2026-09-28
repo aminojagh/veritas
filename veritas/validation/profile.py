@@ -9,7 +9,7 @@ choose it.
 
 **The Restricted Columns are declared on the profile, not on the metrics that touch
 them.** That is
-[R3 of Step 004](../../.claude/docs/plan/step-004-semantic-layer.md#r3--restricted-columns-are-declared-in-the-access-profile-not-in-a-metric-definition--approved-by-amino-2026-08-21),
+R3 of Step 004,
 ruled before the code existed so this Sub-step would *"inherit a decision rather than an
 omission"*: restriction is a property of the identity asking, and putting it on a Metric
 Definition would make one column restricted or not depending on which entry happened to
@@ -23,7 +23,7 @@ module cannot keep.
 
 **The permitted region is a value of the `by region` axis, not a column and a string.**
 That is
-[R1](../../.claude/docs/plan/step-005-validation-gate.md#r1--the-access-profiles-predicate-and-the-slice-rule-ship-together-in-this-step--approved-and-widened-by-amino-2026-08-25):
+R1:
 the axis already registers `dim_client.client_region`, its grain and its three buckets,
 and a profile carrying the column and its own list of regions would be a second
 registration of both — the synonym Non-Negotiable 1 exists to prevent. So this module
@@ -32,7 +32,7 @@ names the **axis** and the Gate resolves the column and the route from the entry
 
 **What this enforcement is and is not** is stated where the rule that reads this module
 lives, in `gate.py`'s module docstring, and it is
-[DEBT-008](../../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)'s
+[ADR-0002](../../.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)'s
 own sentence rather than a paraphrase of it.
 """
 
@@ -115,10 +115,10 @@ class AccessProfile:
 # [Glossary Section B](../../.claude/docs/glossary.md#b-the-warehouse) it is the only
 # one naming a firm rather than describing a Trade, a Position or a price, which is what
 # makes it the honest thing to restrict rather than a token. It is the column
-# [Step 003's spike](../../.claude/docs/design/validation-feasibility.md) measured nine
+# Step 003's spike measured nine
 # statement shapes against, and the spike keeps its own pinned copy of this declaration
 # for the same reason it keeps three pinned expressions — see
-# [R4 of Step 004](../../.claude/docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21).
+# R4 of Step 004.
 #
 # **`role` is a value, not a registered term.** It names who is asking the way `EU` names
 # a bucket of the `by region` axis: data carried by an entry, not a component of the

@@ -29,8 +29,8 @@ Do these in order. Later items depend on earlier ones being honest.
 
 1. **Verify.** Run the Sub-step's verification command from the plan, in full.
    Read the whole output and the exit code. Not a subset, not a previous run.
-   Evidence must come from a **committed test**: `uv run pytest` for behaviour,
-   `verify_framework.py` for documents. Never transcribe the output of a throwaway
+   Evidence must come from a **committed test**: `uv run pytest` — behaviour, and
+   documents through `tests/test_links.py` and `tests/test_language.py`. Never transcribe the output of a throwaway
    inline script into the review or the commit message; the reader cannot re-run it.
 
    Behaviour is proven in `tests/` and nowhere else, by a test written before the
@@ -96,7 +96,7 @@ no judgement calls was too small to review.
 
 | Excuse | Reality |
 |---|---|
-| "It's a docs-only change, no need to verify" | Run `verify_framework.py` — it already checks links, skills, and paths. Do not hand-roll a second link checker |
+| "It's a docs-only change, no need to verify" | Run `uv run pytest tests/test_framework.py tests/test_links.py tests/test_language.py` — it already checks links, skills, and paths. Do not hand-roll a second link checker |
 | "I'll write a quick inline script to check this" | If it is worth showing Amino, it is worth committing to `tests/`. Check what is already there first |
 | "This check doesn't fit pytest, I'll add a check script" | It fits. A check script is a test with a worse runner and no assertion. `.claude/scripts/` takes no new file |
 | "The reviewer needs the background to judge this" | The background is in the plan and the ADR. The review says what a reader of both still would not know |

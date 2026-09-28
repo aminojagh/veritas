@@ -1,7 +1,7 @@
 """Sub-step 5.3's rule: no Restricted Column reaches the answer, under an Access Profile.
 
 The third of the five modules
-[R8](../../docs/plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
+R8
 lays out, and the first that judges a statement against an identity. It puts ten shapes
 in front of the Gate and reads each of them **three** ways:
 
@@ -48,7 +48,7 @@ measurement.
 `probes.check_the_statements_are_the_spikes` reads them out of
 `check_validation_feasibility.py`'s **source text** on every run rather than leaving
 that claim to a comment — and without importing it, which is
-[R14](../../docs/plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27).
+R14.
 The tenth is this Sub-step's, and it is here because the spike's star probe turns out
 not to reach this rule inside the assembled Gate.
 """
@@ -238,7 +238,7 @@ PROBES = (
             "statement — the leak in a branch a Gate reading the outermost "
             "scope would never reach. The Gate never gets that far, because a "
             "`UNION` is not a single `SELECT`, the refusal "
-            "[R12](../../docs/plan/step-005-validation-gate.md#r12--aminos-rulings-on-the-51-review--decided-2026-08-26) "
+            "R12 "
             "confirmed as deliberate. The lineage walk still reads both "
             "branches, and the table below is where that stays measured",
     ),
@@ -375,7 +375,7 @@ PROBES = (
             "tracing rule is satisfied — there is a metric expression and it "
             "traces — and the projection the star expands to carries a "
             "Client's name. **This is the probe that makes "
-            "[C4](../../docs/design/validation-feasibility.md#c4--the-gate-reads-the-schema-at-run-time)'s "
+            "[C4](../../docs/adr/0003-validation-gate-is-deterministic-code.md#c4--the-gate-reads-the-schema-at-run-time)'s "
             "run-time schema read load-bearing inside the assembled Gate** "
             "rather than inside the detector alone: without the real column "
             "list there is one `Star` node in the projection, no column name "

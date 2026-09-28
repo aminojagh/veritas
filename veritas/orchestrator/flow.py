@@ -226,7 +226,7 @@ class Orchestrator:
         resolved, then what the allowed statement was composed from.
 
         The **verdict** decides the second half, which is
-        [DEBT-034](../../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+        DEBT-034
         paid. Until here it was `GROUNDED_FIELDS` — everything the model was shown — so
         an answer computed with `Gross Revenue` cited `Net Revenue` beside it, having
         been offered both and used one.

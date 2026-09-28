@@ -247,7 +247,7 @@ class RewriteForm(StrEnum):
     """How a resolved meaning is written into the question Retrieval searches with.
 
     The two forms
-    [DEBT-030](../../.claude/docs/debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)
+    DEBT-030
     was opened to have measured against each other. `DEFAULT_REWRITE_FORM` is which
     one `rewrite` uses.
     """

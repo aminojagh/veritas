@@ -1,7 +1,7 @@
 """Sub-step 5.2's rule: every metric expression traces to a Certified Metric.
 
 The second of the five modules
-[R8](../../docs/plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
+R8
 lays out, and the first that reads the corpus. It puts four things in front of the
 Gate:
 
@@ -85,7 +85,7 @@ from veritas.validation import DIALECT  # noqa: E402
 # `probes.check_the_statements_are_the_spikes`, which reads the spike's source text.
 # It was a comment in this file while `restricted.py` beside it checked the same claim
 # about its own probes, and
-# [R14](../../docs/plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27)
+# R14
 # is where either-both-or-neither was settled on both.
 #
 # Every statement here is a string literal inside `.claude/scripts/`, one of
@@ -198,7 +198,7 @@ PROBES = (
             "is not a metric expression, so the grouping column does not have to trace. "
             "Sub-step 5.4's certified-route rule refused it on two joins to `dim_client` "
             "no entry named; "
-            "[5.5](../../docs/plan/step-005-validation-gate.md#55--the-gate-requires-the-access-profiles-predicate-admits-a-slice-route-and-pays-debt-020) "
+            "5.5 "
             "added the Join Paths and the `routes` field that certify them, so that rule "
             "allows it too and `by region` is an axis a query can reach. What refuses it "
             "now is the access predicate it does not carry — the third rule to reach a "
@@ -304,7 +304,7 @@ PROBES = (
         why="Traded Notional's certified expression converted out of the wrong "
             "currency column. Nothing in the projection differs, so **this rule traces "
             "it and allows it** — which is "
-            "[DEBT-014](../../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)'s "
+            "DEBT-014's "
             "own diagnosis, and is why the entry could not be paid by a better tracer. "
             "Sub-step 5.4's certified-route rule is what refuses it, two rules later, "
             "on the join: the statement reaches fct_fx_rate through the Trade's "
@@ -347,7 +347,7 @@ PROBES = (
         why="a certified branch and a Shadow Metric branch in one statement. The "
             "spike's tracer had to read every scope to catch it; the Gate never gets "
             "that far, because a UNION is not a single SELECT — the refusal "
-            "[R12](../../docs/plan/step-005-validation-gate.md#r12--aminos-rulings-on-the-51-review--decided-2026-08-26) "
+            "R12 "
             "confirmed as deliberate. The tracer still reads every scope, and the "
             "spike is where that stays measured",
     ),
@@ -549,7 +549,7 @@ class CountingWarehouse:
 
     Not a mock — it delegates every call to the real adapter and adds one integer. It
     exists to make
-    [DEBT-019](../../docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)'s
+    DEBT-019's
     payment a measurement instead of a claim about how the code is written.
     """
 
@@ -568,7 +568,7 @@ class CountingWarehouse:
 def check_one_judgement_reads_once(gate: ValidationGate, report: Report) -> None:
     """One judgement reads the catalogue once and resolves the statement once.
 
-    [DEBT-019](../../docs/debt-ledger.md#debt-019--every-parse-tree-rule-reads-the-catalogue-and-resolves-the-statement-again)
+    DEBT-019
     was opened in Sub-step 5.3 and paid in 5.4, and its argument was never speed:
     *"two rules judging one statement against two readings of a live catalogue can, in
     principle, disagree about what a `SELECT *` stands for — the tracing rule seeing one
@@ -694,7 +694,7 @@ def check_this_rules_verdicts(gate: ValidationGate, report: Report) -> None:
     rather than left in prose.
 
     `notional, wrong currency` is the one to read: it is
-    [DEBT-014](../../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+    DEBT-014
     entire. The entry's diagnosis is that the projection is identical either way, which
     is exactly the statement *"this rule allowed it and the next one did not"* — and a
     check that only reported the Gate's rejection would have hidden the half of the

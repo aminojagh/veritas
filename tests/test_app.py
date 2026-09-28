@@ -277,17 +277,13 @@ def shown(page):
 # -- the rendering claim ---------------------------------------------------------
 
 
-def test_the_enforcement_note_is_the_ledgers_own_sentence(root):
-    """[DEBT-008](../.claude/docs/debt-ledger.md#debt-008--the-access-control-story-promises-more-than-it-delivers)
-    asks the App to *"say precisely what is true"*, and names the words.
-
-    The entry's own sentence rather than a paraphrase of it, which is checked here
-    because a paraphrase drifts in exactly the direction the entry exists to prevent.
-    """
-    entry = (root / ".claude" / "docs" / "debt-ledger.md").read_text()
-    # The entry states it as a block quote, so the markers come off before the words
+def test_the_enforcement_note_is_the_adrs_own_sentence(root):
+    """[ADR-0002](../.claude/docs/adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
+    names the words an access-control claim is qualified with, not a paraphrase."""
+    adr = root / ".claude" / "docs" / "adr" / "0002-duckdb-as-the-warehouse-behind-an-adapter.md"
+    # The ADR states it as a block quote, so the markers come off before the words
     # are compared; nothing else about the sentence may differ.
-    quoted = " ".join(re.sub(r"^\s*>\s?", "", entry, flags=re.M).split())
+    quoted = " ".join(re.sub(r"^\s*>\s?", "", adr.read_text(), flags=re.M).split())
     assert " ".join(ENFORCEMENT_NOTE.split()) in quoted
 
 
@@ -300,7 +296,7 @@ def test_a_value_is_shown_the_way_a_person_reads_it():
 
 
 def test_a_row_is_labelled_by_the_columns_it_came_back_under(answered):
-    """[DEBT-031](../.claude/docs/debt-ledger.md#debt-031--a-grounded-answer-carries-rows-with-no-column-names)
+    """DEBT-031
     paid, at the end that reads it: the axis and the metric are told apart by the names
     the engine returned, and not by knowing what the prompt asked the model to alias."""
     assert table(answered) == {
@@ -335,7 +331,7 @@ def test_a_single_figure_carries_the_unit_its_metric_is_quoted_in(
     figure, answered, semantic
 ):
     """The smaller thing
-    [DEBT-034](../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)
+    DEBT-034
     was blocking: the metric whose `unit` and `reporting_currency` label the figure is
     identifiable now that Lineage names what the statement used.
 

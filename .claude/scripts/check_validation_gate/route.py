@@ -1,9 +1,9 @@
 """Sub-step 5.4's rule: the metric is computed across its own joins, over its own period.
 
 The fourth of the five modules
-[R8](../../docs/plan/step-005-validation-gate.md#r8--the-steps-check-is-a-package-with-one-module-per-rule-from-51--approved-by-amino-2026-08-25)
+R8
 lays out, and the one that pays
-[DEBT-014](../../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject).
+DEBT-014.
 The entry's repayment condition is a test rather than an intention — *"that Sub-step is
 not done until `notional through the wrong currency` is rejected by the Gate"* — and
 this file is where that test is run.
@@ -26,18 +26,18 @@ these are the numbers.
 Trigger is *"the first 'as of' date chosen by anything but the Snapshot calendar"*, and a
 probe that picked a period boundary out of the air would fire it. The two boundaries
 below are read out of `fct_position_snapshot` on every run, which keeps the arm unfired
-the way [R7 of Step 004](../../docs/plan/step-004-semantic-layer.md#r7--the-date-axis-defers-debt-012s-trigger-rather-than-avoiding-it--approved-by-amino-2026-08-21)
+the way R7 of Step 004
 did — and it means the period moves when the loaded window moves, so the figures printed
 here are a dated measurement rather than a constant.
 
 **The hole this module declared is closed, and the pair that declared it stays.** A
 Metric Definition carries three fields that say which rows its expression is computed
 over; Sub-step 5.4 read two of them and
-[DEBT-020](../../docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters)
+DEBT-020
 was the third, `filters`. For one Sub-step `Realised P&L` with its `movement_type`
 predicate dropped was declared **allowed** here on purpose, which carried the cost
 DEBT-014 was opened about — this file passed while demonstrating a wrong answer — and
-[R15](../../docs/plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28)
+R15
 ruled that Sub-step 5.5 pays it rather than the Grounding Step the Trigger names. It
 does: the probe is `rejected`, its control is still `allowed`, and
 `check_the_filter_gap` goes on running both halves so the entry stays a measurement
@@ -55,7 +55,7 @@ declared verdict rather than a discovery, which is what the declarations were fo
 **Two statements are the spike's and are read out of its text rather than copied.**
 `probes.spike_statements` parses `check_validation_feasibility.py` with `ast` and takes
 the `sql=` literals off the parse tree, which is
-[R14](../../docs/plan/step-005-validation-gate.md#r14--aminos-rulings-on-the-53-review--decided-2026-08-27).
+R14.
 `traces.py` already holds those two character for character and checks that claim on
 every run; a third copy here would be a third thing to keep in step, so this module reads
 the one the spike compiled. What that costs is that the two are not string literals in
@@ -267,7 +267,7 @@ def statement_for(gate: ValidationGate, name: str, with_filters: bool) -> str:
 
 def filter_probes(gate: ValidationGate) -> tuple[RouteProbe, ...]:
     """The hole Sub-step 5.4 found and Sub-step 5.5 closed:
-    [DEBT-020](../../docs/debt-ledger.md#debt-020--the-gate-checks-a-metrics-route-and-not-its-certified-filters).
+    DEBT-020.
 
     A Metric Definition carries **three** fields that pin down which rows its expression
     is computed over — `join_paths`, `date_column` and `filters` — and 5.4 read two of
@@ -279,7 +279,7 @@ def filter_probes(gate: ValidationGate) -> tuple[RouteProbe, ...]:
     for. For one Sub-step the probe below declared `allowed` on purpose and this file
     passed while demonstrating a wrong answer — the cost DEBT-014 was opened about,
     carried openly under
-    [R15](../../docs/plan/step-005-validation-gate.md#r15--aminos-rulings-on-the-54-review--decided-2026-08-28).
+    R15.
     It is now `rejected`, its control is still `allowed`, and `check_the_filter_gap`
     goes on printing the two numbers so the entry stays a measurement after it is paid.
     `access.py`'s third mutation is what shows the flip is a rule rather than a renamed

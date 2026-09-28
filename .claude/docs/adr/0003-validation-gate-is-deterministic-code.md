@@ -1,8 +1,6 @@
 # ADR-0003 — The Validation Gate is deterministic code, not an LLM self-check
 
 - **Status:** accepted
-- **Date:** 2026-08-03
-- **Decided in:** Step 001, Sub-step 1.3
 
 ## Context
 
@@ -11,7 +9,7 @@ checks: every metric expression traces to a Certified Metric, no restricted
 column appears in the projection, the Access Profile predicate is present, the
 scan is bounded, and the statement is read-only.
 
-The path of least resistance in 2026 is to ask a model. A second Large Language
+The path of least resistance is to ask a model. A second Large Language
 Model (LLM) call, a self-critique pass, or a judge prompt would take an
 afternoon, needs no parser, and handles phrasings a rule-based checker would
 miss. It is what most systems in this space do, and choosing otherwise needs a
@@ -54,7 +52,7 @@ where it measures answer quality after the fact and never gates execution.
 |---|---|
 | **LLM self-critique** — the generating model checks its own SQL | Cheapest to build and needs no parser. Rejected because it shares the blind spots of the generation it is checking, and because it is non-deterministic: the same query can pass and then fail, which makes both the rejection reason and any dashboard built on it meaningless. It also cannot produce the stable taxonomy of rejection reasons that "Validation-Gate rejections by reason" needs to be a real chart. |
 | **A second, different LLM as validator** | The strongest alternative, and it does break the shared-blind-spot argument — a stronger model checking a weaker one's output is a legitimate and widely used pattern. Rejected anyway: it puts unbounded cost and latency on the critical path of every question; it is reachable by prompt content that arrives inside the SQL itself as comments and string literals; and it still yields a probability rather than a guarantee. For access control specifically, a probability is not a control. |
-| **Regex / string matching on the SQL text** | The cheap deterministic option, and deterministic is most of what is wanted. Rejected because it is deterministic without being correct: a restricted name in a comment, a column aliased to something benign, a subquery, or a `SELECT *` that expands to include a restricted column all defeat text matching — and none of those are adversarial, they are ordinary SQL. A parse tree makes these questions answerable; a string does not. |
+| **Regex / string matching on the SQL text** | The cheap deterministic option, and deterministic is most of what is wanted. Rejected because it is deterministic without being correct: a restricted name in a comment, a column aliased to something benign, a subquery, or a `SELECT *` that expands to include a restricted column all defeat text matching — and none of those are adversarial, they are ordinary SQL. A parse tree makes these questions answerable; a string does not. `check_validation_feasibility.py` measures the two against each other on the Restricted Column shapes, and they disagree in both directions: text matching lets a leak through, and refuses more legitimate queries than it leaks. |
 | **Warehouse-native enforcement** — grants, secure views, row/column policies | This is the *right* answer for access control, and it is where the full MVP goes with BigQuery policy tags. Rejected for the slice because DuckDB has no such mechanism (ADR-0002), and — importantly — it would not be sufficient even in the full MVP: no database permission system can express certified-metrics-only, which is a claim about *how* a number was derived rather than about who may read what. The Gate survives the migration for that check regardless. |
 | **Validate after execution, on the result set** | Too late by construction. A restricted column has already been read and an unbounded scan has already been paid for. Post-execution checking measures; it does not gate. |
 
@@ -134,55 +132,67 @@ where it measures answer quality after the fact and never gates execution.
   gate. The signal: any proposal to let a judge's score influence whether a query
   runs.
 
-### Status note, 2026-08-20 — the parse-tree claim was measured: **go**
+## What the decision requires of the Semantic Layer and the Gate
 
-Not a change of decision, and the status stays `accepted`. This ADR was written on
-2026-08-03 on an argument, and the Step 001 review said so in as many words —
-*"sqlglot is load-bearing and unproven here… I believe this works but have not built
-it"*. [Step 003](../plan/step-003-validation-feasibility.md) built
-`.claude/scripts/check_validation_feasibility.py` and ran it against the real schema
-and the real data. The findings, the reproduction command and the go/no-go are in
-[validation-feasibility.md](../design/validation-feasibility.md); what belongs here is
-what the measurement did to this ADR's own sentences.
+The parse tree carries the Gate: a certified expression stays recognisable through
+aliasing, a derived table, a Common Table Expression (CTE) and a Dimension Definition
+applied to the metric; a query computing revenue inline is refused; and a Restricted
+Column is found in every shape that puts it in a projection, including a `SELECT *`
+whose text never names it. `check_validation_feasibility.py` measures each against
+the built Warehouse and fails if any verdict changes. It holds under six constraints.
 
-**The central bet holds.** A certified expression stays recognisable in a generated
-query's parse tree through aliasing, a derived table, a common table expression and a
-Dimension Definition applied to the metric; a query computing revenue inline is
-rejected; a Restricted Column is found in all five shapes that put it in a
-projection, including a `SELECT *` whose text never names it, and is not reported in
-four shapes that do not.
+### C1 — A Metric Definition publishes a form the Orchestrator pastes
 
-**The rejected alternative is now a measurement rather than an argument.** This ADR
-rejected string matching as *"deterministic without being correct"*, and named the
-four shapes that defeat it. Text matching and the parse tree disagree on **5 of 9
-shapes** — one leak, and **four legitimate queries text matching refuses**. The
-false-refusal half is the larger one and this ADR did not dwell on it.
+A certified expression is recognised by its form, so a paraphrase that returns the
+identical number is refused. The Semantic Layer publishes each expression as the
+text the Orchestrator inserts verbatim, and Grounding does not leave the model free
+to re-derive an equivalent one. The alternative, normalising commuted operands
+before comparing, is rejected: every rewrite a normalising comparison accepts is one
+more thing trusted between the statement a reviewer reads and the statement the Gate
+judges.
 
-**Two costs are confirmed, and one is sharper than written.** *"Coverage is only as
-good as a hand-written rule set"* now has a named instance rather than a general
-worry: a certified expression **does not pin down its join**, so `Traded Notional`
-converted through the wrong currency column has an identical projection, traces, and
-is 96.39% wrong on the loaded data. The fix is a Metric Definition field and a join
-check, not a different kind of Gate —
-[DEBT-014](../debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject).
+### C2 — A Metric Definition carries its Join Path, and its date predicate
 
-**One commitment is not yet met by anything.** *"A parse failure on generated SQL
-must be treated as a rejection, never a pass"*. The spike refuses an unparseable
-statement and rejects a statement whose projections it never read — both by
-accident rather than by a rule, which the Sub-step 3.2 review measures. The Gate owes
-an explicit read-only and fail-closed rule.
+A certified expression pins down the arithmetic and not the rows it is computed
+over: `Traded Notional` converted through the wrong currency column projects
+identically to the right one and traces. So a Metric Definition carries the Join
+Paths and the date column it is certified over, and the Gate compares the Route a
+statement took against them. Trade Date against Settlement Date is the same
+question — two columns on `fct_trade`, one projection that cannot tell them apart.
 
-**What the measurement leaves untouched.** Three of the five checks — Access Profile
-predicate, bounded scan, read-only — are unexamined, and only projections are read
-for certified-metrics-only. Those boundaries are listed under
-[what this Step did not measure](../design/validation-feasibility.md#what-this-step-did-not-measure).
+### C3 — The two parse-tree rules ship together
+
+Several Restricted Column shapes compute a certified expression exactly, so
+certified-metrics-only allows them and only the projection rule stops them. A Gate
+with one rule and not the other passes the leak.
+
+### C4 — The Gate reads the schema at run time
+
+`SELECT *` is expandable only against the real column list, and it is the one shape
+whose restricted name exists nowhere in its own text. The Gate therefore takes the
+schema as well as the statement, read through the Warehouse Adapter, which keeps it
+on the right side of ADR-0002's seam.
+
+### C5 — The rewrites the Gate trusts are named in code, and there are two
+
+Every optimizer rule is one more rewrite trusted to preserve meaning. sqlglot's
+`optimize()` runs many; `qualify` and `merge_subqueries` are enough for every
+measured shape, and `sqlglot.lineage` adds none. The Gate names its two as
+`TRUSTED_REWRITES`, so widening the set is a visible decision rather than a default.
+
+### C6 — Fail closed on parse failure, by a rule rather than by accident
+
+A statement the Gate cannot parse, or whose projections it never reads, is rejected
+by a named rule with its own Rejection Reason — never allowed because nothing was
+found to object to.
 
 ## Related
 
 - ADR-0001 — certified-metrics-only is decidable only because the Semantic Layer
   makes the certified set an enumerable, machine-readable corpus.
 - ADR-0002 — DuckDB has no policy-tag mechanism to delegate access control to,
-  which is why the Gate carries it; both ADRs rest on sqlglot.
+  which is why the Gate carries it, and the sentence every access-control claim
+  carries; both ADRs rest on sqlglot.
 - Glossary: `Validation Gate`, `Access Profile`, `Certified Metric`,
   `Shadow Metric`, `Grounded Answer`, `Evaluation Measure`, `Operational Measure`
   — all already `agreed`; this decision introduced no new terms.

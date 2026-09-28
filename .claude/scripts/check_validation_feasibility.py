@@ -10,7 +10,7 @@ how its answer stops being falsifiable. What it produces is a measurement, and
 Sub-step 3.5 turns that into a go or a no-go on
 [ADR-0003](../docs/adr/0003-validation-gate-is-deterministic-code.md).
 
-The four claims in the [Step 003 plan](../docs/plan/step-003-validation-feasibility.md):
+The four claims in the Step 003 plan:
 
   **Claim 1 — tracing.** A certified expression has to stay recognisable in a
   generated query's parse tree under the rewrites a generator performs for its
@@ -73,7 +73,7 @@ The four claims in the [Step 003 plan](../docs/plan/step-003-validation-feasibil
   agrees to.
 
   Claim 4 also answers the question
-  [DEBT-009](../docs/debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)
+  DEBT-009
   left open in writing — whether a transpile-and-compare test would be a better
   dialect scan than the name list `check_seam` uses. `check_dialect_detectors`
   runs the two over the same statements and over every DuckDB-only function name
@@ -81,7 +81,7 @@ The four claims in the [Step 003 plan](../docs/plan/step-003-validation-feasibil
 
 The certified expressions and the Restricted Columns are **Python literals in this
 file**, per
-[R2](../docs/plan/step-003-validation-feasibility.md#r2--the-spikes-certified-expressions-stay-python-literals--approved-by-amino-2026-08-15).
+R2.
 They are probe inputs, not a corpus: writing them as `semantic/metrics/*.yaml`
 would fix the Semantic Layer's file format inside a spike, and that format is a
 seam three Extension Register entries land against. The same reasoning covers the
@@ -120,7 +120,7 @@ from veritas.validation import (  # noqa: E402
     route_of,
 )
 # The tracer this file measured is now `veritas/validation/`'s, imported back under
-# [R2 of Step 005](../docs/plan/step-005-validation-gate.md#r2--the-spike-imports-the-gate-rather-than-keeping-its-own-tracer--approved-by-amino-2026-08-25):
+# R2 of Step 005:
 # *"the logic that belongs to veritas must be only accessible from veritas once its
 # containing component is built."* The Validation Gate is built, so the tracer, the
 # canonical form, the two trusted rewrites and the refusal all live there and this
@@ -139,10 +139,10 @@ from veritas.validation import (  # noqa: E402
 # the same value out of a declaration, so claim 1's verdict is now *traces **and** takes
 # the metric's own route* — which is what makes `notional through the wrong currency` a
 # rejection here instead of a passing measurement of a hole
-# ([DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)).
+# (DEBT-014).
 # One route reader, two declarations, exactly as above.
 #
-# **What did not move is the corpus.** [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+# **What did not move is the corpus.** R4 of Step 004
 # pins the three certified expressions below as Python literals so *"the dated
 # measurement stays the measurement that was taken"*. One tracer, two corpora: the
 # Gate traces against `semantic/metrics/` and this file goes on tracing against its
@@ -243,7 +243,7 @@ CERTIFIED_EXPRESSIONS = {
 # Join Path it is computed over as (table joined, join condition).
 #
 # **Pinned here for the reason the expressions above are**, under
-# [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21):
+# R4 of Step 004:
 # a dated measurement whose inputs move is not evidence. `check_semantic_layer.py`
 # asserts the pins and `semantic/` agree character for character, which is what makes
 # pinning safe rather than a second corpus nobody reads.
@@ -301,7 +301,7 @@ CERTIFIED_ROUTES = {
 # anonymous tuple until Sub-step 5.3 gave it a home.
 #
 # **The declaration is pinned here and the Access Profile declares its own**, for the
-# reason [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+# reason R4 of Step 004
 # pins the three expressions below: a dated measurement whose inputs move is not
 # evidence. One detector, two declarations.
 RESTRICTED_COLUMNS = frozenset({RestrictedColumn("dim_client", "client_name")})
@@ -319,7 +319,7 @@ REFUSED = "refused"        # the tracer cannot read it at all
 # `notional through the wrong currency`. It named a real hole and it made this file the
 # one place in the repository where a check passed while demonstrating a wrong answer,
 # which is what
-# [DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject)
+# DEBT-014
 # was opened about. The entry's repayment condition — *"this probe's expected verdict
 # flips from allowed to rejected, `BLIND_SPOT` stops being one of the kinds a passing run
 # can contain, and the probe becomes an ordinary Shadow Metric"* — is what removed it.
@@ -360,7 +360,7 @@ class Probe(NamedTuple):
 # Every statement is portable SQL. `.claude/scripts/` is inside `check_warehouse.py`'s
 # scanned roots, so these literals are read by the dialect scan Sub-step 2.6 built
 # and Sub-step 3.1 narrowed, and under
-# [R3](../docs/plan/step-003-validation-feasibility.md#r3--an-exemption-names-the-file-as-well-as-the-symbol--approved-and-widened-by-amino-2026-08-15)
+# R3
 # this file has to pass that scan **without claiming an exemption**.
 PROBES = (
     Probe(
@@ -1085,7 +1085,7 @@ def check_traces(corpus: dict[str, str], schema: dict[str, dict[str, str]]) -> N
     whether every expression traces; `off_the_pinned_route` asks whether the statement
     took the joins the metric is certified across. A statement has to pass both, and the
     reason is
-    [DEBT-014](../docs/debt-ledger.md#debt-014--the-spike-allows-a-query-the-gate-must-reject):
+    DEBT-014:
     `notional through the wrong currency` passes the first and fails the second, and
     while this file read only the first it recorded that as a passing `BLIND_SPOT` —
     *"the one place in this repository where a check passes while demonstrating a wrong
@@ -1293,11 +1293,11 @@ def check_widening_cast(warehouse: WarehouseAdapter) -> None:
 
     **`WarehouseError` is what is caught**, which it could not be until Sub-step 5.1
     gave the adapter an error type —
-    [DEBT-016](../docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type).
+    DEBT-016.
     Here the catch is the branch that *prints the measurement holding*, so a wider
     one would let this spike report the cast as load-bearing on the strength of a
     bug in this file. Only the engine refusing the uncast expression says that.
-    [R4 of Step 004](../docs/plan/step-004-semantic-layer.md#r4--the-spike-is-pinned-to-the-corpus-rather-than-re-pointed-at-it--approved-by-amino-2026-08-21)
+    R4 of Step 004
     pins the expression this probe runs, and that expression is untouched — the pin
     keeps the inputs of a dated measurement fixed, not the code that decides whether
     the measurement was taken.

@@ -7,8 +7,8 @@ is scored against is the part of a Gold Question's Relevant Set a search could r
 and the question it is searched for is the one a correct rewrite step would have
 produced — derived from the gold SQL, so nothing here calls a model. The **sweep
 claim**: the two settings
-[DEBT-027](../.claude/docs/debt-ledger.md#debt-027--the-searchable-text-is-one-flat-field-so-a-name-match-cannot-outrank-a-description-match)
-and [DEBT-030](../.claude/docs/debt-ledger.md#debt-030--the-resolved-meaning-is-appended-to-the-question-and-nothing-has-measured-that-against-splicing-it)
+DEBT-027
+and DEBT-030
 were opened about are both varied, over the same questions and the same relevant sets.
 
 **Generation — three more.** The **ending claim**: which of a Grounded Answer's three

@@ -8,8 +8,8 @@ claim**: a Relevant Set is read off the statement rather than written beside it,
 Join Paths it names are exactly the joins the statement carries. The **separation
 claim**: a Gold Question turning on a Glossary Section C pair separates the two sides of
 that pair by more than `RESULT_TOLERANCE`, which is what
-[DEBT-004](../.claude/docs/debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal)
-and [DEBT-011](../.claude/docs/debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level)
+DEBT-004
+and DEBT-011
 require of it.
 
 Nothing here calls a model. The rewrite step's matcher is read directly, because which
@@ -62,7 +62,7 @@ REFUSED_TODAY = {"Account Value as of 10 August 2026": (RejectionReason.SHADOW_M
 # Question Log rather than retyped. It is the metric's own `expression` over the metric's
 # own `join_paths` — one operand of a composed definition — and it executes to a fraction
 # of the metric. The Gate refused it from Sub-step 9.5 on, which is
-# [DEBT-043](../.claude/docs/debt-ledger.md#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it);
+# DEBT-043;
 # before that it was allowed, and the App answered with it.
 ACCOUNT_VALUE_WITHOUT_THE_CASH = """\
 SELECT sum(CAST(fct_position_snapshot.quantity AS DECIMAL(38, 6)) * fct_instrument_price.market_price * fct_fx_rate.fx_rate) AS answer
@@ -144,7 +144,7 @@ def test_a_composed_metric_is_refused_in_both_directions(
     [DEBT-035](../.claude/docs/debt-ledger.md#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows).
     This says the **partial** one is refused too, as an `incomplete certified metric`,
     which is
-    [DEBT-043](../.claude/docs/debt-ledger.md#debt-043--the-gate-certifies-half-of-a-composed-metric-as-the-whole-of-it)
+    DEBT-043
     paid. Together they are the whole of what a composed metric can do today: a metric
     with no answer, failing loudly at both shapes rather than quietly at one.
 
@@ -154,8 +154,8 @@ def test_a_composed_metric_is_refused_in_both_directions(
     """
     definition = semantic.metrics["Account Value"]
     assert definition.derives_from, "this is the composed metric or the test is moot"
-    # The README and `docs/decisions.md` both tell a reader this reaches one metric and
-    # no other, which is only true while one metric is composed.
+    # The README tells a reader this reaches one metric and no other, which is only
+    # true while one metric is composed.
     composed_metrics = [
         name for name, metric in semantic.metrics.items() if metric.derives_from
     ]
@@ -197,7 +197,7 @@ def test_every_gold_sql_executes_to_its_gold_result(gold, gate, warehouse):
 
 
 def test_every_certified_metric_reaches_the_gold_question_set(gold, gate, semantic):
-    """[DEBT-033](../.claude/docs/debt-ledger.md#debt-033--the-generators-live-evidence-is-five-self-written-questions-and-four-certified-metrics-never-reach-it)'s
+    """DEBT-033's
     coverage, read off the statements rather than off a list."""
     computed = {
         metric.name
@@ -253,7 +253,7 @@ def test_the_set_holds_a_breakdown_for_more_than_one_axis(gold, gate):
 
 
 def test_debt_029s_four_phrasing_classes_are_in_the_set_and_detected(gold, semantic):
-    """[DEBT-029](../.claude/docs/debt-ledger.md#debt-029--ambiguous-term-detection-is-literal-so-every-other-phrasing-of-a-registered-word-passes-silently),
+    """DEBT-029,
     paid and scored over the Gold Question Set rather than over four strings.
 
     Every question whose correct ending is a Clarifying Question says a term Veritas
@@ -341,7 +341,7 @@ def test_a_question_with_no_gold_sql_has_an_empty_relevant_set(gold, gate):
 
 
 def test_the_trade_date_period_is_not_the_settlement_date_period(gold, warehouse):
-    """[DEBT-004](../.claude/docs/debt-ledger.md#debt-004--the-fx-date-distinction-is-too-small-to-be-a-reliable-evaluation-signal):
+    """DEBT-004:
     the period question separates the Section C pair by more than the tolerance.
 
     Keying the same quarter on Settlement Date moves the number twice — it shifts which
@@ -373,7 +373,7 @@ def test_the_trade_date_period_is_not_the_settlement_date_period(gold, warehouse
 def test_traded_notional_is_scoped_narrowly_enough_to_separate_from_the_close(
     gold, warehouse
 ):
-    """[DEBT-011](../.claude/docs/debt-ledger.md#debt-011--execution-price-against-market-price-cancels-at-book-level):
+    """DEBT-011:
     the notional question is scoped to one day, and this is why.
 
     Valuing the same Trades at the day's close instead of at what they filled at is a

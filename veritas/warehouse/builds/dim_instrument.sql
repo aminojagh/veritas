@@ -44,8 +44,8 @@ SELECT
         AS instrument_name,
 
     -- The exchange's own exchange-traded fund flag wins where there is one: it is
-    -- the reference source's classification, and data-availability.md chose the
-    -- source partly for it. Yahoo's vocabulary covers everything else, translated
+    -- the reference source's classification, and the source was chosen partly
+    -- for it. Yahoo's vocabulary covers everything else, translated
     -- through raw.yahoo_instrument_type rather than a CASE, so the four permitted
     -- values live in exactly one place.
     CASE

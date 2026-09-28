@@ -384,7 +384,7 @@ SEED = [
 
 # Each of these must be refused by the engine. Every one is a wrong number this
 # project has already met: the pence trap and the adjusted-close trap are the two
-# `data-availability.md` proved on real data, and the rest are the Section C
+# `check_data_availability.py` proves on real data, and the rest are the Section C
 # confusions the schema is shaped to make unrepresentable.
 REJECTIONS = [
     ("dim_instrument refuses a pence quotation (`GBp`) — the 100x trap",
@@ -448,7 +448,7 @@ def check_constraints() -> None:
 
     **Both probes catch `WarehouseError` and nothing wider**, which they could not
     do until Sub-step 5.1 gave the adapter an error type — that was
-    [DEBT-016](../docs/debt-ledger.md#debt-016--the-semantic-layer-check-cannot-name-the-engines-error-type).
+    DEBT-016.
     The narrowing matters most in the second loop, where a caught exception is what
     *prints a pass*: under `except Exception`, a probe statement this file had
     mistyped into something the adapter rejects before the engine sees it would have
@@ -1348,7 +1348,7 @@ def gross_revenue(
     **This exists to be the *other* number.**
     `.claude/scripts/check_semantic_layer.py` executes the expression the Semantic
     Layer publishes for `Gross Revenue` and compares its answer against this one, and
-    [R2 of Step 004](../docs/plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)
+    R2 of Step 004
     is why the two are written separately rather than one reading the other:
 
         Coupled — `check_warehouse.py` reading `semantic/`: both sides compute the
@@ -1361,7 +1361,7 @@ def gross_revenue(
 
     **`boundary` is the half that catches the other mistake, and it is filtered on
     Trade Date because this file says so.** A period filter is the second half of
-    [C2](../docs/design/validation-feasibility.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate),
+    [C2](../docs/adr/0003-validation-gate-is-deterministic-code.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate),
     and a Metric Definition that named `settlement_date` instead would partition its
     own figure just as neatly and total identically — so the mistake is invisible to
     any check that only ever asks for the total. Asking both files for the same
@@ -1411,7 +1411,7 @@ def gross_revenue(
 # Eight more of what `gross_revenue()` above is: a figure this file computes for
 # itself, so that `check_semantic_layer.py` has something to put beside the answer
 # a published expression returns.
-# [R2 of Step 004](../docs/plan/step-004-semantic-layer.md#r2--the-semantic-layer-and-check_warehousepy-stay-independent--approved-by-amino-2026-08-21)
+# R2 of Step 004
 # is why they are written separately rather than one reading the other, and the
 # cost is the authoring tax that ruling accepted in writing: editing a published
 # expression means editing the SQL here too, or the run fails.
@@ -2271,7 +2271,7 @@ def check_lots(warehouse: WarehouseAdapter) -> None:
 def duckdb_importers() -> list[Path]:
     """Every Python file that imports `duckdb`, adapter or not.
 
-    Parsed rather than grepped, for the same reason check_language.py parses: the
+    Parsed rather than grepped, for the same reason `tests/test_language.py` parses: the
     rule is about imports, and the word `duckdb` in a comment or a docstring is
     prose. Grepping conflates the two and fires on every explanation of the rule,
     including this one.
@@ -2577,7 +2577,7 @@ def published_sql() -> list[tuple[str, str]]:
 
     Every SQL-bearing field of every entry, not the expression alone. A Join Path's
     condition and a certified filter are pasted into the same query the expression
-    is ([C1](../docs/design/validation-feasibility.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)),
+    is ([C1](../docs/adr/0003-validation-gate-is-deterministic-code.md#c1--a-metric-definition-publishes-a-form-the-orchestrator-pastes)),
     so a dialect assumption in one of them reaches the engine exactly as far. Which
     fields those are is `veritas.semantic.sql_fields`'s answer, because the loader's
     dataclasses are the file format and a scan that decided for itself would be a
@@ -2608,9 +2608,9 @@ def check_seam() -> None:
     """No module outside veritas/warehouse/ reaches for the engine.
 
     Three readings. ADR-0002 names two signals, Sub-step 2.1 shipped one of them
-    ([DEBT-009](../docs/debt-ledger.md#debt-009--the-seam-scan-checks-imports-but-not-the-dialect)),
+    (DEBT-009),
     and Sub-step 3.4 measured that the second was written in the wrong unit
-    ([DEBT-015](../docs/debt-ledger.md#debt-015--the-dialect-scan-names-functions-and-the-loss-measured-was-in-a-cast)):
+    (DEBT-015):
     a `duckdb` import, a DuckDB-specific function **name**, and — since Sub-step
     4.3 — a **type construct** that does not survive the trip to the target engine.
 
@@ -2618,8 +2618,8 @@ def check_seam() -> None:
     the other.** Sub-step 3.4 measured both over the same statements: sqlglot emits
     a DuckDB-only name it has no translation for exactly as it found it, so a
     before-and-after comparison reads its own failure as portability; and a cast is
-    not a function call, so no name list can see one. The full measurement is in
-    [validation-feasibility.md](../docs/design/validation-feasibility.md#debt-009s-open-question-answered-no).
+    not a function call, so no name list can see one. `check_validation_feasibility.py`
+    prints the measurement.
 
     **The two readings also end differently, and the difference is not an
     oversight.** A DuckDB-only function name outside the adapter fails the run,

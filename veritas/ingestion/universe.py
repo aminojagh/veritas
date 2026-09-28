@@ -5,9 +5,9 @@ place, in Python — rather than inline in SQL, because Sub-step 2.3 needs two o
 them again and a mapping that lives in two files is a mapping that will disagree
 with itself.
 
-`data-availability.md` fixes the shape of the universe: *"The traded Instrument
-universe is equity, ETF, future and currency pair (R1). Bond exposure is via bond
-ETFs."* What it does not fix is which symbols, which is what this file decides.
+The Glossary's `Instrument` fixes the shape of the universe — equity, ETF, future or
+currency pair, with bond exposure through bond ETFs. What it does not fix is which
+symbols, which is what this file decides.
 """
 
 # The traded Instrument universe, chosen so that every axis a later Sub-step has

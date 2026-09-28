@@ -23,7 +23,7 @@ exception to know whether it was answered.
 statement the Gate refused; Observability needs the same word to group a chart by, and a
 taxonomy owned by the component that scores answers is a taxonomy the component that
 records them has to copy. It moved here, and splitting its coarsest member is
-[DEBT-032](../../.claude/docs/debt-ledger.md#debt-032--a-refusal-that-is-not-the-gates-carries-no-reason-a-chart-can-group-by)
+DEBT-032
 paid.
 """
 

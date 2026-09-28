@@ -4,12 +4,12 @@ Two claims. The **composition claim**: an allowing verdict names the Certified M
 the statement's expressions traced to, the axes it sliced by and the Join Paths its
 route was certified by, and a refusing verdict names none of them — which is what a
 Lineage of what the statement *used* is read off
-([DEBT-034](../.claude/docs/debt-ledger.md#debt-034--lineage-records-what-the-model-was-shown-not-what-the-statement-used)).
+(DEBT-034).
 
 The **route claim**:
-[DEBT-021](../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+DEBT-021
 and
-[DEBT-022](../.claude/docs/debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
+DEBT-022
 both name the Sub-step that builds Grounding as their Trigger, and both owe the same
 thing: a probe that writes the statement, declares it, and prints the numbers it and
 the certified statement return. The tests under the second divider are that probe for
@@ -200,7 +200,7 @@ def test_two_metrics_may_convert_through_two_rates_in_one_statement(gate, wareho
 
 
 def test_a_crossed_conversion_is_refused_and_the_numbers_say_why(gate, warehouse):
-    """[DEBT-021](../.claude/docs/debt-ledger.md#debt-021--two-joins-to-one-table-under-different-aliases-are-not-told-apart)
+    """DEBT-021
     paid: the same statement with the two rates swapped.
 
     Every earlier rule is satisfied — both expressions trace, both joins are in the
@@ -233,7 +233,7 @@ def test_the_two_spellings_of_an_inner_join_are_one_join(gate, kind):
 
 @pytest.mark.parametrize("kind", ["LEFT JOIN", "LEFT OUTER JOIN", "FULL JOIN"])
 def test_an_outer_join_over_a_certified_condition_is_refused(gate, kind):
-    """[DEBT-022](../.claude/docs/debt-ledger.md#debt-022--the-gate-compares-joins-without-their-kind-so-an-outer-join-passes-as-an-inner-one)
+    """DEBT-022
     paid: the condition is the certified one and the join is not.
 
     A Join Path is a route between two tables — the rows on both sides — so an outer

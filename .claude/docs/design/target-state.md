@@ -4,20 +4,7 @@
 rarely and only by explicit agreement — it is the fixed point every Step is
 measured against.
 
-**Status:** **`agreed`** — 2026-08-03. The Domain Language it uses is `agreed`,
-and the [data-availability check](data-availability.md) confirmed every source
-this design assumes can actually be obtained key-free. Two consequences of that
-check are folded in below: single bonds and options are out of scope, and market
-prices are snapshotted into the repository rather than fetched live.
-
-**One correction, 2026-08-05**, agreed while planning Step 002. The Warehouse row
-below previously listed a **date** dimension alongside Client, Account and
-Instrument. It has been removed: the Glossary's `Dimension Definition` entry
-points the date axis at a column — *"**by date** (`trade_date`, daily)"* — and no
-Certified Metric or Section C distinction needs a calendar attribute that cannot
-be derived in SQL. A `dim_date` table was considered and rejected rather than
-registered, so the Data Definition Language (DDL) written in Step 002 has one
-design to follow instead of two.
+**Status:** **`agreed`**.
 
 ---
 
@@ -148,9 +135,8 @@ As load-bearing as the goals. Veritas deliberately does **not**:
   types do we hold?", "show me ten rows" — none of these have an answer. Veritas
   is a metrics copilot, not a database browser: the schema is deliberately not in
   the retrieval corpus, and anyone wanting to explore it can open the Warehouse
-  directly. Decided 2026-08-04; see [DEBT-006](../debt-ledger.md) for the
-  alternatives that were rejected and why the most integrated one was the most
-  dangerous.
+  directly. [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md#consequences)
+  says why the most integrated alternative is the most dangerous.
 - **Chase conversational polish.** Multi-turn memory, charting, and export are
   outside the slice.
 
@@ -168,8 +154,8 @@ not an afterthought.
 | Problem description | 2 | The grader's first checkbox — *does the project explain what problem it solves and why it matters?* Veritas frames it as **silent metric ambiguity**: answering "revenue" with Gross when the business meant Net is a confident, well-formatted wrong number. The [`The problem`](#the-problem) section is that narrative, carried by the Gross-vs-Net worked example. |
 | Retrieval flow | 2 | Semantic Layer knowledge base + LLM, both load-bearing in the flow. |
 | Retrieval evaluation | 2 | Hit rate and MRR across ≥3 approaches — text, vector, hybrid, re-ranked. Ground truth is *derived*: the Semantic Entries a gold SQL touches are its Relevant Set. |
-| LLM evaluation | 2 | The rubric's words are *"Multiple approaches are evaluated, and the best one is used"*, and its own example of an approach is *"one prompt"* — it asks for no second model and no second provider. Veritas evaluates every **(model, prompt) combination** over the registered provider's models: Execution Accuracy as the objective primary signal, LLM-as-judge as a second lens, and the best combination is what ships as `DEFAULT_PROMPT_FORM` and the registry's default model. **Corrected 2026-09-05** — this row read *"across ≥2 prompts and ≥2 models"*, a bar the rubric does not set; [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) had cited it as the reason a second provider was needed. |
-| Interface | 2 | The **App** — a Streamlit page showing answer, SQL, Lineage, and Validation Gate outcome. (The rubric's criterion is named *Interface*; our component is the `App`, renamed 2026-08-04 to stop one word carrying both.) |
+| LLM evaluation | 2 | The rubric's words are *"Multiple approaches are evaluated, and the best one is used"*, and its own example of an approach is *"one prompt"* — it asks for no second model and no second provider. Veritas evaluates every **(model, prompt) combination** over the registered provider's models: Execution Accuracy as the objective primary signal, LLM-as-judge as a second lens, and the best combination is what ships as `DEFAULT_PROMPT_FORM` and the registry's default model. |
+| Interface | 2 | The **App** — a Streamlit page showing answer, SQL, Lineage, and Validation Gate outcome. (The rubric's criterion is named *Interface*; our component is the `App`, so one word does not carry both.) |
 | Ingestion pipeline | 2 | dlt pipelines for FX, market data, and the Semantic Layer index. |
 | Monitoring | 2 | Feedback capture + Grafana dashboard, ≥5 charts — including Validation-Gate rejections by reason and metric-usage frequency. |
 | Containerization | 2 | docker-compose: app, Postgres, Grafana. |
@@ -186,7 +172,8 @@ does not touch it); reusing course-module code is explicitly allowed (`LLMZC`).
 ### What "credential-free" means
 
 The reproducibility criterion drove three decisions — [ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md),
-[DEBT-002](../debt-ledger.md) and [DEBT-003](../debt-ledger.md) — so the rule it
+[ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md) and
+[DEBT-003](../debt-ledger.md#debt-003--no-market-price-vendor-so-single-bonds-and-options-are-out-of-scope) — so the rule it
 rests on is worth stating rather than leaving implied. It is **not** "no
 credentials at all", which would be impossible for a Large Language Model
 project.
@@ -197,8 +184,8 @@ project.
 | Credential | Allowed? | Why |
 |---|---|---|
 | **Large Language Model API key** — OpenAI | ✅ yes | Inherent to the project category. Every Large Language Model Zoomcamp capstone needs one and the course itself asks for this one, so a grader has it before they clone anything. |
-| **Groq API key** | ✅ yes, and optional | Free tier, no card. **Nothing published depends on it** — the LLM-evaluation criterion is covered by the (model, prompt) grid over OpenAI, and Groq is a second registered provider a reader may sweep, not a measured alternative any figure rests on. **Demoted by Amino on 2026-09-05**, after its free tier failed the same sweep twice; before that it supplied the second model a since-corrected reading of the rubric asked for. **Narrowed by Amino on 2026-08-30** from *"OpenAI, Anthropic, Groq"* with an Ollama fallback to exactly these two — [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) quotes the ruling, and a third provider is [EXT-011](../extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam). |
-| **Market-data vendor key** — Alpha Vantage, Tiingo, Polygon… | ❌ no | Incidental to this project. It would make a grader sign up for a service nobody else's capstone requires. This is what ruled out every supported price vendor and left Yahoo ([DEBT-002](../debt-ledger.md), [DEBT-003](../debt-ledger.md)). |
+| **Groq API key** | ✅ yes, and optional | Free tier, no card. **Nothing published depends on it** — the LLM-evaluation criterion is covered by the (model, prompt) grid over OpenAI, and Groq is a second registered provider a reader may sweep, not a measured alternative any figure rests on. These two are the whole list — [ADR-0005](../adr/0005-one-openai-compatible-endpoint-for-every-provider.md) — and a third provider is [EXT-011](../extension-register.md#ext-011--more-large-language-model-providers-behind-the-seam). |
+| **Market-data vendor key** — Alpha Vantage, Tiingo, Polygon… | ❌ no | Incidental to this project. It would make a grader sign up for a service nobody else's capstone requires. This is what ruled out every supported price vendor and left Yahoo ([ADR-0004](../adr/0004-snapshot-and-replay-and-where-dlt-stops.md), [DEBT-003](../debt-ledger.md#debt-003--no-market-price-vendor-so-single-bonds-and-options-are-out-of-scope)). |
 | **Cloud warehouse** — Google Cloud, Snowflake | ❌ no | Same objection, plus it bills someone. This is what ruled out BigQuery ([ADR-0002](../adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md)). |
 | **Service credentials inside `docker-compose`** — Postgres, Grafana | ✅ yes | Not obtained, declared. They are generated by the compose file, so bring-up needs no account anywhere. |
 | **Cloud deployment credentials** | n/a | Cloud deployment is out of scope for the slice regardless. |
@@ -207,9 +194,8 @@ The distinction that matters is **obtained versus assumed**: a credential the
 grader must go and get is friction Veritas imposed; one they already hold, or one
 the compose file creates, is not.
 
-**`README.md` must list every credential Veritas touches** — required by Amino on
-2026-08-04, and a requirement of the reproducibility criterion rather than a
-courtesy. A grader who discovers a needed key halfway through bring-up has had a
+**`README.md` must list every credential Veritas touches** — a requirement of the
+reproducibility criterion rather than a courtesy. A grader who discovers a needed key halfway through bring-up has had a
 reproducibility failure, whatever the repository technically supports. The list is
 short and must be complete:
 
@@ -220,22 +206,8 @@ short and must be complete:
 | **Grafana** — admin login | Same: `docker-compose` sets it. Say what the default is, since a reviewer will need it to open the dashboard. |
 | **Data sources** | **None.** Frankfurter, Yahoo, NASDAQ Trader and the Securities and Exchange Commission are all key-free, and the snapshots in `data/snapshots/` mean a clone reproduces even offline. Worth stating positively — it is a deliberate result, not an absence. |
 
-Two Debt Ledger entries already fire on the README being written
-([DEBT-002](../debt-ledger.md) on the reproducibility claim,
-[DEBT-008](../debt-ledger.md) on the access-control claim), so this list belongs
-in the same pass as both.
-
-**Checked against the rubric text on 2026-09-04 and again on 2026-09-05**, fetched
-both days from <https://github.com/DataTalksClub/llm-zoomcamp/blob/main/project.md>.
-The map holds, with one row corrected: LLM evaluation, whose *"≥2 prompts and ≥2
-models"* was this project's own invention and not the rubric's bar — the second
-reading is what
-[ruling 3](../plan/step-009-containerization-and-readme.md#rulings-in-flight) acted
-on. The credential reading above is unchanged by it: the rubric sets no credential
-rule, so the table is this project's own standard rather than a criterion, and Amino
-settled the practical question on 2026-08-30 — the OpenAI key is the one the course
-asks for, so it is the one Veritas assumes, and the local-model fallback that used to
-stand behind that assumption is gone rather than dormant.
+The rubric sets no credential rule, so this table is this project's own standard
+rather than a criterion.
 
 ---
 
