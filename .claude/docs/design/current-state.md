@@ -157,7 +157,7 @@ after it renders and warns rather than swallowing the answer when it cannot.
 **Sub-step 8.4 added Feedback**: the seam takes a verdict and a sentence against a row,
 the App offers them under every answer it recorded, and the answer stays on the page
 while a person leaves them.
-**`tests/` holds Delivery Mode's two guards, the six corpus checks, the search checks,
+**`tests/` holds the framework's two rules, the six corpus checks, the search checks,
 the rewrite and boundary checks, the flow checks, the two route probes, the App's
 rendering, page, recording and Feedback checks, the gold checks, the evaluation checks
 and the Question Log checks**;
@@ -173,11 +173,13 @@ that need a running service skip without one. Measured 2026-09-06 by `uv run pyt
 ## Resume here
 
 - **Every Step through 009 is `done`**; the capstone is submitted and reviewed, and
-  `main` at `b3b4f08` is what it holds. Nothing in the code has changed since.
+  `main` at `b3b4f08` is what it holds. Since then only the framework's rules have
+  changed: `CLAUDE.md`, the skills, and `tests/test_framework.py`.
 - **Veritas is being redesigned.** The route is the
   [Redesign Roadmap](../plan/redesign-roadmap.md): take its first item that is not
-  `done` and whose dependencies are. As of 2026-09-28 that is **R0 — one mode, and
-  the new document model**, which opens with four rulings awaiting Amino.
+  `done` and whose dependencies are. **R0 is `done`**: `CLAUDE.md` and the skills
+  state the rules and the document model every later item works under. Next is
+  **R1 — purge history and derivable documents**, which makes this tree match them.
 - **This file is rewritten in R1** to reality only. Until then, the sections below
   still describe the capstone as built, and the Step 009 handoff detail is in
   [its review](../reviews/step-009-containerization-and-readme.md).
@@ -465,9 +467,9 @@ veritas/
 │       ├── sources.py         # NASDAQ Trader · SEC · Yahoo metadata and bars, for dlt
 │       └── simulator.py       # the seeded simulator — reads the real tables,
 │                              # generates the client side as a pure function
-├── tests/                     # Delivery Mode's proving system — `uv run pytest`
+├── tests/                     # the proving system — `uv run pytest`
 │   ├── conftest.py            # the repo root, the built Warehouse, the Semantic Layer
-│   ├── test_delivery_mode.py  # the frozen check-script set, the history-link ratchet
+│   ├── test_framework.py      # the check-script set and the history links, each only shrinking
 │   ├── test_retrieval.py      # every entry indexed, every metric alias searchable, no
 │   │                          # schema; a fixed question set found under all four strategies
 │   ├── test_rewrite.py        # each of the five Ambiguous Terms resolved or asked back,

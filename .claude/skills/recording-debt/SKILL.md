@@ -69,14 +69,16 @@ what turns a wishlist into a set of tripwires.
 | "Before launch" | "Before anything other than Amino can reach the app" |
 | "Eventually" | "If p95 retrieval latency exceeds 2s" |
 
-A Trigger you cannot imagine ever firing means the shortcut is permanent —
-mark the entry `accepted` and say why, rather than pretending it is open.
+A Trigger you cannot imagine ever firing means the shortcut is permanent, and a
+permanent shortcut is not debt. Record it where permanent limits live — a
+Non-goal in Target State, or an *accepted* cost in the ADR that causes it — and
+delete the entry rather than pretending it is open.
 
 ## Writing the entry
 
-Copy the template from the comment block in `.claude/docs/debt-ledger.md`. Fill every
-field; append to the Entries section; add a row to the Index table and update
-the counts at the bottom of it.
+Copy the template from the comment block in `.claude/docs/debt-ledger.md`. Take the
+Ledger's next free number and advance it; fill every field; append to the Entries
+section; add a row to the Index table.
 
 Keep **Location** precise enough (`path/file.py:42`, or a component name if the
 shortcut is genuinely diffuse) that it can be found without archaeology.
@@ -86,17 +88,21 @@ properly" is not a repayment plan.
 
 ## Paying debt
 
-When a Trigger fires, repayment belongs *inside* the Step that fired it. Set
-`Status: paid`, name the Sub-step that paid it, and leave the entry in place —
-the Ledger is a record, not a queue, and deleting paid entries destroys the
-history of how the project was actually built.
+When a Trigger fires, repayment belongs *inside* the Step that fired it. Paying
+an entry deletes it: the entry, its Index row, and every link to it —
+`verify_framework.py` names each link left dead. The commit message names the
+entry it paid; git keeps the text. The number is never reused.
+
+An entry that turns out to be an extension moves to the
+[Extension Register](../../docs/extension-register.md) and is deleted here the
+same way.
 
 ## Common mistakes
 
 | Mistake | Fix |
 |---|---|
 | Ledger entry with no Cost | Then it is not debt; delete it |
-| Ledger entry with no Trigger | Invent the tripwire or mark it `accepted` |
+| Ledger entry with no Trigger | Invent the tripwire, or it is permanent and leaves the Ledger — see The Trigger |
 | One entry covering several unrelated shortcuts | Split — they will be repaid at different times |
 | Using the Ledger as a TODO list | Planned work goes in the plan; the Ledger is only for shortcuts already in the code |
 | Recording debt to avoid a five-minute fix | If it is faster to fix than to document, fix it |

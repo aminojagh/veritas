@@ -1,47 +1,12 @@
 # CLAUDE.md — Operating Agreement
 
-**Veritas** — an end-to-end LLM application. Capstone for the DataTalks.Club LLM
-Zoomcamp, and a deliberately minimal slice of the larger system in
-[`.claude/docs/design/product-brief.md`](.claude/docs/design/product-brief.md).
+**Veritas** — an end-to-end LLM application, being redesigned into a
+domain-agnostic "chat with your data" system. It began as the capstone for the
+DataTalks.Club LLM Zoomcamp.
 
-> **Design settled, building against a deadline.** The Glossary's Domain Language
-> and the Target State are both `agreed`. Steps 000–005 are built and committed:
-> Warehouse, Ingestion, Semantic Layer, Validation Gate.
-
----
-
-## Delivery Mode — until 2026-09-09
-
-**The capstone is due 2026-09-09.** Five of the nine Target State components are
-unbuilt and the remaining build is ~2,000 lines of product code. That is
-achievable; the overhead around it is not. Steps 002–005 wrote **2.5× to 14×
-more check-script and prose than product code** — see the
-[Step 006 plan](.claude/docs/plan/step-006-retrieval-and-orchestrator.md#why-delivery-mode-exists)
-for the per-Step figures and the estimate they drive.
-
-So these rules are suspended until 2026-09-09, and **only** these:
-
-| Suspended | Replaced by |
-|---|---|
-| New check scripts in `.claude/scripts/` | `tests/` — pytest. `uv run pytest` |
-| Step Review as narrative | ≤ 40 lines per Sub-step, template in `closing-a-substep` |
-| Plan as argued case | ≤ 120 lines, template in `planning-a-step` |
-| "Why this is built this way" in docstrings | The ADR, the plan, or nothing |
-| Links from code into `plan/` or `reviews/` | Nothing — code cites the Glossary, the Ledger, ADRs, and Target State only |
-
-**Existing check scripts are frozen, not deleted.** They still run and still
-prove what they proved. Nothing new goes into them and nothing is ported out of
-them — porting costs days and buys nothing before the deadline
-([DEBT-023](.claude/docs/debt-ledger.md#debt-023--two-proving-systems-run-side-by-side)).
-
-**Nothing in the Four Non-Negotiables is suspended.** Shared language, recorded
-shortcuts, true state documents, and evidence before claims all hold exactly as
-written. Evidence only changes *shape*: a committed test is a committed script.
-
-**This section expires by its own date, not by decision.** After 2026-09-09 it is
-deleted and [DEBT-023](.claude/docs/debt-ledger.md#debt-023--two-proving-systems-run-side-by-side)
-and [DEBT-024](.claude/docs/debt-ledger.md#debt-024--source-and-step-documents-carry-prose-delivery-mode-would-not-admit)
-come due. Until then, when a rule below and this section disagree, this section wins.
+> **Redesigning.** The capstone's Target State is built and delivered. The next one
+> is being decided; until it is `agreed`, the **Resume here** block in
+> [Current State](.claude/docs/design/current-state.md) names the route.
 
 ---
 
@@ -55,7 +20,8 @@ come due. Until then, when a rule below and this section disagree, this section 
 
 ## Roles
 
-- **Claude** designs, implements, verifies, and writes the Step Review.
+- **Claude** designs, implements, verifies, writes the Step Review, and drafts the
+  commit message.
 - **Amino** reviews and **commits**. Claude never runs `git commit`, `git push`,
   or `gh pr create` unless explicitly asked in that message.
 
@@ -78,6 +44,13 @@ Current State ─┘                                        ▲                 
 **One Sub-step = one commit.** If a Sub-step cannot be described in a single
 commit message without the word "and", it is two Sub-steps.
 
+**Test first.** A Sub-step with behaviour opens with the test that claims it, run
+and seen to fail; the code is then written to make it pass. Behaviour is claimed in
+`tests/` and nowhere else, and a test is named for its claim and no longer than
+checking it needs. `.claude/scripts/` takes no new file: the checks still there are
+frozen, and each is replaced by `tests/` as soon as possible
+([DEBT-023](.claude/docs/debt-ledger.md#debt-023--two-proving-systems-run-side-by-side)).
+
 **Never plan more than one Step ahead.** The Target State is fixed; the route
 to it is discovered. Planning Step N+2 before Step N ships is speculation.
 
@@ -95,9 +68,9 @@ one trivial implementation. See `recording-debt`.
 
 | Phase | Skill | Produces |
 |---|---|---|
-| Prove behaviour | — | `tests/test_<component>.py`, run by `uv run pytest` |
+| Prove behaviour | — | `tests/test_<component>.py`, written before the code, run by `uv run pytest` |
 | Plan a Step | `planning-a-step` | `.claude/docs/plan/step-NNN-<slug>.md` |
-| Close a Sub-step | `closing-a-substep` | Step Review entry + state updates |
+| Close a Sub-step | `closing-a-substep` | Step Review entry, state updates, the commit message |
 | Take a shortcut | `recording-debt` | `.claude/docs/debt-ledger.md` entry |
 | Coin/contest a term | `registering-language` | `.claude/docs/glossary.md` entry |
 | Make a costly decision | `writing-an-adr` | `.claude/docs/adr/NNNN-*.md` |
@@ -144,6 +117,11 @@ The test: *does the trigger fire inside this project's life?* If it can only fir
 after Veritas becomes something else, it is an extension, and filing it as debt
 puts a wish on the Ledger and blunts the open-debt count.
 
+**Both registers hold only what is open.** An entry that is paid, built, accepted
+as permanent, dropped, or moved to the other register is deleted, with every link
+to it; git keeps it. Identifiers are never reused, so each register keeps its next
+free number.
+
 ### 3. Both state documents are always true
 
 - [`.claude/docs/design/target-state.md`](.claude/docs/design/target-state.md) — where we are
@@ -165,10 +143,9 @@ If verification fails and you cannot fix it within the Sub-step, say so plainly
 in the Step Review and record it as debt. A failed Sub-step honestly reported is
 worth more than a green one that lies.
 
-**Evidence in a document comes from a committed script.** If a check is worth
-putting in a Step Review, it is worth committing — to `tests/` under Delivery
-Mode, or to `.claude/scripts/` for the frozen checks and the framework verifier.
-Never paste the output of a throwaway inline script into a permanent document:
+**Evidence in a document comes from a committed test.** If a check is worth
+putting in a Step Review, it is worth committing to `tests/`. Never paste the
+output of a throwaway inline script into a document or a commit message:
 the reader cannot re-run it, the transcription can be wrong, and a summary count
 (*"checked 37 links, 0 broken"*) hides what was actually covered. **Before
 writing any new check, look for one that already does it** — `verify_framework.py`
@@ -199,8 +176,9 @@ cold session must be able to resume from the files alone. The contract:
 - **`.claude/docs/design/current-state.md` is the entry point.** It opens with a
   **Resume here** block: the active Step, the next Sub-step, and any question
   awaiting Amino. Read it first, every session.
-- **The active plan** (`.claude/docs/plan/step-NNN-*.md`) holds the route; the **latest
-  review** (`.claude/docs/reviews/step-NNN-*.md`) holds the handoff detail.
+- **The active plan** (`.claude/docs/plan/step-NNN-*.md`) holds the route; its
+  **review** (`.claude/docs/reviews/step-NNN-*.md`) holds the handoff detail. Both
+  exist only while their Step is active.
 - `closing-a-substep` is what keeps this true — it refreshes Current State and
   the Resume-here pointer before handing over. A session that ends without a
   valid Resume-here pointer has left the memory broken.
@@ -211,18 +189,17 @@ cold session must be able to resume from the files alone. The contract:
 |---|---|---|
 | [`.claude/docs/glossary.md`](.claude/docs/glossary.md) | Ubiquitous language — domain + process terms | Whenever a term appears |
 | [`.claude/docs/design/target-state.md`](.claude/docs/design/target-state.md) | The finished system, in Glossary terms | Rare, by agreement |
-| [`.claude/docs/design/current-state.md`](.claude/docs/design/current-state.md) | What is built, honestly | Every Sub-step |
+| [`.claude/docs/design/current-state.md`](.claude/docs/design/current-state.md) | What is built, honestly, and where to resume | Every Sub-step |
 | [`.claude/docs/design/product-brief.md`](.claude/docs/design/product-brief.md) | The full system Veritas is a slice of | Rare |
-| [`.claude/docs/debt-ledger.md`](.claude/docs/debt-ledger.md) | Known shortcuts, with repayment triggers | Every shortcut |
-| [`.claude/docs/extension-register.md`](.claude/docs/extension-register.md) | What the full MVP needs that the slice deliberately lacks, each with the seam it lands against | Every ADR cost classified *extension* |
-| [`.claude/docs/adr/`](.claude/docs/adr/) | Decisions that are expensive to reverse | As decided |
-| `.claude/docs/plan/step-NNN-*.md` | The one active Step | Once per Step |
-| `.claude/docs/reviews/step-NNN-*.md` | Handoff notes for Amino's review | Every Sub-step |
+| [`.claude/docs/debt-ledger.md`](.claude/docs/debt-ledger.md) | Open shortcuts, each with a repayment Trigger | Every shortcut |
+| [`.claude/docs/extension-register.md`](.claude/docs/extension-register.md) | Open extensions: what the full system needs that the slice deliberately lacks, each with the seam it lands against | Every ADR cost classified *extension* |
+| [`.claude/docs/adr/`](.claude/docs/adr/) | Decisions that are expensive to reverse, each as it stands now | As decided |
+| `.claude/docs/plan/step-NNN-*.md` | The active Step's route | Written when the Step is planned; deleted when it closes |
+| `.claude/docs/reviews/step-NNN-*.md` | The active Step's handoff notes, for Amino's review | Every Sub-step; deleted when the Step closes |
 | `tests/` | What each component must do, as executable claims | Every Sub-step with behaviour |
-| [`docs/decisions.md`](docs/decisions.md) | Public: every decision that moves a number a reader sees, each pointing at the dated review that argued it | Whenever a decision moves such a number |
 
-`README.md` and `docs/` are the public face for Zoomcamp reviewers. The `.claude/docs/`
-tree is the working record. Keep them separate — do not turn the README into a changelog.
+`README.md` is the public face; the `.claude/docs/` tree is the working record. Keep
+them separate — do not turn the README into a changelog.
 
 ### Writing conventions
 
@@ -231,11 +208,17 @@ tree is the working record. Keep them separate — do not turn the README into a
   it was a name. Everywhere else links to it. A second copy of the reasoning is a
   defect even when it is accurate, because the two copies drift and the reader
   pays for both.
-- **A docstring says what this is and how it works.** Never why it was built this
-  way — that is the ADR's or the plan's, and code that argues its own case cannot
-  be edited without re-litigating it. Never a link into `plan/` or `reviews/`: a
-  ruling is a transcript of a conversation, and code that cites one makes that
-  conversation permanent.
+- **A standing document says what is true now.** The Glossary, both state
+  documents, the ADRs, the Ledger and the Register carry no dated amendments, no
+  changelog, and no account of how they came to read as they do. That is git's:
+  the commit messages, and the plan and review each Step deleted as it closed.
+- **Nothing derivable is kept by hand.** A count, or an index of a directory's
+  files, goes stale silently, and a command prints it anyway.
+- **A docstring says what this is and how it works**, in the fewest lines that stay
+  exact. Never why it was built this way — that goes in an ADR, the plan, or
+  nowhere, and code that argues its own case cannot be edited without
+  re-litigating it. Never a link into `plan/` or `reviews/`: both are deleted when
+  their Step closes.
 - **The reader's time is the scarcest thing here.** Amino reads every line. A
   sentence that restates the one before it, a paragraph justifying a decision
   already recorded, a review narrating what a diff already shows — each is a
@@ -248,18 +231,19 @@ tree is the working record. Keep them separate — do not turn the README into a
   abbreviation silently assumes they already know. Terms registered in the
   Glossary are exempt only if the Glossary itself expands them.
 - **No unexplained bare numbers.** A figure in a document says where it came
-  from, or names the script that produces it.
+  from, or names the command that produces it.
 - **A measurement is dated evidence, never a standing statement.** Any figure a
   later run could refute or resize — a row count, a percentage, a largest-observed
   value, a file size — is written as evidence: **what was measured, on what date,
   under what settings, and the command that reproduces it.** Ideally it
   reproduces; if it cannot, say so, because an unreproducible figure that reads
   like a fact is the worst of the three.
-  - **Evidence lives in the Step Review that produced it**, which is dated by
-    construction and carries the command. Never in the source code.
-  - **Everywhere else refers to it** — a code comment, the Glossary, an ADR, a
-    plan. State the **rule and why it exists**, then point at the evidence or at
-    the check that prints the current figure. *"differs on nearly every bar —
+  - **Evidence lives in the commit message of the Sub-step that took it**, which is
+    dated by construction and outlives the Step Review. Never in source code or a
+    standing document.
+  - **Everywhere else names the command** — a code comment, the Glossary, an ADR,
+    a plan. State the **rule and why it exists**, then name the command that
+    prints the current figure. *"differs on nearly every bar —
     `check_data_availability.py` prints how many"* survives the next refresh;
     *"differs on 95.5% of 1,255 bars"* silently stops being true.
   - **Figures fixed by the code around them are definitions, not measurements** —
@@ -267,8 +251,7 @@ tree is the working record. Keep them separate — do not turn the README into a
     smallest split. They stay.
 
   The reason is that nothing fails when a number in prose goes stale: no checker
-  reads comments. The sweep that established this rule found a comment that had
-  been false since the traded universe grew, and nothing had noticed.
+  reads comments.
 
 Check the framework is wired up correctly at any time:
 

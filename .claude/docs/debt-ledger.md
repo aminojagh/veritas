@@ -2162,7 +2162,7 @@ which is a different state from one nobody has weighed.
 
 **What we did**
 Froze every existing check script and put all new behavioural claims in `tests/`,
-rather than porting the checks over. `tests/test_delivery_mode.py` enforces the
+rather than porting the checks over. `tests/test_framework.py` enforces the
 freeze. The spike's three-way coupling is frozen with them: it imports
 `veritas.validation`, `check_semantic_layer.py` imports *it*, and
 `check_validation_gate/probes.py` parses its **source text** to assert its SQL
@@ -2204,7 +2204,7 @@ really is the date, because the reason to defer was the deadline and nothing els
 Applied the new writing conventions forward only. Existing docstrings still argue
 why they were built as they are, and 73 links from code still point into `plan/`
 and `reviews/`, pinning those documents' headings as permanent API.
-`tests/test_delivery_mode.py` freezes the link inventory per file so it can only
+`tests/test_framework.py` freezes the link inventory per file so it can only
 shrink, but does not shrink it.
 
 **What we should have done**

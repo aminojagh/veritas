@@ -49,7 +49,7 @@ until R8.
 
 | ID | Decision or work | Depends on | Produces | Status |
 |---|---|---|---|---|
-| R0 | One mode, and the new document model | — | `CLAUDE.md`, `.claude/skills/*` | open |
+| R0 | One mode, and the new document model | — | `CLAUDE.md`, `.claude/skills/*` | done |
 | R1 | Purge history and derivable documents | R0 | a `.claude/docs/` tree holding only what R0 keeps | open |
 | R2 | Frame the problem | R0 | draft purpose and scope in `design/target-state-next.md` | open |
 | R3 | Research prior art | R2 | research note, deleted once R4's ADRs cite what they use | open |
@@ -67,18 +67,18 @@ starts cold, and the resume path is what R1 shrinks.
 Delete the Delivery Mode section and fold the four kept rules and test-driven
 development into `CLAUDE.md`'s permanent sections. The plan and review templates in
 `planning-a-step` and `closing-a-substep` become the only templates.
-`tests/test_delivery_mode.py` becomes a permanent rules test:
+`tests/test_delivery_mode.py` becomes `tests/test_framework.py`, a permanent rules test:
 - the set of check scripts may only shrink
 - links from code into `plan/` and `reviews/` go to zero once R1 cuts them
 
-**Rulings R0 needs.** Each has a recommendation.
+**Rulings R0 took — all four approved by Amino, 2026-09-28.**
 
 1. **Plans and reviews live only while their Step is active.** They are deleted
-   when the Step closes, and git keeps them. *Recommended.*
+   when the Step closes, and git keeps them.
 2. **A dated measurement lives in the commit message of the Sub-step that took it.**
    Today the rule puts it in the Step Review, which rule 1 deletes. A commit message
    is dated, carries the command, and is already where history lives. Documents
-   name the command that reproduces the figure. *Recommended.*
+   name the command that reproduces the figure.
 3. **An ADR states the decision as it stands now.** Its rejected alternatives may
    include a former approach and why it was dropped. There are no dated amendments
    and no chains of superseded records. `writing-an-adr` is rewritten to match.
@@ -92,12 +92,19 @@ development into `CLAUDE.md`'s permanent sections. The plan and review templates
   - `reviews/` and the closed plans `step-000`–`step-009`
   - the Ledger entries rule 4 removes
   - `docs/decisions.md`: its reasons that are still true move into ADRs first
-  - the dated amendments inside the Glossary, ADRs and Target State
+  - the dated amendments inside the Glossary, ADRs and Target State, and each
+    ADR's date, Step and supersede lines
+  - the Glossary's *Retired terms* section, and the Register entries rule 4 removes
+  - the index READMEs of `plan/`, `reviews/` and `adr/`: each is derivable
+- **Rewrite** the Ledger's and Register's headers and entry templates to R0's
+  rules: open entries only, a next free number in place of counts, no link to a
+  review.
 - **Rewrite** Current State as reality only: short, pointing at code rather than
   describing it.
 - **Cut every link from code to a deleted anchor.** This is a mechanical pass that
   only edits docstrings. They carry links to more than twenty closed Ledger entries,
-  and to `plan/` and `reviews/` from files that `tests/test_delivery_mode.py` lists.
+  and to `plan/` and `reviews/` from the files `tests/test_framework.py` lists;
+  that table ends empty.
 - **Trim `README.md`** to what is true. It is rewritten after the new design is
   built.
 - **Move the framework checks into `tests/`.** These are `verify_framework.py` and

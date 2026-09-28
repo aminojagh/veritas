@@ -59,9 +59,9 @@ arrives quietly: `net_revenue` in the warehouse, `netRev` in a helper, "revenue
 (net)" on a chart. Three names, one concept, and a reader who cannot tell
 whether they are the same number.
 
-When you notice a collision, flag it and resolve it in that Sub-step. Retire the
-loser — move it to the Retired section with a pointer to its replacement, so old
-commits and old conversations stay readable.
+When you notice a collision, flag it and resolve it in that Sub-step. Delete the
+loser from the Glossary and rename every use of it — documents and identifiers —
+in the same Sub-step. The Glossary holds only words in use; git keeps the rest.
 
 ## Distinctions we must not blur
 
@@ -80,4 +80,4 @@ has not done its job.
 | Defining a term in isolation when it has a dangerous neighbour | Define it against the neighbour |
 | Registering every word, including plumbing | Only terms whose misuse would silently produce wrong answers |
 | Using a `proposed` term in an identifier | Wait for `agreed` — renaming code is the cost of jumping early |
-| Quietly renaming an agreed term | Retire the old one explicitly; silent renames orphan the history |
+| Quietly renaming an agreed term | Propose the rename; once agreed, change the row and every use in one Sub-step |
