@@ -103,10 +103,10 @@ client against a local server that speaks the same API.
   names that date and page.
 - **A question the provider never answered is not a Question Log row.** The row
   is a Grounded Answer, and a failed call is not one: the Orchestrator raises
-  `LanguageModelError`, and the App tells the person why and returns before
-  recording. So the dashboard's counts by ending undercount by exactly those
-  questions. *Accepted* — widening `record` to take a failure puts a second shape
-  through the Observability seam, for the one ending that says nothing about the
+  `LanguageModelError`, and the App tells the User why and returns before
+  recording. So the dashboard's counts by the step that ended a question
+  undercount by exactly those questions. *Accepted* — widening `record` to take a failure puts a second shape
+  through the Observability seam, for the one failure that says nothing about the
   question.
 - **Two dependencies** — `openai`, which brings pydantic and `httpx2`, and
   `python-dotenv`, which is what makes a key in a file reach the process.

@@ -8,11 +8,10 @@ code rather than describing it; how each part came to be is in git.
 
 - **Veritas is being redesigned.** The route is the
   [Redesign Roadmap](../plan/redesign-roadmap.md): take its first item that is not
-  `done` and whose dependencies are. R0 and R1 are `done`; next is **R2 — frame the
-  problem**.
-- **Awaiting Amino:** [ADR-0006](../adr/0006-every-certified-metric-follows-one-stated-book-convention.md)
-  and [ADR-0007](../adr/0007-evaluation-scores-within-a-tolerance-and-picks-defaults-by-measurement.md)
-  are `proposed`. Both hold reasons that lived in the deleted `docs/decisions.md`.
+  `done` and whose dependencies are. R0, R1 and R2 are `done`: R2's purpose and scope
+  are in [Target State — next](target-state-next.md), and its terms in the Glossary.
+  Next is **R3 — research prior art**.
+- **Awaiting Amino:** nothing.
 - No Step is active, so there is no plan or review under `plan/` or `reviews/`.
 
 ## What is built
@@ -49,7 +48,7 @@ lists which remain.
 
 ## The working record
 
-- [Glossary](../glossary.md) — the domain and process language.
+- [Glossary](../glossary.md) — the system, Domain and process language.
 - [Target State](target-state.md) — the capstone's design, `agreed`, and still the
   fixed point until the redesign replaces it.
 - [Product Brief](product-brief.md) — the full system the capstone is a slice of.

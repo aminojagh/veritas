@@ -160,7 +160,7 @@ today, while there is nothing on either side of it.
   against the Validation Gate's existing cost-check interface.
 
 - **No concurrency story, and no engine-native row- or column-level security.**
-  DuckDB is single-writer, so the App supports one user at a time. And
+  DuckDB is single-writer, so the App supports one User at a time. And
   because DuckDB has no policy-tag mechanism, the Access Profile must be enforced
   in application code by the Validation Gate rather than by the engine — a
   strictly weaker guarantee than the real system's warehouse-native policies, and

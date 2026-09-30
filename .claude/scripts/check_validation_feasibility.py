@@ -657,7 +657,7 @@ class RestrictedColumnProbe(NamedTuple):
 #
 # The four that must not be caught matter as much as the five that must. A Gate that
 # refuses every query mentioning a restricted name in a comment, or every query that
-# counts distinct Clients, is a Gate people route around — and a Gate people route
+# counts distinct Clients, is a Gate Users route around — and a Gate Users route
 # around protects nothing.
 RESTRICTED_COLUMN_PROBES = (
     RestrictedColumnProbe(

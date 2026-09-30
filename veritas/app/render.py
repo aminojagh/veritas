@@ -1,4 +1,4 @@
-"""What a Grounded Answer looks like to a person, as values rather than as widgets.
+"""What a Grounded Answer looks like to a User, as values rather than as widgets.
 
 Nothing here imports Streamlit. Each function turns a `GroundedAnswer`, a
 `Validation Gate outcome` or an `Access Profile` into the strings a page shows, and
@@ -35,7 +35,7 @@ NOTHING_USED = "nothing was used: no statement was allowed to run"
 
 
 def formatted(value: object) -> str:
-    """One value out of the Warehouse, as a person reads it.
+    """One value out of the Warehouse, as a User reads it.
 
     Money and counts carry thousands separators — a brokerage figure is read wrong
     without them — and a decimal keeps two places, which is the grain every Certified
@@ -69,7 +69,7 @@ def table(answer: GroundedAnswer) -> dict[str, list[str]]:
     """The answer's rows under the names their columns came back with.
 
     Formatted here rather than at the point of display, so what a test reads is what a
-    person sees.
+    User sees.
     """
     return {
         label: [formatted(row[position]) for row in answer.rows]
@@ -93,7 +93,7 @@ def unit_line(answer: GroundedAnswer) -> str:
     metric's `unit`, and its Reporting Currency where it has one.
 
     A single figure comes back under whatever the statement aliased it — `answer` — so
-    the number reaches a person labelled with nothing they can read a unit off. The
+    the number reaches a User labelled with nothing they can read a unit off. The
     metric is identifiable because Lineage now records what the statement used, which is
     the smaller thing
     DEBT-034

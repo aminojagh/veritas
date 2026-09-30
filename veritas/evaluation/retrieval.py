@@ -90,7 +90,7 @@ def searchable_relevant_set(gold: GoldQuestion, gate: ValidationGate) -> tuple[s
     name them. Scoring a ranking against a Relevant Set that includes them would
     measure that shape of the corpus rather than the search.
 
-    A question whose correct ending is a refusal or a Clarifying Question has an empty
+    A question whose correct Ending is a refusal or a Clarifying Question has an empty
     Relevant Set and therefore an empty one here, which is what leaves it out of the
     sweep: there is no entry it *should* have retrieved.
     """

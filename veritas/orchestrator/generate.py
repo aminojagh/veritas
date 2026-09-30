@@ -138,7 +138,7 @@ correct answer; inventing SQL is not.\
 """
 
 # What the question the model is handed has already had done to it. The rewrite step
-# resolves the Ambiguous Terms a person said before anything searches for the question,
+# resolves the Ambiguous Terms a User said before anything searches for the question,
 # and the model is given what that step produced rather than what was typed — see
 # `rewrite.py`. It is stated apart from the rules so that both forms below carry it: it
 # describes the input, not the instruction, and an arm that differed in both would

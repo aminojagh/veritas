@@ -48,7 +48,7 @@ available to the model.
 - **Retrieval becomes a correctness mechanism, not a relevance mechanism.**
   Retrieving the wrong Metric Definition *is* the wrong answer. This is why hit
   rate and Mean Reciprocal Rank (MRR) are meaningful measures here rather than
-  proxies for user satisfaction.
+  proxies for User satisfaction.
 - **Retrieval ground truth is derived, not labelled.** The Semantic Entries a
   gold SQL touches are its Relevant Set. No hand-labelling and no Large Language
   Model (LLM) judge is needed for the primary retrieval signal.

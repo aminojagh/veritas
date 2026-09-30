@@ -180,7 +180,7 @@ def test_a_reply_carries_what_the_call_read_wrote_and_took():
     """What the Question Log records per model call, measured where the call is made.
 
     A caller that was handed the text alone could not cost the call afterwards, and the
-    wall time a person waited is the time this socket took.
+    wall time a User waited is the time this socket took.
     """
     usage = {"prompt_tokens": 1200, "completion_tokens": 90, "total_tokens": 1290}
     with StubEndpoint(completion("hello", usage)) as provider:

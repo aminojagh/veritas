@@ -1,6 +1,6 @@
 # ADR-0006 — Every Certified Metric follows one stated book convention
 
-- **Status:** proposed
+- **Status:** accepted
 
 ## Context
 

@@ -98,7 +98,7 @@ def said_as(spelling: str) -> re.Pattern[str]:
     *"how much is in"* on its own.
 
     Whichever shape it is, the match spans the words the question used and no
-    others, so a caller that asks a person about a term can quote them rather than
+    others, so a caller that asks a User about a term can quote them rather than
     quote the registry.
     """
     parts = [re.escape(part.strip()) for part in PLACEHOLDER.split(spelling)]
@@ -126,7 +126,7 @@ def without_overlaps(found: Iterable[re.Match[str]]) -> list[re.Match[str]]:
     of it is written.
 
     Earliest first, and the longer of two that begin together: a longer match spans more
-    of the words the person used, and those words are exactly what a splice replaces and
+    of the words the User used, and those words are exactly what a splice replaces and
     what a Clarifying Question quotes back.
     """
     kept: list[re.Match[str]] = []
@@ -162,7 +162,7 @@ def ambiguous_terms_in(question: str, layer: SemanticLayer) -> list[AmbiguousTer
     """The Ambiguous Terms a question says, in the order it says them.
 
     Question order rather than corpus order, so a Clarifying Question asks about the
-    words in the order the person wrote them.
+    words in the order the User wrote them.
     """
     said = [
         (match.start(), position, term)
@@ -231,7 +231,7 @@ def clarifying_question_for(terms: list[AmbiguousTerm], question: str) -> str:
     """The question Veritas asks back about the terms that stayed unresolved.
 
     Each term is quoted as the question spelled it rather than as the corpus files
-    it, so a person who typed *"turnover"* is asked about "turnover" and not about
+    it, so a User who typed *"turnover"* is asked about "turnover" and not about
     the `volume` entry they have never seen. The meanings on offer are the entry's,
     because those are what the two spellings share.
     """
@@ -253,7 +253,7 @@ class RewriteForm(StrEnum):
     """
 
     APPENDED = "appended"
-    """The person's words intact, with the certified names in a parenthesis after
+    """The User's words intact, with the certified names in a parenthesis after
     them: *"what was our gross revenue last quarter (revenue means Gross Revenue)"*."""
 
     SPLICED = "spliced"

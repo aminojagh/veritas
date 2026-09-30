@@ -88,7 +88,7 @@ MINOR_UNIT_CURRENCIES = {
 # Yahoo's `instrumentType` vocabulary, mapped to the four values the Instrument
 # term permits and `dim_instrument`'s CHECK enforces. The left side is the
 # source's word and the right side is ours; keeping the translation in one table
-# is what stops a source rename from silently becoming a domain rename.
+# is what stops a source rename from silently becoming a Glossary rename.
 YAHOO_INSTRUMENT_TYPES = {
     "EQUITY": "equity",
     "ETF": "ETF",

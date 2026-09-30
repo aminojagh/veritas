@@ -83,7 +83,7 @@ LIVE_VARIABLE = "VERITAS_LIVE_MODEL"
 # free to vary between two runs is a resolution a person cannot check.
 TEMPERATURE = 0.0
 
-# One question at a time, in front of a person watching a browser tab.
+# One question at a time, in front of a User watching a browser tab.
 TIMEOUT_SECONDS = 30.0
 
 # How many times a refused call is tried again. A free tier meters tokens per minute
@@ -288,7 +288,7 @@ class ChatCompletions:
         """The model's reply to one system instruction and one user message, with what
         the call read, wrote and took.
 
-        The clock is this side of the seam because the wall time a person waits is the
+        The clock is this side of the seam because the wall time a User waits is the
         wall time the socket took, and a provider that reports no `usage` leaves the
         tokens at zero — the field is optional in the API this speaks, and a reply with
         no accounting on it is still a reply.

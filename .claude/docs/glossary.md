@@ -1,8 +1,9 @@
 # Glossary — Ubiquitous Language
 
-The single source of truth for vocabulary in this project. Every domain noun
+The single source of truth for vocabulary in this project. Every Glossary term
 used in a document, a plan, or a **code identifier** must appear here, spelled
-exactly as registered.
+exactly as registered. The `registering-language` skill says which words are
+Glossary terms.
 
 **Adding a term:** see the `registering-language` skill. Never coin a term
 silently — propose it, agree on it, then register it.
@@ -13,21 +14,33 @@ deleted, and every use of it renamed.
 
 ---
 
-## Domain Language
+## System Language
+
+Veritas's own words, as distinct from the words of a Domain it answers questions
+about.
+
+**Metric** in Veritas means one thing only: a **business** metric — a Certified
+Metric about the brokerage, like Gross Revenue or Traded Notional. The measures of
+how well Veritas *itself* performs are never called metrics; they are
+**measures**. Keeping the two words apart is what stops the collision this
+Glossary exists to prevent — a chart labelled "metrics" mixing Gross Revenue with
+hit-rate.
 
 ### A. The system
 
-What Veritas is made of.
+What Veritas is made of, and how it is measured.
 
 | Term | Definition | Lives in | Status |
 |---|---|---|---|
+| **Domain** | The subject a database records, such as a brokerage or a hospital: its things, how they relate, and how the business measures them. Veritas never holds a Domain: it holds the database's schema and a User's definitions, which together describe one. Not the database and not the definitions, which describe a Domain. Not *one database and the certified definitions that describe it*: a brokerage is not a database plus definitions. | — (not built yet) | agreed |
+| **User** | The person who connects a Domain to Veritas, writes and certifies the definitions that describe it, and asks questions in its words. Runs as one Access Profile. Not the LLM, which may draft a definition but never certifies one. One role, not an *Asker* and a *Steward*: the aim is to make describing a Domain too small a job to need a role of its own. | — (not built yet) | agreed |
 | **Semantic Layer** | The certified registry of Metric Definitions, Dimension Definitions, Join Paths and Ambiguous Terms. Veritas's knowledge base — the thing retrieval searches. | `semantic/` | agreed |
 | **Semantic Entry** | One retrievable document in the Semantic Layer. The unit of retrieval and the unit of relevance in retrieval evaluation. | `semantic/` | agreed |
-| **Metric Definition** | A named, versioned, certified computation over the warehouse — its SQL expression, grain, filters, units, and the aliases people use for it. | `semantic/metrics/` | agreed |
+| **Metric Definition** | A named, versioned, certified computation over the warehouse — its SQL expression, grain, filters, units, and the aliases Users use for it. | `semantic/metrics/` | agreed |
 | **Certified Metric** | A metric that exists in the Semantic Layer. The only kind Veritas is permitted to compute. | `semantic/metrics/` | agreed |
 | **metric expression** | The SQL expression inside a query that computes a metric — the thing the Validation Gate traces. Distinct from the **Metric Definition**, which is the certified entry that publishes one, and from the **Certified Metric** it must trace to: a metric expression that traces to no Certified Metric is a **Shadow Metric**. Lower case, because that is how the [Target State's flow](design/target-state.md#flow) spells it — *"every metric expression traces to a Certified Metric"*. A statement that computes none is refused with the `Rejection Reason` `no metric expression`. | `veritas/validation/` — read out of the generated SQL | agreed |
 | **Shadow Metric** | A metric computed inline in a query instead of drawn from the Semantic Layer. The failure mode Veritas exists to prevent. A **metric expression** that traces to no Certified Metric is one. `RejectionReason.SHADOW_METRIC` is the verdict the Validation Gate returns on a statement whose metric expressions do not all trace; no Semantic Entry publishes one. | `veritas/validation/` — as a Rejection Reason (no file publishes one) | agreed |
-| **Ambiguous Term** | A word users say that maps to two or more Certified Metrics and therefore has no single correct answer. Not a metric — an instruction to disambiguate before generating SQL. | `semantic/ambiguous/` | agreed |
+| **Ambiguous Term** | A word Users say that maps to two or more Certified Metrics and therefore has no single correct answer. Not a metric — an instruction to disambiguate before generating SQL. | `semantic/ambiguous/` | agreed |
 | **Dimension Definition** | A certified axis for *slicing* a metric — the answer to "by what?". Names the column, its grain, and its allowed values, so "by region" always means the same column with the same buckets. The five certified axes, each written here as `(columns — grain — allowed values)`: **by trade date** (`fct_trade.trade_date` — daily), **by snapshot date** (`fct_position_snapshot.snapshot_date` · `fct_balance_snapshot.snapshot_date` — daily), **by accounting movement date** (`fct_accounting_movement.movement_date` — daily), **by region** (`dim_client.client_region` — one Client — EU · UK · APAC), **by instrument type** (`dim_instrument.instrument_type` — one Instrument — equity · ETF · future · currency pair). A date axis enumerates no allowed values, because its values are minted by the data rather than registered here. "Net Revenue **by region** last quarter" applies the region Dimension Definition to the Net Revenue metric. `semantic/dimensions/` publishes the five axes, and `check_semantic_layer.py` reads this cell back against them. There are three date axes because a Snapshot metric's route never reaches `fct_trade.trade_date`. An axis also declares **the routes that reach it** — the map from a metric's `from_table` to the Join Paths that reach this axis's columns from there, so that an axis is applicable rather than merely certified. The routes themselves are **not** listed here: `semantic/dimensions/` holds them and `check_semantic_layer.py`'s check 19 walks them, for the reason [DEBT-017](debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) is already open about this cell. An axis that names no route from a fact table is not reachable from it, and a slice by it is refused by name. | `semantic/dimensions/` | agreed |
 | **Join Path** | A certified route between two warehouse tables, so the model never invents a join. | `semantic/joins/` | agreed |
 | **Route** | Where a statement's rows come from: the tables it starts at, and the joins it reaches the rest of them through. Read off a parse tree, or built from a Metric Definition's `from_table` and `join_paths`, so that what a query took and what the corpus certifies can be compared as values. A **Join Path** is one certified hop between two tables and is published as a file; a Route is the whole chain plus where it starts, and is never published — `Traded Notional`'s Route is two Join Paths and `fct_trade`, `Trade Count`'s is no Join Paths and `fct_trade`. A Route is also built from a Dimension Definition's `routes`, and the Route the Validation Gate permits a statement is the union of the metric's, the axis's, and the route the Access Profile's predicate needs. No file is a Route; the entries publish the fields one is built from. | `veritas/validation/` — read from a statement or from a Metric Definition's fields (no file publishes one) | agreed |
@@ -35,15 +48,18 @@ What Veritas is made of.
 | **Validation Gate** | Deterministic, non-LLM checks a query must pass before execution: certified-metrics-only, no restricted columns, access policy applied, cost bounded, read-only. | `veritas/validation/` | agreed |
 | **Access Profile** | The identity Veritas runs a question as — role and permitted region. Determines which rows and columns the Validation Gate allows. | `veritas/validation/` | agreed |
 | **Restricted Column** | A column an Access Profile forbids from appearing in a Grounded Answer's projection. *In the projection* is judged on the parse tree once `SELECT *` has been expanded against the real schema: the name in a comment, in a string literal, or in a filter is not a projection of it. | `veritas/validation/` | agreed |
-| **Validation Gate outcome** | The verdict the Validation Gate returns: allowed or rejected, the Rejection Reasons that fired, the explanation a caller shows a person, and the rule set the decision was taken under. What a Grounded Answer carries, what the App renders, and what Observability charts. | `veritas/validation/` | agreed |
+| **Validation Gate outcome** | The verdict the Validation Gate returns: allowed or rejected, the Rejection Reasons that fired, the explanation a caller shows a User, and the rule set the decision was taken under. What a Grounded Answer carries, what the App renders, and what Observability charts. | `veritas/validation/` | agreed |
 | **Rejection Reason** | One member of the stable taxonomy a rejected Validation Gate outcome carries — the thing *"Validation-Gate rejections by reason"* is grouped by. The **members** are registered in `veritas/validation/`, where the Gate enumerates them, and deliberately not in this cell: a vocabulary inside one table cell read by a prose parse is [DEBT-017](debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell). | `veritas/validation/` | agreed |
 | **Grounded Answer** | The response object: the answer, the SQL, the Lineage, and the Validation Gate outcome. Veritas never returns a bare number. | `veritas/` | agreed |
 | **Clarifying Question** | What Veritas returns instead of an answer when a question says an **Ambiguous Term** and nothing resolved which Certified Metric was meant: the question Veritas asks back, naming each unresolved term and the metrics it could mean. Not a **refusal** — a refusal says the question cannot be answered, a Clarifying Question says it is not answerable *yet* and what would settle it. They are the two ways a **Grounded Answer** carries no number, and one carrying both says two different things about one question, which is why `GroundedAnswer` refuses to be built that way. Rendered by the App, and grouped over by Observability as a `Validation Gate outcome` is grouped by its `Rejection Reason`. Spelled `clarifying_question` on both `Rewrite` and `GroundedAnswer`. | `veritas/orchestrator/` | agreed |
+| **Ending** | One of the three ways a Grounded Answer ends: a number, a Clarifying Question or a refusal. A Gold Question names its correct Ending, and Evaluation scores the pair of correct and given Endings. Not the answer itself: an Ending of *a number* says only that a number was given, not which one. Not *Outcome*, *Verdict* or *Result*, which Validation Gate outcome, Feedback and the gold result already hold. Spelled `Expectation` in the code until [DEBT-045](debt-ledger.md#debt-045--the-code-calls-an-ending-an-expectation) is paid. | `veritas/evaluation/` | agreed |
 | **Lineage** | The record of which Semantic Entries and which Metric Definition versions produced a Grounded Answer. What makes an answer auditable. | `veritas/` | agreed |
+| **Interpretation** | An answer's statement, in the Domain's words, of exactly what it computed: which definitions, filters, period and grouping. The User checks it instead of the SQL. Not **Lineage**, which records which entries and versions an answer came from, for audit: an Interpretation says what the answer means, for the User. Not *Explanation*, which suggests narrating the result, nor *Restatement*, which suggests echoing the question. | — (not built yet) | agreed |
 | **Gold Question Set** | The evaluation corpus: question, gold SQL, gold result, and the Semantic Entries the gold SQL touches. | `data/gold/` | agreed |
-| **Gold Question** | One member of the **Gold Question Set**: the question as a person asks it, which of a **Grounded Answer**'s three endings is correct for it, and — where that ending is a number — the gold SQL and the gold result. One file under `data/gold/`, read by the `GoldQuestion` dataclass whose field list is that file format. Its **Relevant Set** is not one of its fields: a Gold Question says what the *answer* should be, and what the *corpus* should have been searched for is derived from its statement. | `data/gold/` | agreed |
-| **Relevant Set** | The Semantic Entries one **Gold Question**'s gold SQL touches — what a Retrieval ranking is scored against, and the [Target State](design/target-state.md#zoomcamp-criteria-map)'s *"ground truth is derived"* in one noun. **Derived, never written down**: the Certified Metrics the statement's projections trace to, the certified axes it groups by or filters on, and the Join Paths those two declare, all read through `veritas/validation/`'s own readers. Distinct from **Lineage**, which records the entries an answer *was* built from: a Relevant Set is what a correct answer *would have needed*, so the two are the two sides hit rate and Mean Reciprocal Rank compare. A question whose correct ending is a refusal or a **Clarifying Question** has an empty one. `relevant_entries` computes one. | `veritas/evaluation/` — derived from a gold SQL (no file publishes one) | agreed |
+| **Gold Question** | One member of the **Gold Question Set**: the question as a User asks it, which of a **Grounded Answer**'s three Endings is correct for it, and — where that Ending is a number — the gold SQL and the gold result. One file under `data/gold/`, read by the `GoldQuestion` dataclass whose field list is that file format. Its **Relevant Set** is not one of its fields: a Gold Question says what the *answer* should be, and what the *corpus* should have been searched for is derived from its statement. | `data/gold/` | agreed |
+| **Relevant Set** | The Semantic Entries one **Gold Question**'s gold SQL touches — what a Retrieval ranking is scored against, and the [Target State](design/target-state.md#zoomcamp-criteria-map)'s *"ground truth is derived"* in one noun. **Derived, never written down**: the Certified Metrics the statement's projections trace to, the certified axes it groups by or filters on, and the Join Paths those two declare, all read through `veritas/validation/`'s own readers. Distinct from **Lineage**, which records the entries an answer *was* built from: a Relevant Set is what a correct answer *would have needed*, so the two are the two sides hit rate and Mean Reciprocal Rank compare. A question whose correct Ending is a refusal or a **Clarifying Question** has an empty one. `relevant_entries` computes one. | `veritas/evaluation/` — derived from a gold SQL (no file publishes one) | agreed |
 | **Execution Accuracy** | Share of generated queries whose result set matches the gold result. The primary correctness measure — objective, unlike a judge's opinion. | `veritas/evaluation/` | agreed |
+| **Evaluation Measure** | A measure of how well Veritas answers, computed over the Gold Question Set: hit rate and MRR for Retrieval; Execution Accuracy and LLM-as-judge agreement for generation. These are the Zoomcamp evaluation measures. | `veritas/evaluation/` | agreed |
 | **Reporting Currency** | The single currency a Grounded Answer is expressed in. Every monetary metric must state one. | `semantic/metrics/` | agreed |
 | **Warehouse** | The analytical store holding the brokerage star schema — the `fct_` and `dim_` tables of Section B. DuckDB for the slice. Reached **only** through the Warehouse Adapter; no component queries it directly. | `veritas/warehouse/` | agreed |
 | **Warehouse Adapter** | The single boundary through which all Warehouse access passes. Holds the connection and the engine's dialect; nothing DuckDB-specific exists outside it. The seam an engine swap lands on. | `veritas/warehouse/` | agreed |
@@ -51,11 +67,18 @@ What Veritas is made of.
 | **Retrieval** | The step that turns a question into the Semantic Entries needed to answer it. Searches the Semantic Layer **only** — never Warehouse schema, never free text. Hybrid text + vector, re-ranked. | `veritas/retrieval/` | agreed |
 | **Retrieval Strategy** | Which search one call of Retrieval runs over the corpus — the thing an Evaluation Measure is grouped by when Retrieval's hit rate and MRR are compared, as a Validation Gate outcome is grouped by its Rejection Reason. Not a second word for **Retrieval**: Retrieval is the step, and a Retrieval Strategy is which of its searches that step ran, so two of them over one corpus return different entries for one question and are comparable by measure. The **members** are registered in `veritas/retrieval/`, where `RetrievalStrategy` enumerates them, and deliberately not in this cell for the reason [DEBT-017](debt-ledger.md#debt-017--the-certified-axes-are-registered-inside-one-glossary-cell) is open about. Not `Retrieval Approach`: one concept, one word. | `veritas/retrieval/` — as an enumeration (no file publishes one) | agreed |
 | **Orchestrator** | The component that runs a question through the seven-step flow: rewrite, retrieve, ground, generate, validate, execute, answer. Owns the sequence and the failure paths; owns none of the steps' logic. Not `Copilot`: Veritas *is* a copilot, so the word cannot also name one component inside it, and "copilot" stays lower-case prose for the product as a whole. | `veritas/orchestrator/` | agreed |
-| **App** | Where a person asks a question and reads a Grounded Answer — with its SQL, its Lineage and its Validation Gate outcome. **Never renders a bare number.** Not `Interface`, which is the rubric's criterion name; `App` matches the directory. | `veritas/app/` | agreed |
+| **App** | Where a User asks a question and reads a Grounded Answer — with its SQL, its Lineage and its Validation Gate outcome. **Never renders a bare number.** Not `Interface`, which is the rubric's criterion name; `App` matches the directory. | `veritas/app/` | agreed |
 | **Observability** | Records what happened at runtime: every question, Grounded Answer, Validation Gate outcome, cost, latency and Feedback — the Question Log. Produces Operational Measures. **Records; never judges.** Live traffic, no ground truth. | `veritas/observability/` | agreed |
+| **Operational Measure** | A runtime measure logged per question and shown on the Grafana dashboard: cost, latency, Validation Gate outcome, and Feedback. | `veritas/observability/` | agreed |
 | **Evaluation** | Computes Evaluation Measures over the Gold Question Set: hit rate and MRR for Retrieval, Execution Accuracy and LLM-as-judge for generation. **Offline, against known-correct answers** — the opposite pole from Observability. | `veritas/evaluation/` | agreed |
-| **Question Log** | The record Observability keeps: one row per question a person asked through the App, carrying its Grounded Answer, Validation Gate outcome, Lineage, Operational Measures and Feedback. The seam `veritas/observability/` exposes and the tables behind it. Not the **Gold Question Set**: a Question Log row is live traffic with no ground truth; a Gold Question is ground truth with no traffic. | `veritas/observability/` | agreed |
-| **Feedback** | What a person says about a Grounded Answer they were shown: a verdict, up or down, and optionally a sentence. Attached to that answer's **Question Log** row and never to the question text alone, so Feedback on an answer is Feedback on *that* SQL, Lineage and Validation Gate outcome, and a later answer to the same words inherits none of it. The one of **Operational Measure**'s four — cost, latency, Validation Gate outcome, Feedback — that had no row of its own. Not an **Evaluation Measure**: a verdict is live traffic, and nothing scores it against a gold result. | `veritas/observability/` — offered by the App | agreed |
+| **Question Log** | The record Observability keeps: one row per question a User asked through the App, carrying its Grounded Answer, Validation Gate outcome, Lineage, Operational Measures and Feedback. The seam `veritas/observability/` exposes and the tables behind it. Not the **Gold Question Set**: a Question Log row is live traffic with no ground truth; a Gold Question is ground truth with no traffic. | `veritas/observability/` | agreed |
+| **Feedback** | What a User says about a Grounded Answer they were shown: a verdict, up or down, and optionally a sentence. Attached to that answer's **Question Log** row and never to the question text alone, so Feedback on an answer is Feedback on *that* SQL, Lineage and Validation Gate outcome, and a later answer to the same words inherits none of it. The one of **Operational Measure**'s four — cost, latency, Validation Gate outcome, Feedback — that had no row of its own. Not an **Evaluation Measure**: a verdict is live traffic, and nothing scores it against a gold result. | `veritas/observability/` — offered by the App | agreed |
+
+---
+
+## Brokerage Language
+
+The words of the brokerage, the first Domain Veritas answers questions about.
 
 ### B. The warehouse
 
@@ -97,7 +120,7 @@ instruments, trades move cash and change positions.
 ### C. Distinctions we must not blur
 
 These pairs are near-synonyms in ordinary speech and different quantities in the
-domain. Confusing one for another produces a **correct program computing the
+brokerage. Confusing one for another produces a **correct program computing the
 wrong number** — the failure that is hardest to notice and most expensive to
 trust. Every pair here is drawn from the job specification's own list.
 
@@ -119,7 +142,7 @@ trust. Every pair here is drawn from the job specification's own list.
 
 ### D. Ambiguous Terms
 
-Words users genuinely say that are **not** metrics. Veritas must resolve them
+Words Users genuinely say that are **not** metrics. Veritas must resolve them
 before generating SQL — never guess silently.
 
 | User says | Could mean | Resolution | Also said as |
@@ -130,7 +153,7 @@ before generating SQL — never guess silently.
 | "P&L" | Realised P&L · Unrealised P&L · both | Ask | PnL · P and L · P & L · P/L |
 | "how much does X have" | Cash Balance · Account Value | Ask | how much is in X · how much does X hold |
 
-*Also said as* is the other spellings of the same word — what a person types when
+*Also said as* is the other spellings of the same word — what a User types when
 they do not type the registered one. A spelling here is **the registered term**: it
 is detected exactly as the *User says* cell is, resolved against the same *Could
 mean* pair, and `X` stands for the subject in a phrase as it does in the row above.
@@ -147,24 +170,6 @@ to an operations team, and Veritas serves both.
 the check prints it as prose rather than resolving it. Every other *Could mean* name
 is a Section B term spelled as registered, which `check_semantic_layer.py` reads back
 against `semantic/ambiguous/`.
-
-### E. System measures
-
-**Metric** in Veritas means one thing only: a **business** metric — a Certified
-Metric about the brokerage, like Gross Revenue or Traded Notional. The measures of
-how well Veritas *itself* performs are never called metrics; they are
-**measures**. Keeping the two words apart is what stops the collision this
-Glossary exists to prevent — a chart labelled "metrics" mixing Gross Revenue with
-hit-rate.
-
-| Term | Definition | Lives in | Status |
-|---|---|---|---|
-| **Evaluation Measure** | A measure of how well Veritas answers, computed over the Gold Question Set: hit rate and MRR for Retrieval; Execution Accuracy and LLM-as-judge agreement for generation. These are the Zoomcamp evaluation measures. | `veritas/evaluation/` | agreed |
-| **Operational Measure** | A runtime measure logged per question and shown on the Grafana dashboard: cost, latency, Validation Gate outcome, and Feedback. | `veritas/observability/` | agreed |
-
-Execution Accuracy is registered separately in
-[Section A. The system](#a-the-system) because it is the primary correctness
-signal; it is itself an Evaluation Measure.
 
 ---
 
@@ -194,8 +199,8 @@ requires abbreviations to be expanded on first use in each document; an entry
 here satisfies that requirement project-wide, so this table is the one place to
 look when a document uses a short form you do not recognise.
 
-These are **not** Domain Language terms — they are shorthand. A word that carries
-domain meaning belongs in a section above, with a definition and a status.
+These are shorthand, **not** terms. A word that carries meaning belongs in a
+section above, with a definition and a status.
 
 | Short | Expanded | Note |
 |---|---|---|

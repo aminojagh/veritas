@@ -39,8 +39,8 @@ from veritas.validation import ValidationGateOutcome
 class EndedBy(StrEnum):
     """Which step of the flow ended a question.
 
-    `flow.py`'s five ways a question ends without a number, the one that is not an
-    ending at all, and the answer itself. A closed taxonomy rather than a sentence,
+    `flow.py`'s five ways a question ends without a number, the one that does not
+    end a question at all, and the answer itself. A closed taxonomy rather than a sentence,
     because *"refusals by reason"* is a chart and prose is not a bar:
     [ADR-0003](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md)
     argued that for the Validation Gate's own reasons, and it applies here the moment
@@ -71,7 +71,7 @@ class EndedBy(StrEnum):
 
     PROVIDER = "provider"
     """The call did not come back at all — no key, a timeout, a reply that is not JSON.
-    Not one of `flow.py`'s endings and deliberately kept apart from them: it says
+    Not one of the ways `flow.py` ends a question, and deliberately kept apart from them: it says
     nothing about the question, and it is the one member no Grounded Answer carries,
     because there is none. A sweep scores it as a row of its own; Observability records
     no row for it at all."""
@@ -114,7 +114,7 @@ class GroundedAnswer:
     `rows` is what the Warehouse returned and `columns` is what the engine calls each
     position in them, `sql` is the statement they came back for, `lineage` is what that
     statement was built from and `outcome` is the verdict it was allowed under.
-    `refusal` is the sentence a person reads when there is no number, and
+    `refusal` is the sentence a User reads when there is no number, and
     `clarifying_question` is the question Veritas asks back when the question said an
     Ambiguous Term and did not say which meaning.
 
@@ -133,7 +133,7 @@ class GroundedAnswer:
     returns carries the measures, so nothing has to ask the Orchestrator a second
     question to find out what the first one took.
 
-    **`ended_by` is stated, not inferred.** Four of the six endings are visible in the
+    **`ended_by` is stated, not inferred.** Four of the six ways a question ends are visible in the
     fields — a question asked back, a number, a statement the Gate refused, a statement
     the engine refused — and two are not: a refusal with no statement is either the
     corpus having nothing that defines a Certified Metric or the model declining to
@@ -144,8 +144,8 @@ class GroundedAnswer:
     both refuses and asks back says two different things about one question; one that
     answers without SQL is the bare number the Glossary says Veritas never returns; one
     that answers under a verdict that is not an allowing verdict is a number that
-    reached a person past the Validation Gate; one whose names do not label its
-    values is a table whose headings belong to a different query; and one whose ending
+    reached a User past the Validation Gate; one whose names do not label its
+    values is a table whose headings belong to a different query; and one whose `ended_by`
     contradicts its own fields is a chart bar that counts the wrong questions.
     """
 
@@ -184,10 +184,10 @@ class GroundedAnswer:
                 f"and these {len(self.columns)} names do not label "
                 f"{[len(row) for row in self.rows]}"
             )
-        if self.ended_by not in self.endings():
+        if self.ended_by not in self.consistent_ended_by():
             raise ValueError(
                 f"this answer says it ended by '{self.ended_by}' and its own fields "
-                f"say {' or '.join(f"'{one}'" for one in self.endings())}"
+                f"say {' or '.join(f"'{one}'" for one in self.consistent_ended_by())}"
             )
 
     @property
@@ -195,8 +195,8 @@ class GroundedAnswer:
         """Whether a number came back, as opposed to a refusal or a question."""
         return not self.refusal and self.clarifying_question is None
 
-    def endings(self) -> tuple[EndedBy, ...]:
-        """The endings these fields are consistent with — one, or the two a refusal
+    def consistent_ended_by(self) -> tuple[EndedBy, ...]:
+        """The `EndedBy` members these fields are consistent with — one, or the two a refusal
         with no statement cannot be told apart by.
 
         The whole of what a Grounded Answer can say about how it ended, which is why

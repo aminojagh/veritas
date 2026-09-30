@@ -147,7 +147,7 @@ def generation_table(rows: list[GenerationMeasures], today: str) -> list[str]:
     """
     width = max(len("model"), *(len(row.model) for row in rows))
     lines = [
-        f"  {'prompt':<6}  {'model':<{width}}  {'ending':>7}  "
+        f"  {'prompt':<6}  {'model':<{width}}  {'Ending':>7}  "
         f"{'execution accuracy':>18}  {'judge agreement':>15}"
     ]
     for row in rows:

@@ -24,7 +24,7 @@ single-account access to many **Instrument** classes — equities, ETFs, bonds,
 futures, options, swaps, funds, and currency pairs. The analytical estate is an
 enterprise data warehouse (BigQuery in the real system); the business runs on it.
 
-The domain nouns this generates — Client, Account, Instrument, Trade, Cash
+The terms this generates — Client, Account, Instrument, Trade, Cash
 Movement, Position, Gross vs Net Revenue, and the rest — are registered in the
 [Glossary](../glossary.md). They are not incidental to Veritas; they *are* the
 subject the system reasons about.

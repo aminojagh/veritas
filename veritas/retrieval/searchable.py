@@ -23,7 +23,7 @@ from veritas.semantic import (
     SemanticLayer,
 )
 
-# Which fields of each entry type carry language a person might use, and therefore
+# Which fields of each entry type carry language a User might use, and therefore
 # which a search may match. Parallel to the loader's `SQL_FIELDS`, and disjoint
 # from it: a field that publishes SQL never publishes searchable text.
 #

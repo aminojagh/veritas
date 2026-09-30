@@ -122,7 +122,7 @@ class AccessProfile:
 #
 # **`role` is a value, not a registered term.** It names who is asking the way `EU` names
 # a bucket of the `by region` axis: data carried by an entry, not a component of the
-# system. Veritas has no user concept yet — the App Step is where one arrives — and
+# system. Veritas has no User concept yet — the App Step is where one arrives — and
 # registering a vocabulary of roles before anything reads a second one would be
 # registering a guess.
 #

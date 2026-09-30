@@ -1,6 +1,6 @@
-"""What the App shows a person, and what it refuses to hide from them.
+"""What the App shows a User, and what it refuses to hide from them.
 
-Three claims. The **rendering claim**: a Grounded Answer becomes strings a person reads —
+Three claims. The **rendering claim**: a Grounded Answer becomes strings a User reads —
 values under the names the engine gave them, a single figure under the unit its
 Certified Metric is quoted in, a verdict that says which rules ran, and an identity that
 carries what its enforcement is worth. The **page claim**: every one
@@ -8,9 +8,9 @@ of the four things a question can come back as reaches the page as itself, and n
 them arrives without the statement, the Lineage and the Validation Gate outcome beside
 it — [`App`](../.claude/docs/glossary.md#a-the-system)'s *"never renders a bare
 number"*, as a test rather than as an intention. The **recording claim**: the question a
-person just asked reaches the Question Log after it reaches the page, carrying the
+User just asked reaches the Question Log after it reaches the page, carrying the
 identity it was asked as — and a log that will not take it costs a warning rather than
-the answer. The **Feedback claim**: the verdict a person leaves is written against the
+the answer. The **Feedback claim**: the verdict a User leaves is written against the
 row that answer was recorded as, the answer stays on the page while they leave it, and
 an answer that reached no row is offered no widget that would throw a verdict away.
 
@@ -478,7 +478,7 @@ def test_a_provider_that_cannot_be_reached_is_not_a_traceback():
 
 def test_a_question_is_recorded_once_it_has_been_answered(answered):
     """The App is the one caller that writes to the Question Log, and it writes the
-    answer a person was just shown — with the identity it was asked as, which the
+    answer a User was just shown — with the identity it was asked as, which the
     Grounded Answer does not carry."""
     log = Recorded()
     page = asked(answered, log=log)
@@ -490,8 +490,8 @@ def test_a_question_is_recorded_once_it_has_been_answered(answered):
 
 
 def test_a_refusal_is_recorded_as_readily_as_an_answer(rejected, lineage):
-    """*"Every question a person asks"* — a refused one is traffic, and the ending is
-    what makes it a bar on a chart rather than a gap in one."""
+    """*"Every question a User asks"* — a refused one is traffic, and the step that
+    ended it is what makes it a bar on a chart rather than a gap in one."""
     log = Recorded()
     page = asked(
         GroundedAnswer(
@@ -519,7 +519,7 @@ def test_a_question_that_was_never_asked_is_never_recorded():
 
 
 def test_a_log_that_will_not_take_the_row_does_not_take_the_answer_away(answered):
-    """A person asked a question; whether Veritas managed to write it down is Veritas's
+    """A User asked a question; whether Veritas managed to write it down is Veritas's
     problem. So a failed write is a warning beside the answer and never instead of it."""
     page = asked(answered, log=Recorded(refusing="the server went away"))
     assert not page.exception
@@ -553,7 +553,7 @@ def test_a_page_with_no_question_log_says_so_and_records_nothing(answered):
 
 def test_feedback_is_offered_on_every_answer_that_reached_the_log(answered, rejected,
                                                                  lineage):
-    """*"Under every Grounded Answer"* — a refusal is an answer a person may have
+    """*"Under every Grounded Answer"* — a refusal is an answer a User may have
     something to say about as readily as a number is."""
     for one in (
         answered,
@@ -619,7 +619,7 @@ def test_a_sentence_with_no_verdict_is_not_feedback(answered):
 def test_an_answer_that_reached_no_row_is_offered_no_verdict(answered):
     """Feedback attaches to a row. Where there is none — no Question Log, or a write
     that failed — there is nothing to attach it to, so nothing is offered rather than a
-    widget that throws what a person says away."""
+    widget that throws what a User says away."""
     assert not asked(answered).feedback
     page = asked(answered, log=Recorded(refusing="the server went away"))
     assert "was not recorded" in page.warning[0].value
@@ -656,7 +656,7 @@ def test_only_the_page_imports_streamlit(root):
     reason=f"spends a real key: set {LIVE_VARIABLE}=1 to run it",
 )
 def test_the_page_answers_a_real_question_end_to_end(warehouse, gate, retriever):
-    """The whole of Veritas behind the box a person types into.
+    """The whole of Veritas behind the box a User types into.
 
     Nothing is scripted: the configured provider resolves the question, writes the
     statement, the Gate judges it and the Warehouse runs it — and what the page shows
@@ -683,9 +683,9 @@ def test_a_real_question_asked_on_the_page_becomes_a_row(warehouse, gate, retrie
 
     Both halves are real — the configured provider answers and Postgres takes the row —
     so this needs a key **and** a server and skips without either. Two questions, so two
-    endings are recorded from one run: one answered, and one that says an Ambiguous Term
+    steps that end a question are recorded from one run: one answered, and one that says an Ambiguous Term
     and is asked back. A verdict is then left on the second of them through the widget a
-    person clicks, so the Feedback claim is made once against the real schema rather
+    User clicks, so the Feedback claim is made once against the real schema rather
     than only against the double. It deletes the rows it wrote, because a test that
     leaves traffic behind is a test that changes what the dashboard says.
     """
@@ -756,7 +756,7 @@ def test_a_real_question_asked_on_the_page_becomes_a_row(warehouse, gate, retrie
             assert reading.execute(
                 "SELECT count(*) FROM feedback WHERE question_id = ANY(%s)", (log.rows,)
             ).fetchone() == (0,), "a question taken back takes its Feedback with it"
-    endings = [row[1] for row in written]
-    assert endings == ["answer", "rewrite"], endings
+    ended_by = [row[1] for row in written]
+    assert ended_by == ["answer", "rewrite"], ended_by
     assert all(row[6] >= 1 for row in written), "every question here calls a model"
     assert verdicts == [(log.rows[1], False, "I meant gross revenue")], verdicts

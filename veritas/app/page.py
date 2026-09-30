@@ -2,14 +2,14 @@
 
     uv run streamlit run veritas/app/page.py
 
-[`App`](../../.claude/docs/glossary.md#a-the-system) is registered as *"where a person
+[`App`](../../.claude/docs/glossary.md#a-the-system) is registered as *"where a User
 asks a question and reads a Grounded Answer — with its SQL, its Lineage and its
 Validation Gate outcome. **Never renders a bare number**"*, and `show` below is that
 sentence: the statement, the entries it was composed from and the verdict it ran under
 are laid out beneath every answer rather than folded away behind a control.
 
 `page` takes the Orchestrator it asks and the Question Log it records to rather than
-reaching for either, so the same page a person loads is the page a test drives with a
+reaching for either, so the same page a User loads is the page a test drives with a
 scripted model and a doubled log. Called with nothing it builds both real ones, once per
 server process.
 
@@ -17,7 +17,7 @@ server process.
 returns what it took; writing that down is this side of the seam, so the Evaluation
 sweep drives the same flow a few hundred times and puts nothing on the dashboard —
 Observability is live traffic, and a sweep is not traffic. It is also the one caller
-that takes Feedback, for the same reason: nothing but a person reading an answer has
+that takes Feedback, for the same reason: nothing but a User reading an answer has
 any to give.
 """
 
@@ -119,7 +119,7 @@ def recording() -> tuple[QuestionLog | None, str]:
 
     Cached for the same reason the Orchestrator is: it holds a connection. An
     installation with no server reaches this once and says so on every page load
-    afterwards, rather than retrying a connection per question in front of a person.
+    afterwards, rather than retrying a connection per question in front of a User.
     """
     try:
         log = question_log()
@@ -179,7 +179,7 @@ def page(
     asked, the row that answer was recorded as, and the Feedback offered on it.
 
     `log` is taken the way `orchestrator` is, so a test drives the page against a double
-    and the server the page opens for itself is the one a person gets.
+    and the server the page opens for itself is the one a User gets.
 
     The answer is held in session state rather than in the run that produced it. A
     Feedback button reruns the script with nothing submitted in the question form, and an
@@ -236,7 +236,7 @@ def record(
 ) -> int | None:
     """Put the question that was just answered in the Question Log, and return its row.
 
-    **After the answer is on the page, and never instead of it.** A person asked a
+    **After the answer is on the page, and never instead of it.** A User asked a
     question; whether Veritas managed to write it down is Veritas's problem, so a failed
     write is a warning beside an answer rather than an error in place of one, and an
     installation with no log at all says so in the sidebar and is otherwise silent.
@@ -254,7 +254,7 @@ def record(
 
 
 def offer_feedback(question_id: int | None, log: QuestionLog | None) -> None:
-    """Take the verdict and the sentence a person leaves on the answer above.
+    """Take the verdict and the sentence a User leaves on the answer above.
 
     One form, so a verdict and the sentence that qualifies it are one write rather than
     two — and so the widgets do not rerun the script between them. It is keyed by the
@@ -263,7 +263,7 @@ def offer_feedback(question_id: int | None, log: QuestionLog | None) -> None:
 
     Offered only where the answer reached the Question Log, because Feedback attaches to
     a row: an installation with no log says so in the sidebar and shows no widget that
-    would throw a person's verdict away.
+    would throw a User's verdict away.
     """
     if question_id is None or log is None:
         return

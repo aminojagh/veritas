@@ -1,7 +1,7 @@
 # CLAUDE.md — Operating Agreement
 
 **Veritas** — an end-to-end LLM application, being redesigned into a
-domain-agnostic "chat with your data" system. It began as the capstone for the
+Domain-agnostic "chat with your data" system. It began as the capstone for the
 DataTalks.Club LLM Zoomcamp.
 
 > **Redesigning.** The capstone's Target State is built and delivered. The next one
@@ -82,7 +82,7 @@ one trivial implementation. See `recording-debt`.
 ### 1. Shared language is never compromised
 
 [`.claude/docs/glossary.md`](.claude/docs/glossary.md) is the single source of truth for every
-domain term. Before using a domain noun in a document, a plan, or a **code
+Glossary term. Before using a term in a document, a plan, or a **code
 identifier**, check it.
 
 - Term is in the Glossary → use it, spelled exactly as registered.
@@ -188,7 +188,7 @@ cold session must be able to resume from the files alone. The contract:
 
 | Path | What it is | Cadence |
 |---|---|---|
-| [`.claude/docs/glossary.md`](.claude/docs/glossary.md) | Ubiquitous language — domain + process terms | Whenever a term appears |
+| [`.claude/docs/glossary.md`](.claude/docs/glossary.md) | Ubiquitous language — system, Domain and process terms | Whenever a term appears |
 | [`.claude/docs/design/target-state.md`](.claude/docs/design/target-state.md) | The finished system, in Glossary terms | Rare, by agreement |
 | [`.claude/docs/design/current-state.md`](.claude/docs/design/current-state.md) | What is built, honestly, and where to resume | Every Sub-step |
 | [`.claude/docs/design/product-brief.md`](.claude/docs/design/product-brief.md) | The full system Veritas is a slice of | Rare |
@@ -227,7 +227,7 @@ them separate — do not turn the README into a changelog.
   exact.
 - **Expand every abbreviation on first use in each document**, then use the short
   form freely: "Data Definition Language (DDL)", "Mean Reciprocal Rank (MRR)".
-  This applies to domain and technical shorthand alike. The reader of these
+  This applies to a Domain's shorthand and technical shorthand alike. The reader of these
   documents is reading them to learn what was decided, and an unexpanded
   abbreviation silently assumes they already know. Terms registered in the
   Glossary are exempt only if the Glossary itself expands them.

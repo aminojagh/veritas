@@ -98,10 +98,10 @@ where it measures answer quality after the fact and never gates execution.
   ([EXT-001](../extension-register.md#ext-001--warehouse-native-security-and-concurrency)).
 - **False rejections are absolute.** A legitimate query that trips a conservative
   rule is refused with no appeal path. The honest version of that User Experience
-  (UX) is a user seeing "rejected" for a question that was perfectly fine.
+  (UX) is a User seeing "rejected" for a question that was perfectly fine.
   → **Accepted, with a monitoring obligation.** Rejection-reason frequency is an
   Operational Measure precisely so a rule that over-rejects shows up as a spike
-  rather than as silent user attrition.
+  rather than as silent User attrition.
 - **sqlglot becomes load-bearing safety infrastructure.** Its parser coverage
   *is* the Gate's coverage: a construct it mis-parses is a construct the Gate
   mis-judges. ADR-0002 already depends on sqlglot for dialect retargeting, so a

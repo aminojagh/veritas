@@ -132,8 +132,8 @@ DIALECT = "duckdb"
 #
 # They are the callables rather than their names, so that the names a
 # `Validation Gate outcome` reports are taken off them and there is no second list to
-# drift. Sub-step 5.1 declared them ahead of their first user and 5.2's `resolve` is
-# that user — the only place in the Gate that applies a rewrite, so widening this
+# drift. Sub-step 5.1 declared them ahead of their first caller and 5.2's `resolve` is
+# that caller — the only place in the Gate that applies a rewrite, so widening this
 # tuple is the one edit that changes what every parse-tree rule reads.
 TRUSTED_REWRITES = (qualify, merge_subqueries)
 
@@ -628,7 +628,7 @@ def joins_in(scope: Scope) -> dict[str, Join]:
 
 
 def spelled(join: Join) -> str:
-    """One join as a person reads it in a rejection: `LEFT OUTER JOIN dim_account ON …`."""
+    """One join as a User reads it in a rejection: `LEFT OUTER JOIN dim_account ON …`."""
     table, kind, on = join
     return f"{kind} JOIN {table} ON {on}" if on else f"{kind} JOIN {table} (no condition)"
 
@@ -1026,7 +1026,7 @@ class Route:
     joins: frozenset[Join]
 
     def joins_beyond(self, other: "Route") -> list[str]:
-        """This Route's joins that `other` does not have, spelled for a person to read.
+        """This Route's joins that `other` does not have, spelled for a User to read.
 
         Both directions of the certified-route rule are this one method: called on the
         statement it names the joins nothing certifies, and called on the certified route
@@ -1296,7 +1296,7 @@ def access_predicate(
     there, an axis over more than one column, or a region that is not one of its
     buckets. That is a broken installation and not a bad query, so it is the call
     `certified_form` makes for a corpus that will not yield a metric expression rather
-    than a rejection a user is handed. `ValidationGate.judge` asks for this before it
+    than a rejection a User is handed. `ValidationGate.judge` asks for this before it
     runs a rule, so the refusal arrives when the profile is put to work rather than
     inside whichever rule happened to read it first.
     """
@@ -1529,8 +1529,8 @@ class ValidationGate:
         **The question is whether the column reaches the answer, not whether the name
         appears.** `columns_reaching_the_answer` is where that distinction is made and
         argued; a Gate that refused every query mentioning a restricted name in a
-        comment, or every query counting distinct Clients, is a Gate people route
-        around, and a Gate people route around protects nothing.
+        comment, or every query counting distinct Clients, is a Gate Users route
+        around, and a Gate Users route around protects nothing.
 
         `SELECT *` is the shape this rule cannot do without
         [C4](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c4--the-gate-reads-the-schema-at-run-time)'s

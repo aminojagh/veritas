@@ -3,7 +3,7 @@
 Three claims. The **seam claim**: the only module that names Postgres is
 `veritas/observability/postgres.py`, and an installation with no server says which value
 it is missing rather than raising a driver's exception at whoever asked a question. The
-**row claim**: a Grounded Answer becomes one row carrying its ending, its statement, its
+**row claim**: a Grounded Answer becomes one row carrying the step that ended it, its statement, its
 verdict with the Rejection Reasons a chart groups by, its Lineage entry by entry and its
 model calls call by call — and a cost that is absent rather than zero where the model
 that served it is unpriced. Feedback then lands on that row and on no other, and the
@@ -211,8 +211,8 @@ def test_the_schema_is_applied_on_connect_and_a_second_connect_keeps_the_rows(
 def test_an_answered_question_is_one_row_saying_what_it_was_and_what_it_took(
     log, writing, answered
 ):
-    """The whole of a Grounded Answer that carried a number: the ending a chart groups
-    by, the statement, the verdict, how many rows came back, and what answering it
+    """The whole of a Grounded Answer that carried a number: the step that ended it, which a chart
+    groups by, the statement, the verdict, how many rows came back, and what answering it
     cost."""
     question_id = writing(answered)
     [row] = read(log, "question", question_id)
@@ -286,7 +286,7 @@ def test_a_refused_question_records_the_reasons_a_chart_groups_by(log, writing):
 
 
 def test_a_question_asked_back_records_the_question_and_no_statement(log, writing):
-    """The first way out, and a row: the person was asked which meaning, and nothing
+    """The first way out, and a row: the User was asked which meaning, and nothing
     reached the Gate."""
     question_id = writing(
         GroundedAnswer(
@@ -328,7 +328,7 @@ def test_where_the_rows_go_is_said_without_the_password(log):
 def test_feedback_lands_on_the_row_of_the_answer_it_was_left_on(log, writing, answered):
     """Registered as *"attached to that answer's Question Log row and never to the
     question text alone"* — so the same words asked twice are two rows, and a verdict
-    belongs to the one the person was shown."""
+    belongs to the one the User was shown."""
     question_id = writing(answered)
     the_same_words_again = writing(answered)
     log.leave_feedback(question_id, Feedback(up=True, note="matches the finance pack"))

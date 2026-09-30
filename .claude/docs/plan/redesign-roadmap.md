@@ -21,8 +21,8 @@ until R8.
 - **Test-driven development stays.** Behaviour is claimed only in `tests/`.
 - **Work continues on `main`.** The capstone review is done, and reviewers see the
   commit they were given.
-- **New goal: a domain-agnostic "chat with your data" system.** It is prototyped on
-  one domain: finance, or another with cleaner public data.
+- **New goal: a Domain-agnostic "chat with your data" system.** It is prototyped on
+  one Domain: finance, or another with cleaner public data.
 - **The core design is re-opened, independent of stack.** One idea to test is a
   conceptual model of the data at several levels of abstraction, with defined moves
   between levels. The model sees only those definitions, never records.
@@ -40,7 +40,7 @@ until R8.
   - everything tied to the old Target State, including its debt and extension
     records
 - **What remains:**
-  - the domain language
+  - the Glossary
   - Target State and Current State
   - the Step loop that closes the gap between them
   - open and partly open Ledger and Register entries
@@ -51,10 +51,10 @@ until R8.
 |---|---|---|---|---|
 | R0 | One mode, and the new document model | — | `CLAUDE.md`, `.claude/skills/*` | done |
 | R1 | Purge history and derivable documents | R0 | a `.claude/docs/` tree holding only what R0 keeps | done |
-| R2 | Frame the problem | R0 | draft purpose and scope in `design/target-state-next.md` | open |
+| R2 | Frame the problem | R0 | draft purpose and scope in [`design/target-state-next.md`](../design/target-state-next.md); its terms in the Glossary | done |
 | R3 | Research prior art | R2 | research note, deleted once R4's ADRs cite what they use | open |
 | R4 | Core design | R2, R3 | ADRs, draft components and flow, proposed Glossary terms | open |
-| R5 | Prototype domain | R4 | ADR, domain section of the Glossary | open |
+| R5 | Prototype Domains | R4 | ADR, a Glossary section per Domain | open |
 | R6 | Stack, mapped to the skills goal | R4, R5 | ADRs, the *Built with* column; `target-state-next.md` becomes the Target State, status `agreed` | open |
 | R7 | What survives | R6 | pruned Ledger and Register, Current State rewritten as the gap | open |
 | R8 | Plan Step 010 | R7 | `plan/step-010-*.md`; this file is deleted | open |
@@ -114,7 +114,7 @@ development into `CLAUDE.md`'s permanent sections. The plan and review templates
 product checks. Both would spend effort on code the redesign may delete. R7 scopes
 them to what survives.
 
-**Calls R1 took beyond the list above — each awaiting Amino.**
+**Calls R1 took beyond the list above — all three approved by Amino, 2026-09-28.**
 
 1. **`design/data-availability.md` and `design/validation-feasibility.md` are
    deleted.** Both are dated gate reports, which is history. The six constraints the
@@ -132,7 +132,7 @@ them to what survives.
 These questions come before any research, so the research knows what it is for:
 
 - Who asks the questions, and who connects Veritas to a new database?
-- What does connecting a new domain cost? That cost is what domain-agnostic
+- What does connecting a new Domain cost? That cost is what Domain-agnostic
   measurably means.
 - **What does an answer promise?** The current thesis is to refuse rather than
   guess, and [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md#consequences)
@@ -155,10 +155,18 @@ Concepts only; no products chosen here. These are leads to check, not findings:
 - text-to-SQL methods, such as schema linking, decomposition and self-correction,
   and their benchmarks
 - building the conceptual model automatically from schema and profiling
+- semantic layers that derive joins from keys declared once per entity, rather than
+  from a route written per metric
+- systems that learn from their own refusals: how a miss becomes a definition or a
+  test
+- describing a Domain gradually, as its questions need it, against describing it
+  before the first question
 
 **One problem the "definitions only, never records" idea must answer:** a filter
 needs real values (`'UK'` or `'United Kingdom'`?). The options are a value index or a
-lookup tool that the model calls without seeing rows.
+lookup tool that the model calls without seeing rows. Either is built from the
+connected database, never by Ingestion:
+[What connecting a Domain costs](../design/target-state-next.md#what-connecting-a-domain-costs).
 
 ### R4 — Core design
 
@@ -169,21 +177,46 @@ lookup tool that the model calls without seeing rows.
   true by construction. This fork shapes everything after it.
 - Which parts of the Semantic Layer, Validation Gate and Ambiguous Term handling
   generalise, and which were finance-specific?
-- Who authors the conceptual model for a new domain: a person, an LLM with a person
-  checking, or a machine alone?
+- Who authors the conceptual model for a new Domain: a User, or an LLM with a
+  User checking? *A machine alone* is ruled out by
+  [Who uses it](../design/target-state-next.md#who-uses-it).
+- **Is a Domain described before its first question, or gradually?** Amino's idea,
+  2026-09-29: once the data is loaded, the LLM works with the User to grow the
+  definitions until they answer whatever is asked. It is refusal review run inside the
+  conversation: a refusal names the missing definition, the LLM drafts it, and the
+  User who asked certifies it. Its risk is a definition certified in haste,
+  mid-question, which every later answer then follows. Compare it with describing a
+  Domain up front, and with a mix: the parts the schema gives drafted up front, the
+  rest as questions need them. Whichever wins restates how
+  [the User's effort](../design/target-state-next.md#what-connecting-a-domain-costs)
+  is measured.
+- What is a Domain made of? Which parts of its description come from the schema, and
+  which a User writes:
+  [What describes a Domain](../design/target-state-next.md#what-describes-a-domain).
+- The LLM now sees the schema. What keeps an answer Grounded, and is
+  [ADR-0001](../adr/0001-semantic-layer-as-the-retrieval-corpus.md) rewritten or
+  deleted?
+- How is a refusal decided, by whom, and how much of it is automatic?
+- May a User write a definition over columns their own Access Profile forbids?
+- How does Veritas carry a conversation, and how does Evaluation score one:
+  [Follow-ups](../design/target-state-next.md#follow-ups).
+- How are questions about the schema or the definitions answered, and are they
+  scored: [What an answer promises](../design/target-state-next.md#what-an-answer-promises).
 
-The finance domain serves as the worked example, because it is known ground. The
+The brokerage serves as the worked example, because it is known ground. The
 skills goal is deliberately not an input.
 
-### R5 — Prototype domain
+### R5 — Prototype Domains
 
 - **Criteria:**
   - public, clean and licensed
   - enough levels of abstraction to exercise R4
   - joins
   - real ambiguity
-- **Open question:** proving domain-agnosticism may need two domains, not one.
-  Keeping finance as one of them costs nothing that already exists.
+  - for the second Domain, a database its publisher shaped:
+    [What connecting a Domain costs](../design/target-state-next.md#what-connecting-a-domain-costs)
+- **Two Domains** (Amino, 2026-09-29): the prototype is built on one and proven on a
+  second. Keeping finance as one of them costs nothing that already exists.
 
 ### R6 — Stack, mapped to the skills goal
 

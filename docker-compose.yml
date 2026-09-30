@@ -49,7 +49,7 @@ services:
       # Streamlit answers this endpoint as soon as it is listening, before any page has
       # been loaded — so what the start period covers is the server booting, not the
       # Warehouse, the indexes or the models. Those are built when the first page loads,
-      # under a spinner a person can see.
+      # under a spinner a User can see.
       start_period: 30s
 
   postgres:

@@ -90,7 +90,7 @@ YAML files, one per certified entry, in four kinds:
 | **Metric Definition** | 9 | A named, versioned SQL expression, the table it starts from, the joins it is certified over, its unit and its Reporting Currency. `Gross Revenue`, `Net Revenue`, `Realised P&L`, `Unrealised P&L`, `Trade Count`, `Traded Notional`, `Cash Balance`, `Account Value`, `Position Change`. |
 | **Dimension Definition** | 5 | A certified axis to slice by — the column, its grain, its allowed values, and the routes that reach it from each fact table. |
 | **Join Path** | 13 | One certified hop between two warehouse tables, so the model never invents a join. |
-| **Ambiguous Term** | 5 | A word people say that maps to two or more metrics and therefore has no single answer — `revenue`, `pnl`, `balance`, `volume`, `how much does X have` — each with the spellings people actually use. |
+| **Ambiguous Term** | 5 | A word Users say that maps to two or more metrics and therefore has no single answer — `revenue`, `pnl`, `balance`, `volume`, `how much does X have` — each with the spellings Users actually use. |
 
 A question runs through seven steps, all of them in
 [`veritas/orchestrator/`](veritas/orchestrator/):
@@ -126,7 +126,7 @@ resolves it, so Veritas asks back which of Gross and Net was meant. *"What was o
 net revenue last quarter"* resolves it, and the resolved meaning is **spliced over**
 the ambiguous word before retrieval — a form chosen by measurement, not taste (see
 [Evaluation](#retrieval-hit-rate-and-mean-reciprocal-rank)). The five Ambiguous
-Terms carry the spellings people actually use, so *"revenues"*, *"PnL"* and
+Terms carry the spellings Users actually use, so *"revenues"*, *"PnL"* and
 *"turnover"* are recognised as the terms they are.
 
 **Step 2 is hybrid search with re-ranking**, in [`veritas/retrieval/`](veritas/retrieval/).
@@ -307,9 +307,9 @@ enforcing that is and is not worth. See
 
 Both halves of the flow are measured over a committed **Gold Question Set** —
 twenty-four questions in [`data/gold/`](data/gold/), one file each, carrying the
-question as a person asks it, which of a Grounded Answer's three endings is correct
-for it, and where that ending is a number, the gold SQL and the gold result. It
-covers all nine Certified Metrics, all five Ambiguous Terms, and the phrasings people
+question as a User asks it, which of a Grounded Answer's three Endings is correct
+for it, and where that Ending is a number, the gold SQL and the gold result. It
+covers all nine Certified Metrics, all five Ambiguous Terms, and the phrasings Users
 actually use.
 
 **Ground truth for retrieval is derived, not written down.** A question's *Relevant
@@ -365,7 +365,7 @@ model. Measured **2026-09-05** with the command above:
   excluded      'Account Value as of 10 August 2026' — the Validation Gate refuses the statement the set itself calls correct, so no model can answer it
   judge         gpt-5.4-mini, on every scored question
 
-  prompt  model                 ending  execution accuracy  judge agreement
+  prompt  model                 Ending  execution accuracy  judge agreement
   rules   openai gpt-5.4-mini    22/23         11/11 1.000      23/23 1.000  <- today
   rules   openai gpt-5.4-nano    18/23          8/11 0.727      22/23 0.957
   rules   openai gpt-4o-mini     14/23          2/11 0.182      22/23 0.957
@@ -374,10 +374,11 @@ model. Measured **2026-09-05** with the command above:
   shape   openai gpt-4o-mini     14/23          2/11 0.182      22/23 0.957
 ```
 
-- **ending** — did the question end the way the Gold Question Set says it should:
+- **Ending** — did the question end the way the Gold Question Set says it should:
   answered, refused, or asked back. A statement the Validation Gate refused is counted
-  as a Gate ending rather than as a generation failure, so the two are never confused.
-- **execution accuracy** — of the questions whose correct ending is a number, how many
+  as ended by the Gate rather than as a generation failure, so the two are never
+  confused.
+- **execution accuracy** — of the questions whose correct Ending is a number, how many
   produced the gold result.
 - **judge agreement** — how often an LLM-as-judge agrees with the objective score. It
   is a second lens, never the primary one.
@@ -416,11 +417,11 @@ is the seam and the only module that imports `psycopg`.
 [`grafana/`](grafana/) provisions the datasource and a seven-panel dashboard on
 <http://localhost:3000>, each panel one statement over those rows:
 
-1. **Questions over time by ending** — answered, refused, asked back, or stopped by
+1. **Questions over time by the step that ended them** — answered, refused, asked back, or stopped by
    the Gate.
 2. **Validation Gate rejections by Rejection Reason** — the governance chart.
-3. **Metric-usage frequency** — which Certified Metrics people actually ask for.
-4. **Latency: what a person waited, and how much of it was the model.**
+3. **Metric-usage frequency** — which Certified Metrics Users actually ask for.
+4. **Latency: what a User waited, and how much of it was the model.**
 5. **Cost by model.**
 6. **Feedback: up against down.**
 7. **Endings without a number: refusals and Clarifying Questions.**

@@ -11,11 +11,11 @@ DEBT-027
 and DEBT-030
 were opened about are both varied, over the same questions and the same relevant sets.
 
-**Generation — three more.** The **ending claim**: which of a Grounded Answer's three
-endings came back is read off the answer, and which step of the flow produced it is the
+**Generation — three more.** The **Ending claim**: which of a Grounded Answer's three
+Endings came back is read off the answer, and which step of the flow produced it is the
 `EndedBy` the answer already carries — one taxonomy, the Orchestrator's, rather than a
 copy kept here. The **accuracy claim**: a question is right when it ends the way
-the set says and, where that ending is a number, returns the gold result — and a
+the set says and, where that Ending is a number, returns the gold result — and a
 question whose own gold statement the Validation Gate refuses is nobody's generation
 failure and is left out. The **judge claim**: the judge is shown the statements and
 never the two result sets, so its agreement with Execution Accuracy measures something
@@ -221,7 +221,7 @@ def test_a_sweep_over_no_strategy_and_no_setting_measures_nothing(gold, gate):
     assert measure_retrieval(gold, gate, searchable_forms=[]) == []
 
 
-# -- the ending claim ------------------------------------------------------------
+# -- the Ending claim ------------------------------------------------------------
 
 
 class GoldenModel:
@@ -234,7 +234,7 @@ class GoldenModel:
     a sweep driven by it scores what a model that got everything right would score,
     which is what makes the measures checkable without a key.
 
-    What it resolves a question's terms to follows the ending that question calls
+    What it resolves a question's terms to follows the Ending that question calls
     correct, because that is the only reading under which every one of them is answered
     right. A number: whatever its gold SQL computes. A Clarifying Question: nothing, so
     the flow asks back. A refusal: the first certified meaning of each term, because what
@@ -324,7 +324,7 @@ def test_a_scored_question_carries_the_ending_the_answer_named(
     A sweep and a dashboard grouping by two copies of `EndedBy` would report the same run
     as two different pictures, which is why this component no longer owns one — and
     `PROVIDER` is the only member it adds, for the row that has no Grounded Answer to
-    read an ending off at all.
+    read an Ending off at all.
     """
     one = next(item for item in scorable if item.answerable)
     judged = score(
@@ -438,7 +438,7 @@ def test_the_sweep_scores_every_prompt_against_every_model_over_the_same_questio
         assert row.execution_accuracy == 1.0
         assert row.judge_agreement == 1.0
         assert not row.unreached
-        print(f"\n  {row.prompt_form:6} {row.model:6} ending "
+        print(f"\n  {row.prompt_form:6} {row.model:6} Ending "
               f"{row.right_ending[0]}/{row.questions}  "
               f"accuracy {row.execution_accuracy:.3f}  "
               f"agreement {row.judge_agreement:.3f}")
@@ -537,7 +537,7 @@ def test_the_judge_is_shown_the_statements_and_never_the_two_result_sets(
 
 def test_what_the_judge_is_shown_of_a_question_that_was_not_answered(gold):
     """A refusal and a Clarifying Question are what the system did, so they are what the
-    judge is shown — beside the ending the set calls correct, and no statement, because
+    judge is shown — beside the Ending the set calls correct, and no statement, because
     there is none to show."""
     refused = next(one for one in gold if one.expects is Expectation.REFUSAL)
     said = judgement_text(refused, GroundedAnswer(question="q", ended_by=EndedBy.GENERATION, refusal="no entry does"))

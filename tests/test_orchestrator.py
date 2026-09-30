@@ -8,7 +8,7 @@ a Grounded Answer naming the step that ended it, and an answered one carries its
 Lineage, the verdict it ran under and what it cost — the Lineage naming what the
 statement used rather than what retrieval put in front of the model. The **contract
 claim**: a Grounded Answer cannot be built that says two things at once, that carries a
-number without the statement and the verdict behind it, or that names an ending its own
+number without the statement and the verdict behind it, or that names an `ended_by` its own
 fields contradict.
 
 Every test here drives a scripted model, so the suite needs no key and no network. The
@@ -234,7 +234,7 @@ def test_the_two_prompt_forms_say_the_same_thing_at_two_lengths(orchestrator):
 
 
 def test_the_question_the_generator_is_handed_is_described_to_it(orchestrator, semantic):
-    """The rewrite step splices certified names over the words a person typed, so the
+    """The rewrite step splices certified names over the words a User typed, so the
     generator is never handed the question as it was asked.
 
     Every form carries that, because it describes the input rather than the instruction —
@@ -311,7 +311,7 @@ def test_a_breakdown_cites_the_axis_it_was_sliced_by(orchestrator):
 def test_a_question_the_gate_refuses_cites_the_terms_alone(orchestrator):
     """A refusal produced no answer, so its Lineage claims nothing produced one.
 
-    The resolved Ambiguous Term stays: it is what the person's word was read as, and it
+    The resolved Ambiguous Term stays: it is what the User's word was read as, and it
     is true of the question whether or not a statement ever ran.
     """
     answer = orchestrator({"revenue": "Net Revenue"}, wrote(SHADOW)).answer(
@@ -358,7 +358,7 @@ def test_an_unresolved_ambiguous_term_asks_back_and_generates_nothing(orchestrat
 
 
 def test_a_resolved_ambiguous_term_reaches_lineage(orchestrator):
-    """The word the person typed is part of what produced the answer, so it is recorded.
+    """The word the User typed is part of what produced the answer, so it is recorded.
 
     It grounds nothing, and it is still what turned `revenue` into the metric that was
     computed — which is what makes an answer auditable rather than merely reproducible.
@@ -477,8 +477,8 @@ def test_every_ending_names_the_step_that_produced_it(orchestrator):
         EndedBy.GATE: orchestrator(wrote(SHADOW)).answer(UNAMBIGUOUS),
         EndedBy.ANSWER: orchestrator(wrote(CERTIFIED)).answer(UNAMBIGUOUS),
     }
-    for ending, answer in ended.items():
-        assert answer.ended_by is ending, answer
+    for ended_by, answer in ended.items():
+        assert answer.ended_by is ended_by, answer
 
 
 def test_an_answer_carries_the_calls_it_took_and_the_time_it_took(orchestrator):
@@ -532,8 +532,8 @@ def test_an_ending_that_contradicts_the_answer_is_a_construction_error():
         GroundedAnswer("q", EndedBy.GATE, refusal="nothing defines it")
     with pytest.raises(ValueError, match="'provider'"):
         GroundedAnswer("q", EndedBy.PROVIDER, refusal="the call failed")
-    for ending in (EndedBy.RETRIEVAL, EndedBy.GENERATION):
-        assert GroundedAnswer("q", ending, refusal="no").ended_by is ending
+    for ended_by in (EndedBy.RETRIEVAL, EndedBy.GENERATION):
+        assert GroundedAnswer("q", ended_by, refusal="no").ended_by is ended_by
 
 
 def test_a_question_that_made_no_priced_call_costs_nothing_known():

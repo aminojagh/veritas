@@ -112,7 +112,7 @@ Two capabilities delivered by one migration, which is why they are one entry:
    Profile mapped to a real principal. Enforcement moves out of Veritas and into
    the warehouse.
 2. **Concurrent request handling.** A server-based engine, so the App serves
-   more than one user at a time.
+   more than one User at a time.
 
 **What the slice does instead, and why that is correct here**
 
@@ -135,7 +135,7 @@ currently rejects an access violation *before execution*, with a specific reason
 that feeds the rejection-reason Operational Measure. Warehouse-native enforcement
 fails at execution with a database error instead. Keep a **non-enforcing**
 pre-flight check if that signal matters — but it must be labelled as a
-user-experience affordance, never described as access control.
+UX affordance, never described as access control.
 
 **Readiness**
 
@@ -147,7 +147,7 @@ Any one of:
    claim carries the qualification
    [ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences)
    states, word for word.
-3. More than one concurrent user is required.
+3. More than one concurrent User is required.
 
 ---
 
@@ -183,7 +183,7 @@ A warehouse with real migrations breaks metrics silently. Rename
 `fct_trade.commission` and every Certified Metric built on it is broken — but the
 Semantic Layer still looks healthy, retrieval still returns the entry, the
 Validation Gate still passes the query (the expression *does* trace to a
-Certified Metric), and the failure surfaces as a database error after a user has
+Certified Metric), and the failure surfaces as a database error after a User has
 asked their question. It also undercuts the word *certified*: a Certified Metric
 that cannot execute was never certified, only registered.
 
@@ -258,7 +258,7 @@ Refusal turned into a signal rather than a dead end:
 1. **Record every ungroundable question** — the question, the entries retrieval
    did return, and why grounding failed (no Certified Metric, an unresolved
    Ambiguous Term, no Join Path).
-2. **Cluster them**, so "eleven people asked for client acquisition cost" is
+2. **Cluster them**, so "eleven Users asked for client acquisition cost" is
    visible as one gap rather than eleven refusals.
 3. **Surface the clusters as a metric-authoring backlog**, ranked by frequency.
 
@@ -282,7 +282,7 @@ knowledge graph. It deliberately needs no graph at all. The coherence half is
 
 **Readiness**
 
-Real question traffic exists — meaning users other than the author, asking
+Real question traffic exists — meaning Users other than the author, asking
 questions nobody designed for. Before that, the log would record the Gold
 Question Set being replayed, which teaches nothing.
 
@@ -577,7 +577,7 @@ Any one of:
 - **Size:** M
 - **Motivated by:** the [Glossary](glossary.md#a-the-system)'s `Join Path` — *"a
   certified route between two warehouse tables, so the model never invents a
-  join"* — and the fact that most published Join Paths have exactly one user
+  join"* — and the fact that most published Join Paths serve exactly one metric
 
 **What the full system needs**
 
@@ -593,7 +593,7 @@ routes are genuinely shared:
   neighbours by construction rather than per file. Today two routes are named for the
   currency axis and a third for the date axis, each locally correct and the set mixed —
   which is what a rule would prevent;
-- **reuse as a checkable property.** A route with no second user is not wrong, but at
+- **reuse as a checkable property.** A route no second metric uses is not wrong, but at
   scale it is the signal that a metric author wrote a private join and gave it a public
   name, which is the copy-paste the entry type exists to prevent;
 - **composition beyond a flat list.** `join_paths` is an ordered list a route walks
@@ -608,7 +608,7 @@ and reaches back only to tables already joined. `check_semantic_layer.py` prints
 metric's full route on every run, so how much reuse there actually is can be counted from
 its output rather than asserted here. The honest reading of that count is that **this Warehouse has few
 tables and few ways between them** — ten tables in
-[Glossary Section B](glossary.md#b-the-warehouse) — so most routes having one user is a
+[Glossary Section B](glossary.md#b-the-warehouse) — so most routes serving one metric is a
 fact about the Warehouse, not a flaw in the entry type.
 
 **Why this is an extension and not debt**
@@ -617,7 +617,7 @@ Nothing here is wrong, cheaply. Each Join Path file is a correct, reviewed join
 condition, and a metric naming a route it alone uses still gets the thing the seam is
 for: the join is written where a reviewer reads it, once, beside the expression it
 serves, instead of inside a query nobody sees. The trigger test settles it — *"most
-routes have more than one user"* cannot fire inside this project's life, because the
+routes serve more than one metric"* cannot fire inside this project's life, because the
 number of tables is fixed by the Warehouse and the number of metrics is fixed at nine by
 Glossary Section B. Acting now would be tuning a design against a corpus too small to
 show whether the tuning helps — premature optimizing.
@@ -725,7 +725,7 @@ Any one of:
 
 **What the full system needs**
 
-Veritas talks to two providers: OpenAI, and Groq as an optional second. A system serving people who are not this project's
+Veritas talks to two providers: OpenAI, and Groq as an optional second. A system serving Users who are not this project's
 graders reaches more of them — Anthropic and Google are the two named most often,
 and a deployment inside a bank reaches whichever one its procurement approved and
 no other. Some of those are one more row in `PROVIDERS`; Anthropic's own
@@ -802,7 +802,7 @@ narrowed.
 
 The trigger test settles it: traffic big enough for a period to matter cannot arrive
 inside this project's life. Rows enter the Question Log one question at a time, from a
-person typing into the App, and the Evaluation sweep — the one thing here that asks
+User typing into the App, and the Evaluation sweep — the one thing here that asks
 hundreds of questions — deliberately writes none of them.
 A Ledger entry would carry *"when Veritas serves real traffic"*, which is a wish.
 
@@ -880,7 +880,7 @@ Any one of:
 1. Veritas runs anywhere a second person can reach it — the direct case, and the one that
    makes anonymous viewing a decision rather than a convenience.
 2. The Question Log holds anything that is not synthetic. It holds real questions today
-   in the sense that a person typed them, but nothing in it is about a real client;
+   in the sense that a User typed them, but nothing in it is about a real client;
    [ADR-0002](adr/0002-duckdb-as-the-warehouse-behind-an-adapter.md#consequences) says
    what the access story is and is not.
 3. A second dashboard or a second reader arrives, at which point one role per reader is

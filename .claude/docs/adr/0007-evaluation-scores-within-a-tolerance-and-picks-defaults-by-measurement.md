@@ -1,6 +1,6 @@
 # ADR-0007 — Evaluation scores within a tolerance, and picks defaults by measurement
 
-- **Status:** proposed
+- **Status:** accepted
 
 ## Context
 

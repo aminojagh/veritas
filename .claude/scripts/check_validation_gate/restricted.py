@@ -21,7 +21,7 @@ argument.
 **Six shapes carry a Restricted Column into the answer and four do not**, and the four
 that do not matter as much as the six that do. A Gate that refuses every query mentioning
 a restricted name in a comment, or every query that counts distinct Clients, is a Gate
-people route around — and a Gate people route around protects nothing. Three of those
+Users route around — and a Gate Users route around protects nothing. Three of those
 four are this module's positive controls: statements this rule ran on and passed on. The
 fourth, `projected inside, aggregated away`, this rule allows and an earlier one
 refuses — counting Clients is not a Certified Metric — and two rules disagreeing about
@@ -581,7 +581,7 @@ def check_this_rules_verdicts(
         if not probe.reaches and probe.name in refused:
             problems.append(
                 f"no Restricted Column reaches {probe.name!r}'s answer and this rule "
-                f"refused it — the false positive that makes a Gate people route "
+                f"refused it — the false positive that makes a Gate Users route "
                 f"around. {probe.why}"
             )
 

@@ -1,5 +1,5 @@
 # The one Section D row that is a phrase rather than a word. It resolves to the
-# same pair as "balance" and is registered separately because a user who says it
+# same pair as "balance" and is registered separately because a User who says it
 # has not said "balance" — and Retrieval matches what was said.
 name: how much does X have
 version: 1

@@ -8,10 +8,10 @@ is **derived** here, through the Validation Gate's own readers, so no Relevant S
 second opinion about what a statement computes.
 
 **A Gold Question that Veritas should not answer carries no SQL.** `expects` says which
-of a Grounded Answer's three endings is correct — a number, a refusal, or a
+of a Grounded Answer's three Endings is correct — a number, a refusal, or a
 [`Clarifying Question`](../../.claude/docs/glossary.md#a-the-system) — and the loader
-refuses a file that carries a statement for an ending that has none, or none for the
-ending that needs one.
+refuses a file that carries a statement for an Ending that has none, or none for the
+Ending that needs one.
 
 **What "touches" means, one reading per entry type:**
 
@@ -79,7 +79,7 @@ GOLD_SCALE = 6
 
 
 class Expectation(StrEnum):
-    """Which ending a Gold Question says is correct.
+    """Which Ending a Gold Question says is correct.
 
     The three a `GroundedAnswer` has, and a `StrEnum` so the member survives into an
     Evaluation table as the word a person reads.
@@ -129,9 +129,9 @@ class GoldQuestionError(ValueError):
 class GoldQuestion:
     """One question the Gold Question Set holds, as it is written down.
 
-    `question` is the question as a person asks it and is what Retrieval and the
+    `question` is the question as a User asks it and is what Retrieval and the
     Orchestrator are given; `sql` is the statement that answers it correctly and `result`
-    is what that statement returns. `expects` says which ending is correct, and
+    is what that statement returns. `expects` says which Ending is correct, and
     `phrasing_class` is set only where the question spells an Ambiguous Term some way
     other than the registered one.
 
@@ -336,7 +336,7 @@ def relevant_entries(
     Metric Definitions first, then the axes, then the Join Paths those two declare. A
     Gold Question with no gold SQL touches nothing and returns an empty list: there is
     no statement to read, which is the honest answer for a question whose correct
-    ending is a refusal or a Clarifying Question.
+    Ending is a refusal or a Clarifying Question.
     """
     if not gold.sql:
         return []

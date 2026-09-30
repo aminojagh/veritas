@@ -349,7 +349,7 @@ def check_the_slice_is_worth_having(gate: ValidationGate, report: Report) -> Non
     if difference < MIN_GAP:
         problems.append(
             f"Net Revenue is the same number scoped and unscoped ({difference:.6f}% "
-            f"apart), so the Access Profile's predicate costs a user a query and buys "
+            f"apart), so the Access Profile's predicate costs a User a query and buys "
             f"them nothing on this data"
         )
 

@@ -126,7 +126,7 @@ class Orchestrator:
         Orchestrator serves many identities. There is no default identity beyond the one
         Access Profile this slice declares.
 
-        The clock is here rather than in each branch because what a person waited is one
+        The clock is here rather than in each branch because what a User waited is one
         measurement whichever way the question ended, and a Grounded Answer that has to
         be timed by its caller is one every caller times differently.
         """
@@ -137,7 +137,7 @@ class Orchestrator:
     def _answered(
         self, question: str, access_profile: AccessProfile
     ) -> GroundedAnswer:
-        """The flow itself: the six endings, and the model calls each one has made by
+        """The flow itself: the six ways a question ends, and the model calls each one has made by
         the time it is reached."""
         resolved = rewrite(question, self.model, self.gate.semantic)
         calls: tuple[ModelCall, ...] = resolved.calls
@@ -233,7 +233,7 @@ class Orchestrator:
 
         A question that reached no allowing verdict is the terms alone: nothing ran, so
         nothing produced an answer. The resolved terms lead, because they are what turned
-        the word the person typed into the metric that was computed, and they ground
+        the word the User typed into the metric that was computed, and they ground
         nothing themselves. Then what was computed, how it was sliced, and how its rows
         were reached — the order a reader checks an answer in.
         """

@@ -15,7 +15,7 @@ test: **does the trigger fire inside this project's life?**
 moved to the Register is deleted, with every link to it; git keeps it. Numbers are
 never reused.
 
-**Next free number:** DEBT-045
+**Next free number:** DEBT-046
 
 ---
 
@@ -32,6 +32,7 @@ never reused.
 | [DEBT-024](#debt-024--docstrings-argue-why-they-were-built-as-they-are) | Docstrings argue why they were built as they are | L | Fired — repaid per surviving component |
 | [DEBT-025](#debt-025--the-nine-certified-metrics-are-implemented-twice) | The nine Certified Metrics are implemented twice | M | A change to a Certified Metric's `expression`, or DEBT-023's port |
 | [DEBT-035](#debt-035--a-composed-certified-metric-has-no-statement-the-gate-allows) | A composed Certified Metric has no statement the Gate allows | L | Fired — stated, not paid |
+| [DEBT-045](#debt-045--the-code-calls-an-ending-an-expectation) | The code calls an Ending an Expectation | S | The first change to `veritas/evaluation/` |
 
 ---
 
@@ -93,7 +94,7 @@ Enforce the mechanical subset with hooks in `.claude/settings.json`:
 - A `Stop` hook running `uv run pytest tests/test_framework.py tests/test_links.py
   tests/test_language.py`.
 
-Judgement-dependent rules — is this a shortcut? is this word a domain noun? — cannot
+Judgement-dependent rules — is this a shortcut? is this word a Glossary term? — cannot
 be hooked and will always rest on discipline.
 
 **Why we deferred**
@@ -208,7 +209,7 @@ but *"Account Value at the end of Q2"* cannot be expressed.
 **Trigger**
 
 The first "as of" date chosen by anything other than the Snapshot calendar: a Gold
-Question naming a date, the App accepting a date from a user, or a Dimension
+Question naming a date, the App accepting a date from a User, or a Dimension
 Definition whose period boundary is a calendar date.
 
 ---
@@ -472,3 +473,38 @@ day this is paid without a line edited.
 
 **Fired** when Execution Accuracy was first measured, and ruled stated rather than
 paid. Repaid when `Account Value` must be answerable.
+
+---
+
+### DEBT-045 — The code calls an Ending an Expectation
+
+- **Size:** S
+- **Location:** `veritas/evaluation/gold.py` (`Expectation`, `GoldQuestion.expects`),
+  `veritas/evaluation/generation.py` (`ended_as`), the `expects:` key of every file in
+  `data/gold/`, and the tests that read them
+
+**What we did**
+
+Registered **Ending** in the Glossary and left the code's older name for the same
+concept: the `Expectation` enumeration of the three Endings, and the `expects` field
+that holds a Gold Question's correct Ending.
+
+**What we should have done**
+
+Renamed `Expectation` to `Ending` and `expects` to `correct_ending`, in the code, the
+Gold Question files and the tests, in the change that registered the term.
+
+**Why we deferred**
+
+Registering the term was a documents-only change, and the redesign may reshape or
+delete `veritas/evaluation/`, which would make the rename wasted work.
+
+**Cost while unpaid**
+
+Two names for one concept: a reader of `gold.py` meets `Expectation` where the
+Glossary says Ending.
+
+**Trigger**
+
+The first change to `veritas/evaluation/`. If the redesign deletes the module, this
+entry goes with it.

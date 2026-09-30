@@ -105,6 +105,6 @@ ADR, or Target State instead.
 | Sub-steps that only make sense together | Amino cannot review or revert them independently |
 | Silently widening scope mid-Step | The plan stops describing the work; write it into the plan or a later Step |
 | Planning around debt instead of firing its Trigger | The Ledger becomes decorative |
-| Introducing new nouns in the plan | Every domain term must clear the Glossary first — use `registering-language` |
+| Introducing new nouns in the plan | Every new term must clear the Glossary first — use `registering-language` |
 | Arguing the Step's case at length | The Step is approved or it is not; the argument is not re-read. State the route |
 | A behavioural Sub-step with no test named | The plan names the `tests/` file that proves it before it is built |

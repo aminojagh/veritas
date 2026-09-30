@@ -297,7 +297,7 @@ def yahoo_instrument_types() -> Iterator[dict[str, object]]:
     """The source-vocabulary-to-Glossary map for instrument_type.
 
     Landed for the same reason as the minor units: the four values on the right
-    are registered domain vocabulary that `dim_instrument`'s CHECK enforces, so
+    are registered Glossary vocabulary that `dim_instrument`'s CHECK enforces, so
     the translation into them belongs somewhere a reader can see it rather than
     buried in a CASE.
     """

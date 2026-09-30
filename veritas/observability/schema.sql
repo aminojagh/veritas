@@ -1,8 +1,8 @@
--- The Question Log: one question a person asked, per row, with what answering it
+-- The Question Log: one question a User asked, per row, with what answering it
 -- produced and what it took. Applied on every connect, which is why every statement
 -- here is idempotent.
 --
--- Four tables, because a question has one ending, one cost and one standing Feedback
+-- Four tables, because a question has one `ended_by`, one cost and one standing Feedback
 -- but any number of Lineage entries and any number of model calls. A chart that groups
 -- by a Rejection Reason reads the array on the question row; the Gate has never returned
 -- more than one, and the column is the tuple the verdict carries rather than a
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS question (
     question            TEXT             NOT NULL,
     rewritten           TEXT             NOT NULL,
     -- An `EndedBy` member: which step of the flow ended this question. A taxonomy, so
-    -- that "questions over time by ending" and "refusals by reason" are one GROUP BY.
+    -- that "questions over time by the step that ended them" and "refusals by reason" are one GROUP BY.
     ended_by            TEXT             NOT NULL,
     -- The Access Profile the question was judged under.
     role                TEXT             NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS question (
     allowed             BOOLEAN,
     explanation         TEXT,
     reasons             TEXT[]           NOT NULL DEFAULT '{}',
-    -- What the person read when there was no number.
+    -- What the User read when there was no number.
     refusal             TEXT,
     clarifying_question TEXT,
     -- Operational Measures. `cost` is NULL for a model the price table does not price,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS model_call (
     PRIMARY KEY (question_id, position)
 );
 
--- What a person said about the Grounded Answer they were shown: up or down, and
+-- What a User said about the Grounded Answer they were shown: up or down, and
 -- optionally a sentence. Keyed by the question, so Feedback is attached to the answer
 -- someone actually read and a second verdict on it replaces the first rather than
 -- adding a bar to the chart beside it.

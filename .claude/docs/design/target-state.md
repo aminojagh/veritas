@@ -78,7 +78,7 @@ Two consequences follow, and they are the whole design:
 > Observability produce **measures** of Veritas itself: Evaluation Measures (hit
 > rate, MRR, Execution Accuracy) and Operational Measures (cost, latency,
 > feedback). The two words are never used interchangeably. See the
-> [System measures](../glossary.md#e-system-measures) section of the Glossary.
+> [System Language](../glossary.md#system-language) section of the Glossary.
 
 ### Flow
 

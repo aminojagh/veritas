@@ -2,7 +2,7 @@
 
 Four claims. The **statement claim**: every gold SQL is one the Validation Gate allows
 and executes to the gold result written beside it. The **coverage claim**: every
-Certified Metric, every Ambiguous Term and every ending a question can have is in the
+Certified Metric, every Ambiguous Term and every Ending a question can have is in the
 set, and every gold statement keys on its own metric's date column. The **derivation
 claim**: a Relevant Set is read off the statement rather than written beside it, and the
 Join Paths it names are exactly the joins the statement carries. The **separation
@@ -58,7 +58,7 @@ from veritas.validation import (
 # breaks this test and the exemption goes with it.
 REFUSED_TODAY = {"Account Value as of 10 August 2026": (RejectionReason.SHADOW_METRIC,)}
 
-# The statement Veritas ran when a person asked it for `Account Value`, read out of the
+# The statement Veritas ran when a User asked it for `Account Value`, read out of the
 # Question Log rather than retyped. It is the metric's own `expression` over the metric's
 # own `join_paths` — one operand of a composed definition — and it executes to a fraction
 # of the metric. The Gate refused it from Sub-step 9.5 on, which is
@@ -225,7 +225,7 @@ def test_every_gold_statement_keys_on_its_own_metrics_date_column(gold, gate):
 
 
 def test_every_ambiguous_term_is_asked_about_by_a_gold_question(gold, semantic):
-    """Each Section D row is said by a question whose correct ending is a Clarifying
+    """Each Section D row is said by a question whose correct Ending is a Clarifying
     Question."""
     said = {
         term.name
@@ -256,7 +256,7 @@ def test_debt_029s_four_phrasing_classes_are_in_the_set_and_detected(gold, seman
     """DEBT-029,
     paid and scored over the Gold Question Set rather than over four strings.
 
-    Every question whose correct ending is a Clarifying Question says a term Veritas
+    Every question whose correct Ending is a Clarifying Question says a term Veritas
     finds — the four spelled some other way included, which is what `phrasing_class`
     is carried on the question to say.
     """
@@ -279,7 +279,7 @@ def test_no_gold_question_that_names_its_meaning_is_asked_back_about(gold, seman
     """The other direction of DEBT-029's repayment, and the one a wider alias breaks.
 
     A spelling registered too loosely turns a question Veritas should answer into one
-    it stops to ask about. So every Gold Question whose correct ending is *not* a
+    it stops to ask about. So every Gold Question whose correct Ending is *not* a
     Clarifying Question is checked for the terms it says, and each of them must have
     one of its own meanings named in the question — which is what the rewrite step
     resolves it by, and is why the question is answerable at all.
@@ -471,7 +471,7 @@ def test_a_field_the_format_does_not_name_fails_to_load(tmp_path):
 
 
 def test_an_ending_outside_the_three_fails_to_load(tmp_path):
-    """A fourth ending would be a measure grouped by a word nothing else knows."""
+    """A fourth Ending would be a measure grouped by a word nothing else knows."""
     path = tmp_path / "bad.yaml"
     path.write_text("name: x\nquestion: how many trades\nexpects: maybe\n")
     with pytest.raises(GoldQuestionError, match="expects"):
@@ -479,7 +479,7 @@ def test_an_ending_outside_the_three_fails_to_load(tmp_path):
 
 
 def test_the_set_reads_back_as_the_questions_it_holds(gold):
-    """What a reader of the review sees: the whole set, with the ending each expects."""
+    """What a reader of the review sees: the whole set, with the Ending each expects."""
     assert len(gold) == len({question.name for question in gold})
     for question in gold:
         assert isinstance(question, GoldQuestion)

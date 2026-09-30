@@ -9,7 +9,7 @@ scored by here: an opinion is worth reporting only against the objective measure
 either tracks or does not.
 
 **The whole flow answers each question, not `generate` alone.** A Gold Question whose
-correct ending is a refusal or a Clarifying Question has no result set to compare, and
+correct Ending is a refusal or a Clarifying Question has no result set to compare, and
 what it claims is that Veritas ends that way — which is the Orchestrator's outcome
 rather than the generator's. So the unit scored is a `GroundedAnswer`, and the `EndedBy`
 it carries says which step produced it, because a question that scores zero because the
@@ -70,7 +70,7 @@ correct statement has, is not.\
 
 
 def ended_as(answer: GroundedAnswer) -> Expectation:
-    """Which of a Grounded Answer's three endings this one is.
+    """Which of a Grounded Answer's three Endings this one is.
 
     The same three `Expectation` names a Gold Question is written with, so what the set
     claims and what came back are compared as one vocabulary rather than two.
@@ -85,7 +85,7 @@ def ended_as(answer: GroundedAnswer) -> Expectation:
 def correctly_answered(gold: GoldQuestion, answer: GroundedAnswer) -> bool:
     """Whether Veritas answered this Gold Question the way the set says it should.
 
-    The ending first, then — where that ending is a number — the result set, under the
+    The Ending first, then — where that Ending is a number — the result set, under the
     tolerance the Gold Question Set's own constraints were built against. A question
     that should have been refused and was answered is wrong however good the number is,
     which is the whole reason a refusal is a Gold Question at all.

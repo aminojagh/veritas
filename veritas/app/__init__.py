@@ -1,4 +1,4 @@
-"""The App — the page a person asks a question on, and reads a Grounded Answer from.
+"""The App — the page a User asks a question on, and reads a Grounded Answer from.
 
 Laid out like the other components: this file re-exports, `render.py` turns a Grounded
 Answer into the strings a reader sees, and `page.py` is the Streamlit script that places

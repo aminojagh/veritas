@@ -47,8 +47,8 @@ SEMANTIC_DIR = REPO_ROOT / "semantic"
 # makes the files *more* portable rather than less.
 #
 # Quoting the key in the file would fix that one key and nothing else. The values
-# are where this gets expensive: a Dimension Definition's allowed values are domain
-# text, and YAML 1.1 reads `no`, `on`, `y` and `n` as booleans in any casing —
+# are where this gets expensive: a Dimension Definition's allowed values are Domain
+# words, and YAML 1.1 reads `no`, `on`, `y` and `n` as booleans in any casing —
 # Norway's country code, Ontario's province code, and both halves of every yes/no
 # flag ever written. Silently turning one of those into False is a certified axis
 # that lies, and `.claude/scripts/check_semantic_layer.py` compares those values
@@ -102,7 +102,7 @@ class MetricDefinition(SemanticEntry):
     """A named, versioned, certified computation over the Warehouse.
 
     The fields past `SemanticEntry`'s three are the Glossary's own definition —
-    *"its SQL expression, grain, filters, units, and the aliases people use for
+    *"its SQL expression, grain, filters, units, and the aliases Users use for
     it"* — plus the two
     [C2](../../.claude/docs/adr/0003-validation-gate-is-deterministic-code.md#c2--a-metric-definition-carries-its-join-path-and-its-date-predicate)
     requires, because *"a certified expression pins down the arithmetic and not the
@@ -172,10 +172,10 @@ class JoinPath(SemanticEntry):
 
 @dataclass(frozen=True)
 class AmbiguousTerm(SemanticEntry):
-    """A word users genuinely say that resolves to more than one Certified Metric.
+    """A word Users genuinely say that resolves to more than one Certified Metric.
 
     [Glossary Section D](../../.claude/docs/glossary.md#d-ambiguous-terms) is the
-    registry of these — *"words users genuinely say that are **not** metrics"*,
+    registry of these — *"words Users genuinely say that are **not** metrics"*,
     which Veritas *"must resolve ... before generating SQL — never guess silently"*.
     This entry type is that sentence made retrievable, and it is the one
     [ADR-0001](../../.claude/docs/adr/0001-semantic-layer-as-the-retrieval-corpus.md)
@@ -327,7 +327,7 @@ class SemanticLayer:
     by name, and an Ambiguous Term names the Certified Metrics it disambiguates
     between the same way. One `name` may be claimed once across the **whole** tree
     rather than once per kind, which is what makes an Ambiguous Term named after a
-    Certified Metric fail to load — Section D's words are *"words users genuinely
+    Certified Metric fail to load — Section D's words are *"words Users genuinely
     say that are **not** metrics"*, and the corpus enforces that by construction
     instead of by a check.
     """
@@ -361,7 +361,7 @@ def entry_files(root: Path = SEMANTIC_DIR) -> list[Path]:
 def read_entry(path: Path) -> SemanticEntry:
     """Read one file as the Semantic Entry its directory says it is.
 
-    Every failure is raised with the file named, because the caller is a person
+    Every failure is raised with the file named, because the caller is a User
     editing YAML and the useful message says which key in which file.
     """
     directory = path.parent.name
@@ -382,7 +382,7 @@ def read_entry(path: Path) -> SemanticEntry:
     expected = {entry_field.name for entry_field in fields(entry_type)}
     # A field carrying a default is one the format lets a file leave out, and
     # `reporting_currency` is the only one. Everything else missing is an error
-    # named after the key, which is what a person editing YAML needs to read.
+    # named after the key, which is what a User editing YAML needs to read.
     optional = {
         entry_field.name
         for entry_field in fields(entry_type)
@@ -526,7 +526,7 @@ def _strings(path: Path, key: str, value: object) -> tuple[str, ...]:
     """One list-valued field, as a tuple so a loaded entry stays frozen.
 
     Three of the five hold names — `join_paths`, `derives_from`, `disambiguates` —
-    and two hold text a person wrote, `aliases` and `filters`. Whether the names
+    and two hold text a User wrote, `aliases` and `filters`. Whether the names
     resolve to entries that exist is a claim about the corpus rather than about this
     file, and is checked where the other cross-entry claims are.
     """

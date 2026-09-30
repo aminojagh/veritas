@@ -728,7 +728,7 @@ def build_trades(
     # trade_id, assigned once every Trade exists, in the order a reader would
     # expect to read them: by date, then by Account. Assigning as they were
     # generated would number an Account's whole life before the next Account's
-    # first Trade, which is an ordering nothing in the domain has.
+    # first Trade, which is an ordering nothing in the Domain has.
     trades.sort(key=lambda trade: (trade["trade_date"], trade["account_id"],
                                    trade["instrument_id"], trade["trade_side"]))
     for trade_id, trade in enumerate(trades, start=1):

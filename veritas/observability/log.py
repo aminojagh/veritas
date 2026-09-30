@@ -1,7 +1,7 @@
 """The Question Log seam — what Observability records, before it is a table.
 
 [`Question Log`](../../.claude/docs/glossary.md#a-the-system) is registered as *"the
-record Observability keeps: one row per question a person asked through the App, carrying
+record Observability keeps: one row per question a User asked through the App, carrying
 its Grounded Answer, Validation Gate outcome, Lineage, Operational Measures and
 Feedback"*, and this is the interface that record is written through.
 
@@ -11,7 +11,7 @@ one implementation that reaches a server.
 
 **Recording is not answering, and a failure to record must not become one.** Every way
 the log can fail arrives as `QuestionLogError`, so the App can put a warning beside an
-answer a person already has rather than replacing it with one.
+answer a User already has rather than replacing it with one.
 """
 
 from dataclasses import dataclass
@@ -26,13 +26,13 @@ class QuestionLogError(RuntimeError):
 
     Covers the server being absent, the credentials being unset or wrong, and a write
     that failed. They are one thing to a caller: this question is not recorded, and the
-    person who asked it is owed their answer anyway.
+    User who asked it is owed their answer anyway.
     """
 
 
 @dataclass(frozen=True, slots=True)
 class Feedback:
-    """What a person said about a Grounded Answer they were shown.
+    """What a User said about a Grounded Answer they were shown.
 
     [`Feedback`](../../.claude/docs/glossary.md#a-the-system) is *"a verdict, up or
     down, and optionally a sentence"*: `up` is that verdict, and `note` is the sentence
@@ -50,7 +50,7 @@ class QuestionLog(Protocol):
     """What Observability needs from a store, and the whole of it.
 
     `record` returns the identifier of the row it wrote, because Feedback is left
-    against an answer and not against a question string: a person who asks the same
+    against an answer and not against a question string: a User who asks the same
     words twice gets two rows, and a verdict belongs to the one they were shown.
 
     `leave_feedback` takes that identifier back. An answer carries at most one standing

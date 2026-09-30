@@ -537,7 +537,7 @@ def check_the_numbers_differ(warehouse: WarehouseAdapter, report: Report) -> Non
                 f"the two ways of computing {metric} differ by {difference:.6f}%, which "
                 f"is under {MIN_GAP}% — the Gate is refusing a statement this run can "
                 f"no longer show returns a different answer, and a rejection that costs "
-                f"a user a query and buys them nothing is worse than no rule"
+                f"a User a query and buys them nothing is worse than no rule"
             )
 
 

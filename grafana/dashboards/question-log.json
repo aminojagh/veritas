@@ -1,7 +1,7 @@
 {
   "uid": "question-log",
   "title": "Veritas — the Question Log",
-  "description": "Every question a person asked through the App, as Observability recorded it. Records; never judges — nothing here is scored against a gold result. No panel reads the dashboard's time range, so every chart is the whole log and the time picker is hidden rather than shown doing nothing.",
+  "description": "Every question a User asked through the App, as Observability recorded it. Records; never judges — nothing here is scored against a gold result. No panel reads the dashboard's time range, so every chart is the whole log and the time picker is hidden rather than shown doing nothing.",
   "tags": ["veritas", "observability"],
   "editable": false,
   "schemaVersion": 41,
@@ -12,7 +12,7 @@
     {
       "id": 1,
       "type": "timeseries",
-      "title": "Questions over time by ending",
+      "title": "Questions over time by the step that ended them",
       "description": "One bar per minute per EndedBy member. A question the provider never answered is not here at all — DEBT-041.",
       "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
       "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
@@ -125,7 +125,7 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Latency: what a person waited, and how much of it was the model",
+      "title": "Latency: what a User waited, and how much of it was the model",
       "description": "Two series in one unit, so they share one axis. The upper is the whole question — retrieval, the Gate and the engine included, and the first question in a server process also pays the embedding model's warm-up. Only the lower is model time.",
       "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
       "gridPos": {"h": 9, "w": 12, "x": 0, "y": 17},
@@ -210,7 +210,7 @@
       "id": 6,
       "type": "bargauge",
       "title": "Feedback: up against down",
-      "description": "What people said about the answers they were shown. One standing verdict per answer — a second verdict on the same answer replaces the first rather than adding a bar here.",
+      "description": "What Users said about the answers they were shown. One standing verdict per answer — a second verdict on the same answer replaces the first rather than adding a bar here.",
       "datasource": {"type": "grafana-postgresql-datasource", "uid": "question-log"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
       "targets": [
@@ -257,7 +257,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT ended_by AS \"ending\",\n       count(*) AS \"questions\"\nFROM question\nWHERE ended_by <> 'answer'\nGROUP BY 1\nORDER BY 2 DESC"
+          "rawSql": "SELECT ended_by AS \"ended by\",\n       count(*) AS \"questions\"\nFROM question\nWHERE ended_by <> 'answer'\nGROUP BY 1\nORDER BY 2 DESC"
         }
       ],
       "fieldConfig": {
@@ -271,7 +271,7 @@
       },
       "options": {
         "orientation": "horizontal",
-        "xField": "ending",
+        "xField": "ended by",
         "showValue": "auto",
         "legend": {"showLegend": false},
         "tooltip": {"mode": "single", "sort": "none"}

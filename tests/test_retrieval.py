@@ -5,7 +5,7 @@ Two claims. The corpus claim of
 Semantic Entries and no Warehouse schema — checked rather than asserted in prose,
 with the schema identifiers read from the built Warehouse so the check sees the
 same names the engine holds. And the search claim: every strategy finds the entry
-a person would name, and what comes back carries the entries those hits reference.
+a User would name, and what comes back carries the entries those hits reference.
 """
 
 import re
@@ -28,7 +28,7 @@ from veritas.semantic import (
     entry_files,
 )
 
-# Warehouse columns spelled as a single word that is also the domain's own word for
+# Warehouse columns spelled as a single word that is also the Domain's own word for
 # the thing. `Commission`, `Fee` and `Rebate` are registered Glossary terms; `amount`
 # and `quantity` are ordinary English a description cannot avoid — "less Rebate and
 # pass-through Fee", "by exactly that amount". A check that banned these would ban
@@ -92,13 +92,13 @@ def test_corpus_carries_no_table_or_column_text(semantic, warehouse):
 
 
 def test_corpus_shares_only_domain_words_with_the_schema(semantic, warehouse):
-    """The single-word overlap with the schema is the domain's vocabulary, and no more."""
+    """The single-word overlap with the schema is the Domain's vocabulary, and no more."""
     # The columns the check above cannot ban: no underscore, so the name is also an
     # ordinary word. Two consequences. Matching is on a word boundary, not a substring,
     # so "coffee" is not a `fee`. And the finding is judged against
     # `DOMAIN_WORDS_ALSO_COLUMNS` rather than banned outright, which makes this a
     # tripwire on the *schema* growing: the day a one-word column arrives that is not
-    # already the domain's own word, the first entry to write it fails here.
+    # already the Domain's own word, the first entry to write it fails here.
     one_word = {
         column
         for held in warehouse.columns_by_table().values()
@@ -142,9 +142,9 @@ def test_corpus_searches_no_sql_field():
 
 
 
-# The fixed question set: a question as a person would type it, and the one entry
+# The fixed question set: a question as a User would type it, and the one entry
 # they would name as the answer's source. Written against the corpus rather than
-# sampled from users, so it proves the search reaches an entry through words the
+# sampled from Users, so it proves the search reaches an entry through words the
 # entry does not itself contain — never how well Veritas answers. That is the Gold
 # Question Set's job, and this set is not it.
 QUESTIONS = [
@@ -165,7 +165,7 @@ QUESTIONS = [
     ("how much volume did we do", "volume"),
 ]
 
-# A question about nothing in the domain. Its point is the difference between the
+# A question about nothing in the Domain. Its point is the difference between the
 # two searches: a term search that shares no word with any entry returns nothing,
 # and a vector search always returns its nearest neighbours however far away they
 # are. Everything downstream of Retrieval has to survive both.

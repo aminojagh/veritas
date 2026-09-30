@@ -46,7 +46,7 @@ from veritas.orchestrator import (
 # call that names no model is a Question Log row that cannot say what it cost.
 STUB_CALL = ModelCall("stub", "stub-model")
 
-# One question per registered Ambiguous Term, as a person would type it. Each says
+# One question per registered Ambiguous Term, as a User would type it. Each says
 # exactly one term and does not say which meaning, which is the case Section D
 # registers the term for.
 ASKED = {
@@ -69,7 +69,7 @@ UNAMBIGUOUS = "how many trades did we settle in March"
 
 # One question per class of phrasing that is not the term's own name: morphology,
 # orthography, another word for the same ambiguity, and a rewording of the one
-# Section D row that is a phrase. Each says an Ambiguous Term the way a person does
+# Section D row that is a phrase. Each says an Ambiguous Term the way a User does
 # rather than the way the corpus files it, and each is now registered as a spelling
 # of it — DEBT-029, paid.
 SAID_ANOTHER_WAY = {
@@ -83,7 +83,7 @@ SAID_ANOTHER_WAY = {
 # split on its pipes: an empty cell 0 before the leading pipe, then the four
 # columns. The separator is the Glossary's own, the same character its *Could mean*
 # cells list meanings with.
-SECTION_D = re.compile(r"^### D\. Ambiguous Terms\n(.*?)^### ", re.S | re.M)
+SECTION_D = re.compile(r"^### D\. Ambiguous Terms\n(.*?)^##", re.S | re.M)
 SEPARATOR = "·"
 USER_SAYS_COLUMN = 1
 ALSO_SAID_COLUMN = 4
@@ -150,7 +150,7 @@ def test_a_question_that_says_a_term_says_that_term_alone(name, semantic):
 
 
 def test_a_term_is_found_whatever_case_the_question_uses(semantic):
-    """A person typing `Revenue` said the same word as one typing `revenue`."""
+    """A User typing `Revenue` said the same word as one typing `revenue`."""
     found = ambiguous_terms_in("What Was Our Revenue Last Quarter", semantic)
     assert [term.name for term in found] == ["revenue"]
 
@@ -173,7 +173,7 @@ def test_a_phrasing_that_is_not_the_registered_name_is_detected(name, semantic):
     """DEBT-029,
     paid: the question is asked back about rather than answered silently.
 
-    The four classes the entry named, each said as a person says it and each
+    The four classes the entry named, each said as a User says it and each
     reaching the term the corpus files under another word.
     """
     question = SAID_ANOTHER_WAY[name]
@@ -253,9 +253,9 @@ def test_the_instruction_names_the_spelling_the_question_used(semantic):
 
 
 def test_the_clarifying_question_quotes_the_words_the_question_used(semantic):
-    """A person who typed "turnover" is asked about "turnover", not about `volume`.
+    """A User who typed "turnover" is asked about "turnover", not about `volume`.
 
-    The entry's name is what the corpus files it under and is not a word the person
+    The entry's name is what the corpus files it under and is not a word the User
     has seen; the meanings are the entry's, because that is what the two spellings
     share.
     """
@@ -346,7 +346,7 @@ def test_every_rewrite_form_carries_every_resolved_meaning(form, semantic):
 
 
 def test_the_appended_form_leaves_the_question_it_was_given_intact(semantic):
-    """The person's words, then the meanings — which is what makes it auditable."""
+    """The User's words, then the meanings — which is what makes it auditable."""
     written = rewritten_with(
         "what was our gross revenue last quarter",
         {"revenue": ("Gross Revenue",)},
@@ -390,7 +390,7 @@ def test_the_spliced_form_keeps_the_subject_the_spelling_captured(question, sema
 
 
 def test_the_spliced_form_writes_every_meaning_a_term_resolved_to(semantic):
-    """A term resolved to both of its meanings writes both, joined as a person joins
+    """A term resolved to both of its meanings writes both, joined as a User joins
     them, and over the words the question used — *"PnL"*, a registered spelling of `P&L`,
     rather than the name the corpus files it under."""
     assert rewritten_with(
@@ -479,7 +479,7 @@ def test_two_terms_claiming_the_same_words_are_written_over_once(semantic):
     inside that subject — so both resolved, the shorter would splice into text the
     longer had already replaced.
 
-    The longer match wins, because it spans more of the words the person used. The word
+    The longer match wins, because it spans more of the words the User used. The word
     it swallowed survives in the output as part of the subject, which is right: the
     subject is the question's own words and not the term's.
     """

@@ -292,7 +292,7 @@ def glossary_tables() -> set[str]:
     one that fails, because nothing ever tells you.
     """
     text = GLOSSARY.read_text()
-    section = re.search(r"^### B\. The warehouse\n(.*?)^### ", text, re.S | re.M)
+    section = re.search(r"^### B\. The warehouse\n(.*?)^##", text, re.S | re.M)
     if not section:
         problems.append("glossary.md: could not find the `### B. The warehouse` section")
         return set()
@@ -2018,7 +2018,7 @@ def check_distinctions(warehouse: WarehouseAdapter) -> None:
     # holding cost, against pricing it at the last thing that happened to it.
     #
     # Read as rows and folded in Python rather than asked for as one aggregate,
-    # because "the last fill" is ambiguous in SQL and not in the domain: two Trades
+    # because "the last fill" is ambiguous in SQL and not in the Domain: two Trades
     # can share a Trade Date, and a `max(trade_date)` subquery returns both, leaving
     # which one survives to whichever row the engine happened to emit last. Ordering
     # by `trade_date` and then `trade_id` breaks that tie the way fct_trade already
@@ -2687,7 +2687,7 @@ def check_seam() -> None:
 
         The name half appends a problem, the type half a review comment, and a
         statement the round trip refuses outright appends a problem — see the
-        docstring above for why those three endings differ.
+        docstring above for why those three cases differ.
         """
         for name, duckdb_owns_it in unportable_functions(sql):
             whose = (

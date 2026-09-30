@@ -1,6 +1,6 @@
 ---
 name: registering-language
-description: Use before naming any table, column, function, class, or variable that carries domain meaning; when a needed domain noun is absent from the Glossary; or when two words in the project appear to mean the same thing
+description: Use before naming any table, column, function, class, or variable that carries meaning about Veritas or a Domain; when a needed Glossary term is absent from the Glossary; or when two words in the project appear to mean the same thing
 ---
 
 # Registering Language
@@ -16,7 +16,7 @@ without agreement is a word two people understand differently.
 
 ## The check
 
-Before writing a domain noun into a document, a plan, or an identifier:
+Before writing a Glossary term into a document, a plan, or an identifier:
 
 ```
 In the Glossary, status `agreed`?  → use it, spelled exactly as registered
@@ -24,10 +24,12 @@ In the Glossary, status `proposed`? → do not put it in code yet; it is unsettl
 Not in the Glossary?                → STOP. Raise a Term Proposal
 ```
 
-"Domain noun" means any word carrying meaning about the problem. Framework and
-plumbing words (`client`, `parser`, `retry`) do not need registering. If unsure:
-would getting this word wrong produce a *correct program computing the wrong
-thing*? If yes, register it.
+A **Glossary term** is any word carrying meaning about the problem: one of
+Veritas's own words, which the Glossary's *System Language* holds, or one of a
+Domain's, which that Domain's section holds. Framework and plumbing words
+(`client`, `parser`, `retry`) do not need registering. If unsure: would getting
+this word wrong produce a *correct program computing the wrong thing*? If yes,
+register it.
 
 ## Raising a Term Proposal
 
@@ -66,7 +68,7 @@ in the same Sub-step. The Glossary holds only words in use; git keeps the rest.
 ## Distinctions we must not blur
 
 Some pairs are dangerous precisely because they are near-synonyms in ordinary
-speech but different quantities in the domain. These go in their own Glossary
+speech but different quantities in a Domain. These go in their own Glossary
 section, defined *against each other* rather than separately.
 
 State what each one is **not**. A definition that does not exclude its neighbour

@@ -9,7 +9,7 @@ A corpus cannot be proved by running it, only by running what it claims. Ninetee
 checks do that. Five are the ones
 Sub-step 4.1
 names; the sixth is Non-Negotiable #1 applied to the one place this corpus can coin
-a domain noun by accident. Checks 7 to 11 arrived with
+a Glossary term by accident. Checks 7 to 11 arrived with
 Sub-step 4.2,
 which is where the corpus stopped being one entry: two are that Sub-step's own
 bullets, two are what the shape
@@ -112,7 +112,7 @@ a Dimension Definition is a leaf, so nothing above it would notice if one were w
  14. No Certified Metric's alias is a registered Ambiguous Term, and no alias is
      claimed by two metrics. Sub-step 4.2 took the first as a decision and the 4.2
      review recorded that nothing enforced it; the second is the same failure
-     happening outside Section D, where nothing can ask the user about it.
+     happening outside Section D, where nothing can ask the User about it.
 
  15. Every column a Dimension Definition names exists in the live schema. An axis
      over a column nobody has cannot be applied to any metric, and without this the
@@ -310,7 +310,7 @@ PARSE_PROBES = (
 
 # The cell positions in Glossary Section D's table, once a leading pipe has made
 # cells[0] the empty string. Section D's own three columns in Section D's own
-# order: what a user says, what it could mean, what Veritas does about it. The
+# order: what a User says, what it could mean, what Veritas does about it. The
 # third is not read — `resolution` is prose in both places and comparing two pieces
 # of prose would fail on a comma.
 USER_SAYS_COLUMN = 1
@@ -385,7 +385,7 @@ def certified_metric_terms() -> set[str]:
     Definition that returns a number.
     """
     text = GLOSSARY.read_text()
-    section = re.search(r"^### B\. The warehouse\n(.*?)^### ", text, re.S | re.M)
+    section = re.search(r"^### B\. The warehouse\n(.*?)^##", text, re.S | re.M)
     if not section:
         problems.append(
             "glossary.md: could not find the `### B. The warehouse` section, so "
@@ -403,9 +403,9 @@ def certified_metric_terms() -> set[str]:
 
 
 def ambiguous_terms_in_glossary() -> dict[str, str]:
-    """Glossary Section D, as {what a user says: what the Glossary says it could mean}.
+    """Glossary Section D, as {what a User says: what the Glossary says it could mean}.
 
-    Section D is the registry of *"words users genuinely say that are **not**
+    Section D is the registry of *"words Users genuinely say that are **not**
     metrics"*, and `semantic/ambiguous/` is those rows made retrievable. Read out of
     the Glossary for the reason `certified_metric_terms` above reads Section B: a
     list of five terms typed into this script would prove that this script and the
@@ -417,7 +417,7 @@ def ambiguous_terms_in_glossary() -> dict[str, str]:
     so they come off here; the entry's `name` is the word itself.
     """
     text = GLOSSARY.read_text()
-    section = re.search(r"^### D\. Ambiguous Terms\n(.*?)^### ", text, re.S | re.M)
+    section = re.search(r"^### D\. Ambiguous Terms\n(.*?)^##", text, re.S | re.M)
     if not section:
         problems.append(
             "glossary.md: could not find the `### D. Ambiguous Terms` section, so "
@@ -448,7 +448,7 @@ def section_a_row(term: str) -> list[str] | None:
     two, because two scans of one table is how they stop scanning the same table.
     """
     text = GLOSSARY.read_text()
-    section = re.search(r"^### A\. The system\n(.*?)^### ", text, re.S | re.M)
+    section = re.search(r"^### A\. The system\n(.*?)^##", text, re.S | re.M)
     if not section:
         problems.append(
             "glossary.md: could not find the `### A. The system` section, so nothing "
@@ -473,7 +473,7 @@ def registered_home(term: str) -> str:
     Section A registers the directory, the loader's `ENTRY_KINDS` reads it, and
     checks 13 and 18 put the two in one sentence. Without this the directory names
     `ambiguous` and `dimensions` would be pinned by nothing but the fact that files
-    happen to sit there — and a domain noun pinned by nothing is what
+    happen to sit there — and a Glossary term pinned by nothing is what
     Non-Negotiable #1 is about.
     """
     cells = section_a_row(term)
@@ -965,9 +965,9 @@ def disambiguation_problem(
     Three ways the claim can be false, and the first is the one the rule is named
     after:
 
-      * a meaning no file publishes. Then Veritas asks the user to choose between
+      * a meaning no file publishes. Then Veritas asks the User to choose between
         two things and can compute only one of them, which is a worse failure than
-        not asking — it has spent the user's turn to arrive nowhere. This is the
+        not asking — it has spent the User's turn to arrive nowhere. This is the
         check that would have failed had
         R1
         gone the other way, since `Cash Balance` was a Warehouse column before it was
@@ -994,7 +994,7 @@ def disambiguation_problem(
     if unpublished:
         return (
             f"Ambiguous Term {term.name!r} disambiguates to {unpublished}, which no "
-            f"file under {METRIC_HOME} publishes — so Veritas would ask the user to "
+            f"file under {METRIC_HOME} publishes — so Veritas would ask the User to "
             f"choose a meaning it cannot then compute"
         )
     return None
@@ -1137,8 +1137,8 @@ def check_alias_collisions(layer: SemanticLayer) -> None:
 
       * **an alias that is a registered Ambiguous Term** resolves silently what
         Section D says must be asked about. A metric claiming "balance" would let
-        Retrieval answer with cash when the user meant the whole holding, and the
-        user would never learn a choice was made;
+        Retrieval answer with cash when the User meant the whole holding, and the
+        User would never learn a choice was made;
       * **an alias two metrics both claim** is an ambiguity nobody registered —
         Section D's own failure happening outside Section D, where nothing can ask
         about it.
@@ -1148,7 +1148,7 @@ def check_alias_collisions(layer: SemanticLayer) -> None:
     as an alias at all: the resolution is to drop the word from both metrics and let
     the Ambiguous Term carry it.
 
-    Compared case-folded. `aliases` are lower-case phrases a person types and the
+    Compared case-folded. `aliases` are lower-case phrases a User types and the
     Section D words are written as spoken, so `P&L` and `p&l` are the same word
     reaching Retrieval, and a rule that missed one of them would be a rule about
     capitalisation.

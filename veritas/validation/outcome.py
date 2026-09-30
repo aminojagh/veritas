@@ -186,7 +186,7 @@ class RejectionReason(StrEnum):
     **One member for the rule, and the columns go in the explanation.** A chart grouping
     by reason answers *"how often does the generator try to project an identity"*, which
     is one bar however many columns one statement names; *which* column it was is what a
-    person reading the rejection needs, so the rule names every column it found rather
+    User reading the rejection needs, so the rule names every column it found rather
     than the first.
 
     Separate from `SHADOW_METRIC` because the two are unrelated failures that can arrive
@@ -318,7 +318,7 @@ class ValidationGateOutcome:
     them can edit is a verdict none of them can be held to.
 
     `reasons` is empty exactly when `allowed` is true. `explanation` is the sentence a
-    person reads; `reasons` is what a chart groups by. Both, because the
+    User reads; `reasons` is what a chart groups by. Both, because the
     [Target State's flow](../../.claude/docs/design/target-state.md#flow) says
     *"fail → explain the violation"* and ADR-0003 says the taxonomy has to be stable,
     and neither one does the other's job.
